@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AceDrive.Core/AceDrive.Core.csproj" />
+    <Project Path="src/AceDrive.Overlay/AceDrive.Overlay.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AceDrive.Core.Tests/AceDrive.Core.Tests.csproj" />
+  </Folder>
+</Solution>

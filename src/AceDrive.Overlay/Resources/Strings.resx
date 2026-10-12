@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="AppTitle" xml:space="preserve"><value>AceDrive test shell</value></data>
+  <data name="HintLocked" xml:space="preserve"><value>Locked: clicks pass to game. Ctrl+Shift+C to unlock, drag header to move, grip at corner to resize.</value></data>
+  <data name="HintUnlocked" xml:space="preserve"><value>Unlocked: drag header to move, corner grip to resize, buttons clickable. Ctrl+Shift+C to lock.</value></data>
+  <data name="TelemetryHeader" xml:space="preserve"><value>TELEMETRY</value></data>
+  <data name="WaitingForEvo" xml:space="preserve"><value>waiting for EVO…</value></data>
+  <data name="EvoNoShm" xml:space="preserve"><value>EVO running, no SHM yet…</value></data>
+  <data name="TaxiHeader" xml:space="preserve"><value>TAXI (fake job)</value></data>
+  <data name="NoJob" xml:space="preserve"><value>No job. Press New job, then drive.</value></data>
+  <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press Pickup.</value></data>
+  <data name="JobEnRoute" xml:space="preserve"><value>En route: {0} → {1} · {2:0.0} km</value></data>
+  <data name="JobComplete" xml:space="preserve"><value>Complete: {0} → {1} · tip €{2:0.00}</value></data>
+  <data name="NewJob" xml:space="preserve"><value>New job</value></data>
+  <data name="Pickup" xml:space="preserve"><value>Pickup</value></data>
+  <data name="Dropoff" xml:space="preserve"><value>Dropoff</value></data>
+  <data name="ShiftSummary" xml:space="preserve"><value>Shift: {0} jobs · €{1:0.00}</value></data>
+  <data name="Locked" xml:space="preserve"><value>Locked</value></data>
+  <data name="Unlock" xml:space="preserve"><value>Unlock</value></data>
+  <data name="FatalCrashTitle" xml:space="preserve"><value>AceDrive crashed</value></data>
+  <data name="FatalCrashMessage" xml:space="preserve"><value>Something went wrong. Details were written to the log in {0}.</value></data>
+</root>

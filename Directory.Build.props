@@ -1,0 +1,11 @@
+<Project>
+  <!-- Shared build hygiene for every project in this repo.
+       Recommended rule set (not All: API-design rules like CA1515/CA1303
+       misfire on app code and log strings, which are intentionally not
+       localized — user-facing copy lives in Strings.*.resx instead). -->
+  <PropertyGroup>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+</Project>

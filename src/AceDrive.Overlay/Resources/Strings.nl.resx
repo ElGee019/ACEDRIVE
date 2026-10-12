@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="AppTitle" xml:space="preserve"><value>AceDrive testschil</value></data>
+  <data name="HintLocked" xml:space="preserve"><value>Vergrendeld: kliks gaan naar het spel. Ctrl+Shift+C om te ontgrendelen, sleep de kop om te verplaatsen, hoekgreep om te vergroten/verkleinen.</value></data>
+  <data name="HintUnlocked" xml:space="preserve"><value>Ontgrendeld: sleep de kop om te verplaatsen, hoekgreep om te vergroten/verkleinen, knoppen klikbaar. Ctrl+Shift+C om te vergrendelen.</value></data>
+  <data name="TelemetryHeader" xml:space="preserve"><value>TELEMETRIE</value></data>
+  <data name="WaitingForEvo" xml:space="preserve"><value>wachten op EVO…</value></data>
+  <data name="EvoNoShm" xml:space="preserve"><value>EVO actief, nog geen SHM…</value></data>
+  <data name="TaxiHeader" xml:space="preserve"><value>TAXI (nepklus)</value></data>
+  <data name="NoJob" xml:space="preserve"><value>Geen klus. Druk op Nieuwe klus en rijd.</value></data>
+  <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op Ophalen.</value></data>
+  <data name="JobEnRoute" xml:space="preserve"><value>Onderweg: {0} → {1} · {2:0.0} km</value></data>
+  <data name="JobComplete" xml:space="preserve"><value>Klaar: {0} → {1} · fooi €{2:0.00}</value></data>
+  <data name="NewJob" xml:space="preserve"><value>Nieuwe klus</value></data>
+  <data name="Pickup" xml:space="preserve"><value>Ophalen</value></data>
+  <data name="Dropoff" xml:space="preserve"><value>Afzetten</value></data>
+  <data name="ShiftSummary" xml:space="preserve"><value>Dienst: {0} klussen · €{1:0.00}</value></data>
+  <data name="Locked" xml:space="preserve"><value>Vergrendeld</value></data>
+  <data name="Unlock" xml:space="preserve"><value>Ontgrendel</value></data>
+  <data name="FatalCrashTitle" xml:space="preserve"><value>AceDrive is gecrasht</value></data>
+  <data name="FatalCrashMessage" xml:space="preserve"><value>Er is iets misgegaan. Details staan in het logboek in {0}.</value></data>
+</root>
