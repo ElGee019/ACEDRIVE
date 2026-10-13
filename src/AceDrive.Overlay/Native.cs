@@ -12,6 +12,8 @@ internal static class Native
     public const uint MOD_SHIFT = 0x0004;
     public const uint VK_C = 0x43;
     public const int WM_HOTKEY = 0x0312;
+    public const int WM_ENTERSIZEMOVE = 0x0231;
+    public const int WM_EXITSIZEMOVE = 0x0232;
 
     [DllImport("user32.dll")]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);

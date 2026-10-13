@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Threading;
 using AceDrive.Core;
@@ -25,6 +26,9 @@ public partial class App : Application, IDisposable
         _log = new FileLogger();
         _log.LogInfo("AceDrive starting...");
         var fares = new JsonFareStore(_log).Load();
+        var todos = new JsonTodoStore(_log).Load();
+        var content = new JsonOnboardingContent(_log).Load();
+        var deliveryCatalog = new JsonDeliveryCatalog(_log).Load();
 
         var vm = new MainViewModel(
             new ShmReader(_log),
@@ -32,10 +36,46 @@ public partial class App : Application, IDisposable
             new TaxiShift(),
             new JsonSettingsStore(),
             _log,
-            fares);
+            fares,
+            new JsonOnboardingStore(),
+            content,
+            CreateVoice(_log),
+            new CarLogWatcher(_log),
+            todos,
+            deliveryCatalog);
 
-        MainWindow = new MainWindow(vm);
-        MainWindow.Show();
+        MainWindow = new MainWindow(vm, _log);
+        // The VM owns visibility: with a mic we start hidden until the wake
+        // word. Showing first and hiding on Loaded left a visible flash.
+        if (vm.IsShown)
+        {
+            MainWindow.Show();
+        }
+    }
+
+    // Mic model lookup: %AppData% first (drop the Vosk model folder here),
+    // then EVO_VOSK_MODEL, then Data next to the exe. No model = visible
+    // window, voice off; the app must never fail to start over voice.
+    private static IVoiceListener CreateVoice(FileLogger log)
+    {
+        string[] candidates =
+        [
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "AceDrive", "vosk-model"),
+            Environment.GetEnvironmentVariable("EVO_VOSK_MODEL") ?? "",
+            Path.Combine(AppContext.BaseDirectory, "Data", "vosk-model"),
+        ];
+        foreach (string dir in candidates)
+        {
+            if (dir.Length > 0 && Directory.Exists(dir))
+            {
+                return new VoskListener(dir, log);
+            }
+        }
+
+        log.LogWarning("no vosk-model found; voice off, window stays visible");
+        return new NullVoiceListener();
     }
 
     // Last resort: log the crash for diagnostics, tell the user where the

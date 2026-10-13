@@ -5,43 +5,12 @@ using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
-internal sealed class FakeClock : IClock
-{
-    public DateTime Now { get; set; } = new(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc);
-    public DateTime UtcNow => Now;
-    public void Advance(TimeSpan dt) => Now += dt;
-}
-
-internal sealed class FakeTelemetry : ITelemetrySource
-{
-    public bool GameRunning { get; set; } = true;
-    public bool PhysicsPresent { get; set; } = true;
-    public TelemetrySample Next { get; set; } =
-        new(1, 0.5f, 0f, 4, 5000, 0f, 90f);
-    public void Dispose() { }
-    public TelemetrySample? TryRead() => PhysicsPresent ? Next : null;
-}
-
-internal sealed class FakeStore : ISettingsStore
-{
-    public WindowBounds? Saved { get; private set; }
-    public WindowBounds? Load() => null;
-    public void Save(WindowBounds bounds) => Saved = bounds;
-}
-
-internal sealed class TestLog : ILog
-{
-    public readonly List<string> Warnings = new();
-    public void LogInfo(string message) { }
-    public void LogWarning(string message) => Warnings.Add(message);
-    public void LogError(string message) { }
-}
-
 /// <summary>ViewModel flows run headless against fakes (LSP in action).</summary>
 public sealed class MainViewModelTests
 {
+    internal static readonly OnboardingContent EmptyContent = new([], new Dictionary<string, string[]>(), [], []);
     private static (MainViewModel Vm, FakeClock Clock, FakeTelemetry Tel, FakeStore Store)
-        Create(float speedKmh = 90f)
+        Create(float speedKmh = 90f, OnboardingState? progress = null, DeliveryCatalog? catalog = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -49,8 +18,15 @@ public sealed class MainViewModelTests
         var tel = new FakeTelemetry();
         tel.Next = tel.Next with { SpeedKmh = speedKmh };
         var store = new FakeStore();
+        var onboarding = new FakeOnboardingStore();
+        if (progress is not null)
+        {
+            onboarding.Save(progress);
+        }
         var vm = new MainViewModel(tel, clock, new TaxiShift(), store,
-            new NullLogger(), FareTable.Default);
+            new NullLogger(), FareTable.Default,
+            onboarding, EmptyContent, new FakeVoiceListener(available: false),
+            new FakeCarBrandSource(), TodoTable.Default, catalog ?? DeliveryCatalog.Default);
         return (vm, clock, tel, store);
     }
 
@@ -108,6 +84,35 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void NewJob_StartsShift_ShowsCountdownAndContinueLabel()
+    {
+        var (vm, _, _, _) = Create(speedKmh: 0f);
+        vm.FinishDialogue();
+        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
+
+        vm.NewJobCommand.Execute(null);
+        Assert.Equal("CONTINUE TAXI SHIFT", control.TaxiLabel);
+        Assert.Contains("left", vm.ShiftText, StringComparison.Ordinal);
+        Assert.True(control.VoiceActions.ContainsKey("CONTINUE TAXI SHIFT"));
+    }
+
+    [Fact]
+    public void ShiftTimeout_EndsShift_FlipsLabelBack()
+    {
+        var (vm, clock, _, _) = Create(speedKmh: 0f);
+        vm.FinishDialogue();
+        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        vm.NewJobCommand.Execute(null);
+        Assert.Equal("CONTINUE TAXI SHIFT", control.TaxiLabel);
+
+        clock.Advance(TimeSpan.FromMinutes(30).Add(TimeSpan.FromSeconds(1)));
+        vm.Poll();
+        Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
+        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Pickup_OnlyFromProposed()
     {
         var (vm, _, _, _) = Create();
@@ -117,13 +122,57 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void ToggleLock_FlipsHint()
+    public void ToggleShow_FlipsVisibility()
     {
         var (vm, _, _, _) = Create();
-        Assert.True(vm.IsLocked);
-        string before = vm.HintText;
-        vm.ToggleLockCommand.Execute(null);
-        Assert.False(vm.IsLocked);
-        Assert.NotEqual(before, vm.HintText);
+        Assert.True(vm.IsShown);
+        vm.ToggleShowCommand.Execute(null);
+        Assert.False(vm.IsShown);
+    }
+
+    [Fact]
+    public void FinishDialogue_ShowsControlPage()
+    {
+        var (vm, _, _, _) = Create();
+        vm.FinishDialogue();
+        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("Monday 12:00 | Week 1", control.DateHeader);
+        Assert.False(vm.IsOnboarding);
+    }
+
+    [Fact]
+    public void CompletedOnboarding_BootsToControlPage()
+    {
+        var (vm, _, _, _) = Create(progress: OnboardingState.Fresh with { BirthdayDone = true });
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void DeliveryButton_OpensCareerPage_BackReturns()
+    {
+        var catalog = new DeliveryCatalog(
+            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, 140, 1)],
+            0.7, 100);
+        var (vm, _, _, _) = Create(catalog: catalog);
+        vm.FinishDialogue();
+        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.True(control.DeliveryCommand.CanExecute(null));
+
+        control.DeliveryCommand.Execute(null);
+        var delivery = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsOnboarding); // job page, not onboarding
+        Assert.Equal("OPEN NEW CAREER", delivery.MainButtonLabel);
+
+        delivery.ToggleOrderCommand.Execute(delivery.Rows[0]);
+        Assert.Equal("DELIVER", delivery.MainButtonLabel);
+
+        // Back with a pending cart = CANCEL ORDER: refunds, then exits.
+        delivery.BackCommand.Execute(null);
+        Assert.Same(control, vm.CurrentScreen);
+
+        // The page and its now-empty cart survive navigation.
+        control.DeliveryCommand.Execute(null);
+        Assert.Same(delivery, vm.CurrentScreen);
+        Assert.Equal("OPEN NEW CAREER", delivery.MainButtonLabel);
     }
 }

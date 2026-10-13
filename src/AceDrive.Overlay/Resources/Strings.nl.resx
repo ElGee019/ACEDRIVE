@@ -10,17 +10,75 @@
   <data name="TelemetryHeader" xml:space="preserve"><value>TELEMETRIE</value></data>
   <data name="WaitingForEvo" xml:space="preserve"><value>wachten op EVO…</value></data>
   <data name="EvoNoShm" xml:space="preserve"><value>EVO actief, nog geen SHM…</value></data>
+  <data name="SpeedKmh" xml:space="preserve"><value>{0:0} km/u</value></data>
+  <data name="GearUnknown" xml:space="preserve"><value>N</value></data>
+  <data name="EvoLive" xml:space="preserve"><value>EVO live · pakket {0}</value></data>
+  <data name="EvoDetail" xml:space="preserve"><value>tpm {0} · gas {1:0%} · rem {2:0%}</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (nepklus)</value></data>
   <data name="NoJob" xml:space="preserve"><value>Geen klus. Druk op Nieuwe klus en rijd.</value></data>
-  <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op Ophalen.</value></data>
+  <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op OPHALEN.</value></data>
   <data name="JobEnRoute" xml:space="preserve"><value>Onderweg: {0} → {1} · {2:0.0} km</value></data>
   <data name="JobComplete" xml:space="preserve"><value>Klaar: {0} → {1} · fooi €{2:0.00}</value></data>
-  <data name="NewJob" xml:space="preserve"><value>Nieuwe klus</value></data>
-  <data name="Pickup" xml:space="preserve"><value>Ophalen</value></data>
-  <data name="Dropoff" xml:space="preserve"><value>Afzetten</value></data>
+  <data name="NewJob" xml:space="preserve"><value>NIEUWE KLUS</value></data>
+  <data name="Pickup" xml:space="preserve"><value>OPHALEN</value></data>
+  <data name="Dropoff" xml:space="preserve"><value>AFZETTEN</value></data>
   <data name="ShiftSummary" xml:space="preserve"><value>Dienst: {0} klussen · €{1:0.00}</value></data>
-  <data name="Locked" xml:space="preserve"><value>Vergrendeld</value></data>
-  <data name="Unlock" xml:space="preserve"><value>Ontgrendel</value></data>
+  <data name="ShiftSummaryActive" xml:space="preserve"><value>Dienst: {0} klussen · €{1:0.00} · nog {2}</value></data>
+  <data name="FareTotal" xml:space="preserve"><value>€{0:0.00}</value></data>
+  <data name="Locked" xml:space="preserve"><value>VERGRENDELD</value></data>
+  <data name="Unlock" xml:space="preserve"><value>ONTGRENDEL</value></data>
   <data name="FatalCrashTitle" xml:space="preserve"><value>AceDrive is gecrasht</value></data>
   <data name="FatalCrashMessage" xml:space="preserve"><value>Er is iets misgegaan. Details staan in het logboek in {0}.</value></data>
+  <data name="BrandTitle" xml:space="preserve"><value>WAT IS JE FAVORIETE MERK</value></data>
+  <data name="GrandmaCarTitle" xml:space="preserve"><value>IN WELKE AUTO RIJDT OMA</value></data>
+  <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
+  <data name="DialogueContinue" xml:space="preserve"><value>DOORGAAN</value></data>
+  <data name="SpeakerGrandma" xml:space="preserve"><value>Oma</value></data>
+  <data name="SpeakerYou" xml:space="preserve"><value>Jij</value></data>
+  <data name="VoiceInfoTitle" xml:space="preserve"><value>SPRAAKBEDIENING</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {BRAND}" om de app te activeren vanuit de auto waarin je rijdt.
+Bijvoorbeeld "HEY ALPINE".</value></data>
+  <data name="VoiceInfoButtons" xml:space="preserve"><value>Spreek de tekst van een knop uit om op die knop te drukken.
+Bijvoorbeeld "{0}".</value></data>
+  <data name="ControlTaxi" xml:space="preserve"><value>START TAXIDIENST</value></data>
+  <data name="ControlTaxiContinue" xml:space="preserve"><value>DOORGAAN MET TAXIDIENST</value></data>
+  <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
+  <data name="ControlCalendar" xml:space="preserve"><value>KALENDER</value></data>
+  <data name="ControlTodo" xml:space="preserve"><value>OMA'S TAKENLIJSTJE</value></data>
+  <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
+  <data name="DaySun" xml:space="preserve"><value>Zondag</value></data>
+  <data name="DayMon" xml:space="preserve"><value>Maandag</value></data>
+  <data name="DayTue" xml:space="preserve"><value>Dinsdag</value></data>
+  <data name="DayWed" xml:space="preserve"><value>Woensdag</value></data>
+  <data name="DayThu" xml:space="preserve"><value>Donderdag</value></data>
+  <data name="DayFri" xml:space="preserve"><value>Vrijdag</value></data>
+  <data name="DaySat" xml:space="preserve"><value>Zaterdag</value></data>
+  <data name="EventCentoMiglia" xml:space="preserve"><value>Cento Miglia</value></data>
+  <data name="EventValuation" xml:space="preserve"><value>Taxatie</value></data>
+  <data name="EventRoadTest" xml:space="preserve"><value>Wegtest</value></data>
+  <data name="EventWilly" xml:space="preserve"><value>Waar is Willy</value></data>
+  <data name="EventPancakes" xml:space="preserve"><value>Oma's pannenkoeken</value></data>
+  <data name="NoEvent" xml:space="preserve"><value>Geen evenement</value></data>
+  <data name="TodoMaxGrocery" xml:space="preserve"><value>Klik op Max' kruidenier, rijd erheen en ga de winkel binnen.</value></data>
+  <data name="TodoVisitBank" xml:space="preserve"><value>Ga naar de bank om een deel van je spaargeld op te nemen.</value></data>
+  <data name="TodoTaxiJobs" xml:space="preserve"><value>Voltooi {0} taxiritten. (nu {1})</value></data>
+  <data name="TodoEarnCr" xml:space="preserve"><value>Verdien in totaal {0} CR. (nu {1})</value></data>
+  <data name="DeliveryTitle" xml:space="preserve"><value>BEZORGKLUS</value></data>
+  <data name="DeliveryCredP" xml:space="preserve"><value>Vertrouwenspunten: {0}</value></data>
+  <data name="DeliveryGrowthUp" xml:space="preserve"><value>Stadsgroei: ▲ +{0} / uur</value></data>
+  <data name="DeliveryGrowthDown" xml:space="preserve"><value>Stadsgroei: ▼ {0} / uur</value></data>
+  <data name="DeliveryGrowthFlat" xml:space="preserve"><value>Stadsgroei: ▬ 0 / uur</value></data>
+  <data name="DeliveryCitizens" xml:space="preserve"><value>Huidige inwoners: {0}</value></data>
+  <data name="DeliveryUnits" xml:space="preserve"><value>{0} / {1} eenheden</value></data>
+  <data name="DeliveryPercent" xml:space="preserve"><value>{0:F0}%</value></data>
+  <data name="DeliveryUrgent" xml:space="preserve"><value>URGENT</value></data>
+  <data name="DeliveryStoreGrowthUp" xml:space="preserve"><value>▲ +{0} inwoner / uur</value></data>
+  <data name="DeliveryStoreGrowthDown" xml:space="preserve"><value>▼ {0} inwoner / uur</value></data>
+  <data name="DeliveryStoreGrowthFlat" xml:space="preserve"><value>▬ 0 inwoner / uur</value></data>
+  <data name="DeliveryConfirmed" xml:space="preserve"><value>Bestelling bevestigd voor €{0:0.00}</value></data>
+  <data name="DeliveryOpenCareer" xml:space="preserve"><value>NIEUW CARRIERE OPENEN</value></data>
+  <data name="DeliveryDeliver" xml:space="preserve"><value>BEZORGEN</value></data>
+  <data name="DeliveryBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="DeliveryCancelOrder" xml:space="preserve"><value>BESTELLING ANNULEREN</value></data>
+  <data name="DeliveryEmpty" xml:space="preserve"><value>Nog geen winkels beschikbaar voor bezorging. Gebruik je Vertrouwenspunten om je eerste bezorgcarrière te starten met HIERONDER NIEUW CARRIERE OPENEN.</value></data>
 </root>

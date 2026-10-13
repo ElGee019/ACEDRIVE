@@ -10,17 +10,75 @@
   <data name="TelemetryHeader" xml:space="preserve"><value>TELEMETRY</value></data>
   <data name="WaitingForEvo" xml:space="preserve"><value>waiting for EVO…</value></data>
   <data name="EvoNoShm" xml:space="preserve"><value>EVO running, no SHM yet…</value></data>
+  <data name="SpeedKmh" xml:space="preserve"><value>{0:0} km/h</value></data>
+  <data name="GearUnknown" xml:space="preserve"><value>N</value></data>
+  <data name="EvoLive" xml:space="preserve"><value>EVO live · pkt {0}</value></data>
+  <data name="EvoDetail" xml:space="preserve"><value>rpm {0} · thr {1:0%} · brk {2:0%}</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (fake job)</value></data>
   <data name="NoJob" xml:space="preserve"><value>No job. Press New job, then drive.</value></data>
-  <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press Pickup.</value></data>
+  <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press PICKUP.</value></data>
   <data name="JobEnRoute" xml:space="preserve"><value>En route: {0} → {1} · {2:0.0} km</value></data>
   <data name="JobComplete" xml:space="preserve"><value>Complete: {0} → {1} · tip €{2:0.00}</value></data>
-  <data name="NewJob" xml:space="preserve"><value>New job</value></data>
-  <data name="Pickup" xml:space="preserve"><value>Pickup</value></data>
-  <data name="Dropoff" xml:space="preserve"><value>Dropoff</value></data>
+  <data name="NewJob" xml:space="preserve"><value>NEW JOB</value></data>
+  <data name="Pickup" xml:space="preserve"><value>PICKUP</value></data>
+  <data name="Dropoff" xml:space="preserve"><value>DROPOFF</value></data>
   <data name="ShiftSummary" xml:space="preserve"><value>Shift: {0} jobs · €{1:0.00}</value></data>
-  <data name="Locked" xml:space="preserve"><value>Locked</value></data>
-  <data name="Unlock" xml:space="preserve"><value>Unlock</value></data>
+  <data name="ShiftSummaryActive" xml:space="preserve"><value>Shift: {0} jobs · €{1:0.00} · {2} left</value></data>
+  <data name="FareTotal" xml:space="preserve"><value>€{0:0.00}</value></data>
+  <data name="Locked" xml:space="preserve"><value>LOCKED</value></data>
+  <data name="Unlock" xml:space="preserve"><value>UNLOCK</value></data>
   <data name="FatalCrashTitle" xml:space="preserve"><value>AceDrive crashed</value></data>
   <data name="FatalCrashMessage" xml:space="preserve"><value>Something went wrong. Details were written to the log in {0}.</value></data>
+  <data name="BrandTitle" xml:space="preserve"><value>WHAT IS YOUR FAVORITE BRAND</value></data>
+  <data name="GrandmaCarTitle" xml:space="preserve"><value>WHAT CAR DOES GRANDMA DRIVE</value></data>
+  <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
+  <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Say "HEY {BRAND}" to activate the app from within the car you are driving.
+For instance "HEY ALPINE".</value></data>
+  <data name="VoiceInfoButtons" xml:space="preserve"><value>Say a button's text to click that button.
+For instance "{0}".</value></data>
+  <data name="SpeakerGrandma" xml:space="preserve"><value>Grandma</value></data>
+  <data name="SpeakerYou" xml:space="preserve"><value>You</value></data>
+  <data name="ControlTaxi" xml:space="preserve"><value>START TAXI SHIFT</value></data>
+  <data name="ControlTaxiContinue" xml:space="preserve"><value>CONTINUE TAXI SHIFT</value></data>
+  <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
+  <data name="ControlCalendar" xml:space="preserve"><value>CALENDAR</value></data>
+  <data name="ControlTodo" xml:space="preserve"><value>GRANDMA'S TO DO</value></data>
+  <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
+  <data name="DaySun" xml:space="preserve"><value>Sunday</value></data>
+  <data name="DayMon" xml:space="preserve"><value>Monday</value></data>
+  <data name="DayTue" xml:space="preserve"><value>Tuesday</value></data>
+  <data name="DayWed" xml:space="preserve"><value>Wednesday</value></data>
+  <data name="DayThu" xml:space="preserve"><value>Thursday</value></data>
+  <data name="DayFri" xml:space="preserve"><value>Friday</value></data>
+  <data name="DaySat" xml:space="preserve"><value>Saturday</value></data>
+  <data name="EventCentoMiglia" xml:space="preserve"><value>Cento Miglia</value></data>
+  <data name="EventValuation" xml:space="preserve"><value>Market valuation</value></data>
+  <data name="EventRoadTest" xml:space="preserve"><value>Road test</value></data>
+  <data name="EventWilly" xml:space="preserve"><value>Where is Willy</value></data>
+  <data name="EventPancakes" xml:space="preserve"><value>Grandma's pancakes</value></data>
+  <data name="NoEvent" xml:space="preserve"><value>No event</value></data>
+  <data name="TodoMaxGrocery" xml:space="preserve"><value>Click Max's Grocery Store, drive there and enter the store.</value></data>
+  <data name="TodoVisitBank" xml:space="preserve"><value>Visit the bank to withdraw some of your savings.</value></data>
+  <data name="TodoTaxiJobs" xml:space="preserve"><value>Complete {0} taxi jobs. (currently {1})</value></data>
+  <data name="TodoEarnCr" xml:space="preserve"><value>Earn {0} CR in total. (currently {1})</value></data>
+  <data name="DeliveryTitle" xml:space="preserve"><value>DELIVERY JOB</value></data>
+  <data name="DeliveryCredP" xml:space="preserve"><value>Credibility Points: {0}</value></data>
+  <data name="DeliveryGrowthUp" xml:space="preserve"><value>City growth: ▲ +{0} / hr</value></data>
+  <data name="DeliveryGrowthDown" xml:space="preserve"><value>City growth: ▼ {0} / hr</value></data>
+  <data name="DeliveryGrowthFlat" xml:space="preserve"><value>City growth: ▬ 0 / hr</value></data>
+  <data name="DeliveryCitizens" xml:space="preserve"><value>Current citizens: {0}</value></data>
+  <data name="DeliveryUnits" xml:space="preserve"><value>{0} / {1} units</value></data>
+  <data name="DeliveryPercent" xml:space="preserve"><value>{0:F0}%</value></data>
+  <data name="DeliveryUrgent" xml:space="preserve"><value>URGENT</value></data>
+  <data name="DeliveryStoreGrowthUp" xml:space="preserve"><value>▲ +{0} citizen / hr</value></data>
+  <data name="DeliveryStoreGrowthDown" xml:space="preserve"><value>▼ {0} citizen / hr</value></data>
+  <data name="DeliveryStoreGrowthFlat" xml:space="preserve"><value>▬ 0 citizen / hr</value></data>
+  <data name="DeliveryConfirmed" xml:space="preserve"><value>Order Confirmed for €{0:0.00}</value></data>
+  <data name="DeliveryOpenCareer" xml:space="preserve"><value>OPEN NEW CAREER</value></data>
+  <data name="DeliveryDeliver" xml:space="preserve"><value>DELIVER</value></data>
+  <data name="DeliveryBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="DeliveryCancelOrder" xml:space="preserve"><value>CANCEL ORDER</value></data>
+  <data name="DeliveryEmpty" xml:space="preserve"><value>No stores available for delivery yet. Use your Credibility Points to start your first delivery career by clicking OPEN NEW CAREER below.</value></data>
 </root>

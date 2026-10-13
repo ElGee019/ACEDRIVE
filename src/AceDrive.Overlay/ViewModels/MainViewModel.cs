@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -13,7 +14,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// time, telemetry, logging and fares are abstracted so every flow is
 /// unit-testable with fakes. Knows NOTHING about HWNDs or files.
 /// </summary>
-public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
+public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, IVoiceInfoNavigator, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -21,6 +22,30 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     private readonly ISettingsStore _store;
     private readonly ILog _log;
     private readonly FareTable _fares;
+    private readonly IOnboardingStore _onboarding;
+    private readonly OnboardingContent _content;
+    private readonly TodoTable _todos;
+    private readonly IVoiceListener _voice;
+    private readonly ICarBrandSource _carBrands;
+    private readonly DeliveryCatalog _deliveryCatalog;
+    private OnboardingState _progress;
+    private MainControlScreenViewModel? _control;
+    private DeliveryJobScreenViewModel? _deliveryScreen;
+
+    // Companion parity: hidden until "hey {brand}", idle hides after 9 s,
+    // one utterance fires one button (muted until the final fragment).
+    private const double IdleHideSec = 9.0;
+    private const double WakeCooldownSec = 3.0;
+    private const string DefaultBrand = "mazda";
+    private DateTime _lastActivity;
+    private DateTime _lastWake = DateTime.MinValue;
+    private string? _mutedLabel;
+    private Action? _mutedAction;
+    private bool _resizing;
+
+    // Wake brand = the car currently driven in ACE (watcher-published),
+    // never the saved favorite.
+    private string _carBrand = DefaultBrand;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
     private bool _disposed;
@@ -35,13 +60,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     };
     private int _jobIndex;
     private TaxiJobState _job = new();
+    private int _lastShiftSecs = -1;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock,
         TaxiShift shift, ISettingsStore store,
-        ILog log, FareTable fares)
+        ILog log, FareTable fares,
+        IOnboardingStore onboarding, OnboardingContent content,
+        IVoiceListener voice, ICarBrandSource carBrands,
+        TodoTable todos, DeliveryCatalog deliveryCatalog)
     {
         _telemetry = telemetry;
         _clock = clock;
@@ -49,6 +78,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _store = store;
         _log = log;
         _fares = fares;
+        _onboarding = onboarding;
+        _content = content;
+        _todos = todos;
+        _voice = voice;
+        _carBrands = carBrands;
+        _deliveryCatalog = deliveryCatalog;
+        _carBrands.BrandChanged += (_, e) => OnCarBrand(e.Brand);
+        _progress = _onboarding.Load();
+        _lastActivity = _clock.UtcNow;
+        _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _timer.Tick += (_, _) => Poll();
         _lastTick = _clock.UtcNow;
@@ -56,26 +95,37 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         NewJobCommand = new RelayCommand(NewJob);
         PickupCommand = new RelayCommand(Pickup, () => _job.Phase == JobPhase.Proposed);
         DropoffCommand = new RelayCommand(Dropoff, () => _job.Phase == JobPhase.EnRoute);
-        ToggleLockCommand = new RelayCommand(() => IsLocked = !IsLocked);
+        ToggleShowCommand = new RelayCommand(() =>
+        {
+            if (IsShown) Hide(); else Show();
+        });
 
         RefreshJob();
         StatusText = Strings.Get("WaitingForEvo");
-        SpeedText = "0 km/h";
-        GearText = "N";
+        SpeedText = Strings.Format("SpeedKmh", 0);
+        GearText = Strings.Get("GearUnknown");
         DetailText = string.Empty;
+
+        // Companion parity: the brand page is the onboarding home — what the
+        // window shows at boot and on every wake until onboarding completes.
+        // Past that, home is the main control page (PORTPLAN item 54); its
+        // date header replaces the onboarding titles. Empty content degrades
+        // to a blank screen instead of trapping the user on a broken page.
+        SetScreen(HomeScreen());
+
+        // With a mic we start hidden until the wake word; without one the
+        // window stays up so the app remains usable (and testable).
+        IsShown = !voice.IsAvailable;
     }
 
     // ---- bindable state -------------------------------------------------
 
-    private bool _isLocked = true;
-    public bool IsLocked
+    private bool _isShown;
+    public bool IsShown
     {
-        get => _isLocked;
-        set { if (SetField(ref _isLocked, value)) { OnPropertyChanged(nameof(LockButtonText)); OnPropertyChanged(nameof(HintText)); } }
+        get => _isShown;
+        private set => SetField(ref _isShown, value);
     }
-
-    public string LockButtonText => Strings.Get(IsLocked ? "Locked" : "Unlock");
-    public string HintText => Strings.Get(IsLocked ? "HintLocked" : "HintUnlocked");
 
     private string _statusText = "";
     public string StatusText { get => _statusText; private set => SetField(ref _statusText, value); }
@@ -104,13 +154,123 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
     public ICommand NewJobCommand { get; }
     public ICommand PickupCommand { get; }
     public ICommand DropoffCommand { get; }
-    public ICommand ToggleLockCommand { get; }
+    public ICommand ToggleShowCommand { get; }
+
+    // ---- onboarding navigation (IScreenController) ---------------------------
+
+    private object? _currentScreen;
+
+    /// <summary>Active screen: an onboarding page, a jobs page or null.</summary>
+    public object? CurrentScreen
+    {
+        get => _currentScreen;
+        private set
+        {
+            if (SetField(ref _currentScreen, value))
+            {
+                OnPropertyChanged(nameof(IsOnboarding));
+                OnPropertyChanged(nameof(JobsVisible));
+            }
+        }
+    }
+
+    public bool IsOnboarding => CurrentScreen is not null && CurrentScreen is not IJobsScreen;
+    public bool JobsVisible => CurrentScreen is null;
+
+    public void ChooseBrand(string brand)
+    {
+        if (!_content.Brands.Contains(brand)) return;
+        _progress = _progress with { FavoriteBrand = brand };
+        _onboarding.Save(_progress);
+        _log.LogInfo($"favorite brand: {brand}");
+        SetScreen(new GrandmaCarScreenViewModel(this, _content.Cars));
+    }
+
+    public void ChooseCar(string carId)
+    {
+        if (!_content.Cars.Any(c => c.Id == carId)) return;
+        _progress = _progress with { GrandmaCarId = carId };
+        _onboarding.Save(_progress);
+        _log.LogInfo($"grandma car: {carId}");
+        SetScreen(new VoiceInfoScreenViewModel(this));
+    }
+
+    public void ShowDialogue()
+    {
+        _log.LogInfo("voice info acknowledged: showing birthday dialogue");
+        SetScreen(new DialogueScreenViewModel(this, _content.Dialogue));
+    }
+
+    public void FinishDialogue()
+    {
+        _progress = _progress with { BirthdayDone = true };
+        _onboarding.Save(_progress);
+        _log.LogInfo("birthday dialogue done: main control page unlocked");
+        SetScreen(CreateControlScreen());
+    }
+
+    // Onboarding home (brand page) or the control page once complete.
+    // No new IScreenController verbs: the control page takes its job
+    // commands by constructor (composition over interface growth).
+    private object? HomeScreen()
+    {
+        if (_progress.IsComplete)
+        {
+            return CreateControlScreen();
+        }
+        if (_content.Brands.Count == 0)
+        {
+            return null;
+        }
+        return new BrandScreenViewModel(this, _content.Brands);
+    }
+
+    // Built once and reused: the date header stays live across wakes.
+    // Taxi reuses the existing fake-job flow; delivery opens the career
+    // page (port of Unity DeliveryJobScreen); the calendar day buttons have
+    // no destinations until the freeroam map lands, so they stay disabled
+    // (and voiceless).
+    private MainControlScreenViewModel CreateControlScreen() =>
+        _control ??= new MainControlScreenViewModel(
+            _clock, _todos, CalendarStamp.Default, _shift,
+            NewJobCommand, new RelayCommand(OpenDelivery),
+            new RelayCommand(OnDayLocked, () => false));
+
+    private void OnDayLocked() =>
+        _log.LogInfo("calendar day tapped while locked: waiting on the freeroam map");
+
+    // Built once and reused: the pickup cart survives leaving the page, like
+    // Unity's player.pickupCart. Back lands on the control page. The hub and
+    // run buttons are navigation seams only: hub purchase needs the wholesale
+    // content (PORTPLAN 18) and the pickup/drop-off wizard the freeroam map,
+    // so both just log until those pages land.
+    private void OpenDelivery()
+    {
+        _deliveryScreen ??= new DeliveryJobScreenViewModel(
+            _deliveryCatalog, _log,
+            new RelayCommand(() => SetScreen(CreateControlScreen())),
+            new RelayCommand(OnDeliveryRun),
+            new RelayCommand(OnDeliveryHub));
+        SetScreen(_deliveryScreen);
+    }
+
+    private void OnDeliveryRun() =>
+        _log.LogInfo("deliver tapped: pickup wizard lands with the freeroam map");
+
+    private void OnDeliveryHub() =>
+        _log.LogInfo("open new career tapped: hub purchase lands with the wholesale content");
+
+    private void SetScreen(object? screen) => CurrentScreen = screen;
 
     // ---- lifecycle (called by the view) ----------------------------------
 
     public void Start()
     {
         _lastTick = _clock.UtcNow;
+        _carBrand = _carBrands.Prime(DefaultBrand);
+        _log.LogInfo($"listening for 'hey {_carBrand}'");
+        _carBrands.StartWatching();
+        _voice.StartListening();
         _timer.Start();
     }
 
@@ -125,20 +285,66 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         double dt = (now - _lastTick).TotalSeconds;
         _lastTick = now;
 
+        // Idle auto-hide, companion parity. Must run before any telemetry
+        // early-return: hiding is independent of whether EVO is live.
+        // Suspended while the window is being resized: the sizing drag
+        // itself is the user's activity, even when held still.
+        // Suspended while a dialogue is still open (IDialogueScreen): a
+        // slow reader is never hidden mid-conversation.
+        // Uses the clock, never tick counts.
+        bool dialogueOpen = CurrentScreen is IDialogueScreen dialogue && !dialogue.IsComplete;
+        if (IsShown && !_resizing && !dialogueOpen && (now - _lastActivity).TotalSeconds >= IdleHideSec)
+        {
+            Hide();
+        }
+
+        // The control page date stays live whether or not EVO is attached.
+        // Refresh self-guards on the minute: no per-tick allocations.
+        // A timed-out shift ends here (Unity 30-min idle rule) so the taxi
+        // button flips back to START even when the player never taps it.
+        if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
+        {
+            _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
+                $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+            _lastShiftSecs = -1;
+            RefreshJob();
+        }
+        // Voice-flash expiry runs on the clock, not the minute guard: a 1 s
+        // yellow glow must clear inside the same minute it started.
+        _control?.UpdateFlash();
+        _control?.Refresh();
+
+        // Shift countdown: second-guarded so an open-but-idle shift costs one
+        // string per second, never per 10 Hz tick. While EnRoute the meter
+        // below already repaints every tick, so this path skips it.
+        if (_shift.IsStarted && _job.Phase != JobPhase.EnRoute)
+        {
+            int secs = (int)_shift.Remaining(now).TotalSeconds;
+            if (secs != _lastShiftSecs)
+            {
+                _lastShiftSecs = secs;
+                RefreshJob();
+            }
+        }
+        else if (!_shift.IsStarted)
+        {
+            _lastShiftSecs = -1;
+        }
+
         var s = _telemetry.TryRead();
         if (s is null)
         {
             IsLive = false;
             StatusText = Strings.Get(_telemetry.GameRunning ? "EvoNoShm" : "WaitingForEvo");
-            SpeedText = "0 km/h";
+            SpeedText = Strings.Format("SpeedKmh", 0);
             return;
         }
 
         IsLive = true;
-        StatusText = $"EVO live · pkt {s.PacketId}";
-        SpeedText = $"{s.SpeedKmh:0} km/h";
+        StatusText = Strings.Format("EvoLive", s.PacketId);
+        SpeedText = Strings.Format("SpeedKmh", s.SpeedKmh);
         GearText = TelemetryConventions.GearDisplay(s.Gear);
-        DetailText = $"rpm {s.Rpm} · thr {s.Gas:0%} · brk {s.Brake:0%}";
+        DetailText = Strings.Format("EvoDetail", s.Rpm, s.Gas, s.Brake);
 
         // Meter runs while the passenger is aboard.
         if (_job.Phase == JobPhase.EnRoute && dt is > 0 and < 1)
@@ -149,10 +355,135 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         }
     }
 
+    // ---- visibility + voice --------------------------------------------------
+
+    /// <summary>Called by the view on any mouse/key activity.</summary>
+    public void RecordActivity() => _lastActivity = _clock.UtcNow;
+
+    /// <summary>
+    /// Called by the view when a window resize drag starts/stops.
+    /// While resizing, idle auto-hide is suspended; both edges count as
+    /// activity so the 9 s window restarts after the drag.
+    /// </summary>
+    public void SetResizing(bool resizing)
+    {
+        _resizing = resizing;
+        RecordActivity();
+    }
+
+    public void Show()
+    {
+        RecordActivity();
+        if (!IsShown)
+        {
+            IsShown = true;
+            _log.LogInfo("overlay shown");
+        }
+    }
+
+    private void Hide()
+    {
+        if (!IsShown) return;
+        IsShown = false;
+        _mutedLabel = null;
+        _mutedAction = null;
+        _log.LogInfo("overlay hidden");
+    }
+
+    // Watcher thread lands here; marshal to the UI thread like voice.
+    private void OnCarBrand(string brand)
+    {
+        try
+        {
+            _timer.Dispatcher.Invoke(() =>
+            {
+                _carBrand = brand;
+                _log.LogInfo($"now following: {brand} (say 'hey {brand}')");
+            });
+        }
+        catch { /* shutdown race; never break the watcher thread */ }
+    }
+
+    // Mic thread lands here; marshal to the UI thread for all state changes.
+    private void OnVoiceHeard(string text, bool isFinal)
+    {
+        try
+        {
+            _timer.Dispatcher.Invoke(() => HandleVoice(text, isFinal));
+        }
+        catch { /* shutdown race; never break the mic thread */ }
+    }
+
+    internal void HandleVoice(string text, bool isFinal)
+    {
+        // Diagnostic: one line per finished utterance. Non-English names
+        // ("Cento Miglia") arrive as whatever the English model believes it
+        // heard; reading the real transcripts from the log lets us extend
+        // the keyword tables from data instead of guesses.
+        if (isFinal) _log.LogInfo($"voice heard: {text}");
+
+        if (!IsShown)
+        {
+            string brand = _carBrand;
+            if (VoiceMatch.IsWake(text, brand, AliasesFor(brand)))
+            {
+                DateTime now = _clock.UtcNow;
+                if ((now - _lastWake).TotalSeconds < WakeCooldownSec) return;
+                _lastWake = now;
+                _log.LogInfo($"wake heard: {text}");
+                Show();
+                SetScreen(HomeScreen());
+            }
+
+            return;
+        }
+
+        if (CurrentScreen is not IVoiceScreen screen) return;
+        string? label = VoiceMatch.MatchLabel(text, screen.VoiceActions.Keys);
+        if (label is null) return;
+        // Voice control counts as user input: same idle-reset as a click.
+        // Repeats of the same tap still count as presence (restarting the
+        // 9 s window) even though the repeat itself stays muted below.
+        RecordActivity();
+        // Mute repeats of the same tap until the utterance's final fragment.
+        // One utterance can reach a button under two different keys (a
+        // partial hearing "where is" alias, the final "Where is Willy"
+        // label), so the shared action delegate counts as the same tap too.
+        Action action = screen.VoiceActions[label];
+        if (label == _mutedLabel || action == _mutedAction)
+        {
+            if (isFinal) { _mutedLabel = null; _mutedAction = null; }
+            return;
+        }
+
+        _mutedLabel = label;
+        _mutedAction = action;
+        _log.LogInfo($"voice button: {text}");
+        action.Invoke();
+    }
+
+    private string[] AliasesFor(string brand)
+    {
+        if (_content.Aliases.TryGetValue(brand, out string[]? hit)) return hit;
+        return _content.Aliases.TryGetValue(VoiceMatch.Normalize(brand), out string[]? norm) ? norm : [];
+    }
+
     // ---- job commands ------------------------------------------------------
 
     private void NewJob()
     {
+        DateTime now = _clock.UtcNow;
+        if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
+        {
+            _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
+                $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+        }
+        if (!_shift.IsStarted)
+        {
+            _shift.Start(now);
+            _lastShiftSecs = -1;
+            _log.LogInfo("taxi shift started");
+        }
         var (from, to) = FakeJobs[_jobIndex % FakeJobs.Length];
         _jobIndex++;
         _job = new TaxiJobState
@@ -164,6 +495,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         };
         _log.LogInfo($"job proposed: {from} -> {to}");
         RefreshJob();
+        _control?.Refresh();
     }
 
     private void Pickup()
@@ -181,7 +513,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         _job.Phase = JobPhase.Complete;
         _job.Fare = TaxiFare.ComputeFare(_job.DistanceKm, _fares);
         _job.Tip = TaxiFare.ComputeTip(_job.Fare, cleanDrive: true, _fares);
-        _shift.RecordCompleted(_job);
+        _shift.RecordCompleted(_job, _clock.UtcNow);
         _log.LogInfo($"job dropoff: {_job.PickupName} -> {_job.DropoffName} " +
                   $"dist={_job.DistanceKm:0.00}km total={_job.Total:0.00} " +
                   $"shift={_shift.JobsDone} jobs / {_shift.Earned:0.00}");
@@ -198,11 +530,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
             JobPhase.Complete => Strings.Format("JobComplete", _job.PickupName, _job.DropoffName, _job.Tip),
             _ => string.Empty,
         };
-        FareText = $"€{_job.Total:0.00}";
-        ShiftText = Strings.Format("ShiftSummary", _shift.JobsDone, _shift.Earned);
+        FareText = Strings.Format("FareTotal", _job.Total);
+        ShiftText = _shift.IsStarted
+            ? Strings.Format("ShiftSummaryActive",
+                _shift.JobsDone, _shift.Earned, FormatRemaining(_shift.Remaining(_clock.UtcNow)))
+            : Strings.Format("ShiftSummary", _shift.JobsDone, _shift.Earned);
         ((RelayCommand)PickupCommand).RaiseCanExecuteChanged();
         ((RelayCommand)DropoffCommand).RaiseCanExecuteChanged();
     }
+
+    private static string FormatRemaining(TimeSpan remaining) =>
+        remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
 
     // ---- plumbing ------------------------------------------------------------
 
@@ -222,6 +560,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IDisposable
         if (_disposed) return;
         _disposed = true;
         _timer.Stop();
+        _voice.Dispose();
+        _carBrands.Dispose();
         _telemetry.Dispose();
     }
 }

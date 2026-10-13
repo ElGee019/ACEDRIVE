@@ -1,0 +1,5 @@
+[
+  {"id": "ks_mazda_mx5_na", "name": "Mazda MX-5 NA", "year": 1990, "price": 12000},
+  {"id": "ks_abarth_695_biposto", "name": "Abarth 695 Biposto", "year": 2014, "price": 35000},
+  {"id": "ks_datsun_240z_fairlady", "name": "Datsun 240Z", "year": 1970, "price": 35000}
+]

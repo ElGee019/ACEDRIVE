@@ -1,0 +1,8 @@
+{
+  "Entries": [
+    { "SubjectId": "MaxGrocery", "Target": 1 },
+    { "SubjectId": "TaxiJobs", "Target": 3 },
+    { "SubjectId": "EarnCr", "Target": 500 },
+    { "SubjectId": "VisitBank", "Target": 1 }
+  ]
+}

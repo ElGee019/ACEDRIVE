@@ -1,52 +1,47 @@
-﻿<Window x:Class="AceDrive.Overlay.MainWindow"
+<Window x:Class="AceDrive.Overlay.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:loc="clr-namespace:AceDrive.Overlay.Localization"
-        Title="{loc:Loc Key=AppTitle}" Height="340" Width="320"
-        WindowStyle="None" AllowsTransparency="True"
-        Background="#CC14161A" Topmost="True"
-        ResizeMode="CanResizeWithGrip" ShowInTaskbar="True">
-    <Border BorderBrush="#FF3A3F4B" BorderThickness="1" CornerRadius="8" Padding="10">
-        <StackPanel>
-            <!-- Header: drag here when unlocked -->
-            <DockPanel x:Name="Header" Background="Transparent" Margin="0,0,0,6">
-                <TextBlock Text="{loc:Loc Key=AppTitle}" Foreground="#FFF" FontWeight="Bold"
-                           VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                    <Button Content="{Binding LockButtonText}" Width="90" Margin="0,0,4,0"
-                            Command="{Binding ToggleLockCommand}" ToolTip="Ctrl+Shift+C"/>
-                    <Button Content="X" Width="28" Click="CloseBtn_Click"/>
-                </StackPanel>
-            </DockPanel>
-            <TextBlock Text="{Binding HintText}" Foreground="#FF9AA0B0" FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"/>
-
-            <!-- Live telemetry -->
-            <TextBlock Text="{loc:Loc Key=TelemetryHeader}" Foreground="#FF7FD4FF" FontSize="11" FontWeight="Bold"/>
-            <Grid Margin="0,2,0,6">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/><ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                <Grid.RowDefinitions>
-                    <RowDefinition/><RowDefinition/><RowDefinition/>
-                </Grid.RowDefinitions>
-                <TextBlock Text="{Binding StatusText}" Foreground="#FFFFB060" Grid.ColumnSpan="2"/>
-                <TextBlock Text="{Binding SpeedText}" Foreground="#FFF" FontSize="20" FontWeight="Bold" Grid.Row="1"/>
-                <TextBlock Text="{Binding GearText}" Foreground="#FFF" FontSize="20" FontWeight="Bold"
-                           Grid.Row="1" Grid.Column="1" HorizontalAlignment="Right"/>
-                <TextBlock Text="{Binding DetailText}" Foreground="#FF9AA0B0" FontSize="11"
-                           Grid.Row="2" Grid.ColumnSpan="2"/>
-            </Grid>
-
-            <!-- Fake taxi job -->
-            <TextBlock Text="{loc:Loc Key=TaxiHeader}" Foreground="#FF7FD4FF" FontSize="11" FontWeight="Bold"/>
-            <TextBlock Text="{Binding JobLine}" Foreground="#FFF" TextWrapping="Wrap" Margin="0,2,0,2"/>
-            <TextBlock Text="{Binding FareText}" Foreground="#FFA8E6A1" FontSize="14"/>
-            <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
-                <Button Content="{loc:Loc Key=NewJob}" Width="80" Margin="0,0,4,0" Command="{Binding NewJobCommand}"/>
-                <Button Content="{loc:Loc Key=Pickup}" Width="70" Margin="0,0,4,0" Command="{Binding PickupCommand}"/>
-                <Button Content="{loc:Loc Key=Dropoff}" Width="70" Command="{Binding DropoffCommand}"/>
-            </StackPanel>
-            <TextBlock Text="{Binding ShiftText}" Foreground="#FF9AA0B0" FontSize="11" Margin="0,4,0,0"/>
-        </StackPanel>
+        xmlns:vm="clr-namespace:AceDrive.Overlay.ViewModels"
+        xmlns:views="clr-namespace:AceDrive.Overlay.Views"
+        Title="AceDrive" Width="360" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" ShowActivated="False"
+        Background="Transparent" Topmost="True"
+        ResizeMode="CanResizeWithGrip" ShowInTaskbar="True" MinWidth="200" MinHeight="80">
+    <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:BrandScreenViewModel}">
+            <views:BrandScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:GrandmaCarScreenViewModel}">
+            <views:GrandmaCarScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:VoiceInfoScreenViewModel}">
+            <views:VoiceInfoScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DialogueScreenViewModel}">
+            <views:DialogueScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MainControlScreenViewModel}">
+            <views:MainControlScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DeliveryJobScreenViewModel}">
+            <views:DeliveryJobScreenView/>
+        </DataTemplate>
+    </Window.Resources>
+    <!-- Two rings: the outer Border paints the background, its Padding pushes
+         the edge line 10 px inward so the dark fill frames it. The window fill
+         is transparent because an opaque window background would square off the
+         rounded corners behind both rings.
+         The dark fill is the fallback: the WebP backdrop is applied in code
+         (MainWindow.ApplyBackdrop) because a XAML ImageSource would render-
+         thread-crash on machines whose WIC has no WebP codec (older Win10). -->
+    <Border x:Name="Backdrop" Background="#F214161A" CornerRadius="18" Padding="10">
+        <Border BorderBrush="#FFFFFFFF" BorderThickness="2" CornerRadius="8" Padding="10">
+            <!-- Screens only, companion parity. Scroll: fixed size can clip taller pages.
+                 Horizontal scroll stays off so long lines wrap inside the
+                 window width instead of growing it. -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <ContentControl Content="{Binding CurrentScreen}"/>
+            </ScrollViewer>
+        </Border>
     </Border>
 </Window>

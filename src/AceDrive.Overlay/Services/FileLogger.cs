@@ -6,8 +6,9 @@ using System.Globalization;
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// Dated file sink (%AppData%\AceDrive\logs\acedrive.log.yyyy-MM-dd,
-/// PitVox-style). Lock-guarded, rolls daily, never throws.
+/// Dated file sink (%AppData%\AceDrive\logs\acedrive.log.MM-dd,
+/// PitVox-style). Lock-guarded, rolls daily, never throws. Year is left
+/// out of the date: within the overlay's context it is irrelevant.
 /// </summary>
 public sealed class FileLogger : ILog, IDisposable
 {
@@ -36,7 +37,7 @@ public sealed class FileLogger : ILog, IDisposable
             lock (_gate)
             {
                 if (_disposed) return;
-                string day = DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                string day = DateTime.Now.ToString("MM-dd", CultureInfo.InvariantCulture);
                 if (_writer is null || day != _openDay)
                 {
                     _writer?.Dispose();
@@ -47,7 +48,7 @@ public sealed class FileLogger : ILog, IDisposable
                     { AutoFlush = true };
                     _openDay = day;
                 }
-                _writer.WriteLine($"{DateTime.Now:yyyy-MM-ddTHH:mm:ss} {level,-5} {message}");
+                _writer.WriteLine($"{DateTime.Now:MM-ddTHH:mm:ss} {level,-5} {message}");
             }
         }
         catch { /* logging must never break the app */ }

@@ -47,4 +47,31 @@ public sealed class TaxiFareTests
         Assert.Equal(1, shift.JobsDone);
         Assert.Equal(11.0, shift.Earned);
     }
+
+    [Fact]
+    public void Shift_StartsClosed_TimesOutAfterThirtyIdleMinutes()
+    {
+        var shift = new TaxiShift();
+        var start = new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc);
+        Assert.False(shift.IsStarted);
+        Assert.False(shift.IsTimedOut(start));
+
+        shift.Start(start);
+        Assert.True(shift.IsStarted);
+        Assert.False(shift.IsTimedOut(start.AddMinutes(29.9)));
+        Assert.True(shift.Remaining(start) - TimeSpan.FromMinutes(30) < TimeSpan.FromSeconds(1));
+
+        var done = new TaxiJobState { Phase = JobPhase.Complete, Fare = 10, Tip = 1 };
+        shift.RecordCompleted(done, start.AddMinutes(5));
+        Assert.Equal(1, shift.JobsDone);
+        // Idle clock restamps on dropoff: 30 min after the job, not the start.
+        Assert.False(shift.IsTimedOut(start.AddMinutes(34.9)));
+        Assert.True(shift.IsTimedOut(start.AddMinutes(35)));
+
+        Assert.True(shift.TryEndTimedOut(start.AddMinutes(35), out TimeSpan idle));
+        Assert.False(shift.IsStarted);
+        Assert.Equal(1, shift.JobsDone); // counters kept for the receipt
+        Assert.True((idle - TimeSpan.FromMinutes(30)).Duration() < TimeSpan.FromSeconds(1));
+        Assert.False(shift.TryEndTimedOut(start.AddMinutes(36), out _));
+    }
 }

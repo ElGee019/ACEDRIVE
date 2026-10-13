@@ -1,0 +1,110 @@
+<UserControl x:Class="AceDrive.Overlay.Views.MainControlScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views">
+    <UserControl.Resources>
+        <views:BoolToFontWeightConverter x:Key="DayWeight"/>
+    </UserControl.Resources>
+    <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
+         date row at a fixed height where the title sits on the other pages.
+         Body order mirrors the Unity JobSelectionScreen: job entries, then
+         the calendar strip, then Grandma's ToDo list. Day names stay plain
+         text; only days with an event render the event as a Button (global
+         white-edge style), disabled until the freeroam map lands. Empty
+         events collapse the button so eventless days show just their name. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{Binding DateHeader}" TextWrapping="Wrap"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <Button Content="{Binding TaxiLabel}" Margin="0,0,0,6"
+                    Command="{Binding TaxiCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding TaxiFlash}" Value="True">
+                                <Setter Property="Foreground" Value="Yellow"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{Binding DeliveryLabel}" Margin="0,0,0,10"
+                    Command="{Binding DeliveryCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding DeliveryFlash}" Value="True">
+                                <Setter Property="Foreground" Value="Yellow"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <TextBlock Text="{loc:Loc Key=ControlCalendar}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                       HorizontalAlignment="Center" Margin="0,0,0,4"/>
+            <ItemsControl ItemsSource="{Binding Days}" Margin="0,0,0,10" Grid.IsSharedSizeScope="True">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- SharedSizeGroup keeps every day row the same height:
+                             button rows measure taller (border + padding), so
+                             plain-text rows would otherwise sit tighter. The
+                             day label centers itself on the shared height, which
+                             lines its baseline up with the button content. -->
+                        <Grid Margin="0,1">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" SharedSizeGroup="DayRow"/>
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="90"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{Binding DayLabel}" Foreground="#FFF" FontSize="13"
+                                       VerticalAlignment="Center"
+                                       FontWeight="{Binding IsToday, Converter={StaticResource DayWeight}}"/>
+                            <Button Grid.Column="1" Margin="0,1"
+                                    Command="{Binding DataContext.DayCommand, RelativeSource={RelativeSource AncestorType=UserControl}}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EventLabel}" Value="">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                                <TextBlock Text="{Binding EventLabel}" FontSize="13"
+                                           TextWrapping="Wrap"
+                                           FontWeight="{Binding IsToday, Converter={StaticResource DayWeight}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="#FFF"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Flash}" Value="True">
+                                                    <Setter Property="Foreground" Value="Yellow"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Button>
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{loc:Loc Key=ControlTodo}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                       HorizontalAlignment="Center" Margin="0,0,0,4"/>
+            <ItemsControl ItemsSource="{Binding TodoLines}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Foreground="#FFF" FontSize="13" TextWrapping="Wrap" Margin="0,1"
+                                   Text="{Binding Mode=OneWay}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </Grid>
+</UserControl>

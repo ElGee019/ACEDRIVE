@@ -1,0 +1,34 @@
+<UserControl x:Class="AceDrive.Overlay.Views.GrandmaCarScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views">
+    <UserControl.Resources>
+        <views:ImagePathConverter x:Key="ImgPath"/>
+    </UserControl.Resources>
+    <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
+         title row at a fixed height, car list centered below it. Centering
+         horizontally too so thumb+button read as one block. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=GrandmaCarTitle}"/>
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Options}"
+                      VerticalAlignment="Center" HorizontalAlignment="Center">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <StackPanel Margin="0,0,0,8">
+                        <Image Source="{Binding Car.ImagePath, Converter={StaticResource ImgPath}}" MaxWidth="240" Stretch="Uniform"
+                               HorizontalAlignment="Center" Margin="0,0,0,4"
+                               Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
+                        <Button Content="{Binding Label}" Padding="4"
+                                Command="{Binding DataContext.SelectCarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </StackPanel>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

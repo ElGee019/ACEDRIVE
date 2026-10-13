@@ -1,0 +1,100 @@
+<UserControl x:Class="AceDrive.Overlay.Views.DeliveryJobScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views">
+    <UserControl.Resources>
+        <views:StockLevelToBrushConverter x:Key="StockFill"/>
+    </UserControl.Resources>
+    <!-- Same page skeleton as the other screens: viewport-pinned MinHeight,
+         title band on top. Body order mirrors the Unity DeliveryJobScreen:
+         stats header, store list, then the phase-flipping main button and
+         the back/cancel button at the bottom. All copy arrives preformatted
+         or from resx; the view draws and nothing else. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=DeliveryTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+            <TextBlock Text="{Binding CredPLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding CityGrowthLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding CitizensLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,8"/>
+            <ItemsControl ItemsSource="{Binding Rows}" Margin="0,0,0,10">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- One row is one button: tapping confirms or drops
+                             the full-restock order (per-item steppers arrive
+                             with the order screen). -->
+                        <Button Margin="0,2" HorizontalContentAlignment="Stretch"
+                                Command="{Binding DataContext.ToggleOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}">
+                            <StackPanel>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding NameLine}" Foreground="#FFF" FontSize="13"
+                                                   FontWeight="Bold" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding OwnerLine}" Foreground="#B0FFFFFF" FontSize="11"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                        <TextBlock Text="{Binding PercentLine}" Foreground="#FFF" FontSize="13"
+                                                   FontWeight="Bold" HorizontalAlignment="Right"/>
+                                        <TextBlock Text="{loc:Loc Key=DeliveryUrgent}" Foreground="#FFFFB300"
+                                                   FontSize="11" FontWeight="Bold" HorizontalAlignment="Right"
+                                                   Visibility="{Binding IsUrgent, Converter={StaticResource BoolToVis}}"/>
+                                    </StackPanel>
+                                </Grid>
+                                <Grid Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding UnitsLine}" Foreground="#FFF" FontSize="12"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding GrowthLine}" Foreground="#B0FFFFFF" FontSize="12"/>
+                                </Grid>
+                                <ProgressBar Style="{StaticResource StockBar}" Value="{Binding Percent}"
+                                             Foreground="{Binding Level, Converter={StaticResource StockFill}}"
+                                             Margin="0,3,0,0"/>
+                                <!-- Confirmed rows trade the stock read-out for the
+                                     order summary (Unity BuildConfirmedRow). Empty
+                                     string means unconfirmed: collapse the line. -->
+                                <TextBlock Text="{Binding ConfirmedLine}" Foreground="#FF97EAD2" FontSize="12"
+                                           Margin="0,3,0,0" TextWrapping="Wrap">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ConfirmedLine}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{loc:Loc Key=DeliveryEmpty}" Foreground="#FFF" FontSize="13"
+                       TextWrapping="Wrap" Margin="4,0,4,10">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasStores}" Value="False">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <Button Content="{Binding MainButtonLabel}" Margin="0,0,0,6" Command="{Binding MainButtonCommand}"/>
+            <Button Content="{Binding BackButtonLabel}" Margin="0,0,0,6" Command="{Binding BackCommand}"/>
+        </StackPanel>
+    </Grid>
+</UserControl>
