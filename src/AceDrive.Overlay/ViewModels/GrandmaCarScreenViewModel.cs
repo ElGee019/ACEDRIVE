@@ -3,9 +3,6 @@ using AceDrive.Core;
 
 namespace AceDrive.Overlay.ViewModels;
 
-/// <summary>One car button: label plus optional thumbnail.</summary>
-public sealed record CarOption(GrandmaCar Car, string Label, bool HasImage);
-
 /// <summary>
 /// Onboarding page 2: which of grandma's cars she drives (Career Start item 3).
 /// Mouse-only by companion parity (see BrandScreenViewModel).

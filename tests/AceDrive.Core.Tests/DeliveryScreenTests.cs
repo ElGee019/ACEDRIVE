@@ -5,39 +5,55 @@ using AceDrive.Overlay.ViewModels;
 namespace AceDrive.Core.Tests;
 
 /// <summary>Delivery career page runs headless against a fixture catalog:
-/// stats, ordered store rows, cart phase flips and voice actions all resolve
-/// from the resx and injected commands (LSP in action).</summary>
+/// stats, ordered store rows, cart phase flips, career gating and voice
+/// actions all resolve from the resx and injected commands (LSP in action).</summary>
 public sealed class DeliveryScreenTests
 {
-    // Adenau Post: 12/40 = 30 % amber, needs 28 -> wholesale 2.50*0.7*28 = 49.00
+    // Adenau Post: 12/40 = 30 % amber (low band: -1/hr), needs 28 -> 2.50*0.7*28 = 49.00
     private static readonly DeliveryStore Post =
-        new("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, 140, 1);
+        new("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50);
 
-    // Nurburg Kiosk: 6/40 = 15 % red/urgent, needs 34 -> 2.20*0.7*34 = 52.36
+    // Nurburg Kiosk: 6/40 = 15 % red/urgent (empty band: -2/hr), needs 34 -> 2.20*0.7*34 = 52.36
     private static readonly DeliveryStore Kiosk =
-        new("nurburg-kiosk", "Nurburg Kiosk", "Fuchs", 6, 40, 2.20, 45, -2);
+        new("nurburg-kiosk", "Nurburg Kiosk", "Fuchs", 6, 40, 2.20);
 
+    // Full Market: 40/40 = 100 % (high band: +2/hr), so it takes no order.
     private static readonly DeliveryStore FullMarket =
-        new("full-market", "Full Market", "Schmitz", 40, 40, 4.40, 70, 0);
+        new("full-market", "Full Market", "Schmitz", 40, 40, 4.40);
 
     private static readonly DeliveryCatalog Catalog =
         new([Post, Kiosk, FullMarket], 0.7, 100);
 
+    private static readonly HubCatalog GrocersAndSonsHubs = new([
+        new HubTier(1, true, [
+            new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])]),
+    ]);
+
     private static (
         DeliveryJobScreenViewModel Vm,
         TestLog Log,
-        bool[] Fired) // [0]=back [1]=run [2]=hub
-        Create(DeliveryCatalog? catalog = null)
+        bool[] Fired, // [0]=back [1]=run [2]=hub
+        DeliveryCareer Career)
+        Create(DeliveryCatalog? catalog = null, HubCatalog? hubs = null,
+            FakeClock? clock = null, VoiceBeat? beat = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var log = new TestLog();
         var fired = new bool[3];
+        var board = catalog ?? Catalog;
+        var career = new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
+        var city = new CityEconomy(board.Stores, CityRules.Default);
+        // Tests that assert the deferred voice navigation own the clock and
+        // the beat, so they can advance past the beat and drain it.
+        clock ??= new FakeClock();
+        beat ??= new VoiceBeat(clock);
         var vm = new DeliveryJobScreenViewModel(
-            catalog ?? Catalog, log,
+            board, career, city, log,
             new RelayCommand(() => fired[0] = true),
             new RelayCommand(() => fired[1] = true),
-            new RelayCommand(() => fired[2] = true));
-        return (vm, log, fired);
+            new RelayCommand(() => fired[2] = true),
+            beat);
+        return (vm, log, fired, career);
     }
 
     private static DeliveryRow Row(DeliveryJobScreenViewModel vm, string key) =>
@@ -46,10 +62,12 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void Boot_ShowsStatsAndOrderedRows()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         Assert.Equal("Credibility Points: 100", vm.CredPLine);
+        // Town math (PORTPLAN 25): -1 + -2 + +2 = -1/hr; three stores seeded
+        // at the rules' 100 citizens each.
         Assert.Equal("City growth: ▼ -1 / hr", vm.CityGrowthLine);
-        Assert.Equal("Current citizens: 255", vm.CitizensLine);
+        Assert.Equal("Current citizens: 300", vm.CitizensLine);
 
         // Unconfirmed rows sort by stock percent ascending.
         Assert.Equal(["nurburg-kiosk", "adenau-post", "full-market"],
@@ -62,7 +80,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void Rows_BandsUrgentAndGrowth_FormattedFromData()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         DeliveryRow kiosk = Row(vm, "nurburg-kiosk");
         Assert.Equal("15%", kiosk.PercentLine);
         Assert.Equal(StockLevel.Red, kiosk.Level);
@@ -75,17 +93,17 @@ public sealed class DeliveryScreenTests
         Assert.Equal("30%", post.PercentLine);
         Assert.Equal(StockLevel.Amber, post.Level);
         Assert.False(post.IsUrgent);
-        Assert.Equal("▲ +1 citizen / hr", post.GrowthLine);
+        Assert.Equal("▼ -1 citizen / hr", post.GrowthLine);
 
         DeliveryRow full = Row(vm, "full-market");
         Assert.Equal(StockLevel.Green, full.Level);
-        Assert.Equal("▬ 0 citizen / hr", full.GrowthLine);
+        Assert.Equal("▲ +2 citizen / hr", full.GrowthLine);
     }
 
     [Fact]
     public void TapStore_ConfirmsFullRestockOrder()
     {
-        var (vm, log, _) = Create();
+        var (vm, log, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
 
         // Confirmed rows move to the top (cart order), like Unity's staged list.
@@ -102,7 +120,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void TapConfirmedRow_DropsTheOrder()
     {
-        var (vm, log, _) = Create();
+        var (vm, log, _, _) = Create();
         var post = Row(vm, "adenau-post");
         vm.ToggleOrderCommand.Execute(post);
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
@@ -116,7 +134,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void TapFullyStocked_IgnoredWithLog()
     {
-        var (vm, log, _) = Create();
+        var (vm, log, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
 
         Assert.False(Row(vm, "full-market").IsConfirmed);
@@ -127,7 +145,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void UrgentFlag_HidesOnceConfirmed()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
         Assert.False(Row(vm, "nurburg-kiosk").IsUrgent);
     }
@@ -135,7 +153,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void MainButton_RoutesByPhase()
     {
-        var (vm, _, fired) = Create();
+        var (vm, _, fired, _) = Create();
         vm.MainButtonCommand.Execute(null);
         Assert.True(fired[2]); // empty cart: OPEN NEW CAREER -> hub seam
         Assert.False(fired[1]);
@@ -146,9 +164,51 @@ public sealed class DeliveryScreenTests
     }
 
     [Fact]
+    public void Deliver_FillsTheOrderedShelvesAndEmptiesTheCart()
+    {
+        var (vm, log, fired, _) = Create();
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+        vm.MainButtonCommand.Execute(null);
+
+        // Stand-in until the freeroam map lands: the drop-off completes on the
+        // tap, so the ordered store prints full while its neighbour keeps
+        // draining, and the run seam still reports the leg not driven.
+        Assert.True(fired[1]);
+        DeliveryRow post = Row(vm, "adenau-post");
+        Assert.Equal("40 / 40 units", post.UnitsLine);
+        Assert.Equal("100%", post.PercentLine);
+        Assert.Equal("▲ +2 citizen / hr", post.GrowthLine);
+        Assert.Equal("6 / 40 units", Row(vm, "nurburg-kiosk").UnitsLine);
+
+        // A delivered order is a fulfilled order: the page flips back to its
+        // intro copy instead of holding a cart nothing will pick up.
+        Assert.Equal(0.0, vm.CartTotal);
+        Assert.Equal("OPEN NEW CAREER", vm.MainButtonLabel);
+        Assert.Equal("BACK", vm.BackButtonLabel);
+        Assert.Contains("orders delivered: €49.00 -> Adenau Post at full stock",
+            string.Join("|", log.Infos), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Deliver_HeaderFollowsTheRestockedBand()
+    {
+        // The town's growth is read off the shelves, so the header answers to
+        // the delivery without a second call: the kiosk flips the total from
+        // -1/hr (-1, -2, +2) to +3/hr (-1, +2, +2).
+        var (vm, _, _, _) = Create();
+        Assert.Equal("City growth: ▼ -1 / hr", vm.CityGrowthLine);
+
+        vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
+        vm.MainButtonCommand.Execute(null);
+
+        Assert.Equal("City growth: ▲ +3 / hr", vm.CityGrowthLine);
+        Assert.Equal("Current citizens: 300", vm.CitizensLine);
+    }
+
+    [Fact]
     public void Back_WithPendingCart_CancelsOrdersFirst()
     {
-        var (vm, log, fired) = Create();
+        var (vm, log, fired, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
         vm.BackCommand.Execute(null);
 
@@ -161,7 +221,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void Back_EmptyCart_OnlyNavigates()
     {
-        var (vm, log, fired) = Create();
+        var (vm, log, fired, _) = Create();
         vm.BackCommand.Execute(null);
         Assert.True(fired[0]);
         Assert.Empty(log.Infos);
@@ -170,7 +230,7 @@ public sealed class DeliveryScreenTests
     [Fact]
     public void EmptyCatalog_ShowsEmptyState()
     {
-        var (vm, _, _) = Create(DeliveryCatalog.Default);
+        var (vm, _, _, _) = Create(DeliveryCatalog.Default);
         Assert.False(vm.HasStores);
         Assert.Empty(vm.Rows);
         Assert.Equal("Credibility Points: 100", vm.CredPLine);
@@ -178,18 +238,43 @@ public sealed class DeliveryScreenTests
     }
 
     [Fact]
+    public void Stores_ConnectWhenTheirCareerOpens()
+    {
+        var board = new DeliveryCatalog(
+            [Post with { Category = "groceries" }, Kiosk with { Category = "coffee_beans" }], 0.7, 100);
+        var (vm, _, _, career) = Create(board, GrocersAndSonsHubs);
+
+        // Unity's career gate: an empty board until a hub is bought.
+        Assert.False(vm.HasStores);
+        Assert.Empty(vm.Rows);
+        Assert.Equal("OPEN NEW CAREER", vm.MainButtonLabel);
+
+        Assert.True(career.TryOpenCareer(tierId: 1, careerIndex: 0, levelIndex: 0));
+        vm.Refresh(); // Unity re-shows the board after the hub page closes.
+
+        Assert.True(vm.HasStores);
+        Assert.Equal(["adenau-post"], vm.Rows.Select(r => r.Store.Key).ToArray());
+        Assert.Equal("Credibility Points: 0", vm.CredPLine);
+    }
+
+    [Fact]
     public void Voice_BothPhaseNamesAndStoresAnswer()
     {
-        var (vm, _, fired) = Create();
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        var (vm, _, fired, _) = Create(clock: clock, beat: beat);
         Assert.True(vm.VoiceActions.ContainsKey("OPEN NEW CAREER"));
         Assert.True(vm.VoiceActions.ContainsKey("DELIVER")); // staged even while OPEN shows
         Assert.True(vm.VoiceActions.ContainsKey("BACK"));
         Assert.True(vm.VoiceActions.ContainsKey("CANCEL ORDER"));
+        Assert.True(vm.VoiceActions.ContainsKey("cancel"));
         Assert.True(vm.VoiceActions.ContainsKey("Adenau Post"));
 
         // One button routes by the page's phase, exactly like a click: with
-        // an empty cart either name opens the hub seam, not the run.
+        // an empty cart either name opens the hub seam, not the run. Voice
+        // taps wait out the shared beat so the glow shows before the flip.
         vm.VoiceActions["DELIVER"].Invoke();
+        DrainBeat(clock, beat);
         Assert.True(fired[2]);
         Assert.False(fired[1]);
 
@@ -198,13 +283,103 @@ public sealed class DeliveryScreenTests
 
         // Orders staged: the same names now route to the run seam.
         vm.VoiceActions["DELIVER"].Invoke();
+        DrainBeat(clock, beat);
         Assert.True(fired[1]);
+    }
+
+    // What MainViewModel.Poll does at 10 Hz: wall time passes, the beat drains.
+    private static void DrainBeat(FakeClock clock, VoiceBeat beat)
+    {
+        clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
+        beat.Poll();
+    }
+
+    [Fact]
+    public void Voice_MainTap_GlowsFirst_NavigatesAtTheBeatEnd()
+    {
+        // The page change waits: the tapped button holds its teal glow for
+        // the half-second beat and the seam only opens when the beat drains.
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        var (vm, _, fired, _) = Create(clock: clock, beat: beat);
+
+        vm.VoiceActions["OPEN NEW CAREER"].Invoke();
+        Assert.True(vm.MainFlash);
+        Assert.False(fired[2]); // still on this page while the beat runs
+
+        DrainBeat(clock, beat);
+        Assert.True(fired[2]);
+        Assert.False(vm.MainFlash); // no stale glow to re-show later
+    }
+
+    [Fact]
+    public void Voice_BackTap_WaitsTheBeat_ThenClearsPendingCart()
+    {
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        var (vm, _, fired, _) = Create(clock: clock, beat: beat);
+        vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
+
+        vm.VoiceActions["BACK"].Invoke();
+        Assert.True(vm.BackFlash);
+        Assert.False(fired[0]); // CANCEL ORDER lands after the beat
+        Assert.True(vm.Rows[0].IsConfirmed);
+
+        DrainBeat(clock, beat);
+        Assert.True(fired[0]);
+        Assert.Equal(0.0, vm.CartTotal);
+    }
+
+    [Fact]
+    public void Voice_CancelAlone_ClearsPendingCart()
+    {
+        // The one-word request: "cancel" fires what prints "CANCEL ORDER"
+        // (refund + leave), beside the full label that already answered.
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        var (vm, _, fired, _) = Create(clock: clock, beat: beat);
+        vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
+
+        vm.VoiceActions["cancel"].Invoke();
+        Assert.True(vm.BackFlash);
+        Assert.False(fired[0]); // the beat still runs before the page flips
+        Assert.True(vm.Rows[0].IsConfirmed);
+
+        DrainBeat(clock, beat);
+        Assert.True(fired[0]);
+        Assert.Equal(0.0, vm.CartTotal);
+    }
+
+    [Fact]
+    public void Click_MainAndBack_NavigateAtOnce_NoBeatWait()
+    {
+        // The wait exists so the voice glow is seen; a click already lands
+        // its action instantly, glow or not.
+        var (vm, _, fired, _) = Create();
+        vm.MainButtonCommand.Execute(null);
+        Assert.True(fired[2]);
+        vm.BackCommand.Execute(null);
+        Assert.True(fired[0]);
+    }
+
+    [Fact]
+    public void NumberWords_TriggerTheStoreAtThatPosition()
+    {
+        var (vm, _, _, _) = Create();
+        // Positions follow the displayed row order (stock ascending here).
+        Assert.Equal("ONE", vm.Rows[0].NumberWord);
+        Assert.Equal("TWO", vm.Rows[1].NumberWord);
+        Assert.Equal("THREE", vm.Rows[2].NumberWord);
+
+        // The word answers as button text does: "two" -> the second row.
+        vm.VoiceActions["TWO"].Invoke();
+        Assert.True(Row(vm, "adenau-post").IsConfirmed);
     }
 
     [Fact]
     public void CartMath_TotalSumsWholesaleCosts()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
         vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
         // 2.50*0.7*28 + 2.20*0.7*34 = 49.00 + 52.36

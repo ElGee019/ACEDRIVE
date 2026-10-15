@@ -35,6 +35,13 @@ public sealed class ImagePathConverter : IValueConverter
             bmp.Freeze();
             return bmp;
         }
-        catch { return null; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or NotSupportedException or UriFormatException or ArgumentException)
+        {
+            // Decode/permission/uri failure at the image boundary: a
+            // missing file or codec-less machine shows no thumbnail,
+            // never an exception (the view degrades, nothing else throws).
+            return null;
+        }
     }
 }

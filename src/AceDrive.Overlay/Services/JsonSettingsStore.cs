@@ -25,7 +25,12 @@ public sealed class JsonSettingsStore : ISettingsStore
             var b = JsonSerializer.Deserialize<WindowBounds>(File.ReadAllText(_file));
             return b is { IsSane: true } ? b : null;
         }
-        catch { return null; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // Corrupt or locked settings just mean "no saved placement":
+            // the window falls back to defaults instead of blocking startup.
+            return null;
+        }
     }
 
     public void Save(WindowBounds bounds)
@@ -35,6 +40,9 @@ public sealed class JsonSettingsStore : ISettingsStore
             Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
             File.WriteAllText(_file, JsonSerializer.Serialize(bounds));
         }
-        catch { /* never break shutdown for persistence */ }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // never break shutdown for persistence
+        }
     }
 }

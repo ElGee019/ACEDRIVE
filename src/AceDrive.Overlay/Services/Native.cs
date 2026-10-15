@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace AceDrive.Overlay;
+namespace AceDrive.Overlay.Services;
 
 /// <summary>Win32 interop: click-through toggle + global hotkey.</summary>
 internal static class Native

@@ -3,9 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using AceDrive.Core;
-using AceDrive.Overlay.Services;
 
-namespace AceDrive.Overlay;
+namespace AceDrive.Overlay.Services;
 
 /// <summary>
 /// EVO shared-memory reader (physics block). All byte offsets live here and

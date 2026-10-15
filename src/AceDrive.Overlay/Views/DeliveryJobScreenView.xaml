@@ -9,28 +9,56 @@
     <!-- Same page skeleton as the other screens: viewport-pinned MinHeight,
          title band on top. Body order mirrors the Unity DeliveryJobScreen:
          stats header, store list, then the phase-flipping main button and
-         the back/cancel button at the bottom. All copy arrives preformatted
-         or from resx; the view draws and nothing else. -->
+         the back/cancel button. The button bar lives in its own bottom band
+         flush with the panel edge, the way the title is flush with the top
+         one: the window chrome pads all sides equally, so zero own-margin
+         mirrors the date's top spacing exactly. All copy arrives
+         preformatted or from resx; the view draws and nothing else. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=DeliveryTitle}"/>
         <StackPanel Grid.Row="1" VerticalAlignment="Top">
             <TextBlock Text="{Binding CredPLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,2"/>
             <TextBlock Text="{Binding CityGrowthLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,2"/>
             <TextBlock Text="{Binding CitizensLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,8"/>
+            <!-- Instruction line above the stock levels; same muted voice as the
+                 hub subtitle. Meaningless without stores to tap, so it hides
+                 exactly where DeliveryEmpty shows (inverse HasStores trigger). -->
+            <TextBlock Text="{loc:Loc Key=DeliverySelectHint}" Foreground="#B0FFFFFF"
+                       FontSize="14" TextAlignment="Center" TextWrapping="Wrap"
+                       Margin="0,14,0,14">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasStores}" Value="False">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
             <ItemsControl ItemsSource="{Binding Rows}" Margin="0,0,0,10">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <!-- One row is one button: tapping confirms or drops
-                             the full-restock order (per-item steppers arrive
-                             with the order screen). -->
-                        <Button Margin="0,2" HorizontalContentAlignment="Stretch"
-                                Command="{Binding DataContext.ToggleOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}">
-                            <StackPanel>
+                        <!-- The number button IS the row's button: tapping ONE,
+                             TWO, … confirms or drops the full-restock order for
+                             that store (per-item steppers arrive with the order
+                             screen). The store read-out keeps its place beside
+                             it, borderless. -->
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="{Binding NumberWord}"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding DataContext.ToggleOrderCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}"/>
+                            <StackPanel Grid.Column="1" Margin="6,0,0,0">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -76,7 +104,7 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </StackPanel>
-                        </Button>
+                        </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
@@ -93,8 +121,34 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <Button Content="{Binding MainButtonLabel}" Margin="0,0,0,6" Command="{Binding MainButtonCommand}"/>
-            <Button Content="{Binding BackButtonLabel}" Margin="0,0,0,6" Command="{Binding BackCommand}"/>
+        </StackPanel>
+        <!-- Button bar: own bottom band so the last button ends flush with
+             the panel edge; the 6 px between them keeps the list rhythm.
+             Teal is the shared voice-ack highlight: the button the mic
+             tapped glows for one beat before the page waits it out. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{Binding MainButtonLabel}" Margin="0,0,0,6" Command="{Binding MainButtonCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding MainFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{Binding BackButtonLabel}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
         </StackPanel>
     </Grid>
 </UserControl>

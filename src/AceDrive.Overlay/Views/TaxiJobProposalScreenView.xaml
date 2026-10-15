@@ -1,0 +1,60 @@
+<UserControl x:Class="AceDrive.Overlay.Views.TaxiJobProposalScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
+         title row, body centered below it, BACK in the bottom row. The body
+         mirrors the Unity TaxiJobProposalScreen: the job phrase, ACCEPT and
+         DECLINE, then the radius hint and field. DECLINE needs no glow: it
+         stays on the page and the fresh proposal is its own acknowledgment. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=ProposalTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Phrase}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap"
+                       TextAlignment="Center" Margin="0,6,0,12"/>
+            <Button Content="{loc:Loc Key=ProposalAccept}" Margin="0,0,0,6"
+                    HorizontalAlignment="Stretch" Command="{Binding AcceptCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding AcceptFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=ProposalDecline}"
+                    HorizontalAlignment="Stretch" Command="{Binding DeclineCommand}"/>
+            <!-- Radius (Unity OnRadiusEndEdit): commits on focus loss, like
+                 the TMP field's end-edit, and shows the committed integer. -->
+            <TextBlock Text="{loc:Loc Key=ProposalRadiusHint}" Foreground="#FFBFC4C9" FontSize="11"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,12,0,4"/>
+            <TextBox Text="{Binding RadiusText}" Width="80" HorizontalAlignment="Center"/>
+        </StackPanel>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=DeliveryBack}" Padding="4"
+                    HorizontalAlignment="Stretch" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

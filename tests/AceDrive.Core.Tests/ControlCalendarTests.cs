@@ -2,29 +2,32 @@ using AceDrive.Core;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>Calendar day math is deterministic and Sunday-first like Unity.</summary>
+/// <summary>Calendar day math is deterministic; the strip lists Monday
+/// first with Sunday last, events tied to their weekday.</summary>
 public sealed class ControlCalendarTests
 {
     [Fact]
-    public void Week_HasSevenSundayFirstRows()
+    public void Week_HasSevenRowsMondayFirstSundayLast()
     {
         Assert.Equal(7, ControlCalendar.Week.Count);
-        for (int i = 0; i < 7; i++)
+        for (int i = 0; i < 6; i++)
         {
-            Assert.Equal(i + 1, ControlCalendar.Week[i].DayOfWeek);
+            Assert.Equal(i + 2, ControlCalendar.Week[i].DayOfWeek);
         }
+
+        Assert.Equal(ControlCalendar.Sunday, ControlCalendar.Week[6].DayOfWeek);
     }
 
     [Fact]
     public void Week_MapsEventsLikeUnity()
     {
-        Assert.Equal(ControlCalendar.CentoMiglia, ControlCalendar.Week[0].EventId);
-        Assert.Equal(ControlCalendar.Valuation, ControlCalendar.Week[1].EventId);
-        Assert.Equal(ControlCalendar.RoadTest, ControlCalendar.Week[2].EventId);
-        Assert.Equal(ControlCalendar.Willy, ControlCalendar.Week[3].EventId);
-        Assert.Null(ControlCalendar.Week[4].EventId);
-        Assert.Equal(ControlCalendar.Pancakes, ControlCalendar.Week[5].EventId);
-        Assert.Null(ControlCalendar.Week[6].EventId);
+        Assert.Equal(ControlCalendar.Valuation, ControlCalendar.Week[0].EventId);
+        Assert.Equal(ControlCalendar.RoadTest, ControlCalendar.Week[1].EventId);
+        Assert.Equal(ControlCalendar.Willy, ControlCalendar.Week[2].EventId);
+        Assert.Null(ControlCalendar.Week[3].EventId);
+        Assert.Equal(ControlCalendar.Pancakes, ControlCalendar.Week[4].EventId);
+        Assert.Null(ControlCalendar.Week[5].EventId);
+        Assert.Equal(ControlCalendar.CentoMiglia, ControlCalendar.Week[6].EventId);
     }
 
     [Fact]

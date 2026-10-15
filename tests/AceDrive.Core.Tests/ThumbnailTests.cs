@@ -75,9 +75,20 @@ public sealed class ThumbnailTests
     [Fact]
     public void Cropper_FindsCarBand_WithMargin()
     {
-        byte[] px = SyntheticBgra(64, 64, carTop: 20, carBottom: 40);
-        // Sampling runs over even rows: first match 20, last match 38; margin pads both.
-        Assert.Equal((20 - ThumbnailCropper.MarginPx, 38 + ThumbnailCropper.MarginPx),
+        byte[] px = SyntheticBgra(64, 64, carTop: 30, carBottom: 40);
+        // Sampling runs over even rows: first match 30, last match 38;
+        // headroom pads the roof, margin pads the wheels.
+        Assert.Equal((30 - ThumbnailCropper.HeadroomPx, 38 + ThumbnailCropper.MarginPx),
+            ThumbnailCropper.ContentRows(px, 64, 64));
+    }
+
+    [Fact]
+    public void Cropper_RoofAtImageTop_ClampsHeadroom()
+    {
+        // Low-slung render: 20px of headroom would run off the image; the
+        // kept band must start at row 0 instead of going negative.
+        byte[] px = SyntheticBgra(64, 64, carTop: 2, carBottom: 40);
+        Assert.Equal((0, 38 + ThumbnailCropper.MarginPx),
             ThumbnailCropper.ContentRows(px, 64, 64));
     }
 

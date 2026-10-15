@@ -25,7 +25,12 @@ public sealed class JsonOnboardingStore : IOnboardingStore
             var state = JsonSerializer.Deserialize<OnboardingState>(File.ReadAllText(_file));
             return state ?? OnboardingState.Fresh;
         }
-        catch { return OnboardingState.Fresh; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // Corrupt or locked progress just means "start onboarding fresh":
+            // the first-run flow re-opens instead of blocking startup.
+            return OnboardingState.Fresh;
+        }
     }
 
     public void Save(OnboardingState state)
@@ -35,6 +40,9 @@ public sealed class JsonOnboardingStore : IOnboardingStore
             Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
             File.WriteAllText(_file, JsonSerializer.Serialize(state));
         }
-        catch { /* never break shutdown for persistence */ }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // never break shutdown for persistence
+        }
     }
 }

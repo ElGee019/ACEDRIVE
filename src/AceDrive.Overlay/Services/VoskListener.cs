@@ -1,3 +1,5 @@
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using AceDrive.Core;
 using NAudio.Wave;
@@ -43,7 +45,15 @@ public sealed class VoskListener : IVoiceListener
             _running = true;
             _log.LogInfo($"voice listening (model {_modelPath})");
         }
-        catch (Exception ex)
+        // WHY: every realistic way voice can fail to start is a model-file
+        // error (IO/access), a native Vosk DLL error (load/format) or a mic
+        // device error (com/invalid/not-supported). Any of them degrades to
+        // "voice off" per App.CreateVoice's contract; anything else is a bug
+        // and must surface rather than hide behind voice-off (CA1031).
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+            or DllNotFoundException or EntryPointNotFoundException
+            or BadImageFormatException or FileLoadException
+            or InvalidOperationException or NotSupportedException or COMException)
         {
             _log.LogWarning($"voice start failed ({ex.GetType().Name}); voice off");
             Cleanup();
@@ -70,7 +80,14 @@ public sealed class VoskListener : IVoiceListener
                 Emit(_rec.PartialResult(), isFinal: false);
             }
         }
-        catch { /* never break the audio thread */ }
+        // WHY: the audio thread has no dispatcher handler, so a dead device
+        // or the dispose race mid-callback would take the overlay (and the
+        // game session beside it) down. Recognizer/driver state errors and
+        // the disposal race are the whole recoverable set (IVoiceListener:
+        // degrade to silence); a bug elsewhere in the chain is NOT muted here.
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or COMException)
+        {
+        }
     }
 
     private void Emit(string json, bool isFinal)
@@ -85,12 +102,23 @@ public sealed class VoskListener : IVoiceListener
                 Heard?.Invoke(this, new VoiceTextEventArgs(text, isFinal));
             }
         }
-        catch { /* torn fragment; the next one follows shortly */ }
+        // WHY: a torn/mis-shaped fragment (JsonException) or a non-string
+        // text element (InvalidOperationException) is expected noise from a
+        // streaming recognizer; the next fragment follows shortly.
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException)
+        {
+        }
     }
 
     private void Cleanup()
     {
-        try { _mic?.StopRecording(); } catch { }
+        // WHY: StopRecording on an already-dead or disposed device is the
+        // expected shutdown race; the overlay must close quietly (CA1031:
+        // specific types, not a blanket mute).
+        try { _mic?.StopRecording(); }
+        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException or COMException)
+        {
+        }
         _mic?.Dispose();
         _mic = null;
         _rec?.Dispose();

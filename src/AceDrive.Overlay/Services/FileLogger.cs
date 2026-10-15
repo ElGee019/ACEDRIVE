@@ -51,7 +51,12 @@ public sealed class FileLogger : ILog, IDisposable
                 _writer.WriteLine($"{DateTime.Now:MM-ddTHH:mm:ss} {level,-5} {message}");
             }
         }
-        catch { /* logging must never break the app */ }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Logging must never break the app, but only genuine sink
+            // failures (locked/corrupt log dir) are swallowed here:
+            // anything else is a bug worth surfacing (AGENTS.md: no bare catch).
+        }
     }
 
     public void Dispose()

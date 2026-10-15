@@ -8,17 +8,19 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDialogueScreen
 {
     private readonly IScreenController _controller;
+    private readonly VoiceBeat _beat;
     private readonly IReadOnlyList<DialogueLine> _lines;
     private int _index;
 
-    public DialogueScreenViewModel(IScreenController controller, IReadOnlyList<DialogueLine> lines)
+    public DialogueScreenViewModel(IScreenController controller, IReadOnlyList<DialogueLine> lines, VoiceBeat beat)
     {
         _controller = controller;
+        _beat = beat;
         _lines = lines;
         ContinueCommand = new RelayCommand(Continue);
         VoiceActions = new Dictionary<string, Action>
         {
-            [Strings.Get("DialogueContinue")] = Continue,
+            [Strings.Get("DialogueContinue")] = VoiceContinue,
         };
         Refresh();
     }
@@ -37,6 +39,10 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
     /// <summary>True once the last page has been acknowledged (idle-hide resumes).</summary>
     public bool IsComplete { get; private set; }
 
+    /// <summary>Teal-glow acknowledgment for a voice tap that finishes the dialogue.</summary>
+    public bool ContinueFlash { get => _continueFlash; private set => SetField(ref _continueFlash, value); }
+    private bool _continueFlash;
+
     private void Continue()
     {
         if (_index + 1 < _lines.Count)
@@ -46,9 +52,33 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
         }
         else
         {
-            IsComplete = true;
-            _controller.FinishDialogue();
+            Finish();
         }
+    }
+
+    // Page turns stay on this screen and act at once like a click; only the
+    // finishing tap navigates, so only it flashes teal first and waits out
+    // the shared beat.
+    private void VoiceContinue()
+    {
+        if (_index + 1 < _lines.Count)
+        {
+            _index++;
+            Refresh();
+            return;
+        }
+        ContinueFlash = true;
+        _beat.Defer(() =>
+        {
+            ContinueFlash = false;
+            Finish();
+        });
+    }
+
+    private void Finish()
+    {
+        IsComplete = true;
+        _controller.FinishDialogue();
     }
 
     private void Refresh()

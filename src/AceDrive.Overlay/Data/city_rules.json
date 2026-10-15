@@ -1,0 +1,17 @@
+{
+  "DefaultCitizens": 100,
+  "MinCitizens": 70,
+  "CitizenTickMinutes": 30,
+  "DepletionTickMinutes": 90,
+  "HighPercent": 75,
+  "MediumPercent": 60,
+  "LowPercent": 40,
+  "VeryLowPercent": 25,
+  "HighDelta": 1,
+  "MediumDelta": 0.5,
+  "NeutralDelta": 0,
+  "LowDelta": -0.5,
+  "VeryLowDelta": -1,
+  "DepletionFirstCitizens": 200,
+  "DepletionStepCitizens": 100
+}

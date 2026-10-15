@@ -34,8 +34,7 @@
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Say "HEY {BRAND}" to activate the app from within the car you are driving.
-For instance "HEY ALPINE".</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Say "HEY {BRAND}" to activate the app. For instance "HEY ALPINE".</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Say a button's text to click that button.
 For instance "{0}".</value></data>
   <data name="SpeakerGrandma" xml:space="preserve"><value>Grandma</value></data>
@@ -43,9 +42,11 @@ For instance "{0}".</value></data>
   <data name="ControlTaxi" xml:space="preserve"><value>START TAXI SHIFT</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>CONTINUE TAXI SHIFT</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
+  <data name="ControlHaul" xml:space="preserve"><value>CAR HAULING JOB</value></data>
   <data name="ControlCalendar" xml:space="preserve"><value>CALENDAR</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>GRANDMA'S TO DO</value></data>
   <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
+  <data name="ControlGateWarning" xml:space="preserve"><value>COME BACK ON {0} BETWEEN 8am AND 8pm</value></data>
   <data name="DaySun" xml:space="preserve"><value>Sunday</value></data>
   <data name="DayMon" xml:space="preserve"><value>Monday</value></data>
   <data name="DayTue" xml:space="preserve"><value>Tuesday</value></data>
@@ -81,4 +82,43 @@ For instance "{0}".</value></data>
   <data name="DeliveryBack" xml:space="preserve"><value>BACK</value></data>
   <data name="DeliveryCancelOrder" xml:space="preserve"><value>CANCEL ORDER</value></data>
   <data name="DeliveryEmpty" xml:space="preserve"><value>No stores available for delivery yet. Use your Credibility Points to start your first delivery career by clicking OPEN NEW CAREER below.</value></data>
+  <data name="DeliverySelectHint" xml:space="preserve"><value>Select any store(s) to start a delivery job for them.</value></data>
+  <!-- Row number buttons (delivery page): spoken/written words so voice and
+       sight share one label. Keys are positional (1 = top row); rows past
+       the last key fall back to plain digits in the ViewModel. -->
+  <data name="DeliveryNumber1" xml:space="preserve"><value>ONE</value></data>
+  <data name="DeliveryNumber2" xml:space="preserve"><value>TWO</value></data>
+  <data name="DeliveryNumber3" xml:space="preserve"><value>THREE</value></data>
+  <data name="DeliveryNumber4" xml:space="preserve"><value>FOUR</value></data>
+  <!-- Open-new-career page (PORTPLAN 18, Unity DeliveryHubScreen). Hub and
+       category names are data (delivery_hubs.json); only chrome lives here.
+       BACK reuses DeliveryBack. -->
+  <data name="HubTitle" xml:space="preserve"><value>DELIVERY HUB</value></data>
+  <data name="HubSubtitle" xml:space="preserve"><value>Select which Wholesale Distribution Hub you want to open.</value></data>
+  <data name="HubTier" xml:space="preserve"><value>TIER {0}</value></data>
+  <data name="HubPrice" xml:space="preserve"><value>{0} - {1:0}CredP</value></data>
+  <data name="HubCellPrice" xml:space="preserve"><value>- {0:0}CredP</value></data>
+  <data name="HubComingSoon" xml:space="preserve"><value>COMING SOON</value></data>
+  <data name="HubOpenCareer" xml:space="preserve"><value>OPEN CAREER</value></data>
+  <!-- Taxi job proposal page (PORTPLAN 11, Unity TaxiJobProposalScreen). The
+       phrase carries Unity's line layout: {0} the drawn passenger identity,
+       {1} pickup, {2} drop-off. Addresses are placeholder names until the
+       Eifel table lands (Step 1); BACK reuses DeliveryBack. -->
+  <data name="ProposalTitle" xml:space="preserve"><value>TAXI JOB PROPOSAL</value></data>
+  <data name="ProposalPhrase" xml:space="preserve"><value>{0}
+need a ride
+from {1}
+to {2}
+
+Accept this job?</value></data>
+  <data name="ProposalAccept" xml:space="preserve"><value>ACCEPT</value></data>
+  <data name="ProposalDecline" xml:space="preserve"><value>DECLINE</value></data>
+  <data name="ProposalAddressA" xml:space="preserve"><value>Address A</value></data>
+  <data name="ProposalAddressB" xml:space="preserve"><value>Address B</value></data>
+  <!-- Leg descriptions, Unity TaxiJobGenerator's fromDescription/toDescription:
+       the customer's home reads "home, {address}", the other address is the
+       second resident's family home ("the {0} residence, {1}"). -->
+  <data name="ProposalLegHome" xml:space="preserve"><value>home, {0}</value></data>
+  <data name="ProposalLegResidence" xml:space="preserve"><value>the {0} residence, {1}</value></data>
+  <data name="ProposalRadiusHint" xml:space="preserve"><value>Limit how far from Grandma's place you're willing to accept taxi jobs by entering a radius below.</value></data>
 </root>

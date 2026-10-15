@@ -147,6 +147,10 @@ Working code that violates these rules still fails review.
 - `dotnet format ACEDRIVE.slnx --verify-no-changes` before committing; CI
   enforces it. Fix findings by hand, never via unattended fixer runs (an
   IDE0005 false positive once deleted a needed using).
+- Repo works in CRLF (`* text=auto` + `core.autocrlf=true`), and format
+  enforces it with `ENDOFLINE` errors. File-creation tools emit LF: after
+  any whole-file write or creation, convert the touched files to CRLF
+  before building/formatting instead of discovering it later.
 - Verify through execution (tests; run the overlay against real EVO).
 - Tests are culture-deterministic (`en-US` set in test setup); product code
   formats with `CurrentCulture`.

@@ -48,8 +48,11 @@ public sealed class JsonTodoStore
             _log.LogInfo($"todos loaded: {table.Entries.Count} entries");
             return table;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            // Read/deserialize boundary only: a corrupt or locked data file
+            // must not take the overlay down (AGENTS.md: Try* at every
+            // external boundary). Anything else stays a crash.
             _log.LogWarning($"todos.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return TodoTable.Default;
         }

@@ -2,9 +2,9 @@
   "WholesaleRate": 0.7,
   "StartCredP": 100,
   "Stores": [
-    { "Key": "adenau-post", "Name": "Adenau Post", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.50, "Citizens": 140, "GrowthPerHour": 1 },
-    { "Key": "nurburg-kiosk", "Name": "Nürburg Kiosk", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.20, "Citizens": 45, "GrowthPerHour": -2 },
-    { "Key": "quiddelbach-farm-market", "Name": "Quiddelbach Farm Market", "Owner": "Schmitz", "StockedUnits": 40, "UnitCapacity": 40, "PricePerUnit": 4.40, "Citizens": 70, "GrowthPerHour": 0 },
-    { "Key": "breidscheid-bakery", "Name": "Breidscheid Bakery", "Owner": "Weber", "StockedUnits": 15, "UnitCapacity": 60, "PricePerUnit": 3.10, "Citizens": 95, "GrowthPerHour": 1 }
+    { "Key": "adenau-post", "Name": "Adenau Post", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.50, "Category": "groceries" },
+    { "Key": "nurburg-kiosk", "Name": "Nürburg Kiosk", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.20, "Category": "coffee_beans" },
+    { "Key": "quiddelbach-farm-market", "Name": "Quiddelbach Farm Market", "Owner": "Schmitz", "StockedUnits": 40, "UnitCapacity": 40, "PricePerUnit": 4.40, "Category": "groceries" },
+    { "Key": "breidscheid-bakery", "Name": "Breidscheid Bakery", "Owner": "Weber", "StockedUnits": 15, "UnitCapacity": 60, "PricePerUnit": 3.10, "Category": "groceries" }
   ]
 }

@@ -68,7 +68,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 
 ## 3. POI / Businesses
 - [x] 24 Typed POI network (markers/handlers) — CONFIRMED
-- [x] 25 Store inventory + citizen-demand depletion — CONFIRMED
+- [x] 25 Store inventory + citizen-demand depletion — CONFIRMED (city growth ported: 100 citizens per store, stock bands drive the tick, demand needs a hub, size saved on exit)
 - [x] 26 Grocery shopping + hunger survival — CONFIRMED
 - [x] 27 Story/quest POIs (Max/Justin/Grandma/Willy/photo-op) — CONFIRMED
 
@@ -98,7 +98,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 - [x] 46 Grandma ToDo tutorial quests (7 subjects) — CONFIRMED
 - [x] 47 Daily streak + consecutive-day + starter bonus — CONFIRMED
 - [x] 48 Bank savings + interest — CONFIRMED
-- [x] 49 Competitive events (Mille/Cento Miglia, Road-Test, Valuation, Star of Show) — CONFIRMED
+- [x] 49 Competitive events (Mille/Cento Miglia, Road-Test, Valuation, Star of Show) — CONFIRMED (road-test pick is sticky: one car until its test is driven, kept across overlay sessions)
 
 ## 7. Time / World sim
 - [x] 50 Game clock (16x) + calendar — CONFIRMED (start from Kunos clock + add calendar)

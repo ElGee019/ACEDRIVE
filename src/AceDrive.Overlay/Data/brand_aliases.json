@@ -1,3 +1,11 @@
 {
-  "lancia": ["lancer"]
+  "lancia": ["lancer"],
+  "audi": ["odie", "ody", "odai", "oday", "owdi", "awdi", "audy", "audie", "o die", "oh dee"],
+  "alpine": ["i'll buy"],
+  "hyundai": ["you know", "young guy", "he'll die", "he um die", "you'll die", "you die", "he and i", "and i", "he die", "he one day", "he'll ny", "he'll lay", "jan di"],
+  "lamborghini": ["your lamborghini"],
+  "lotus": ["lord of"],
+  "maserati": ["majority", "massage therapy", "mother", "missouri", "marseilles variety"],
+  "mazda": ["muster", "muslim", "pasta", "many", "me some", "marsden"],
+  "datsun": ["nissan", "dodson", "nathan", "henderson"]
 }

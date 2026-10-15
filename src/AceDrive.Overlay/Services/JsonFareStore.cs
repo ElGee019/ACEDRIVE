@@ -49,8 +49,11 @@ public sealed class JsonFareStore
             _log.LogInfo($"fares loaded: base={table.BaseFare} perKm={table.PerKmRate} tip={table.TipRate}");
             return table;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {
+            // Read/deserialize boundary only: a corrupt or locked data file
+            // must not take the overlay down (AGENTS.md: Try* at every
+            // external boundary). Anything else stays a crash.
             _log.LogWarning($"fares.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return FareTable.Default;
         }

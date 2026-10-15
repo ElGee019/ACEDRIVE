@@ -23,8 +23,14 @@
         <DataTemplate DataType="{x:Type vm:MainControlScreenViewModel}">
             <views:MainControlScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TaxiJobProposalViewModel}">
+            <views:TaxiJobProposalScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:DeliveryJobScreenViewModel}">
             <views:DeliveryJobScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DeliveryHubScreenViewModel}">
+            <views:DeliveryHubScreenView/>
         </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes

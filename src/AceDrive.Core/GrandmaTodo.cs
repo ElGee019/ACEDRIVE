@@ -5,21 +5,6 @@
 // persistent save (PORTPLAN item 51); until then everything reads 0.
 namespace AceDrive.Core;
 
-/// <summary>One tutorial quest: stable subject key plus its target.</summary>
-public sealed record TodoEntry(string SubjectId, int Target);
-
-/// <summary>Balance table for the starter ToDo list.</summary>
-public sealed record TodoTable(IReadOnlyList<TodoEntry> Entries)
-{
-    public static readonly TodoTable Default = new(
-    [
-        new(GrandmaTodo.MaxGrocery, 1),
-        new(GrandmaTodo.TaxiJobs, 3),
-        new(GrandmaTodo.EarnCr, 500),
-        new(GrandmaTodo.VisitBank, 1),
-    ]);
-}
-
 public static class GrandmaTodo
 {
     public const string MaxGrocery = "MaxGrocery";

@@ -1,22 +1,9 @@
+using System.Globalization;
 using System.Windows.Input;
 using AceDrive.Core;
 using AceDrive.Overlay.Localization;
 
 namespace AceDrive.Overlay.ViewModels;
-
-/// <summary>One store row, preformatted: the view stays dumb (Unity StoreListView).</summary>
-public sealed record DeliveryRow(
-    DeliveryStore Store,
-    string NameLine,
-    string OwnerLine,
-    string UnitsLine,
-    string GrowthLine,
-    string PercentLine,
-    double Percent,
-    StockLevel Level,
-    bool IsUrgent,
-    bool IsConfirmed,
-    string ConfirmedLine);
 
 /// <summary>
 /// Delivery career page (PORTPLAN items 16-19, port of Unity
@@ -24,36 +11,42 @@ public sealed record DeliveryRow(
 /// list and the phase-flipping main button. A row tap confirms a
 /// full-restock order into the pickup cart and flips the page between
 /// OPEN NEW CAREER and DELIVER; the back button becomes CANCEL ORDER while
-/// the cart holds orders, mirroring the Unity screen. Per-item quantities
-/// arrive with the order screen (item 17), hub purchase with item 18, the
-/// pickup run with the map — those actions cross screens and so come in as
-/// injected commands (composition, no IScreenController growth).
+/// the cart holds orders, mirroring the Unity screen. Only stores whose
+/// wholesale career has been opened show on the board (Unity's
+/// HasHubForCategory eligibility), so the board starts empty and the hub
+/// page fills it. Per-item quantities arrive with the order screen (item
+/// 17); the pickup run crosses to the map, so both actions come in as
+/// injected commands (composition, no IScreenController growth). The delivery
+/// lands on the tap for now: with no Eifel address table yet (PORTPLAN Step
+/// 1) there is no leg to drive, so filling the ordered shelves is the
+/// placeholder and the run seam only reports the missing half.
 /// Voice parity with the control page: every button answers to its text.
 /// </summary>
 public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
 {
     private readonly DeliveryCatalog _catalog;
+    private readonly DeliveryCareer _career;
+    private readonly CityEconomy _city;
     private readonly DeliveryCart _cart = new();
     private readonly ILog _log;
+    private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
     private readonly ICommand _runCommand;
     private readonly ICommand _hubCommand;
 
     public DeliveryJobScreenViewModel(
-        DeliveryCatalog catalog, ILog log,
-        ICommand backCommand, ICommand runCommand, ICommand hubCommand)
+        DeliveryCatalog catalog, DeliveryCareer career, CityEconomy city, ILog log,
+        ICommand backCommand, ICommand runCommand, ICommand hubCommand,
+        VoiceBeat beat)
     {
         _catalog = catalog;
+        _career = career;
+        _city = city;
         _log = log;
+        _beat = beat;
         _backCommand = backCommand;
         _runCommand = runCommand;
         _hubCommand = hubCommand;
-
-        // Max's intro gift is the only CredP that exists until the persistent
-        // save lands (PORTPLAN 5/51): the number rides the catalog as data.
-        CredPLine = Strings.Format("DeliveryCredP", catalog.StartCredP);
-        CitizensLine = Strings.Format("DeliveryCitizens", catalog.TotalCitizens);
-        CityGrowthLine = GrowthHeadline(catalog.CityGrowthPerHour);
 
         ToggleOrderCommand = new ParameterizedCommand<DeliveryRow>(ToggleOrder);
         MainButtonCommand = new RelayCommand(OnMainButton);
@@ -61,9 +54,14 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         RebuildRows();
     }
 
-    public string CredPLine { get; }
-    public string CitizensLine { get; }
-    public string CityGrowthLine { get; }
+    public string CredPLine { get => _credPLine; private set => SetField(ref _credPLine, value); }
+    private string _credPLine = "";
+
+    public string CitizensLine { get => _citizensLine; private set => SetField(ref _citizensLine, value); }
+    private string _citizensLine = "";
+
+    public string CityGrowthLine { get => _cityGrowthLine; private set => SetField(ref _cityGrowthLine, value); }
+    private string _cityGrowthLine = "";
 
     public IReadOnlyList<DeliveryRow> Rows { get => _rows; private set => SetField(ref _rows, value); }
     private IReadOnlyList<DeliveryRow> _rows = [];
@@ -82,12 +80,25 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     public ICommand MainButtonCommand { get; }
     public ICommand BackCommand { get; }
 
+    /// <summary>Teal-glow acknowledgment for voice taps, one per button.</summary>
+    public bool MainFlash { get => _mainFlash; private set => SetField(ref _mainFlash, value); }
+    private bool _mainFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per button.</summary>
+    public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
+    private bool _backFlash;
+
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
 
     /// <summary>Total wholesale money committed by the cart (for logs/tests;
     /// the escrow wallet itself lands with the save, PORTPLAN 51).</summary>
     public double CartTotal => _cart.TotalCost(_catalog);
+
+    /// <summary>Unity re-shows this screen after the hub page closes, so it
+    /// re-pulls career state (spent CredP, newly connected stores). This
+    /// page is cached across navigation, hence the explicit refresh.</summary>
+    public void Refresh() => RebuildRows();
 
     private void ToggleOrder(DeliveryRow? row)
     {
@@ -109,13 +120,46 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
 
     private void OnMainButton()
     {
+        // Any action on this button ends a pending voice glow (click after
+        // a voice tap, or the deferred tap itself): no stale teal on revisit.
+        ClearVoiceFlash();
         // Phase flip only routes; what each phase opens lives behind the
         // injected commands so this page never grows map/hub branches.
-        (_cart.Phase == DeliveryPhase.OpenCareer ? _hubCommand : _runCommand).Execute(null);
+        if (_cart.Phase == DeliveryPhase.OpenCareer)
+        {
+            _hubCommand.Execute(null);
+            return;
+        }
+        // Stand-in until the freeroam pickup wizard lands: the run needs
+        // addresses, so the drop-off completes here and the seam only notes
+        // the leg that cannot be driven yet.
+        DeliverOrders();
+        _runCommand.Execute(null);
     }
+
+    // The ordered stores are the delivered ones: a full store takes no order,
+    // so the cart never holds a shelf that does not need the drop-off. Filling
+    // the shelves is CityEconomy's rule (this page never edits town state by
+    // hand), and the wholesale money is only worth the log line until the
+    // escrow wallet lands (PORTPLAN 51).
+    private void DeliverOrders()
+    {
+        IReadOnlyList<string> keys = _cart.ConfirmedKeys;
+        _log.LogInfo($"orders delivered: €{_cart.TotalCost(_catalog):0.00} -> " +
+            $"{string.Join(", ", keys.Select(NameOf))} at full stock");
+        _city.Restock(keys);
+        _cart.Clear();
+        RebuildRows();
+    }
+
+    // A cart key always has a catalog row (a row tap is the only way in);
+    // falling back to the key keeps the log line whole if content changed
+    // under a staged cart.
+    private string NameOf(string key) => _catalog.Find(key)?.Name ?? key;
 
     private void OnBack()
     {
+        ClearVoiceFlash();
         if (!_cart.IsEmpty)
         {
             // Unity: leaving with a pending cart is CANCEL ORDER, which
@@ -128,34 +172,65 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         _backCommand.Execute(null);
     }
 
+    // Navigating voice taps glow first, then act at the end of the shared
+    // beat so the teal acknowledgment shows before the flip. The actions
+    // clear the glow when they run, so a click during a beat (or the beat
+    // itself) never leaves a stale teal on this cached page.
+    private void FlashThen(string target, Action act)
+    {
+        MainFlash = target == "main";
+        BackFlash = target == "back";
+        _beat.Defer(act);
+    }
+
+    private void ClearVoiceFlash()
+    {
+        MainFlash = false;
+        BackFlash = false;
+    }
+
     // Confirmed rows first (cart order, like Unity's staged list), then the
     // rest by stock percentage ascending: emptiest stores need help most.
+    // Stores whose wholesale career is not open yet stay off the board
+    // (Unity eligibility rule) — buying a hub on the page behind the main
+    // button is what fills it. Header and rows read the town's live citizens
+    // and shelves (CityEconomy, PORTPLAN 25), not the printed content.
     private void RebuildRows()
     {
-        var rows = new List<DeliveryRow>(_catalog.Stores.Count);
+        IReadOnlyList<DeliveryStore> visible = _city.Live(_career.VisibleStores(_catalog));
+        CredPLine = Strings.Format("DeliveryCredP", _career.CredP);
+        CitizensLine = Strings.Format("DeliveryCitizens", _city.TotalCitizens(visible));
+        CityGrowthLine = DeliveryCopy.CityGrowth(_city.TotalGrowthPerHour(visible));
+
+        var rows = new List<DeliveryRow>(visible.Count);
+        int position = 1;
         foreach (string key in _cart.ConfirmedKeys)
         {
             DeliveryStore? store = _catalog.Find(key);
-            if (store is not null) rows.Add(BuildRow(store, confirmed: true));
+            if (store is null || !_career.Connects(store)) continue;
+            rows.Add(BuildRow(_city.Live(store), confirmed: true, position++));
         }
-        rows.AddRange(_catalog.Stores
+        foreach (DeliveryStore store in visible
             .Where(s => !_cart.Contains(s.Key))
-            .OrderBy(s => s.StockPercent)
-            .Select(s => BuildRow(s, confirmed: false)));
+            .OrderBy(s => s.StockPercent))
+        {
+            rows.Add(BuildRow(store, confirmed: false, position++));
+        }
         Rows = rows;
-        HasStores = _catalog.Stores.Count > 0;
+        HasStores = rows.Count > 0;
         bool deliver = _cart.Phase == DeliveryPhase.Deliver;
         MainButtonLabel = Strings.Get(deliver ? "DeliveryDeliver" : "DeliveryOpenCareer");
         BackButtonLabel = Strings.Get(deliver ? "DeliveryCancelOrder" : "DeliveryBack");
         RebuildVoice();
     }
 
-    private DeliveryRow BuildRow(DeliveryStore store, bool confirmed) => new(
+    private DeliveryRow BuildRow(DeliveryStore store, bool confirmed, int position) => new(
         store,
+        NumberWord(position),
         store.Name,
         store.Owner.ToUpperInvariant(),
         Strings.Format("DeliveryUnits", store.StockedUnits, store.UnitCapacity),
-        StoreGrowthLine(store.GrowthPerHour),
+        StoreGrowthLine(_city.GrowthPerHour(store)),
         Strings.Format("DeliveryPercent", store.StockPercent),
         store.StockPercent,
         store.Level,
@@ -163,15 +238,22 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         confirmed,
         confirmed ? Strings.Format("DeliveryConfirmed", _catalog.OrderCost(store)) : string.Empty);
 
-    // Unity StoreManager display mapping: ▲ +n / ▼ -n / ▬ 0, as data sign ->
-    // three resx variants so translators own the copy.
-    private static string GrowthHeadline(int growthPerHour) => growthPerHour switch
-    {
-        > 0 => Strings.Format("DeliveryGrowthUp", growthPerHour),
-        < 0 => Strings.Format("DeliveryGrowthDown", growthPerHour),
-        _ => Strings.Get("DeliveryGrowthFlat"),
-    };
+    // One resx key per row position: translators own the spoken word. A
+    // catalog grown past the last key degrades to plain digits rather than
+    // showing a raw resource key.
+    private static readonly string[] NumberWordKeys =
+    [
+        "DeliveryNumber1", "DeliveryNumber2", "DeliveryNumber3", "DeliveryNumber4",
+    ];
 
+    private static string NumberWord(int position) =>
+        position <= NumberWordKeys.Length
+            ? Strings.Get(NumberWordKeys[position - 1])
+            : position.ToString(CultureInfo.CurrentCulture);
+
+    // Unity StoreManager display mapping for a store row: ▲ +n / ▼ -n / ▬ 0
+    // as three resx variants so translators own the copy. The city headline
+    // shares the same rule and lives in DeliveryCopy.
     private static string StoreGrowthLine(int growthPerHour) => growthPerHour switch
     {
         > 0 => Strings.Format("DeliveryStoreGrowthUp", growthPerHour),
@@ -182,21 +264,34 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     private void RebuildVoice()
     {
         // Both phase names answer in either state (taxi shift-label
-        // precedent): the shown label trails the state by the 1 s glow, and
+        // precedent): the shown label trails the state by the glow, and
         // one shared delegate per button keeps the caller's mute working.
-        Action main = OnMainButton;
-        Action back = OnBack;
+        // Main and back navigate, so a voice tap flashes teal first and the
+        // page waits out the shared beat; row taps stay on this page and act
+        // at once like a click.
+        Action main = () => FlashThen("main", OnMainButton);
+        Action back = () => FlashThen("back", OnBack);
         var actions = new Dictionary<string, Action>
         {
             [Strings.Get("DeliveryOpenCareer")] = main,
             [Strings.Get("DeliveryDeliver")] = main,
             [Strings.Get("DeliveryBack")] = back,
             [Strings.Get("DeliveryCancelOrder")] = back,
+            // One word fires what prints "CANCEL ORDER" (the user's request,
+            // taxi keywords' precedent): the general matcher stays strict —
+            // a lone word answers only where a page registers it on purpose.
+            // With an empty cart this same delegate is plain BACK; accepted
+            // because unconditional keys beat conditional ones, exactly why
+            // the phase names above answer in either state.
+            ["cancel"] = back,
         };
         foreach (DeliveryRow row in Rows)
         {
             DeliveryRow hit = row;
             actions[hit.NameLine] = () => ToggleOrder(hit);
+            // The number button is the row's button now: "ONE" triggers the
+            // top store, exactly like clicking its ONE button.
+            actions[hit.NumberWord] = () => ToggleOrder(hit);
         }
         VoiceActions = actions;
     }

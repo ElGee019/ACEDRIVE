@@ -2,9 +2,18 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
-    <StackPanel>
-        <TextBlock Style="{StaticResource PageTitle}" Text="{loc:Loc Key=BrandTitle}"/>
-        <ItemsControl ItemsSource="{Binding Brands}">
+    <!-- Same page skeleton as GrandmaCarScreenView: viewport-pinned MinHeight,
+         title row stays at the top, the brand grid centers in the height the
+         window has left over. Without the pin the ScrollViewer measures with
+         infinite height and the * row would collapse, so centering never
+         happens while a resized window is taller than this page. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=BrandTitle}"/>
+        <ItemsControl Grid.Row="1" ItemsSource="{Binding Brands}" VerticalAlignment="Center">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <UniformGrid Columns="2"/>
@@ -18,5 +27,5 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-    </StackPanel>
+    </Grid>
 </UserControl>

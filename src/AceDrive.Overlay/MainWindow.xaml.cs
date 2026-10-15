@@ -35,18 +35,22 @@ public partial class MainWindow : Window
         TryApplyBackdrop(log);
 
         // Fresh position always; size only restores once past onboarding, so a
-        // stale small window never clips the first-run screens.
+        // stale small window never clips the first-run screens. The gate reads
+        // the saved progress, not the page on screen: the introduction replays
+        // on every call, so a returning player opens on the brand page and must
+        // still get the window they resized (its pages scroll if it is small).
         var saved = _vm.LoadPlacement();
         if (saved is not null)
         {
             Left = saved.Left;
             Top = saved.Top;
-            if (!_vm.IsOnboarding)
+            if (_vm.OnboardingDone)
             {
                 Width = saved.Width;
                 Height = saved.Height;
             }
         }
+
 
         // App.Show() runs after this ctor: re-assert the VM's visibility once
         // the window is really loaded, else a hidden-at-start window would be
@@ -88,8 +92,15 @@ public partial class MainWindow : Window
                 var hwnd = new WindowInteropHelper(this).Handle;
                 Native.UnregisterHotKey(hwnd, Native.HOTKEY_ID);
             }
-            catch { }
+            catch (InvalidOperationException)
+            {
+                // WHY: the HWND may already be gone at Closed; WPF then
+                // refuses the Handle lookup. The hotkey dies with the
+                // process anyway — placement save below must still run.
+            }
             _vm.SavePlacement(new WindowBounds(Left, Top, Width, Height));
+            _vm.SaveClock();
+            _vm.SaveCity();
             _vm.Dispose();
         };
 

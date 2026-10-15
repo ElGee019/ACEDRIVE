@@ -1,4 +1,5 @@
 using System.Windows.Input;
+using AceDrive.Core;
 using AceDrive.Overlay.Localization;
 
 namespace AceDrive.Overlay.ViewModels;
@@ -11,17 +12,30 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly IVoiceInfoNavigator _navigator;
+    private readonly VoiceBeat _beat;
 
-    public VoiceInfoScreenViewModel(IVoiceInfoNavigator navigator)
+    public VoiceInfoScreenViewModel(IVoiceInfoNavigator navigator, VoiceBeat beat)
     {
         _navigator = navigator;
+        _beat = beat;
         WakeText = Strings.Get("VoiceInfoWake");
         ButtonsText = Strings.Format("VoiceInfoButtons",
             Strings.Get("DialogueContinue").ToUpperInvariant());
         ContinueCommand = new RelayCommand(Continue);
+        // Voice continue flashes teal first and the page waits out the
+        // shared beat, so the glow shows before the flip. A click acts at
+        // once with no glow.
         VoiceActions = new Dictionary<string, Action>
         {
-            [Strings.Get("DialogueContinue")] = Continue,
+            [Strings.Get("DialogueContinue")] = () =>
+            {
+                ContinueFlash = true;
+                _beat.Defer(() =>
+                {
+                    ContinueFlash = false;
+                    Continue();
+                });
+            },
         };
     }
 
@@ -35,6 +49,10 @@ public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
 
     /// <summary>Spoken label -&gt; action, same Continue as the dialogue pages.</summary>
     public IReadOnlyDictionary<string, Action> VoiceActions { get; }
+
+    /// <summary>Teal-glow acknowledgment for a voice tap on CONTINUE.</summary>
+    public bool ContinueFlash { get => _continueFlash; private set => SetField(ref _continueFlash, value); }
+    private bool _continueFlash;
 
     private void Continue() => _navigator.ShowDialogue();
 }

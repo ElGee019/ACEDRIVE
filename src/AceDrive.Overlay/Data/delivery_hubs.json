@@ -1,0 +1,79 @@
+{
+  "Tiers": [
+    {
+      "Id": 1,
+      "Enabled": true,
+      "Careers": [
+        {
+          "Id": "groceries",
+          "Label": "GROCERIES",
+          "Levels": [
+            { "Name": "Grocers and Sons", "Cost": 100 },
+            { "Name": "The Food Hub", "Cost": 150 },
+            { "Name": "Provisions Marketplace", "Cost": 200 },
+            { "Name": "The Food Depot", "Cost": 250 },
+            { "Name": "Greens and Greens", "Cost": 300 }
+          ]
+        },
+        {
+          "Id": "coffee_beans",
+          "Label": "COFFEE BEANS",
+          "Levels": [
+            { "Name": "CoffeeUs", "Cost": 100 },
+            { "Name": "BeanHarbor Roasters", "Cost": 150 },
+            { "Name": "Globalbean Co", "Cost": 200 },
+            { "Name": "Primeroast Coffee", "Cost": 250 },
+            { "Name": "JavaJunction Roasters", "Cost": 300 }
+          ]
+        }
+      ]
+    },
+    {
+      "Id": 2,
+      "Enabled": true,
+      "Careers": [
+        {
+          "Id": "2nd_hand",
+          "Label": "2ND HAND",
+          "Levels": [
+            { "Name": "Things and Things Emporium", "Cost": 180 },
+            { "Name": "Second Chance", "Cost": 350 },
+            { "Name": "Treasure Textiles", "Cost": 350 },
+            { "Name": "Vintage Deals", "Cost": 450 },
+            { "Name": "Refashion", "Cost": 550 }
+          ]
+        },
+        {
+          "Id": "medicine",
+          "Label": "MEDICINE",
+          "Levels": [
+            { "Name": "HealthHub Pharma", "Cost": 180 },
+            { "Name": "MedMarket Solutions", "Cost": 350 },
+            { "Name": "ApexMed", "Cost": 350 },
+            { "Name": "Vitasource Pharmaceuticals", "Cost": 450 },
+            { "Name": "Medconnect", "Cost": 550 }
+          ]
+        }
+      ]
+    },
+    {
+      "Id": 3,
+      "Enabled": true,
+      "Careers": [
+        {
+          "Id": "chinese_import",
+          "Label": "CHINESE IMPORT",
+          "Levels": [
+            { "Name": "Yeng Hu Wholesale", "Cost": 180 },
+            { "Name": "JadeHarbor Trading", "Cost": 350 },
+            { "Name": "ForbiddenCity Hub", "Cost": 350 },
+            { "Name": "SilkRoad Imports", "Cost": 450 },
+            { "Name": "Eastern 4U", "Cost": 550 }
+          ]
+        }
+      ]
+    },
+    { "Id": 4, "Enabled": false, "Careers": [] },
+    { "Id": 5, "Enabled": false, "Careers": [] }
+  ]
+}

@@ -13,8 +13,8 @@ public sealed class JsonDeliveryCatalogTests
           "WholesaleRate": 0.7,
           "StartCredP": 100,
           "Stores": [
-            { "Key": "a", "Name": "Store A", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.5, "Citizens": 140, "GrowthPerHour": 1 },
-            { "Key": "b", "Name": "Store B", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.2, "Citizens": 45, "GrowthPerHour": -2 }
+            { "Key": "a", "Name": "Store A", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.5, "Category": "groceries" },
+            { "Key": "b", "Name": "Store B", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.2 }
           ]
         }
         """;
@@ -27,6 +27,10 @@ public sealed class JsonDeliveryCatalogTests
         Assert.Equal(0.7, catalog.WholesaleRate);
         Assert.Equal(100, catalog.StartCredP);
         Assert.Equal("Store A", catalog.Stores[0].Name);
+        // Career gating (PORTPLAN 18): a store without a category is plain
+        // data, not a broken file — open content predates careers.
+        Assert.Equal("groceries", catalog.Stores[0].Category);
+        Assert.Equal("", catalog.Stores[1].Category);
         Assert.Empty(log.Warnings);
     }
 
@@ -51,10 +55,10 @@ public sealed class JsonDeliveryCatalogTests
     }
 
     [Theory]
-    [InlineData("""{"WholesaleRate":0,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"Citizens":10,"GrowthPerHour":0}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":41,"UnitCapacity":40,"PricePerUnit":2,"Citizens":10,"GrowthPerHour":0}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":0,"PricePerUnit":2,"Citizens":10,"GrowthPerHour":0}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":-1,"Citizens":10,"GrowthPerHour":0},{"Key":"a","Name":"Dup","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"Citizens":10,"GrowthPerHour":0}]}""")]
+    [InlineData("""{"WholesaleRate":0,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":41,"UnitCapacity":40,"PricePerUnit":2}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":0,"PricePerUnit":2}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":-1},{"Key":"a","Name":"Dup","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2}]}""")]
     public void InvalidBalanceOrStore_FallsBackToDefault(string json)
     {
         var catalog = LoadFrom(json, out TestLog log);

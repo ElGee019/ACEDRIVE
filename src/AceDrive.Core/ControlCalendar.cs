@@ -5,21 +5,9 @@
 // the ViewModel, so this file needs no localization.
 namespace AceDrive.Core;
 
-/// <summary>One calendar row: the weekday plus its event key, if any.</summary>
-public sealed record CalendarDay(int DayOfWeek, string? EventId);
-
-/// <summary>
-/// Calendar position. Default mirrors the Unity fresh save; the test-shell
-/// fallback until the persistent save arrives (PORTPLAN item 51).
-/// </summary>
-public sealed record CalendarStamp(int Year, int Week)
-{
-    public static readonly CalendarStamp Default = new(1924, 1);
-}
-
 public static class ControlCalendar
 {
-    // Stable event keys, Sunday-first like the Unity day strip.
+    // Stable event keys: display labels resolve through resx, never here.
     public const string CentoMiglia = "CentoMiglia";
     public const string Valuation = "Valuation";
     public const string RoadTest = "RoadTest";
@@ -30,15 +18,24 @@ public static class ControlCalendar
     public const int OpenFromHour = 8;
     public const int OpenUntilHour = 20;
 
+    // Weekday numbers of the week boundary: the display week rolls when the
+    // game crosses Sunday midnight into Monday (Unity parity), which reads
+    // as the strip's last row handing over to its first.
+    public const int Sunday = 1;
+    public const int Monday = 2;
+
+    // Strip order: Monday first, Sunday last (calendar convention the
+    // overlay follows). Events stay tied to their weekday, so the Unity
+    // day-to-event mapping is untouched by the display order.
     public static readonly IReadOnlyList<CalendarDay> Week =
     [
-        new(1, CentoMiglia),
         new(2, Valuation),
         new(3, RoadTest),
         new(4, Willy),
         new(5, null),
         new(6, Pancakes),
         new(7, null),
+        new(1, CentoMiglia),
     ];
 
     // Recognition fragments per event, normalized lowercase. Vosk's English

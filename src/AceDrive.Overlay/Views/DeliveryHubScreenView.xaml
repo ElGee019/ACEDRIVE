@@ -1,0 +1,192 @@
+<UserControl x:Class="AceDrive.Overlay.Views.DeliveryHubScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- DeliveryHubScreen paints, user vocabulary: WHITE = bought into
+             (owned hubs), COLORED #97EAD2 = the button currently activated
+             (the picked career's title and its selected hub), grey = every
+             other hub. Grey means greyed out all the way: the base style's
+             opaque white edge read as "bought" even with muted text, so
+             idle hubs own a grey line too and only bought-in hubs get the
+             white edge back. Unaffordable hubs sink to the faintest edge.
+             The ViewModel ships the flags, the view owns the colors. -->
+        <Style x:Key="TierCell" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- The CredP price inside a hub cell: white = affordable right now,
+             grey = still out of reach. Owned cells carry no price at all. -->
+        <Style x:Key="HubPriceText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsAffordable}" Value="False">
+                    <Setter Property="Foreground" Value="#FF999999"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="HubCellButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Foreground" Value="#FF999999"/>
+            <Setter Property="BorderBrush" Value="#FF999999"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                    <Setter Property="BorderBrush" Value="#FF97EAD2"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsOwned}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFFFF"/>
+                    <Setter Property="BorderBrush" Value="#FFFFFFFF"/>
+                </DataTrigger>
+                <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                        <Condition Binding="{Binding IsOwned}" Value="False"/>
+                        <Condition Binding="{Binding IsAffordable}" Value="False"/>
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="BorderBrush" Value="#40FFFFFF"/>
+                </MultiDataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <!-- Same page skeleton as the other screens: viewport-pinned MinHeight,
+         title band on top. Body order mirrors the Unity DeliveryHubScreen:
+         stats header, tier row, then the career lists stacked vertically
+         (Unity drew them side by side; the narrow overlay reads better one
+         under the other). Each list's category title is itself the pick
+         button for its next buyable hub, with the hub cells highlighted in
+         teal underneath once activated. OPEN CAREER and BACK sit flush with
+         the panel edge, the way the title sits flush with the top one (the
+         chrome pads all sides equally, so zero own-margin mirrors the date's
+         top spacing). All copy arrives preformatted or from resx; the view
+         draws and nothing else. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=HubTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+            <TextBlock Text="{loc:Loc Key=HubSubtitle}" Foreground="#B0FFFFFF" FontSize="11"
+                       TextWrapping="Wrap" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding CredPLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding CityGrowthLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,8"/>
+            <ItemsControl ItemsSource="{Binding TierCells}" Margin="0,0,0,8">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="5"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Content="{Binding LabelLine}" Margin="3,0" Padding="4,3"
+                                FontSize="12" Style="{StaticResource TierCell}"
+                                Command="{Binding DataContext.ChooseTierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <ItemsControl ItemsSource="{Binding Columns}" Margin="0,0,0,10">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="1"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel>
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Margin" Value="3,0"/>
+                                    <Style.Triggers>
+                                        <!-- Stacked-list breathing room in whole
+                                             hub rows (~28 px: cell text, padding,
+                                             border and inter-row margin): one
+                                             blank row above the first list, two
+                                             above the second. -->
+                                        <DataTrigger Binding="{Binding Index}" Value="0">
+                                            <Setter Property="Margin" Value="3,28,3,0"/>
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding Index}" Value="1">
+                                            <Setter Property="Margin" Value="3,56,3,0"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <!-- The title is the list's pick button: it selects
+                                 the first buyable hub underneath. Disabled with
+                                 the column (COMING SOON fillers, nothing left to
+                                 buy), matching Unity's non-interactive header
+                                 while gaining the shortcut the user asked for.
+                                 The list holding the current pick gets the same
+                                 teal edge as an activated cell, so switching
+                                 careers visibly leaves the old title behind. -->
+                            <Button Content="{Binding TitleLine}" Margin="0,0,0,3" Padding="4,3"
+                                    FontSize="13" FontWeight="Bold"
+                                    IsEnabled="{Binding CanPick}"
+                                    Command="{Binding DataContext.ChooseColumnCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                                <Setter Property="BorderBrush" Value="#FF97EAD2"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <ItemsControl ItemsSource="{Binding Cells}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <!-- Name and price paint apart: the price
+                                             fragment is white while the hub is
+                                             affordable, grey when it is not —
+                                             the affordability tell lives in the
+                                             number, not the button edge. -->
+                                        <Button Margin="0,2" Padding="4,3"
+                                                FontSize="12" Style="{StaticResource HubCellButton}"
+                                                IsEnabled="{Binding IsSelectable}"
+                                                Command="{Binding DataContext.ChooseCareerCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding NameLine}"/>
+                                                <TextBlock Text="{Binding PriceLine}" Style="{StaticResource HubPriceText}"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+        <!-- Button bar: own bottom band so BACK ends flush with the panel
+             edge; the 6 px between the buttons keeps the list rhythm.
+             OPEN CAREER exists only while a career is picked (Unity
+             HasSelectedCareer): hidden, not greyed, per the user's page
+             rule that the button itself is the confirmation moment. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=HubOpenCareer}" Margin="0,0,0,6"
+                    Visibility="{Binding HasSelectedCareer, Converter={StaticResource BoolToVis}}"
+                    Command="{Binding OpenCareerCommand}"/>
+            <Button Content="{loc:Loc Key=DeliveryBack}"
+                    Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

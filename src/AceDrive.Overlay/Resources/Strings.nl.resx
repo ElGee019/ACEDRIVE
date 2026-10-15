@@ -36,16 +36,17 @@
   <data name="SpeakerGrandma" xml:space="preserve"><value>Oma</value></data>
   <data name="SpeakerYou" xml:space="preserve"><value>Jij</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>SPRAAKBEDIENING</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {BRAND}" om de app te activeren vanuit de auto waarin je rijdt.
-Bijvoorbeeld "HEY ALPINE".</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {BRAND}" om de app te activeren. Bijvoorbeeld "HEY ALPINE".</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Spreek de tekst van een knop uit om op die knop te drukken.
 Bijvoorbeeld "{0}".</value></data>
   <data name="ControlTaxi" xml:space="preserve"><value>START TAXIDIENST</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>DOORGAAN MET TAXIDIENST</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
+  <data name="ControlHaul" xml:space="preserve"><value>AUTOTRANSPORTKLUS</value></data>
   <data name="ControlCalendar" xml:space="preserve"><value>KALENDER</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>OMA'S TAKENLIJSTJE</value></data>
   <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
+  <data name="ControlGateWarning" xml:space="preserve"><value>KOM TERUG OP {0} TUSSEN 8 EN 20 UUR</value></data>
   <data name="DaySun" xml:space="preserve"><value>Zondag</value></data>
   <data name="DayMon" xml:space="preserve"><value>Maandag</value></data>
   <data name="DayTue" xml:space="preserve"><value>Dinsdag</value></data>
@@ -81,4 +82,10 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DeliveryBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="DeliveryCancelOrder" xml:space="preserve"><value>BESTELLING ANNULEREN</value></data>
   <data name="DeliveryEmpty" xml:space="preserve"><value>Nog geen winkels beschikbaar voor bezorging. Gebruik je Vertrouwenspunten om je eerste bezorgcarrière te starten met HIERONDER NIEUW CARRIERE OPENEN.</value></data>
+  <data name="DeliverySelectHint" xml:space="preserve"><value>Kies een of meer winkels om een bezorgklus voor hen te starten.</value></data>
+  <data name="HubTitle" xml:space="preserve"><value>BEZORGHUB</value></data>
+  <data name="HubSubtitle" xml:space="preserve"><value>Kies wel groothandelscentrum je wilt openen.</value></data>
+  <data name="HubTier" xml:space="preserve"><value>NIVEAU {0}</value></data>
+  <data name="HubComingSoon" xml:space="preserve"><value>BINNENKORT</value></data>
+  <data name="HubOpenCareer" xml:space="preserve"><value>CARRIERE OPENEN</value></data>
 </root>
