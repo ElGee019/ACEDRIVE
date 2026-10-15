@@ -53,7 +53,7 @@ public sealed class VoiceTests
             DeliveryCatalog.Default, HubCareerShell(),
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0),
-            new FakeRoadTestStore(), new FakeGameClockStore(), 1, new VoiceBeat(clock));
+            new FakeRoadTestStore(), new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
         return (vm, clock, mic, car);
     }
 
@@ -342,8 +342,7 @@ public sealed class VoiceTests
         mic.Fire("except");
         Assert.True(proposal.AcceptFlash);
         DrainBeat(vm, clock);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        Assert.Contains("Proposed", vm.JobLine, StringComparison.Ordinal);
+        Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -539,7 +538,7 @@ public sealed class VoiceTests
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock));
+            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
         vm.Show();
         clock.Advance(TimeSpan.FromSeconds(15.1));
         vm.Poll();
@@ -683,7 +682,7 @@ public sealed class VoiceTests
         Assert.True(control.TaxiFlash);
 
         proposal.AcceptCommand.Execute(null);
-        Assert.Contains("Proposed", vm.JobLine, StringComparison.Ordinal);
+        Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]

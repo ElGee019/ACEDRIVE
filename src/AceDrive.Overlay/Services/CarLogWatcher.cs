@@ -25,6 +25,9 @@ public sealed class CarLogWatcher : ICarBrandSource
     private long _offset;
     private string _pending = "";
     private string? _brand;
+    private string? _ksId;
+
+    public string? CurrentKsId => _ksId;
 
     public CarLogWatcher(ILog log, DirectoryInfo? logsDir = null)
     {
@@ -47,6 +50,7 @@ public sealed class CarLogWatcher : ICarBrandSource
                 if (ks is not null && CarBrand.BrandOf(ks) is string brand)
                 {
                     _brand = brand;
+                    _ksId = ks;
                     return brand;
                 }
             }
@@ -128,11 +132,13 @@ public sealed class CarLogWatcher : ICarBrandSource
 
     private void HandleLine(string line)
     {
-        string? brand = CarBrand.BrandOfLogLine(line);
-        if (brand is not null && brand != _brand)
+        string? ksId = CarBrand.KsIdOfLogLine(line);
+        string? brand = ksId is not null ? CarBrand.BrandOf(ksId) : null;
+        if (brand is not null && (brand != _brand || ksId != _ksId))
         {
             _brand = brand;
-            BrandChanged?.Invoke(this, new CarBrandChangedEventArgs(brand));
+            _ksId = ksId;
+            BrandChanged?.Invoke(this, new CarBrandChangedEventArgs(brand, ksId));
         }
     }
 

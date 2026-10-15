@@ -34,7 +34,7 @@ public sealed class OnboardingTests
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock));
+            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public sealed class OnboardingTests
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock));
+            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
 
         vm.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);

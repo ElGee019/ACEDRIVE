@@ -28,6 +28,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     private readonly ISettingsStore _store;
     private readonly ILog _log;
     private readonly FareTable _fares;
+    private readonly DriverWallet _wallet;
+    private readonly IDriverStore _driverStore;
+    private readonly IFriendshipStore _friends;
+    // The car pool behind the road-test ledger, reused for the receipt's
+    // passenger lookup (the driven car's ks id resolves against it).
+    private readonly IReadOnlyList<RoadTestCar> _cars;
     private readonly IOnboardingStore _onboarding;
     private readonly IContentSource _content;
     // WHY read through on demand: Data/*.json edits (wake aliases, transcript
@@ -87,12 +93,27 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // Wake brand = the car currently driven in ACE (watcher-published),
     // never the saved favorite.
     private string _carBrand = DefaultBrand;
+    // ks id behind the brand, when the logs announced one: the receipt's
+    // passenger lookup resolves against the car pool, never the brand
+    // (one brand spans 1- and 4-seaters).
+    private string? _carKsId;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
     private bool _disposed;
 
     private TaxiJobState _job = new();
     private int _lastShiftSecs = -1;
+
+    // Dropoff placeholders until the driving slice feeds real inputs: the
+    // agreed 8.2 km ride with every extra on (tip eligible, one speeding
+    // fine). Car class has no live source yet either (the log watcher only
+    // publishes the brand, never the ks id), so it stays 1 with rarity and
+    // street knowledge until active-car tracking lands.
+    private const double PlaceholderDistanceKm = 8.2;
+    private const int PlaceholderCarClass = 1;
+    private const int PlaceholderCarRarity = 1;
+    private const int PlaceholderStreetKnowledgePct = 100;
+    private const int PlaceholderFines = 1;
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
@@ -106,7 +127,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         CityEconomy city, ICityStore cityStore,
         RoadTestLedger roadTests, IRoadTestStore roadTestStore,
         IGameClockStore clockStore, int startWeek,
-        VoiceBeat beat)
+        VoiceBeat beat, DriverWallet wallet, IDriverStore driverStore,
+        IFriendshipStore friendships, IReadOnlyList<RoadTestCar> cars)
     {
         _telemetry = telemetry;
         _clock = clock;
@@ -130,7 +152,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         _career = career;
         _city = city;
         _cityStore = cityStore;
-        _carBrands.BrandChanged += (_, e) => OnCarBrand(e.Brand);
+        _wallet = wallet;
+        _driverStore = driverStore;
+        _friends = friendships;
+        _cars = cars;
+        _carBrands.BrandChanged += (_, e) => OnCarBrand(e.Brand, e.KsId);
         _progress = _onboarding.Load();
         _lastActivity = _clock.UtcNow;
         _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
@@ -387,6 +413,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     {
         _lastTick = _clock.UtcNow;
         _carBrand = _carBrands.Prime(DefaultBrand);
+        _carKsId = _carBrands.CurrentKsId;
         _log.LogInfo($"listening for 'hey {_carBrand}'");
         _carBrands.StartWatching();
         _voice.StartListening();
@@ -549,7 +576,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         if (_job.Phase == JobPhase.EnRoute && dt is > 0 and < 1)
         {
             _job.DistanceKm += Math.Max(0, s.SpeedKmh) / 3600.0 * dt;
-            _job.Fare = TaxiFare.ComputeFare(_job.DistanceKm, _fares);
+            _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
             RefreshJob();
         }
     }
@@ -595,13 +622,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     }
 
     // Watcher thread lands here; marshal to the UI thread like voice.
-    private void OnCarBrand(string brand)
+    private void OnCarBrand(string brand, string? ksId)
     {
         try
         {
             _timer.Dispatcher.Invoke(() =>
             {
                 _carBrand = brand;
+                _carKsId = ksId;
                 _log.LogInfo($"now following: {brand} (say 'hey {brand}')");
             });
         }
@@ -750,19 +778,17 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         _control?.Refresh();
     }
 
-    // Accepting commits the proposal into the job the meter flow drives
-    // (Proposed -> PICKUP), lands back on the control page and prices the
-    // start of the ride like the old stand-in did. An accepted job is not
-    // durable state yet (no persistent save, PORTPLAN 51), so it banks no
-    // checkpoint; the shift start above already did.
+    // Accepting settles the job straight into its receipt: with no driving
+    // slice the PICKUP/DROPOFF meter flow has no inputs, so the placeholder
+    // ride (8.2 km, tip eligible, one fine) settles here and the receipt
+    // screen shows at once. Pickup()/Dropoff() below are the driving
+    // slice's hooks and stay dormant until telemetry feeds them.
     private void TaxiAccepted(TaxiJobState? job)
     {
         if (job is null) return;
-        job.Fare = TaxiFare.ComputeFare(0, _fares);
         _job = job;
         _log.LogInfo($"job accepted: {job.Customer.Full} {job.PickupName} -> {job.DropoffName}");
-        SetScreen(CreateControlScreen());
-        RefreshJob();
+        SettleReceipt();
     }
 
     private void Pickup()
@@ -778,17 +804,75 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     {
         if (_job.Phase != JobPhase.EnRoute) return;
         _job.Phase = JobPhase.Complete;
-        _job.Fare = TaxiFare.ComputeFare(_job.DistanceKm, _fares);
-        _job.Tip = TaxiFare.ComputeTip(_job.Fare, cleanDrive: true, _fares);
+        SettleReceipt();
+    }
+
+    // Prices the placeholder ride, banks it to the wallet, the driver save
+    // and the shift, and shows the receipt. Shared by ACCEPT now and the
+    // meter DROPOFF once the driving slice lands.
+    private void SettleReceipt()
+    {
+        // No driving slice yet: the placeholder ride settles here instead
+        // of the live meter, wherever the settle was triggered.
+        _job.Phase = JobPhase.Complete;
+        _job.DistanceKm = PlaceholderDistanceKm;
+        int capacity = ResolveCapacity();
+        // Unity keys familiarity off the base name (no companion suffix):
+        // every completed ride is +1 for that resident, strangers included
+        // (0 -> 1 on the first ride). The outcome rides the receipt so the
+        // page renders it; transitions log, quiet rides do not.
+        string baseName = BaseCustomerName(_job.Customer);
+        FriendshipOutcome friendship = _friends.RegisterRide(baseName);
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            _job.DistanceKm, capacity, PlaceholderCarClass,
+            PlaceholderCarRarity, PlaceholderStreetKnowledgePct,
+            tipEligible: true, PlaceholderFines, _fares, _wallet.Xp,
+            new FriendshipResult(friendship.OwnerName, friendship.Level, friendship.TierIncreased));
+        if (friendship.TierIncreased)
+        {
+            _log.LogInfo($"friendship tier up: {friendship.OwnerName} -> {friendship.Level}");
+        }
+        _job.Fare = receipt.BaseTotal;
+        _job.Tip = receipt.Tip;
+        _job.Fine = receipt.FineDeduction;
+        _wallet.AddReceipt(receipt);
+        _driverStore.Save(_wallet.Snapshot());
         _shift.RecordCompleted(_job, _clock.UtcNow);
         // Checkpoint bank: a paid job is progress the player can see, so the
         // moment goes to disk now instead of waiting for the throttle.
         SaveClock();
         _log.LogInfo($"job dropoff: {_job.PickupName} -> {_job.DropoffName} " +
-                  $"dist={_job.DistanceKm:0.00}km total={_job.Total:0.00} " +
-                  $"shift={_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+                  $"dist={receipt.DistanceKm:0.00}km total={receipt.Total:0.00} xp={receipt.XpEarned:0.00} " +
+                  $"wallet={_wallet.Cash:0.00} shift={_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+        SetScreen(new TaxiReceiptScreenViewModel(
+            receipt, _job.Customer.Full, _wallet, _shift, _beat,
+            new RelayCommand(() => SetScreen(CreateControlScreen()))));
         RefreshJob();
     }
+
+    // Passenger seats of the driven car (Unity: passengerCapacity scales
+    // the distance charge). Unknown car (EVO quiet, pool gap) rides solo;
+    // a 0-seat race entry still takes one customer. Builder clamps too.
+    private int ResolveCapacity()
+    {
+        if (_carKsId is not null)
+        {
+            foreach (RoadTestCar car in _cars)
+            {
+                if (string.Equals(car.Id, _carKsId, StringComparison.Ordinal))
+                {
+                    return Math.Max(1, car.Passengers);
+                }
+            }
+        }
+        return 1;
+    }
+
+    // Unity's customerBaseName: first + surname without the companion
+    // suffix ("Klaus Berger and some colleagues" -> "Klaus Berger"), so
+    // repeat rides find the same resident.
+    private static string BaseCustomerName(ProceduralName customer) =>
+        $"{customer.FirstName} {customer.Surname}".Trim();
 
     private void RefreshJob()
     {

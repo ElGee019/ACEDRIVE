@@ -40,13 +40,12 @@ public sealed class JsonFareStore
             }
             var table = JsonSerializer.Deserialize<FareTable>(
                 File.ReadAllText(_file), JsonOptions);
-            if (table is null || table.BaseFare < 0 || table.PerKmRate < 0
-                || table.TipRate is < 0 or > 1)
+            if (table is null || !IsValid(table))
             {
                 _log.LogWarning($"fares.json invalid at {_file}; using built-in defaults");
                 return FareTable.Default;
             }
-            _log.LogInfo($"fares loaded: base={table.BaseFare} perKm={table.PerKmRate} tip={table.TipRate}");
+            _log.LogInfo($"fares loaded: forfait={table.Forfait} tip={table.TipRate} fine={table.FineAmount} tiers={table.Tiers.Count}");
             return table;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -57,5 +56,30 @@ public sealed class JsonFareStore
             _log.LogWarning($"fares.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return FareTable.Default;
         }
+    }
+
+    // A table needs a non-negative forfait, a 0-100% tip rate, a
+    // non-negative fine and at least one tier with a non-negative rate;
+    // only the open top tier may carry a non-positive width.
+    private static bool IsValid(FareTable table)
+    {
+        if (table.Forfait < 0 || table.TipRate is < 0 or > 1 || table.FineAmount < 0)
+        {
+            return false;
+        }
+        if (table.Tiers.Count == 0)
+        {
+            return false;
+        }
+        for (int i = 0; i < table.Tiers.Count; i++)
+        {
+            FareTier tier = table.Tiers[i];
+            bool isLast = i == table.Tiers.Count - 1;
+            if ((!isLast && tier.WidthKm <= 0.0) || tier.RatePerKm < 0.0)
+            {
+                return false;
+            }
+        }
+        return true;
     }
 }

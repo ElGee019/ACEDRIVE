@@ -64,12 +64,21 @@ public partial class App : Application, IDisposable
         // A saved pick beats the draw, so the road-test car is the same car
         // in every session until that car's test is completed (PORTPLAN 49).
         var roadTestStore = new JsonRoadTestStore(_log);
+        var cars = new JsonCarStore(_log).Load();
         var roadTests = new RoadTestLedger(
-            new JsonCarStore(_log).Load(), Environment.TickCount, roadTestStore.Load());
+            cars, Environment.TickCount, roadTestStore.Load());
         // Resume the game moment: a missing or corrupt clock file means a
         // fresh Saturday morning on week 1 (the store never throws).
         var clockStore = new JsonGameClockStore(_log);
         GameClockState? saved = clockStore.Load();
+        // The driver (PORTPLAN 11/43): the cash wallet + XP total resume
+        // from the last session, so money earned on dropoff survives a
+        // restart. A missing or corrupt file means a fresh driver.
+        var driverStore = new JsonDriverStore(_log);
+        var driver = new DriverWallet(driverStore.Load());
+        // Familiarity (PORTPLAN 45): one persisted level per resident, so a
+        // restart reopens the same friendships instead of resetting them.
+        var friendships = new JsonFriendshipStore(_log);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -92,7 +101,11 @@ public partial class App : Application, IDisposable
             roadTestStore,
             clockStore,
             saved?.Week ?? CalendarStamp.Default.Week,
-            beat);
+            beat,
+            driver,
+            driverStore,
+            friendships,
+            cars);
 
         MainWindow = new MainWindow(vm, _log);
         // The VM owns visibility: with a mic we start hidden until the wake

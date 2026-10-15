@@ -6,4 +6,4 @@
 namespace AceDrive.Core;
 
 /// <summary>One road-testable car: stable Kunos id plus its build year, brand and model.</summary>
-public sealed record RoadTestCar(string Id, int Year, string Brand, string Model);
+public sealed record RoadTestCar(string Id, int Year, string Brand, string Model, int Passengers = 1);

@@ -43,4 +43,12 @@ public sealed class CarBrandTests
     [InlineData("[ui] Selected Whatever preset_x", null)]
     public void BrandOfLogLine(string line, string? expected) =>
         Assert.Equal(expected, CarBrand.BrandOfLogLine(line));
+
+    [Theory]
+    [InlineData("[physics] Creating car: ks_ferrari_488_gt3_evo", "ks_ferrari_488_gt3_evo")]
+    [InlineData("[gameplay] Game Started! ... | ks_datsun_240z_fairlady | ...", "ks_datsun_240z_fairlady")]
+    [InlineData("Loaded car ks_lancia_delta", "ks_lancia_delta")]
+    [InlineData("[ui] Selected Whatever preset_x", null)]
+    public void KsIdOfLogLine(string line, string? expected) =>
+        Assert.Equal(expected, CarBrand.KsIdOfLogLine(line));
 }

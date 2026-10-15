@@ -7,6 +7,11 @@ namespace AceDrive.Core.Tests;
 /// to built-in defaults with a warning — never an exception.</summary>
 public sealed class JsonFareStoreTests
 {
+    private const string ValidJson = """
+        {"Forfait":5.0,"TipRate":0.25,"FineAmount":20.0,"Tiers":[
+        {"WidthKm":2.0,"RatePerKm":6.0},{"WidthKm":0.0,"RatePerKm":1.0}]}
+        """;
+
     [Fact]
     public void MissingFile_FallsBackWithWarning()
     {
@@ -37,7 +42,21 @@ public sealed class JsonFareStoreTests
         string file = Path.GetTempFileName();
         try
         {
-            File.WriteAllText(file, """{"BaseFare":-1,"PerKmRate":1.8,"TipRate":0.1}""");
+            File.WriteAllText(file, """{"Forfait":-1,"TipRate":0.2,"FineAmount":50.0,"Tiers":[]}""");
+            var log = new TestLog();
+            Assert.Equal(FareTable.Default, new JsonFareStore(file, log).Load());
+            Assert.Single(log.Warnings);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void EmptyTiers_FallsBackWithWarning()
+    {
+        string file = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(file, """{"Forfait":10.0,"TipRate":0.2,"FineAmount":50.0,"Tiers":[]}""");
             var log = new TestLog();
             Assert.Equal(FareTable.Default, new JsonFareStore(file, log).Load());
             Assert.Single(log.Warnings);
@@ -51,9 +70,15 @@ public sealed class JsonFareStoreTests
         string file = Path.GetTempFileName();
         try
         {
-            File.WriteAllText(file, """{"BaseFare":5.0,"PerKmRate":2.0,"TipRate":0.2}""");
+            File.WriteAllText(file, ValidJson);
             var log = new TestLog();
-            Assert.Equal(new FareTable(5.0, 2.0, 0.2), new JsonFareStore(file, log).Load());
+            FareTable table = new JsonFareStore(file, log).Load();
+            Assert.Equal(5.0, table.Forfait);
+            Assert.Equal(0.25, table.TipRate);
+            Assert.Equal(20.0, table.FineAmount);
+            Assert.Equal(
+                [new FareTier(2.0, 6.0), new FareTier(0.0, 1.0)],
+                table.Tiers);
             Assert.Empty(log.Warnings);
         }
         finally { File.Delete(file); }

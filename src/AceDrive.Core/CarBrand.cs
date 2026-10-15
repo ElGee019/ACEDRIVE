@@ -79,6 +79,23 @@ public static class CarBrand
         return m.Success ? BrandOf(m.Value) : null;
     }
 
+    /// <summary>
+    /// ks id for one ACE log line: the id on a car-announcing line
+    /// ("Creating car:", "Game Started!", ...), null otherwise. The brand
+    /// twin (<see cref="BrandOfLogLine"/>) owns the spoken mapping; this
+    /// one owns identity (capacity lookups).
+    /// </summary>
+    public static string? KsIdOfLogLine(string line)
+    {
+        if (!CarLine.IsMatch(line))
+        {
+            return null;
+        }
+
+        Match m = KsId.Match(line);
+        return m.Success ? m.Value : null;
+    }
+
     /// <summary>Most recent ks id on a car line, scanning bottom-up.</summary>
     public static string? FindCurrentKs(IEnumerable<string> lines)
     {

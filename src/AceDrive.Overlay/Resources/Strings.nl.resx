@@ -88,4 +88,26 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="HubTier" xml:space="preserve"><value>NIVEAU {0}</value></data>
   <data name="HubComingSoon" xml:space="preserve"><value>BINNENKORT</value></data>
   <data name="HubOpenCareer" xml:space="preserve"><value>CARRIERE OPENEN</value></data>
+  <data name="ReceiptTitle" xml:space="preserve"><value>TAXIBON</value></data>
+  <data name="ReceiptDistance" xml:space="preserve"><value>Afstand: {0:0.0} km</value></data>
+  <data name="ReceiptCustomer" xml:space="preserve"><value>Klanten: {0}. {1}</value></data>
+  <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km = €{4:0.00}</value></data>
+  <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km = €{3:0.00}</value></data>
+  <data name="ReceiptForfait" xml:space="preserve"><value>Forfait: €{0:0.00}</value></data>
+  <data name="ReceiptFare" xml:space="preserve"><value>Ritprijs: {0} × €{1:0.00} = €{2:0.00}</value></data>
+  <data name="ReceiptTip" xml:space="preserve"><value>Fooi: €{0:0.00}</value></data>
+  <data name="ReceiptFine" xml:space="preserve"><value>Snelheidsboete: −€{0:0.00}</value></data>
+  <data name="ReceiptTotal" xml:space="preserve"><value>Totaal verdiend: €{0:0.00}</value></data>
+  <data name="ReceiptWallet" xml:space="preserve"><value>Portemonnee: €{0:0.00}</value></data>
+  <data name="ReceiptShift" xml:space="preserve"><value>Dienst: {0} ritten · €{1:0.00}</value></data>
+  <data name="ReceiptXp" xml:space="preserve"><value>XP verdiend: {0:0.00}</value></data>
+  <data name="ReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × klasse {1} × zeldzaamheid {2}) / 100 × straatkennis {3}%</value></data>
+  <data name="ReceiptTotalXp" xml:space="preserve"><value>Totaal XP: {0:0.00}</value></data>
+  <data name="ReceiptContinue" xml:space="preserve"><value>VERDER</value></data>
+  <data name="FriendshipStranger" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. Nog een vreemde.</value></data>
+  <data name="FriendshipAcquaintance" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. Nu een kennis.</value></data>
+  <data name="FriendshipFriend" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. {0} is een vriend.</value></data>
+  <data name="FriendshipGood" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. {0} is een goede vriend.</value></data>
+  <data name="FriendshipClose" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. {0} is een goede vriend.</value></data>
+  <data name="FriendshipBff" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. BFF met {0}!</value></data>
 </root>

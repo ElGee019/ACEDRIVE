@@ -7,9 +7,9 @@ internal static class TestRoadCars
 {
     internal static readonly IReadOnlyList<RoadTestCar> Pool =
     [
-        new("ks_mazda_mx5_na", 1990, "Mazda", "MX-5 NA"),
-        new("ks_abarth_695_biposto", 2014, "Abarth", "695 Biposto"),
-        new("ks_datsun_240z_fairlady", 1970, "Datsun", "240Z"),
+        new("ks_mazda_mx5_na", 1990, "Mazda", "MX-5 NA", 1),
+        new("ks_abarth_695_biposto", 2014, "Abarth", "695 Biposto", 1),
+        new("ks_datsun_240z_fairlady", 1970, "Datsun", "240Z", 1),
     ];
 
     internal static RoadTestLedger Ledger(int seed = 7, RoadTestSnapshot? saved = null) =>

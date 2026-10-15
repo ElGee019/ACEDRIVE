@@ -7,32 +7,44 @@ public sealed class TaxiFareTests
     private static readonly FareTable Table = FareTable.Default;
 
     [Fact]
-    public void ZeroDistance_IsBaseFare() =>
-        Assert.Equal(3.50, TaxiFare.ComputeFare(0, Table));
+    public void ZeroDistance_IsForfaitOnly() =>
+        Assert.Equal(10.0, TaxiFare.ComputeBase(0, Table));
 
     [Fact]
-    public void TenKm_Fare() =>
-        Assert.Equal(21.50, TaxiFare.ComputeFare(10, Table));
+    public void OneKm_FirstTierOnly() =>
+        Assert.Equal(16.67, TaxiFare.ComputeBase(1.0, Table));
 
     [Fact]
-    public void NegativeDistance_ClampedToBase() =>
-        Assert.Equal(3.50, TaxiFare.ComputeFare(-5, Table));
+    public void TwoKm_FirstTierBoundary() =>
+        Assert.Equal(23.34, TaxiFare.ComputeBase(2.0, Table));
 
     [Fact]
-    public void CleanDrive_TipIsTenPercent() =>
-        Assert.Equal(2.15, TaxiFare.ComputeTip(21.50, cleanDrive: true, Table));
+    public void EightPointTwoKm_ThreeTiers() =>
+        Assert.Equal(53.15, TaxiFare.ComputeBase(8.2, Table));
 
     [Fact]
-    public void DirtyDrive_NoTip() =>
-        Assert.Equal(0.0, TaxiFare.ComputeTip(21.50, cleanDrive: false, Table));
+    public void SixtyKm_ReachesOpenTier() =>
+        Assert.Equal(150.35, TaxiFare.ComputeBase(60.0, Table));
 
     [Fact]
-    public void CustomTable_DrivesMath()
-    {
-        var table = new FareTable(BaseFare: 5.00, PerKmRate: 2.00, TipRate: 0.20);
-        Assert.Equal(9.00, TaxiFare.ComputeFare(2, table));
-        Assert.Equal(1.80, TaxiFare.ComputeTip(9.00, cleanDrive: true, table));
-    }
+    public void NegativeDistance_ClampedToForfait() =>
+        Assert.Equal(10.0, TaxiFare.ComputeBase(-5, Table));
+
+    [Fact]
+    public void EligibleTip_IsTwentyPercent() =>
+        Assert.Equal(10.63, TaxiFare.ComputeTip(53.15, tipEligible: true, Table));
+
+    [Fact]
+    public void IneligibleTip_IsZero() =>
+        Assert.Equal(0.0, TaxiFare.ComputeTip(53.15, tipEligible: false, Table));
+
+    [Fact]
+    public void Fines_CostFiftyEach() =>
+        Assert.Equal(100.0, TaxiFare.ComputeFineDeduction(2, Table));
+
+    [Fact]
+    public void NegativeFines_ClampedToZero() =>
+        Assert.Equal(0.0, TaxiFare.ComputeFineDeduction(-1, Table));
 
     [Fact]
     public void Shift_AccumulatesCompletedJobsOnly()
@@ -46,6 +58,16 @@ public sealed class TaxiFareTests
         shift.RecordCompleted(done);
         Assert.Equal(1, shift.JobsDone);
         Assert.Equal(11.0, shift.Earned);
+    }
+
+    [Fact]
+    public void Shift_JobTotalDeductsFine()
+    {
+        var shift = new TaxiShift();
+        var done = new TaxiJobState { Phase = JobPhase.Complete, Fare = 53.15, Tip = 10.63, Fine = 50.0 };
+        shift.RecordCompleted(done, new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc));
+        Assert.Equal(1, shift.JobsDone);
+        Assert.Equal(13.78, shift.Earned);
     }
 
     [Fact]

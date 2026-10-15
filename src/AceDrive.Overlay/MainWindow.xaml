@@ -26,6 +26,9 @@
         <DataTemplate DataType="{x:Type vm:TaxiJobProposalViewModel}">
             <views:TaxiJobProposalScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TaxiReceiptScreenViewModel}">
+            <views:TaxiReceiptScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:DeliveryJobScreenViewModel}">
             <views:DeliveryJobScreenView/>
         </DataTemplate>

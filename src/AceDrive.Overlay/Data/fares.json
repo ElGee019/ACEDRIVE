@@ -1,5 +1,12 @@
 {
-  "BaseFare": 3.50,
-  "PerKmRate": 1.80,
-  "TipRate": 0.10
+  "Forfait": 10.0,
+  "TipRate": 0.20,
+  "FineAmount": 50.0,
+  "Tiers": [
+    { "WidthKm": 2.0, "RatePerKm": 6.67 },
+    { "WidthKm": 3.0, "RatePerKm": 5.67 },
+    { "WidthKm": 5.0, "RatePerKm": 4.0 },
+    { "WidthKm": 40.0, "RatePerKm": 2.0 },
+    { "WidthKm": 0.0, "RatePerKm": 1.0 }
+  ]
 }

@@ -15,7 +15,10 @@ public sealed class MainViewModelTests
             DeliveryCatalog? catalog = null, HubCatalog? hubs = null, ILog? log = null,
             RoadTestLedger? roads = null, IGameClockStore? clocks = null, int startWeek = 1,
             DateTime? gameStart = null, IRoadTestStore? roadTestStore = null,
-            CityEconomy? city = null, ICityStore? cityStore = null)
+            CityEconomy? city = null, ICityStore? cityStore = null,
+            DriverWallet? wallet = null, IDriverStore? driverStore = null,
+            IFriendshipStore? friendships = null,
+            IReadOnlyList<RoadTestCar>? cars = null, string? carKsId = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -30,15 +33,24 @@ public sealed class MainViewModelTests
         }
         var board = catalog ?? DeliveryCatalog.Default;
         var career = new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
+        var brands = new FakeCarBrandSource { CurrentKsId = carKsId };
         var vm = new MainViewModel(tel, clock, new GameClock(clock, gameStart ?? clock.UtcNow), new TaxiShift(), store,
             log ?? new NullLogger(), FareTable.Default,
             new TaxiJobProposer(NamePoolTable.Default, seed: 0),
             onboarding, new FakeContentSource(EmptyContent), new FakeVoiceListener(available: false),
-            new FakeCarBrandSource(), TodoTable.Default, board, career,
+            brands, TodoTable.Default, board, career,
             city ?? new CityEconomy(board.Stores, CityRules.Default), cityStore ?? new FakeCityStore(),
             roads ?? TestRoadCars.Ledger(), roadTestStore ?? new FakeRoadTestStore(),
             clocks ?? new FakeGameClockStore(), startWeek,
-            new VoiceBeat(clock));
+            new VoiceBeat(clock), wallet ?? new DriverWallet(),
+            driverStore ?? new FakeDriverStore(),
+            friendships ?? new FakeFriendshipStore(), cars ?? TestRoadCars.Pool);
+        if (carKsId is not null)
+        {
+            // The watcher thread lands via the dispatcher, which runs inline
+            // headless: the VM now follows the announced car like live.
+            brands.Fire("test", carKsId);
+        }
         return (vm, clock, tel, store);
     }
 
@@ -75,34 +87,77 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void EnRoute_DrivingAccumulatesFare()
+    public void Accept_CapacityFollowsTheDrivenCar()
     {
-        // 180 km/h x 50 polls x 0.4 s = 20 s = 1.0 km exactly.
-        var (vm, clock, _, _) = Create(speedKmh: 180f);
-        ProposeJob(vm);
-        vm.PickupCommand.Execute(null);
-        for (int i = 0; i < 50; i++)
+        // Unity scales the distance charge by passengerCapacity: a 4-seat
+        // car runs the same 8.2 km ride at 4x the charge.
+        var pool = new List<RoadTestCar>
         {
-            clock.Advance(TimeSpan.FromMilliseconds(400));
-            vm.Poll();
-        }
-        // 3.50 + 1.80 * 1.0 = 5.30
-        Assert.Contains("1.0 km", vm.JobLine, StringComparison.Ordinal);
-        Assert.Equal("€5.30", vm.FareText);
+            new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4),
+        };
+        var (vm, _, _, _) = Create(
+            speedKmh: 0f, cars: pool, carKsId: "ks_test_sedan",
+            roads: new RoadTestLedger(pool, seed: 0));
+        ProposeJob(vm);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        // 43.15 x 4 = 172.60 charge + 10 forfait = 182.60 base,
+        // 36.52 tip − 50 fine = 169.12.
+        Assert.Equal("€169.12", vm.FareText);
+        Assert.Equal("Fare: 4 × €43.15 = €172.60", receipt.FareLine);
+        Assert.Contains("Customers: 4.", receipt.CustomerLine, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Dropoff_RecordsShiftWithTip()
+    public void Accept_UnknownCar_RidesSolo()
     {
-        var (vm, clock, _, _) = Create(speedKmh: 0f);
+        // No driving slice: ACCEPT settles the placeholder ride at once
+        // (8.2 km, tip eligible, one 50 fine): 53.15 base + 10.63 tip −
+        // 50 fine = 13.78 on the receipt screen, banked to the wallet
+        // and the driver save.
+        var wallet = new DriverWallet();
+        var drivers = new FakeDriverStore();
+        var (vm, _, _, _) = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers);
         ProposeJob(vm);
-        vm.PickupCommand.Execute(null);
-        clock.Advance(TimeSpan.FromMilliseconds(100));
-        vm.Poll();
-        vm.DropoffCommand.Execute(null);
-        // fare 3.50, tip 10% = 0.35
-        Assert.Equal("€3.85", vm.FareText);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("€13.78", vm.FareText);
         Assert.Contains("1 jobs", vm.ShiftText, StringComparison.Ordinal);
+        Assert.Equal(13.78, wallet.Cash);
+        Assert.Equal(0.082, wallet.Xp, precision: 9);
+        Assert.Equal(new DriverState(13.78, wallet.Xp), drivers.Saved[^1]);
+        Assert.Contains("13.78", receipt.TotalLine, StringComparison.Ordinal);
+        Assert.Contains("0.08", receipt.XpLine, StringComparison.Ordinal);
+
+        // CONTINUE lands back on the control page.
+        receipt.ContinueCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void Accept_SettlesFriendship_AndRepeatRidesGrowIt()
+    {
+        // First ride with a stranger lands familiarity 1 and the receipt
+        // box shows the stranger sentence.
+        var friends = new FakeFriendshipStore();
+        var (vm, _, _, _) = Create(speedKmh: 0f, friendships: friends);
+        ProposeJob(vm);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.True(receipt.HasFriendship);
+        Assert.Single(friends.Names);
+        string baseName = Assert.Single(friends.Names);
+        string first = baseName.Split(' ')[0];
+        Assert.Equal($"New familiarity with {first}: 1. Still a stranger though.", receipt.FriendshipLine);
+        Assert.False(receipt.FriendshipHighlight);
+
+        // Repeat rides with the same resident grow the persisted level;
+        // tier-ups land on 2->3 (stranger to acquaintance) and 4->5
+        // (acquaintance to friend, the Unity bands).
+        Assert.False(friends.RegisterRide(baseName).TierIncreased);
+        Assert.True(friends.RegisterRide(baseName).TierIncreased);
+        Assert.Equal(3, friends.GetLevel(baseName));
+        Assert.False(friends.RegisterRide(baseName).TierIncreased);
+        var fifth = friends.RegisterRide(baseName);
+        Assert.Equal(5, fifth.Level);
+        Assert.True(fifth.TierIncreased);
     }
 
     [Fact]
@@ -121,12 +176,11 @@ public sealed class MainViewModelTests
         Assert.Contains("left", vm.ShiftText, StringComparison.Ordinal);
         Assert.True(control.VoiceActions.ContainsKey("CONTINUE TAXI SHIFT"));
 
-        // Accept commits the proposal into the meter flow: both placeholder
-        // addresses ride the JobProposed line (leg order is the flip's),
-        // back on the control page.
+        // Accept settles the placeholder ride straight into its receipt:
+        // both placeholder addresses ride the customer line (leg order is
+        // the flip's), on the receipt screen.
         proposal.AcceptCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        Assert.Contains("Proposed", vm.JobLine, StringComparison.Ordinal);
+        Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Contains("Address A", vm.JobLine, StringComparison.Ordinal);
         Assert.Contains("Address B", vm.JobLine, StringComparison.Ordinal);
     }
@@ -413,16 +467,12 @@ public sealed class MainViewModelTests
     [Fact]
     public void ShiftAndPaidJob_BankClockImmediately()
     {
-        // Checkpoints, not polls: a shift start and a paid job bank before the
-        // throttle is due, so a kill cannot rewind the calendar past progress.
-        // Pickup carries no durable state and deliberately banks nothing.
+        // Checkpoints, not polls: a shift start and a settled accept bank
+        // before the throttle is due, so a kill cannot rewind the calendar
+        // past progress.
         var store = new FakeGameClockStore();
         var (vm, _, _, _) = Create(speedKmh: 0f, clocks: store);
         ProposeJob(vm);
-        Assert.Single(store.Saved);
-
-        vm.PickupCommand.Execute(null);
-        vm.DropoffCommand.Execute(null);
         Assert.Equal(2, store.Saved.Count);
     }
 
@@ -445,15 +495,6 @@ public sealed class MainViewModelTests
 
     private static string TuesdayButton(MainControlScreenViewModel control) =>
         Assert.Single(control.Days, d => d.DayLabel == "Tuesday").EventLabel;
-
-    [Fact]
-    public void Pickup_OnlyFromProposed()
-    {
-        var (vm, _, _, _) = Create();
-        Assert.False(vm.PickupCommand.CanExecute(null));
-        ProposeJob(vm);
-        Assert.True(vm.PickupCommand.CanExecute(null));
-    }
 
     [Fact]
     public void ToggleShow_FlipsVisibility()
