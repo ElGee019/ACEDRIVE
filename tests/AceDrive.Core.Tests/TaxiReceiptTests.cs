@@ -33,9 +33,9 @@ public sealed class TaxiReceiptTests
     {
         TaxiReceipt receipt = Placeholder();
         Assert.Equal(3, receipt.TierLines.Count);
-        Assert.Equal(new TaxiReceiptTier(0.0, 2.0, 6.67, 2.0, 13.34), receipt.TierLines[0]);
-        Assert.Equal(new TaxiReceiptTier(2.0, 3.0, 5.67, 3.0, 17.01), receipt.TierLines[1]);
-        Assert.Equal(new TaxiReceiptTier(5.0, 5.0, 4.0, 3.2, 12.80), receipt.TierLines[2]);
+        Assert.Equal(new ReceiptTier(0.0, 2.0, 6.67, 2.0, 13.34), receipt.TierLines[0]);
+        Assert.Equal(new ReceiptTier(2.0, 3.0, 5.67, 3.0, 17.01), receipt.TierLines[1]);
+        Assert.Equal(new ReceiptTier(5.0, 5.0, 4.0, 3.2, 12.80), receipt.TierLines[2]);
     }
 
     [Fact]
@@ -73,9 +73,9 @@ public sealed class TaxiReceiptTests
         Assert.Equal(169.12, receipt.Total);
         Assert.Equal(0.082, receipt.XpEarned, precision: 9);
         Assert.Equal(
-            [new TaxiReceiptTier(0.0, 2.0, 6.67, 2.0, 53.36),
-             new TaxiReceiptTier(2.0, 3.0, 5.67, 3.0, 68.04),
-             new TaxiReceiptTier(5.0, 5.0, 4.0, 3.2, 51.20)],
+            [new ReceiptTier(0.0, 2.0, 6.67, 2.0, 53.36),
+             new ReceiptTier(2.0, 3.0, 5.67, 3.0, 68.04),
+             new ReceiptTier(5.0, 5.0, 4.0, 3.2, 51.20)],
             receipt.TierLines);
     }
 
@@ -87,5 +87,42 @@ public sealed class TaxiReceiptTests
         Assert.Equal(0.0, receipt.Tip);
         Assert.Equal(0.0, receipt.FineDeduction);
         Assert.Equal(53.15, receipt.Total);
+    }
+
+    [Fact]
+    public void NoBrand_NoBonus_LinesHidden()
+    {
+        TaxiReceipt receipt = Placeholder();
+        Assert.Equal("", receipt.BrandName);
+        Assert.Equal(0.0, receipt.BrandBonus);
+        Assert.False(receipt.HasBrandBonus);
+    }
+
+    [Fact]
+    public void BrandBonus_PaysRateOnBase_AndJoinsTotal()
+    {
+        // First 8.2 km ride in the brand: 5% of the 53.15 base = 2.66,
+        // so the total moves from 13.78 to 16.44.
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0,
+            brand: "Mazda", brandDistanceKm: 8.2);
+        Assert.Equal("Mazda", receipt.BrandName);
+        Assert.Equal(8.2, receipt.BrandDistanceKm);
+        Assert.Equal(0.05, receipt.BrandBonusRate, precision: 9);
+        Assert.Equal(2.66, receipt.BrandBonus);
+        Assert.True(receipt.HasBrandBonus);
+        Assert.Equal(16.44, receipt.Total);
+    }
+
+    [Fact]
+    public void BrandWithoutMileage_PaysNothing()
+    {
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0,
+            brand: "Mazda", brandDistanceKm: 0.0);
+        Assert.Equal(0.0, receipt.BrandBonusRate);
+        Assert.Equal(0.0, receipt.BrandBonus);
+        Assert.False(receipt.HasBrandBonus);
+        Assert.Equal(13.78, receipt.Total);
     }
 }

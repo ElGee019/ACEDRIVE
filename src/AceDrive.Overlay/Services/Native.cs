@@ -7,6 +7,7 @@ internal static class Native
 {
     public const int GWL_EXSTYLE = -20;
     public const int WS_EX_TRANSPARENT = 0x00000020;
+    public const int WS_EX_NOACTIVATE = 0x08000000;
     public const int HOTKEY_ID = 0xACED;
     public const uint MOD_CONTROL = 0x0002;
     public const uint MOD_SHIFT = 0x0004;
@@ -36,5 +37,15 @@ internal static class Native
             ? style | WS_EX_TRANSPARENT
             : style & ~WS_EX_TRANSPARENT;
         _ = SetWindowLong(hWnd, GWL_EXSTYLE, style);
+    }
+
+    /// <summary>
+    /// Keeps the HUD out of the game's focus while still letting the mouse
+    /// drag it: clicks route to the window without activating it.
+    /// </summary>
+    public static void SetNoActivate(IntPtr hWnd)
+    {
+        int style = GetWindowLong(hWnd, GWL_EXSTYLE);
+        _ = SetWindowLong(hWnd, GWL_EXSTYLE, style | WS_EX_NOACTIVATE);
     }
 }

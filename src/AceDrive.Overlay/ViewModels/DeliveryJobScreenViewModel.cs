@@ -15,11 +15,13 @@ namespace AceDrive.Overlay.ViewModels;
 /// wholesale career has been opened show on the board (Unity's
 /// HasHubForCategory eligibility), so the board starts empty and the hub
 /// page fills it. Per-item quantities arrive with the order screen (item
-/// 17); the pickup run crosses to the map, so both actions come in as
-/// injected commands (composition, no IScreenController growth). The delivery
-/// lands on the tap for now: with no Eifel address table yet (PORTPLAN Step
-/// 1) there is no leg to drive, so filling the ordered shelves is the
-/// placeholder and the run seam only reports the missing half.
+/// 17); the run crosses to the map, so both actions come in as
+/// injected commands (composition, no IScreenController growth). The
+/// delivery lands on the tap for now: with no Eifel address table yet
+/// (PORTPLAN Step 1) there is no leg to drive, so DELIVER fills the
+/// ordered shelves and hands the run (goods + money) to the host, which
+/// settles it straight into a delivery receipt — the same skip the taxi
+/// job's ACCEPT does until the driving slice feeds real legs.
 /// Voice parity with the control page: every button answers to its text.
 /// </summary>
 public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
@@ -31,12 +33,12 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     private readonly ILog _log;
     private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
-    private readonly ICommand _runCommand;
+    private readonly ParameterizedCommand<DeliveryRun> _runCommand;
     private readonly ICommand _hubCommand;
 
     public DeliveryJobScreenViewModel(
         DeliveryCatalog catalog, DeliveryCareer career, CityEconomy city, ILog log,
-        ICommand backCommand, ICommand runCommand, ICommand hubCommand,
+        ICommand backCommand, ParameterizedCommand<DeliveryRun> runCommand, ICommand hubCommand,
         VoiceBeat beat)
     {
         _catalog = catalog;
@@ -130,26 +132,31 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
             _hubCommand.Execute(null);
             return;
         }
-        // Stand-in until the freeroam pickup wizard lands: the run needs
-        // addresses, so the drop-off completes here and the seam only notes
-        // the leg that cannot be driven yet.
+        // The drive is skipped (no Eifel address table yet): the drop-off
+        // completes here and the run hands straight over to the host, which
+        // settles the receipt — the taxi ACCEPT skip's delivery twin.
         DeliverOrders();
-        _runCommand.Execute(null);
     }
 
     // The ordered stores are the delivered ones: a full store takes no order,
     // so the cart never holds a shelf that does not need the drop-off. Filling
     // the shelves is CityEconomy's rule (this page never edits town state by
-    // hand), and the wholesale money is only worth the log line until the
-    // escrow wallet lands (PORTPLAN 51).
+    // hand), and the staged money leaves as the run the host settles — the
+    // escrow ledger that pre-books the debit at confirm lands with the save
+    // (PORTPLAN 51).
     private void DeliverOrders()
     {
         IReadOnlyList<string> keys = _cart.ConfirmedKeys;
-        _log.LogInfo($"orders delivered: €{_cart.TotalCost(_catalog):0.00} -> " +
+        DeliveryRun? run = _cart.Run(_catalog, _city);
+        _log.LogInfo($"orders delivered: €{run?.PaidForGoods:0.00} -> " +
             $"{string.Join(", ", keys.Select(NameOf))} at full stock");
         _city.Restock(keys);
         _cart.Clear();
         RebuildRows();
+        if (run is not null)
+        {
+            _runCommand.Execute(run);
+        }
     }
 
     // A cart key always has a catalog row (a row tap is the only way in);

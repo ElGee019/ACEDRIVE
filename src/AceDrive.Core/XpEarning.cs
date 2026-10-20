@@ -25,6 +25,19 @@ public static class XpEarning
         return Diminish(raw, currentXp);
     }
 
+    /// <summary>
+    /// Delivery XP (Unity ApplyStoreDeliveryEffects): distance / 100 scaled
+    /// by street knowledge, then the same diminishing returns — no car
+    /// class or rarity, the ride hauls goods, not passengers.
+    /// </summary>
+    public static double ComputeDelivery(
+        double distanceKm, int streetKnowledgePct, double currentXp)
+    {
+        double raw = Math.Max(0.0, distanceKm) / 100.0
+            * (Math.Clamp(streetKnowledgePct, 0, 100) / 100.0);
+        return Diminish(raw, currentXp);
+    }
+
     public static double GetMultiplier(double currentXp)
     {
         int tiers = (int)Math.Floor(Math.Max(0.0, currentXp) / TierWidth);

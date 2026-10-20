@@ -1,8 +1,7 @@
 // Pure gameplay logic. No WPF / Windows / telemetry / backend references.
 // Kept dependency-free on purpose so a future Lua port can transliterate
-// this file instead of the UI. Spec source: PORTPLAN.md item 18 (wholesale
-// hub ownership + credibility/CredP ramp), port of Unity HubCareerCatalog
-// + DeliveryHubScreen.
+// this file instead of the UI. Spec source: PORTPLAN.md item 18 (Unity
+// HubCareerCatalog).
 namespace AceDrive.Core;
 
 /// <summary>A delivery career: one product category with its hub levels

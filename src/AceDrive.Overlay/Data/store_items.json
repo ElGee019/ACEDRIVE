@@ -1,0 +1,620 @@
+{
+    "DefaultStock":  20,
+    "Layouts":  {
+                    "groceries":  {
+                                      "groceries":  8,
+                                      "coffee_beans":  2
+                                  }
+                },
+    "Items":  [
+                  {
+                      "Name":  "MAPLE SYRUP",
+                      "Price":  45.99,
+                      "Volume":  0.4,
+                      "Hunger":  3,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PANINO WITH SALAME AND PECORINO",
+                      "Price":  12,
+                      "Volume":  0.7,
+                      "Hunger":  10,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PANINO WITH TUNA AND ARTICHOKES",
+                      "Price":  11,
+                      "Volume":  0.7,
+                      "Hunger":  10,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CAPRESE SALAD",
+                      "Price":  9,
+                      "Volume":  0.8,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "INSALATA DI RISO",
+                      "Price":  8,
+                      "Volume":  1,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "AVOCADO TOAST",
+                      "Price":  8,
+                      "Volume":  0.6,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "TRAMEZZINO PROSCIUTTO E FORMAGGIO",
+                      "Price":  9,
+                      "Volume":  0.6,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "ARANCINI DI RISO",
+                      "Price":  7,
+                      "Volume":  0.6,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PIADINA ROMAGNOLA",
+                      "Price":  8,
+                      "Volume":  0.7,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SUPPLÌ AL TELEFONO",
+                      "Price":  7,
+                      "Volume":  0.6,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PIZZA AL TAGLIO",
+                      "Price":  9,
+                      "Volume":  0.8,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "FOCACCIA FARCITA",
+                      "Price":  7,
+                      "Volume":  0.7,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "MOZZARELLA E POMODORO BOMBOLONE",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CORNETTO ALLA CREMA",
+                      "Price":  5,
+                      "Volume":  0.4,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "JAMBON-BEURRE BAGUETTE",
+                      "Price":  9,
+                      "Volume":  0.6,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PAIN AU CHOCOLAT",
+                      "Price":  4,
+                      "Volume":  0.36,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "QUICHE LORRAINE SLICE",
+                      "Price":  8,
+                      "Volume":  0.7,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CROQUE MONSIEUR",
+                      "Price":  9,
+                      "Volume":  0.7,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "MADELEINE",
+                      "Price":  3,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SPECULOOS",
+                      "Price":  3,
+                      "Volume":  0.28,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "FALAFEL WRAP",
+                      "Price":  8,
+                      "Volume":  0.7,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "HUMMUS E PITA PACK",
+                      "Price":  7,
+                      "Volume":  0.6,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SHAWARMA WRAP",
+                      "Price":  10,
+                      "Volume":  0.8,
+                      "Hunger":  10,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BAKLAVA",
+                      "Price":  5,
+                      "Volume":  0.36,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "DOLMA",
+                      "Price":  5,
+                      "Volume":  0.4,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "HALVA",
+                      "Price":  4,
+                      "Volume":  0.26,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "GREEK SPANOKOPITA SLICE",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "ONIGIRI SALMONE",
+                      "Price":  5,
+                      "Volume":  0.36,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "ONIGIRI TONNO MAYO",
+                      "Price":  5,
+                      "Volume":  0.36,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "KATSU SANDO",
+                      "Price":  9,
+                      "Volume":  0.6,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SPRING ROLLS",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "MATCHA MOCHI",
+                      "Price":  4,
+                      "Volume":  0.24,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BAO BUN PORK",
+                      "Price":  8,
+                      "Volume":  0.5,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "EDAMAME SALATO",
+                      "Price":  4,
+                      "Volume":  0.4,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "GYOZA",
+                      "Price":  7,
+                      "Volume":  0.5,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CHICKEN BURRITO",
+                      "Price":  10,
+                      "Volume":  0.9,
+                      "Hunger":  10,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BEEF EMPANADA",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "TAMALE",
+                      "Price":  6,
+                      "Volume":  0.6,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "QUESADILLA",
+                      "Price":  8,
+                      "Volume":  0.7,
+                      "Hunger":  9,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CHURROS PACK",
+                      "Price":  5,
+                      "Volume":  0.4,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "EMPADA DE PALMITO",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CLUB SANDWICH",
+                      "Price":  10,
+                      "Volume":  0.8,
+                      "Hunger":  10,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "NEW YORK HOT DOG",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "GRANOLA BAR",
+                      "Price":  4,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "TRAIL MIX",
+                      "Price":  5,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BEEF JERKY",
+                      "Price":  6,
+                      "Volume":  0.24,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PEANUT BUTTER CRACKERS",
+                      "Price":  3,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SAMOSA PACK",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "VEG WRAP",
+                      "Price":  7,
+                      "Volume":  0.6,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "GULAB JAMUN",
+                      "Price":  4,
+                      "Volume":  0.32,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PAKORA PACK",
+                      "Price":  5,
+                      "Volume":  0.4,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SMØRREBRØD",
+                      "Price":  9,
+                      "Volume":  0.7,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BRETZEL SALATO",
+                      "Price":  4,
+                      "Volume":  0.4,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BANANA",
+                      "Price":  2,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "MELA RUGGINOSA DELLA VAL DI NON APPLE",
+                      "Price":  3,
+                      "Volume":  0.36,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "TIRAMISU",
+                      "Price":  7,
+                      "Volume":  0.7,
+                      "Hunger":  10,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PANNA COTTA",
+                      "Price":  5,
+                      "Volume":  0.5,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CANNOLI",
+                      "Price":  4,
+                      "Volume":  0.36,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "GLAZED DONUT",
+                      "Price":  4,
+                      "Volume":  0.36,
+                      "Hunger":  6,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BROWNIE",
+                      "Price":  5,
+                      "Volume":  0.44,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "BISCOTTI",
+                      "Price":  3,
+                      "Volume":  0.24,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "TARALLI",
+                      "Price":  3,
+                      "Volume":  0.24,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "GRISSINI",
+                      "Price":  2.5,
+                      "Volume":  0.2,
+                      "Hunger":  3,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "MINI CALZONE",
+                      "Price":  6,
+                      "Volume":  0.5,
+                      "Hunger":  7,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "DRIED FIGS",
+                      "Price":  4,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "DARK CHOCOLATE",
+                      "Price":  4,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "ALMONDS",
+                      "Price":  5,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "PISTACHIOS",
+                      "Price":  6,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "RICE CRACKERS",
+                      "Price":  3,
+                      "Volume":  0.24,
+                      "Hunger":  3,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SESAME SNACK BAR",
+                      "Price":  3.5,
+                      "Volume":  0.28,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "SEAWEED SNACKS",
+                      "Price":  3.5,
+                      "Volume":  0.2,
+                      "Hunger":  3,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "CHEESE STICKS",
+                      "Price":  4.5,
+                      "Volume":  0.3,
+                      "Hunger":  4,
+                      "Category":  "groceries"
+                  },
+                  {
+                      "Name":  "Ethiopia Yirgacheffe Kochere Coffee",
+                      "Price":  18,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Colombia Pink Bourbon Coffee",
+                      "Price":  19,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Kenya AA Nyeri Coffee",
+                      "Price":  20,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Panama Geisha Coffee",
+                      "Price":  22,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Costa Rica Tarrazu Honey Coffee",
+                      "Price":  18,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Guatemala Huehuetenango Coffee",
+                      "Price":  17,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Rwanda Nyamasheke Coffee",
+                      "Price":  19,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Burundi Kayanza Natural Coffee",
+                      "Price":  18,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Brazil Cerrado Yellow Bourbon Coffee",
+                      "Price":  16,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "El Salvador Pacamara Coffee",
+                      "Price":  17,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Peru Cajamarca Organic Coffee",
+                      "Price":  18,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Indonesia Sumatra Gayo Coffee",
+                      "Price":  19,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Uganda Rwenzori Natural Coffee",
+                      "Price":  17,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Nicaragua Jinotega Caturra Coffee",
+                      "Price":  17,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  },
+                  {
+                      "Name":  "Mexico Chiapas Bourbon Coffee",
+                      "Price":  16,
+                      "Volume":  0.5,
+                      "Hunger":  1,
+                      "Category":  "coffee_beans"
+                  }
+              ]
+}

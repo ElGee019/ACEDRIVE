@@ -3,5 +3,5 @@
   {"speaker": "YOU", "text": "Oh, Grandma, please don't cry..."},
   {"speaker": "GRANDMA", "text": "I'm so sorry love. If only your parents were still here to celebrate with us...\n\nBut you are right, enough with the crying. I've got something for you now that you are 18. Look at this, what do you think?\n\nI'm giving you my car!"},
   {"speaker": "YOU", "text": "Wait-what? Your car?"},
-  {"speaker": "GRANDMA", "text": "Yes, love, it's yours now.\n\nCould you stop by Max's Grocery Store on [STREET] and pick up some maple syrup?\nI'll make you pancakes this afternoon."}
+  {"speaker": "GRANDMA", "text": "Yes, love, it's yours now.\n\nCould you stop by [POI] on [STREET] and pick up some maple syrup?\nI'll make you pancakes this afternoon."}
 ]

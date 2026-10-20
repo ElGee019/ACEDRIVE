@@ -1,0 +1,6 @@
+{
+  "PremiumRate": 0.0005,
+  "BaseIncreaseFactor": 1.15,
+  "MinimumDailyCost": 1.0,
+  "ChargeHour": 1
+}

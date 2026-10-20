@@ -60,12 +60,15 @@ public sealed class JsonDeliveryCatalog
         }
     }
 
-    // Wholesale rate must be a real discount cut (Unity: 0.7 buys, 0.9 sells);
-    // every store needs a unique key, a name to show and a positive capacity
-    // with stock inside its bounds, or the row math (need, %, cost) lies.
+    // Wholesale rate must be a real discount cut and the payout rate a real
+    // retail take (Unity: 0.7 buys, 0.9 sells); every store needs a unique
+    // key, a name to show and a positive capacity with stock inside its
+    // bounds, or the row math (need, %, cost) lies.
     private static bool IsValid(DeliveryCatalog catalog)
     {
-        if (catalog.WholesaleRate is <= 0 or > 1 || catalog.StartCredP < 0)
+        if (catalog.WholesaleRate is <= 0 or > 1
+            || catalog.PayoutRate is <= 0 or > 1
+            || catalog.StartCredP < 0)
         {
             return false;
         }

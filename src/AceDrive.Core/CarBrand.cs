@@ -1,6 +1,8 @@
 // Car-id -> spoken wake brand, pure functions only (no file I/O).
-// Spec source: companion carwatch.py, ported 1:1 including the log-scan
-// semantics. File watching lives in Services/CarLogWatcher.
+// Spec source: companion carwatch.py, ported including the log-scan
+// semantics; the identity half extends that port because EVO announces
+// showroom variants as per-car mechanical presets inside the same ks_
+// folder (PORTPLAN 62). File watching lives in Services/CarLogWatcher.
 using System.Text.RegularExpressions;
 
 namespace AceDrive.Core;
@@ -45,6 +47,11 @@ public static class CarBrand
         "(Creating car:|Loaded car|Game Started!|onSetPlayerCurrentCarCommand)",
         RegexOptions.Compiled);
 
+    // Mechanical preset path segment on "Set new car" lines: the showroom
+    // variant inside one car folder. Preset file names share the id alphabet.
+    private static readonly Regex MechPresetPath = new(
+        @"presets\\([a-z0-9_]+)\.mechanicalcarpreset", RegexOptions.Compiled);
+
     // Longest prefix first so ks_alfa_romeo_* never mis-matches a shorter key.
     private static readonly string[] Prefixes =
         [.. Brands.Keys.OrderBy(k => k, StringComparer.Ordinal).OrderByDescending(k => k.Length)];
@@ -82,8 +89,8 @@ public static class CarBrand
     /// <summary>
     /// ks id for one ACE log line: the id on a car-announcing line
     /// ("Creating car:", "Game Started!", ...), null otherwise. The brand
-    /// twin (<see cref="BrandOfLogLine"/>) owns the spoken mapping; this
-    /// one owns identity (capacity lookups).
+    /// twin (<see cref="BrandOfLogLine"/>) owns the spoken mapping; the
+    /// identity twin (<see cref="IdentityOfLogLine"/>) owns capacity lookups.
     /// </summary>
     public static string? KsIdOfLogLine(string line)
     {
@@ -96,23 +103,61 @@ public static class CarBrand
         return m.Success ? m.Value : null;
     }
 
-    /// <summary>Most recent ks id on a car line, scanning bottom-up.</summary>
-    public static string? FindCurrentKs(IEnumerable<string> lines)
+    /// <summary>
+    /// Full identity for one ACE log line: ks id plus the mechanical preset
+    /// (showroom variant) when the line carries the "content\cars\&lt;id&gt;
+    /// \presets\..." spawn path. Preset is null on the shorter announcing
+    /// lines ("Creating car: ks_x"), which only name the folder.
+    /// </summary>
+    public static CarIdentity? IdentityOfLogLine(string line)
     {
+        if (!CarLine.IsMatch(line))
+        {
+            return null;
+        }
+
+        Match m = KsId.Match(line);
+        if (!m.Success)
+        {
+            return null;
+        }
+
+        Match p = MechPresetPath.Match(line);
+        return new CarIdentity(m.Value, p.Success ? p.Groups[1].Value : null);
+    }
+
+    /// <summary>
+    /// Identity of the current car scanning bottom-up: the newest announcing
+    /// line wins, but a preset-less "Loaded car" echo inherits the preset
+    /// from the spawn line above it when both name the same car (EVO emits
+    /// "Set new car … presets\p.mechanicalcarpreset" then the echo — last
+    /// line alone would lose the variant).
+    /// </summary>
+    public static CarIdentity? FindCurrentIdentity(IEnumerable<string> lines)
+    {
+        CarIdentity? current = null;
         foreach (string line in lines.Reverse())
         {
-            if (!CarLine.IsMatch(line))
+            if (IdentityOfLogLine(line) is not { } seen)
             {
                 continue;
             }
 
-            Match m = KsId.Match(line);
-            if (m.Success)
+            if (current is null)
             {
-                return m.Value;
+                current = seen;
+                if (seen.MechPreset is not null)
+                {
+                    break;
+                }
+            }
+            else if (seen.KsId == current.KsId && seen.MechPreset is not null)
+            {
+                current = current with { MechPreset = seen.MechPreset };
+                break;
             }
         }
 
-        return null;
+        return current;
     }
 }

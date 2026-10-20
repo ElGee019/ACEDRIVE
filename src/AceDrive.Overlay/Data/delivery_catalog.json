@@ -1,5 +1,6 @@
 {
   "WholesaleRate": 0.7,
+  "PayoutRate": 0.9,
   "StartCredP": 100,
   "Stores": [
     { "Key": "adenau-post", "Name": "Adenau Post", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.50, "Category": "groceries" },

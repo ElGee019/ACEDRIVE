@@ -1,0 +1,10 @@
+[
+  {
+    "id": "max-grocery",
+    "name": "Max's Grocery Store",
+    "type": "grocery",
+    "ownerName": "Max Silvestri",
+    "category": "groceries",
+    "guaranteedItems": ["MAPLE SYRUP"]
+  }
+]

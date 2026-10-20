@@ -1,6 +1,6 @@
 # ACEVO Free-Roam Gameplay App — PORTPLAN
 
-Source: `C:\Users\gouwy\Documents\GitHub\import\BS\LATESTDRIVEBS2` (Unity driving game)
+Source: `C:\Users\gouwy\Documents\BS\BS\LATESTDRIVEBS2` (Unity driving game)
 Target: Assetto Corsa EVO free-roam gameplay app (Lua / ACEVO mod)
 
 ## Step 1 — Map street-name / house-number grounding (do first, blocks jobs/POI/police)
@@ -117,10 +117,11 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 - [x] 59 Marker layers + autocomplete search — CONFIRMED
 
 ## 10. Multiplayer / Social / Backend
-- [x] 60 Online backend (Firestore/standings/rivals/boards/storage) — CONFIRMED
+- [x] 60 Online backend (Firestore/standings/rivals/boards/storage) — CONFIRMED (XP world standings mechanism landed: rank math, receipt rivals block, snapshot save and the `IRivalsService` seam run on the offline null-object; the live Firestore board arrives as a new implementation — no screen changes needed)
 
 ## 11. Other
 - [x] 61 Reward catalog + glovebox cards + name pools — CONFIRMED
+- [x] 62 Mechanical-variant car identity — CONFIRMED + DATA LANDED (EVO showroom variants are per-car `*.mechanicalcarpreset` files, not extra ks_ folders: identity = ks id + mech preset parsed from the same `onSetPlayerCurrentCarCommand` log line the watcher already reads; kspkg dump done 2026-10-15 — 101 presets / 24 multi-variant cars with game card specs + shop prices in `CARSTATS_EVO.md` v3, 30 variant rows in cars.json keyed `id#preset`; refresh runbook in VARIANT_RESEARCH.md)
 
 ---
 Confirmed list will grow below as you approve.

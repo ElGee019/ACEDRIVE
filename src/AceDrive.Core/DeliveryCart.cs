@@ -44,4 +44,33 @@ public sealed class DeliveryCart
         }
         return Math.Round(total, 2);
     }
+
+    /// <summary>Total retail payout the cart's deliveries come back with,
+    /// read on the town's live shelves: what a store actually receives is
+    /// its current pre-restock need (Unity's per-item quantities collapse
+    /// to unit needs until the order screen lands, item 17).</summary>
+    public double TotalPayout(DeliveryCatalog catalog, CityEconomy city)
+    {
+        double total = 0.0;
+        foreach (string key in _storeKeys)
+        {
+            DeliveryStore? store = catalog.Find(key);
+            if (store is not null) total += catalog.PayoutCost(city.Live(store));
+        }
+        return Math.Round(total, 2);
+    }
+
+    /// <summary>
+    /// The whole cart as one run: store keys plus the money it moves —
+    /// wholesale out, retail payout in — computed before any restock so the
+    /// sums see the shelves the goods fill. Empty carts run nothing.
+    /// </summary>
+    public DeliveryRun? Run(DeliveryCatalog catalog, CityEconomy city)
+    {
+        if (_storeKeys.Count == 0) return null;
+        return new DeliveryRun(
+            [.. _storeKeys],
+            TotalCost(catalog),
+            TotalPayout(catalog, city));
+    }
 }

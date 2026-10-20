@@ -5,9 +5,10 @@ using AceDrive.Core;
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// Loads fare balance from Data/fares.json next to the exe. Missing or
-/// invalid file degrades to <see cref="FareTable.Default"/> with a warning —
-/// the overlay must never fail to start over a data file.
+/// Loads fare balance from Data/fares.json (taxi) and Data/delivery_fares.json
+/// (delivery) next to the exe. Missing or invalid files degrade to the
+/// built-in defaults with a warning — the overlay must never fail to start
+/// over a data file.
 /// </summary>
 public sealed class JsonFareStore
 {
@@ -58,28 +59,48 @@ public sealed class JsonFareStore
         }
     }
 
+    /// <summary>
+    /// The delivery distance-charge table from its own file, same degrade
+    /// rule (Unity's delivery rates live beside the taxi table but price an
+    /// otherwise different fare: no forfait, tip or fine).
+    /// </summary>
+    public DeliveryFareTable LoadDelivery()
+    {
+        string file = Path.Combine(
+            Path.GetDirectoryName(_file)!, "delivery_fares.json");
+        try
+        {
+            if (!File.Exists(file))
+            {
+                _log.LogWarning($"delivery_fares.json missing at {file}; using built-in defaults");
+                return DeliveryFareTable.Default;
+            }
+            var table = JsonSerializer.Deserialize<DeliveryFareTable>(
+                File.ReadAllText(file), JsonOptions);
+            if (table is null || !FareTierRules.Valid(table.Tiers))
+            {
+                _log.LogWarning($"delivery_fares.json invalid at {file}; using built-in defaults");
+                return DeliveryFareTable.Default;
+            }
+            _log.LogInfo($"delivery fares loaded: tiers={table.Tiers.Count}");
+            return table;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            _log.LogWarning($"delivery_fares.json unreadable at {file} ({ex.GetType().Name}); using built-in defaults");
+            return DeliveryFareTable.Default;
+        }
+    }
+
     // A table needs a non-negative forfait, a 0-100% tip rate, a
-    // non-negative fine and at least one tier with a non-negative rate;
-    // only the open top tier may carry a non-positive width.
+    // non-negative fine and a valid tier table; the tier shape is shared
+    // with the delivery table (FareTierRules), so both loaders agree.
     private static bool IsValid(FareTable table)
     {
         if (table.Forfait < 0 || table.TipRate is < 0 or > 1 || table.FineAmount < 0)
         {
             return false;
         }
-        if (table.Tiers.Count == 0)
-        {
-            return false;
-        }
-        for (int i = 0; i < table.Tiers.Count; i++)
-        {
-            FareTier tier = table.Tiers[i];
-            bool isLast = i == table.Tiers.Count - 1;
-            if ((!isLast && tier.WidthKm <= 0.0) || tier.RatePerKm < 0.0)
-            {
-                return false;
-            }
-        }
-        return true;
+        return FareTierRules.Valid(table.Tiers);
     }
 }

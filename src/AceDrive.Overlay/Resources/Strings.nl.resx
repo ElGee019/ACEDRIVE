@@ -14,6 +14,19 @@
   <data name="GearUnknown" xml:space="preserve"><value>N</value></data>
   <data name="EvoLive" xml:space="preserve"><value>EVO live · pakket {0}</value></data>
   <data name="EvoDetail" xml:space="preserve"><value>tpm {0} · gas {1:0%} · rem {2:0%}</value></data>
+  <data name="HudMileageLabel" xml:space="preserve"><value>KILOMETERSTAND</value></data>
+  <data name="HudAddressLabel" xml:space="preserve"><value>HUIDIGE STRAAT</value></data>
+  <data name="HudMileage" xml:space="preserve"><value>{0:000000.0}</value></data>
+  <data name="HudAddress" xml:space="preserve"><value>{0} · nr. {1}</value></data>
+  <data name="HudAddressWithCity" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="HudWrongCar" xml:space="preserve"><value>Carrièremodus uitgeschakeld. Stap in een auto die je bezit.</value></data>
+  <data name="HudDestination" xml:space="preserve"><value>Rij naar {0}, {1} nr. {2} in {3}</value></data>
+  <data name="HudArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}, ga naar binnen om ahornsiroop voor oma te kopen.</value></data>
+  <data name="HudEnter" xml:space="preserve"><value>BINNENGAAN</value></data>
+  <data name="HudTrack" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="HudNoTrack" xml:space="preserve"><value>geen baan</value></data>
+  <data name="HudNoPosition" xml:space="preserve"><value>geen positie op de baan</value></data>
+  <data name="HudNoCar" xml:space="preserve"><value>geen auto</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (nepklus)</value></data>
   <data name="NoJob" xml:space="preserve"><value>Geen klus. Druk op Nieuwe klus en rijd.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op OPHALEN.</value></data>
@@ -29,6 +42,20 @@
   <data name="Unlock" xml:space="preserve"><value>ONTGRENDEL</value></data>
   <data name="FatalCrashTitle" xml:space="preserve"><value>AceDrive is gecrasht</value></data>
   <data name="FatalCrashMessage" xml:space="preserve"><value>Er is iets misgegaan. Details staan in het logboek in {0}.</value></data>
+  <data name="OpeningTitle" xml:space="preserve"><value>WELKOM</value></data>
+  <data name="OpeningName" xml:space="preserve"><value>NAAM</value></data>
+  <data name="OpeningCountry" xml:space="preserve"><value>LAND</value></data>
+  <data name="OpeningCity" xml:space="preserve"><value>STAD</value></data>
+  <data name="OpeningStreet" xml:space="preserve"><value>STRAAT</value></data>
+  <data name="OpeningHouseNumber" xml:space="preserve"><value>HUISNUMMER</value></data>
+  <data name="OpeningContinue" xml:space="preserve"><value>DOORGAAN</value></data>
+  <!-- Eerste scherm (afstandseenheid + taal). De keuzelijstlabels zelf zijn
+       taalonafhankelijk ("km"/"mi", endoniemen), dus alleen deze teksten
+       worden opnieuw gelezen bij een taalwissel. -->
+  <data name="PreferencesTitle" xml:space="preserve"><value>ACEDRIVE INSTELLEN</value></data>
+  <data name="PreferencesUnits" xml:space="preserve"><value>AFSTANDSEENHEID</value></data>
+  <data name="PreferencesLanguage" xml:space="preserve"><value>TAAL</value></data>
+  <data name="PreferencesContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WAT IS JE FAVORIETE MERK</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>IN WELKE AUTO RIJDT OMA</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
@@ -47,6 +74,8 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>OMA'S TAKENLIJSTJE</value></data>
   <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>KOM TERUG OP {0} TUSSEN 8 EN 20 UUR</value></data>
+  <data name="HungerValue" xml:space="preserve"><value>HONGER {0}/{1}</value></data>
+  <data name="FilthValue" xml:space="preserve"><value>VUIL {0}/{1}</value></data>
   <data name="DaySun" xml:space="preserve"><value>Zondag</value></data>
   <data name="DayMon" xml:space="preserve"><value>Maandag</value></data>
   <data name="DayTue" xml:space="preserve"><value>Dinsdag</value></data>
@@ -91,23 +120,183 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ReceiptTitle" xml:space="preserve"><value>TAXIBON</value></data>
   <data name="ReceiptDistance" xml:space="preserve"><value>Afstand: {0:0.0} km</value></data>
   <data name="ReceiptCustomer" xml:space="preserve"><value>Klanten: {0}. {1}</value></data>
-  <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km = €{4:0.00}</value></data>
-  <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km = €{3:0.00}</value></data>
-  <data name="ReceiptForfait" xml:space="preserve"><value>Forfait: €{0:0.00}</value></data>
-  <data name="ReceiptFare" xml:space="preserve"><value>Ritprijs: {0} × €{1:0.00} = €{2:0.00}</value></data>
-  <data name="ReceiptTip" xml:space="preserve"><value>Fooi: €{0:0.00}</value></data>
-  <data name="ReceiptFine" xml:space="preserve"><value>Snelheidsboete: −€{0:0.00}</value></data>
-  <data name="ReceiptTotal" xml:space="preserve"><value>Totaal verdiend: €{0:0.00}</value></data>
+  <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km</value></data>
+  <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km</value></data>
+  <data name="ReceiptForfait" xml:space="preserve"><value>Forfait</value></data>
+  <data name="ReceiptFare" xml:space="preserve"><value>Ritprijs: {0} × €{1:0.00}</value></data>
+  <data name="ReceiptSponsorship" xml:space="preserve"><value>{0}-sponsoring</value></data>
+  <data name="ReceiptBrandBonus" xml:space="preserve"><value>{0}-sponsoring: {1:0.00}% voor {2:0.00} km in hun auto's.</value></data>
+  <data name="ReceiptTip" xml:space="preserve"><value>Fooi</value></data>
+  <data name="ReceiptFine" xml:space="preserve"><value>Snelheidsboete</value></data>
+  <data name="ReceiptTotal" xml:space="preserve"><value>Totaal verdiend</value></data>
+  <data name="ReceiptAmount" xml:space="preserve"><value>€{0:0.00}</value></data>
+  <data name="ReceiptFineAmount" xml:space="preserve"><value>−€{0:0.00}</value></data>
   <data name="ReceiptWallet" xml:space="preserve"><value>Portemonnee: €{0:0.00}</value></data>
   <data name="ReceiptShift" xml:space="preserve"><value>Dienst: {0} ritten · €{1:0.00}</value></data>
   <data name="ReceiptXp" xml:space="preserve"><value>XP verdiend: {0:0.00}</value></data>
   <data name="ReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × klasse {1} × zeldzaamheid {2}) / 100 × straatkennis {3}%</value></data>
   <data name="ReceiptTotalXp" xml:space="preserve"><value>Totaal XP: {0:0.00}</value></data>
+  <data name="ReceiptStandings" xml:space="preserve"><value>Je wereldstandaard voor XP is {0} van {1}.</value></data>
+  <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Je wereldstandaard voor XP is —/—.</value></data>
+  <data name="ReceiptStandingsGainedOne" xml:space="preserve"><value>Je bent 1 plek gestegen.</value></data>
+  <data name="ReceiptStandingsGained" xml:space="preserve"><value>Je bent {0} plekken gestegen.</value></data>
+  <data name="ReceiptStandingsLostOne" xml:space="preserve"><value>Je bent 1 plek gezakt.</value></data>
+  <data name="ReceiptStandingsLost" xml:space="preserve"><value>Je bent {0} plekken gezakt.</value></data>
+  <data name="ReceiptStandingsNoChange" xml:space="preserve"><value>Geen verandering in de standaard.</value></data>
   <data name="ReceiptContinue" xml:space="preserve"><value>VERDER</value></data>
+  <data name="BankTitle" xml:space="preserve"><value>BANK</value></data>
+  <data name="BankSaldo" xml:space="preserve"><value>Huidige banksaldo: CR{0:0.00}</value></data>
+  <data name="BankAfter" xml:space="preserve"><value>Saldo na opname: CR{0:0.00}</value></data>
+  <data name="BankWithdraw" xml:space="preserve"><value>OPNEMEN</value></data>
+  <data name="BankBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="ControlBank" xml:space="preserve"><value>BANK</value></data>
+  <data name="ControlGarage" xml:space="preserve"><value>GARAGE</value></data>
+  <data name="ControlDealer" xml:space="preserve"><value>AUTODEALER</value></data>
+  <data name="GarageTitle" xml:space="preserve"><value>GARAGE</value></data>
+  <data name="GarageEmpty" xml:space="preserve"><value>Nog geen auto's in de garage.</value></data>
+  <data name="GarageCurrent" xml:space="preserve"><value>HUIDIGE</value></data>
+  <data name="GarageCarSpecs" xml:space="preserve"><value>klasse {0} · {1} zitplaatsen · kofferbak {2} L · {3:0} km</value></data>
+  <data name="GarageCarValue" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="GarageBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="DealerTitle" xml:space="preserve"><value>AUTODEALER</value></data>
+  <data name="DealerCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
+  <data name="DealerEmpty" xml:space="preserve"><value>Deze week niets te koop.</value></data>
+  <data name="DealerPick" xml:space="preserve"><value>Kies een auto</value></data>
+  <data name="DealerCarSpecs" xml:space="preserve"><value>klasse {0} · {1} zitplaatsen · kofferbak {2} L · {3} pk · {4} km/u</value></data>
+  <data name="DealerPrice" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="DealerBuy" xml:space="preserve"><value>KOPEN</value></data>
+  <data name="DealerCantAfford" xml:space="preserve"><value>NIET BETAALBAAR</value></data>
+  <data name="BoughtTitle" xml:space="preserve"><value>NIEUWE AUTO</value></data>
+  <data name="BoughtBody" xml:space="preserve"><value>De sleutels zijn van jou. Rijd er nu in of houd je huidige auto?</value></data>
+  <data name="BoughtDrive" xml:space="preserve"><value>RIJD ERIN</value></data>
+  <data name="BoughtKeep" xml:space="preserve"><value>HOUD HUIDIGE</value></data>
+  <data name="BoughtSecondCar" xml:space="preserve"><value>Twee auto's in de garage. Kies welke je rijdt.</value></data>
+  <data name="ControlCarWash" xml:space="preserve"><value>CARWASH</value></data>
+  <data name="CarWashTitle" xml:space="preserve"><value>CARWASH</value></data>
+  <data name="CarWashFilth" xml:space="preserve"><value>Vuil: {0} / {1}</value></data>
+  <data name="CarWashPrice" xml:space="preserve"><value>Prijs om je auto te wassen: CR{0:0.00}</value></data>
+  <data name="CarWashWash" xml:space="preserve"><value>WASSEN</value></data>
+  <data name="CarWashRemoved" xml:space="preserve"><value>{0} vuil verwijderd voor CR {1:0.00}</value></data>
+  <data name="CarWashNoCar" xml:space="preserve"><value>Nog geen auto om te wassen.</value></data>
+  <data name="CarWashBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="TaxiTooDirty" xml:space="preserve"><value>Ik stap echt niet in zo'n vieze auto. Je verloor 1 vriendschap met {0}.</value></data>
   <data name="FriendshipStranger" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. Nog een vreemde.</value></data>
   <data name="FriendshipAcquaintance" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. Nu een kennis.</value></data>
   <data name="FriendshipFriend" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. {0} is een vriend.</value></data>
   <data name="FriendshipGood" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. {0} is een goede vriend.</value></data>
   <data name="FriendshipClose" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. {0} is een goede vriend.</value></data>
   <data name="FriendshipBff" xml:space="preserve"><value>Nieuwe bekendheid met {0}: {1}. BFF met {0}!</value></data>
+  <!-- Bezorgbon: deelt de tier/bedrag/stand-van-zaken/bekendheids-tekst van
+       de taxibon hierboven; alleen de geldregels zijn bezorgspecifiek
+       (groothandel==winkel). -->
+  <data name="DelReceiptTitle" xml:space="preserve"><value>BEZORGBON</value></data>
+  <data name="DelReceiptDistance" xml:space="preserve"><value>Totale afstand: {0:0.0} km</value></data>
+  <data name="DelReceiptPaid" xml:space="preserve"><value>Betaald voor goederen</value></data>
+  <data name="DelReceiptReceived" xml:space="preserve"><value>Ontvangen voor goederen</value></data>
+  <data name="DelReceiptFare" xml:space="preserve"><value>Ritprijs</value></data>
+  <data name="DelReceiptTotalCr" xml:space="preserve"><value>Totaal CR: €{0:0.00}</value></data>
+  <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points verdiend: {0}</value></data>
+  <data name="DelReceiptCredPTotal" xml:space="preserve"><value>Totaal Credibility Points: {0}</value></data>
+  <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km) / 100 × straatkennis {1}%</value></data>
+  <!-- Autobontraansport: betaling is tijdbasis (klasseband schaalt de
+       rijrating naar een tarief per minuut, de rijminuten prijsen het
+       totaal). Geen XP of wereldstand — Unity boekt alleen het geld.
+       Behindnaam {0} plus inhaaltekst voor het onbekende moment waarop
+       de logfile de auto niet kan noemen. Vertalers mogen herordenen,
+       niet verwijderen. -->
+  <data name="HaulReceiptTitle" xml:space="preserve"><value>AUTOBON</value></data>
+  <data name="HaulReceiptCar" xml:space="preserve"><value>{0}</value></data>
+  <data name="HaulReceiptCarUnknown" xml:space="preserve"><value>de nieuwe auto van de klant</value></data>
+  <!-- {0} de uren, {1} het uurwoord (enkelvoud/meervoud hieronder), {2} de
+       minuten, {3} het minuutwoord. De code kiest enkelvoud of meervoud op
+       aantal; de zin blijft volledig vertaalbezit. -->
+  <data name="HaulReceiptTime" xml:space="preserve"><value>De rit duurde {0} {1} en {2} {3}</value></data>
+  <data name="HaulReceiptHour" xml:space="preserve"><value>uur</value></data>
+  <data name="HaulReceiptHours" xml:space="preserve"><value>uur</value></data>
+  <data name="HaulReceiptMinute" xml:space="preserve"><value>minuut</value></data>
+  <data name="HaulReceiptMinutes" xml:space="preserve"><value>minuten</value></data>
+  <data name="HaulReceiptEarned" xml:space="preserve"><value>Je verdiende</value></data>
+  <data name="HaulReceiptDriverRating" xml:space="preserve"><value>Jouw driver rating: {0:0.0}</value></data>
+  <data name="HaulReceiptTier" xml:space="preserve"><value>De huidige klasse is tier {0}</value></data>
+  <data name="HaulReceiptRate" xml:space="preserve"><value>Resulteert in een tarief van €{0:0.00}/min</value></data>
+  <!-- Automonteur (PORTPLAN items 31/32, Unity CarMechanicScreen): het
+       motorenblok, de onderdelenrijen (efficiëntie, prijs, toevoeglabel) en de
+       totaalregel met het saldo na betaling. Onderdeelnamen komen uit het
+       datasleutel via MechanicPartNames. -->
+  <data name="ControlMechanic" xml:space="preserve"><value>MONTEUR</value></data>
+  <data name="MechanicTitle" xml:space="preserve"><value>AUTOMONTEUR</value></data>
+  <data name="MechanicCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
+  <data name="MechanicNoCar" xml:space="preserve"><value>Nog geen auto om te onderhouden.</value></data>
+  <data name="MechanicCarLine" xml:space="preserve"><value>{0} · klasse {1}</value></data>
+  <data name="MechanicBreakdown" xml:space="preserve"><value>Pechkans nu: {0:0.0000}%</value></data>
+  <data name="MechanicEngineCondition" xml:space="preserve"><value>Motorconditie nu: {0:0.00000}%</value></data>
+  <data name="MechanicEngineFailure" xml:space="preserve"><value>Je motor is kapot en je auto is opgehaald.</value></data>
+  <data name="MechanicRepairEngineCost" xml:space="preserve"><value>Reparatie: CR{0:0.00} (kilometerstand blijft)</value></data>
+  <data name="MechanicNewEngineCost" xml:space="preserve"><value>Nieuwe motor: CR{0:0.00} (teller gaat naar 0)</value></data>
+  <data name="MechanicEfficiency" xml:space="preserve"><value>{0:0.00}%</value></data>
+  <data name="MechanicPrice" xml:space="preserve"><value>CR{0:0.00}</value></data>
+  <data name="MechanicAdd" xml:space="preserve"><value>TOEVOEGEN</value></data>
+  <data name="MechanicNoCash" xml:space="preserve"><value>GEEN $</value></data>
+  <data name="MechanicServiced" xml:space="preserve"><value>✓</value></data>
+  <data name="MechanicTotal" xml:space="preserve"><value>Totaal onderdelen: CR{0:0.00}   Contant na betaling: CR{1:0.00}</value></data>
+  <data name="MechanicRepairParts" xml:space="preserve"><value>ONDERDELEN VERVANGEN</value></data>
+  <data name="MechanicRepairEngine" xml:space="preserve"><value>MOTOR REPAREREN</value></data>
+  <data name="MechanicNewEngine" xml:space="preserve"><value>NIEUWE MOTOR KOPEN</value></data>
+  <data name="MechanicPartOilChange" xml:space="preserve"><value>Olie-efficiëntie</value></data>
+  <data name="MechanicPartWipers" xml:space="preserve"><value>Ruitenwissers</value></data>
+  <data name="MechanicPartAirFilter" xml:space="preserve"><value>Luchtfilter</value></data>
+  <data name="MechanicPartBrakePads" xml:space="preserve"><value>Remblokken</value></data>
+  <data name="MechanicPartTires" xml:space="preserve"><value>Banden</value></data>
+  <data name="MechanicPartBrakeFluid" xml:space="preserve"><value>Remvloeistof</value></data>
+  <data name="MechanicPartTransmissionFluid" xml:space="preserve"><value>Transmissievloeistof</value></data>
+  <data name="MechanicPartCarBattery" xml:space="preserve"><value>Autobatterij</value></data>
+  <!-- Verzekeringsmakelaar (PORTPLAN item 34, Unity InsuranceScreen): de
+       schakelaar per auto, de dagprijsregels, het totaal en het blok om de
+       dekking te innen. -->
+  <data name="ControlInsurance" xml:space="preserve"><value>VERZEKERING</value></data>
+  <data name="InsuranceTitle" xml:space="preserve"><value>VERZEKERING</value></data>
+  <data name="InsuranceCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
+  <data name="InsuranceEmpty" xml:space="preserve"><value>Nog geen auto's om te verzekeren.</value></data>
+  <data name="InsuranceDaily" xml:space="preserve"><value>Dagprijs: CR{0:0.00}/dag</value></data>
+  <data name="InsuranceNotCovered" xml:space="preserve"><value>Niet verzekerd</value></data>
+  <data name="InsuranceTotal" xml:space="preserve"><value>Totale dagprijs: CR{0:0.00}/dag</value></data>
+  <data name="InsurancePending" xml:space="preserve"><value>Te innen verzekering: CR{0:0.00}</value></data>
+  <data name="InsuranceCollect" xml:space="preserve"><value>INNEN</value></data>
+  <data name="InsuranceAdd" xml:space="preserve"><value>TOEVOEGEN</value></data>
+  <data name="InsuranceRemove" xml:space="preserve"><value>VERWIJDEREN</value></data>
+  <!-- Pechsessie (PORTPLAN 39, Unity BreakdownPopup + BreakdownFlow): het
+       bericht per soort, de variant met motorpech, de sleepkosten en de hint. -->
+  <data name="BreakdownTitle" xml:space="preserve"><value>PECH</value></data>
+  <data name="BreakdownTaxi" xml:space="preserve"><value>Je auto is pech. De rit is geannuleerd.</value></data>
+  <data name="BreakdownDelivery" xml:space="preserve"><value>Je auto is pech. De bezorging is geannuleerd.</value></data>
+  <data name="BreakdownFreeroam" xml:space="preserve"><value>Je auto is pech langs de weg.</value></data>
+  <data name="BreakdownEngineFailure" xml:space="preserve"><value>Je motor is kapot! De automonteur haalt je auto op.</value></data>
+  <data name="BreakdownHint" xml:space="preserve"><value>Ga naar de automonteur om je motor te repareren of te vervangen.</value></data>
+  <data name="BreakdownFee" xml:space="preserve"><value>De automonteur haalt je auto op voor CR{0:0.00}.</value></data>
+  <!-- Winkelinterieur (PORTPLAN 24/26, Unity MaxsScreen + GrocerySelection):
+       de winkelnaam is contentdata; dit zijn de gedeelde winkellabels. -->
+  <data name="StoreAvailable" xml:space="preserve"><value>Beschikbare artikelen:</value></data>
+  <data name="StoreCash" xml:space="preserve"><value>Uw contant geld: {0:0.00}CR</value></data>
+  <data name="StoreGreeting" xml:space="preserve"><value>&quot;Hallo daar, wat kan ik vandaag voor u doen?&quot;</value></data>
+  <data name="StoreGreetingAfter" xml:space="preserve"><value>&quot;Nog iets anders?&quot;</value></data>
+  <data name="StoreSoldOut" xml:space="preserve"><value>Uitverkocht</value></data>
+  <data name="StoreHunger" xml:space="preserve"><value>honger -{0}</value></data>
+  <data name="StoreCost" xml:space="preserve"><value>CR{0:0.00}</value></data>
+  <data name="StoreSelection" xml:space="preserve"><value>  x  {0}</value></data>
+  <data name="StoreVolumeLine" xml:space="preserve"><value>VOLUME: {0:0.00}L</value></data>
+  <data name="StorePriceLine" xml:space="preserve"><value>PRIJS: CR{0:0.00}</value></data>
+  <data name="StoreTrunkFree" xml:space="preserve"><value>KRUIMRUIMTE: {0:0.00}L vrij</value></data>
+  <data name="StoreTrunkOverflow" xml:space="preserve"><value>KRUIMRUIMTE: {0:0.00}L (OVERLOPEN)</value></data>
+  <data name="StoreDecrease" xml:space="preserve"><value>-</value></data>
+  <data name="StoreIncrease" xml:space="preserve"><value>+</value></data>
+  <data name="StoreBuy" xml:space="preserve"><value>KOPEN</value></data>
+  <data name="StoreBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="StoreBought" xml:space="preserve"><value>U heeft {0} x {1} gekocht</value></data>
+  <data name="StoreFriendship" xml:space="preserve"><value>Nieuwe bekendheidsgraad met {0}: {1}. {2}</value></data>
+  <data name="StoreFriendshipStranger" xml:space="preserve"><value>Nog steeds een vreemde.</value></data>
+  <data name="StoreFriendshipAcquaintance" xml:space="preserve"><value>Nu een kennis.</value></data>
+  <data name="StoreFriendshipFriend" xml:space="preserve"><value>{0} is een vriend.</value></data>
+  <data name="StoreFriendshipGoodFriend" xml:space="preserve"><value>{0} is een goede vriend.</value></data>
+  <data name="StoreFriendshipCloseFriend" xml:space="preserve"><value>{0} is een hechte vriend.</value></data>
+  <data name="StoreFriendshipBff" xml:space="preserve"><value>BFF met {0}!</value></data>
 </root>

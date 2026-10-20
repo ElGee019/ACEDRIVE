@@ -1,0 +1,39 @@
+<UserControl x:Class="AceDrive.Overlay.Views.BreakdownScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Breakdown page (PORTPLAN 39, Unity BreakdownPopup): the interrupted
+         trip's message, the stranded-engine block when it failed, the tow fee
+         and BACK. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=BreakdownTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Message}" Foreground="#FFF" FontSize="15"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,6"/>
+            <TextBlock Text="{loc:Loc Key=BreakdownHint}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding HintVisible, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding FeeLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding FeeVisible, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

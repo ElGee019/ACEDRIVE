@@ -12,7 +12,8 @@ namespace AceDrive.Core;
 public sealed record DeliveryCatalog(
     IReadOnlyList<DeliveryStore> Stores,
     double WholesaleRate,
-    int StartCredP)
+    int StartCredP,
+    double PayoutRate = 0.9)
 {
     public static readonly DeliveryCatalog Default = new([], 0.7, 100);
 
@@ -27,9 +28,16 @@ public sealed record DeliveryCatalog(
 
     /// <summary>
     /// Wholesale cost of one full-restock order (Unity contract: the hub
-    /// charges WholesaleRate x retail per unit; the 0.9x retail payout
-    /// belongs to the run, not this page).
+    /// charges WholesaleRate x retail per unit).
     /// </summary>
     public double OrderCost(DeliveryStore store) =>
         Math.Round(store.PricePerUnit * WholesaleRate * store.UnitsNeeded, 2);
+
+    /// <summary>
+    /// Retail payout of one full-restock delivery (Unity contract: the store
+    /// pays PayoutRate x retail per unit — ApplyStoreDeliveryEffects' 0.9x
+    /// price take).
+    /// </summary>
+    public double PayoutCost(DeliveryStore store) =>
+        Math.Round(store.PricePerUnit * PayoutRate * store.UnitsNeeded, 2);
 }

@@ -1,0 +1,70 @@
+<UserControl x:Class="AceDrive.Overlay.Views.OpeningScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Same page skeleton as the other intro pages: viewport-pinned
+         MinHeight, title row, centered body, action row at the bottom.
+         The form styles live in App.xaml so the preferences page shares them. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=OpeningTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Width="320">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FormLabel}"
+                           Text="{loc:Loc Key=OpeningName}"/>
+                <TextBox Grid.Row="0" Grid.Column="1" Style="{StaticResource FormField}"
+                         Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                         Margin="0,0,0,6"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0" Style="{StaticResource FormLabel}"
+                           Text="{loc:Loc Key=OpeningCountry}"/>
+                <TextBox Grid.Row="1" Grid.Column="1" Style="{StaticResource FormField}"
+                         Text="{Binding Country, Mode=OneWay}" IsReadOnly="True" IsTabStop="False"
+                         Margin="0,0,0,6"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0" Style="{StaticResource FormLabel}"
+                           Text="{loc:Loc Key=OpeningCity}"/>
+                <TextBox Grid.Row="2" Grid.Column="1" Style="{StaticResource FormField}"
+                         Text="{Binding City, Mode=OneWay}" IsReadOnly="True" IsTabStop="False"
+                         Margin="0,0,0,6"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0" Style="{StaticResource FormLabel}"
+                           Text="{loc:Loc Key=OpeningStreet}"/>
+                <ComboBox Grid.Row="3" Grid.Column="1" Style="{StaticResource FormCombo}"
+                          ItemsSource="{Binding Streets}"
+                          SelectedItem="{Binding SelectedStreet}"
+                          Margin="0,0,0,6">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}" Foreground="#FFF"/>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+
+                <TextBlock Grid.Row="4" Grid.Column="0" Style="{StaticResource FormLabel}"
+                           Text="{loc:Loc Key=OpeningHouseNumber}"/>
+                <ComboBox Grid.Row="4" Grid.Column="1" Style="{StaticResource FormCombo}"
+                          ItemsSource="{Binding HouseNumbers}"
+                          SelectedItem="{Binding SelectedHouseNumber}"/>
+            </Grid>
+        </StackPanel>
+        <Button Grid.Row="2" Content="{loc:Loc Key=OpeningContinue}"
+                Command="{Binding ContinueCommand}"/>
+    </Grid>
+</UserControl>

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Windows.Input;
 using AceDrive.Core;
 using AceDrive.Overlay.ViewModels;
 
@@ -13,7 +14,9 @@ public sealed class MainControlScreenTests
         FakeClock? clock = null, TodoTable? todos = null,
         bool deliveryOpen = false, TaxiShift? shift = null,
         bool taxiStartsShift = false, DateTime? gameStart = null,
-        RoadTestLedger? roads = null, VoiceBeat? beat = null)
+        RoadTestLedger? roads = null, VoiceBeat? beat = null,
+        Hunger? hunger = null, Garage? garage = null,
+        ICommand? carWashCommand = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
@@ -23,13 +26,20 @@ public sealed class MainControlScreenTests
         TaxiShift shiftState = shift ?? new TaxiShift();
         return new MainControlScreenViewModel(
             beat ?? new VoiceBeat(tick), game, tick, roads ?? TestRoadCars.Ledger(),
-            todos ?? TodoTable.Default,
+            todos ?? TodoTable.Default, hunger ?? new Hunger(HungerRules.Default),
+            garage ?? new Garage([]),
             CalendarStamp.Default,
             shiftState,
             taxiStartsShift
                 ? new RelayCommand(() => shiftState.Start(tick.UtcNow))
                 : new RelayCommand(() => { }),
             new RelayCommand(() => { }, () => deliveryOpen),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            carWashCommand ?? new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
             new RelayCommand(() => { }),
             new ParameterizedCommand<int>(_ => { }, day => day == game.Today));
     }
@@ -63,7 +73,7 @@ public sealed class MainControlScreenTests
         // short "road test" (see Voice_RoadTestAnswersShortOnly).
         var roads = TestRoadCars.Ledger();
         var vm = Create(roads: roads);
-        var car = Assert.IsType<RoadTestCar>(roads.Current);
+        var car = Assert.IsType<CarSpec>(roads.Current);
         CalendarRow tuesday = Assert.Single(vm.Days, d => d.DayLabel == "Tuesday");
         Assert.Equal(TestRoadCars.Button(car), tuesday.EventLabel);
     }
@@ -75,7 +85,7 @@ public sealed class MainControlScreenTests
         var vm = Create(
             roads: roads,
             gameStart: new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc));
-        var car = Assert.IsType<RoadTestCar>(roads.Current);
+        var car = Assert.IsType<CarSpec>(roads.Current);
         string button = TestRoadCars.Button(car);
         Assert.Equal(button, Assert.Single(vm.Days, d => d.DayLabel == "Tuesday").EventLabel);
         Assert.True(vm.VoiceActions.ContainsKey("Road test"));
@@ -252,15 +262,23 @@ public sealed class MainControlScreenTests
         // The page change waits so the teal acknowledgment stays visible:
         // the tap lights DELIVERY JOB for one half-second beat, and only
         // then does the injected command open the delivery career page.
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
         bool fired = false;
         var game = new GameClock(clock, clock.UtcNow);
         var vm = new MainControlScreenViewModel(
             beat, game, clock, TestRoadCars.Ledger(), TodoTable.Default,
+            new Hunger(HungerRules.Default), new Garage([]),
             CalendarStamp.Default, new TaxiShift(),
             new RelayCommand(() => { }),
             new RelayCommand(() => fired = true),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
+            new RelayCommand(() => { }),
             new RelayCommand(() => { }),
             new ParameterizedCommand<int>(_ => { }, day => day == game.Today));
 
@@ -437,5 +455,86 @@ public sealed class MainControlScreenTests
         vm.VoiceActions["continue"].Invoke();
         Assert.True(shift.IsStarted);
         Assert.True(vm.TaxiFlash);
+    }
+
+    [Fact]
+    public void HungerLine_ShowsTheReadingWhereTheJobButtonsSit()
+    {
+        // Unity's map HUD prints HUNGER x/36 above the job entries; the port
+        // prints it above the job buttons (PORTPLAN 26).
+        var vm = Create();
+        Assert.Equal("HUNGER 0/36", vm.HungerText);
+        Assert.False(vm.HungerAmber);
+    }
+
+    [Fact]
+    public void HungerLine_WearsTheAmberBand()
+    {
+        // Unity YouScreen colours the reading orange from h 16 to h 29.
+        var clock = new FakeClock();
+        DateTime start = clock.UtcNow;
+        var hunger = new Hunger(HungerRules.Default);
+        _ = hunger.AdvanceTo(start, onboarded: true, hasPancakes: false);
+        for (int i = 0; i < 16; i++)
+        {
+            _ = hunger.AdvanceTo(start.AddHours(i + 1), onboarded: true, hasPancakes: false);
+        }
+
+        var vm = Create(clock, hunger: hunger);
+        Assert.Equal("HUNGER 16/36", vm.HungerText);
+        Assert.True(vm.HungerAmber);
+    }
+
+    [Fact]
+    public void FilthLine_ShowsTheCurrentCarsDirt()
+    {
+        // Unity's MapScreen HUD prints FILTH x/25 beside the hunger line
+        // (PORTPLAN 33); the reading is the car driven now.
+        var vm = Create(garage: Dirty(0));
+        Assert.Equal("FILTH 0/25", vm.FilthText);
+        Assert.False(vm.FilthAmber);
+        Assert.False(vm.FilthFullyDirty);
+    }
+
+    [Fact]
+    public void FilthLine_WearsTheAmberBand()
+    {
+        // Unity MapScreen colours the reading orange from 15 up to the cap.
+        var vm = Create(garage: Dirty(15));
+        Assert.Equal("FILTH 15/25", vm.FilthText);
+        Assert.True(vm.FilthAmber);
+        Assert.False(vm.FilthFullyDirty);
+    }
+
+    [Fact]
+    public void FilthLine_AtTheCapReadsFullyDirty()
+    {
+        // Unity paints the cap the shared mint instead of the amber.
+        var vm = Create(garage: Dirty(25));
+        Assert.Equal("FILTH 25/25", vm.FilthText);
+        Assert.False(vm.FilthAmber);
+        Assert.True(vm.FilthFullyDirty);
+    }
+
+    [Fact]
+    public void Voice_CarWashAnswersItsLabelAndTheSpokenSlice()
+    {
+        // The temporary entry (PORTPLAN 33) answers to its text and to what
+        // the mic hears short of it, like the bank/garage/dealer entries.
+        bool opened = false;
+        var vm = Create(carWashCommand: new RelayCommand(() => opened = true));
+        Assert.True(vm.VoiceActions.ContainsKey("CAR WASH"));
+        Assert.True(vm.VoiceActions.ContainsKey("wash"));
+        vm.VoiceActions["wash"].Invoke();
+        Assert.True(opened);
+        Assert.True(vm.CarWashFlash);
+    }
+
+    private static Garage Dirty(int filth)
+    {
+        var car = new CarSpec("ks_mazda_mx5_na", 1990, "Mazda", "mx5 na", Passengers: 1);
+        var garage = new Garage([car]);
+        garage.Add(car, week: 1).Filth.Add(filth);
+        return garage;
     }
 }

@@ -1,8 +1,26 @@
 <Application x:Class="AceDrive.Overlay.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views"
+             ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <views:BoolToHiddenConverter x:Key="BoolToHiddenVis"/>
+        <!-- One earnings row shape for both receipt pages (taxi + delivery):
+             explanation and amount sit in their own column, both
+             left-aligned. The SharedSizeGroup (scoped on the hosting body
+             panel) lines every row of the block up on the same two columns;
+             font size and colour inherit from the hosting element. -->
+        <DataTemplate x:Key="ReceiptLineTemplate">
+            <Grid HorizontalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ReceiptExplanation"/>
+                    <ColumnDefinition Width="Auto" SharedSizeGroup="ReceiptAmount"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding Explanation}"/>
+                <TextBlock Grid.Column="1" Text="{Binding Amount}" Margin="10,0,0,0"/>
+            </Grid>
+        </DataTemplate>
         <!-- Page title band: one style so every page renders its title at the
              same height, no matter how the body below it is aligned. -->
         <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -69,6 +87,133 @@
                     <Setter Property="Background" Value="#22FFFFFF"/>
                 </Trigger>
             </Style.Triggers>
+        </Style>
+        <!-- One form look for the setup pages (first-run + name/address): dim
+             labels, dark fields. The ComboBox rides the same colours so the
+             block reads as one card instead of platform chrome. Shared here
+             so the two intro pages render identical fields (DRY). -->
+        <Style x:Key="FormLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFBFC4C9"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+        </Style>
+        <Style x:Key="FormField" TargetType="TextBox">
+            <Setter Property="Background" Value="Black"/>
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderBrush" Value="#FF3A4148"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="FormCombo" TargetType="ComboBox">
+            <Setter Property="Background" Value="Black"/>
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderBrush" Value="#FF3A4148"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="MinHeight" Value="24"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton x:Name="ToggleButton"
+                                          Focusable="False"
+                                          ClickMode="Press"
+                                          Background="{TemplateBinding Background}"
+                                          Foreground="{TemplateBinding Foreground}"
+                                          BorderBrush="{TemplateBinding BorderBrush}"
+                                          BorderThickness="{TemplateBinding BorderThickness}"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                                      RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="{TemplateBinding Background}"
+                                                BorderBrush="{TemplateBinding BorderBrush}"
+                                                BorderThickness="{TemplateBinding BorderThickness}"
+                                                CornerRadius="4"
+                                                SnapsToDevicePixels="True">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="20"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ContentPresenter Grid.Column="0"
+                                                                  Margin="6,2"
+                                                                  VerticalAlignment="Center"
+                                                                  HorizontalAlignment="Left"
+                                                                  IsHitTestVisible="False"
+                                                                  TextElement.Foreground="#FFF"
+                                                                  Content="{Binding SelectionBoxItem,
+                                                                            RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentTemplate="{Binding SelectionBoxItemTemplate,
+                                                                                    RelativeSource={RelativeSource AncestorType=ComboBox}}"
+                                                                  ContentStringFormat="{Binding SelectionBoxItemStringFormat,
+                                                                                        RelativeSource={RelativeSource AncestorType=ComboBox}}"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="▼"
+                                                           Foreground="White"
+                                                           FontSize="9"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"/>
+                                            </Grid>
+                                        </Border>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="False"
+                                   Focusable="False"
+                                   StaysOpen="False"
+                                   PopupAnimation="Fade"
+                                   MinWidth="{TemplateBinding ActualWidth}"
+                                   MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                <Border Background="Black"
+                                        BorderBrush="#FF3A4148"
+                                        BorderThickness="1">
+                                    <ScrollViewer>
+                                        <ItemsPresenter/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- The dropdown rows follow the same black card as the closed
+             ComboBox; the default ComboBoxItem chrome is light. -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Background" Value="Black"/>
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter VerticalAlignment="Center"
+                                              HorizontalAlignment="Left"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="#FF2A3138"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#FF2A3138"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Application.Resources>
 </Application>

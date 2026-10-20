@@ -1,0 +1,48 @@
+<UserControl x:Class="AceDrive.Overlay.Views.BankScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Bank page skeleton like the receipt pages: viewport-pinned MinHeight,
+         title row, body centered below, the two buttons stacked in the bottom
+         band, withdraw above back (Unity BankScript: withdraw + back-to-control).
+         The input updates the "balance after withdrawal" preview live (Unity
+         _inputFieldAmount.onValueChanged). -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=BankTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding SaldoLine}" Foreground="#FFF" FontSize="16"
+                       TextAlignment="Center" Margin="0,6,0,6"/>
+            <TextBox Text="{Binding AmountText, UpdateSourceTrigger=PropertyChanged}"
+                     Width="120" MinHeight="22" Padding="2,0"
+                     HorizontalAlignment="Center" Margin="0,0,0,6"
+                     Background="#FF10151A" Foreground="#FFF" BorderBrush="#FF3A4148"
+                     HorizontalContentAlignment="Right"/>
+            <TextBlock Text="{Binding AfterLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+        </StackPanel>
+        <!-- Button bar: withdraw on top, back flush with the panel edge below,
+             the delivery job page's stack. Teal is the shared voice-ack
+             highlight: the BACK the mic tapped glows for one beat before the
+             page waits it out. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=BankWithdraw}"
+                    Command="{Binding WithdrawCommand}" Margin="0,0,0,6"/>
+            <Button Content="{loc:Loc Key=BankBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

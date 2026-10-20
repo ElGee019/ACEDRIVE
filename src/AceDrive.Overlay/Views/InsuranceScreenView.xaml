@@ -1,0 +1,77 @@
+<UserControl x:Class="AceDrive.Overlay.Views.InsuranceScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- Insured car row: teal edge, the shared activation tell. -->
+        <Style x:Key="InsuranceRowBorder" TargetType="Border">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsInsured}" Value="True">
+                    <Setter Property="BorderBrush" Value="#FF97EAD2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <!-- Insurance broker page (PORTPLAN 34, Unity InsuranceScreen): every owned
+         car with its daily premium and ADD/REMOVE toggle, the combined daily
+         cost, and the collect block for the escrow a covered repair paid into. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=InsuranceTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CashLine}" Foreground="#FFF" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,2" Padding="6,4" BorderThickness="1" BorderBrush="Transparent"
+                                Style="{StaticResource InsuranceRowBorder}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}" Foreground="#FFF" FontSize="13" FontWeight="Bold"/>
+                                    <TextBlock Text="{Binding DailyLine}" Foreground="#FFBFC4C9" FontSize="11"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="{Binding ToggleLabel}" FontSize="11" Padding="8,2"
+                                        VerticalAlignment="Center"
+                                        Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding TotalLine}" Foreground="#FFF" FontSize="13" FontWeight="Bold"
+                       TextAlignment="Center" Margin="0,8,0,0"/>
+            <TextBlock Text="{Binding PendingLine}" Foreground="#FF97EAD2" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"
+                       Visibility="{Binding PendingVisible, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=InsuranceCollect}" Command="{Binding CollectCommand}"
+                    Margin="0,0,0,6"
+                    Visibility="{Binding PendingVisible, Converter={StaticResource BoolToVis}}"/>
+            <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

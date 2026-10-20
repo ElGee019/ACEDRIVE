@@ -14,6 +14,24 @@
   <data name="GearUnknown" xml:space="preserve"><value>N</value></data>
   <data name="EvoLive" xml:space="preserve"><value>EVO live · pkt {0}</value></data>
   <data name="EvoDetail" xml:space="preserve"><value>rpm {0} · thr {1:0%} · brk {2:0%}</value></data>
+  <!-- Always-visible 200 px HUD: mileage = the driven car's persistent
+       odometer, address = the placeholder map's street at the live lap
+       position. Placeholders survive translation. -->
+  <data name="HudMileageLabel" xml:space="preserve"><value>MILEAGE</value></data>
+  <data name="HudAddressLabel" xml:space="preserve"><value>CURRENT STREET</value></data>
+  <data name="HudMileage" xml:space="preserve"><value>{0:000000.0}</value></data>
+  <data name="HudAddress" xml:space="preserve"><value>{0} · No. {1}</value></data>
+  <!-- The HUD's location line: the shared street shape plus the city the
+       placeholder map lives in ("Street 1 · No. 17, Brands"). -->
+  <data name="HudAddressWithCity" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="HudWrongCar" xml:space="preserve"><value>Career mode disabled. Change into a car you own.</value></data>
+  <data name="HudDestination" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3}</value></data>
+  <data name="HudArrived" xml:space="preserve"><value>You have arrived at {0}, enter to buy maple syrup for grandma.</value></data>
+  <data name="HudEnter" xml:space="preserve"><value>ENTER</value></data>
+  <data name="HudTrack" xml:space="preserve"><value>{0} · {1}</value></data>
+  <data name="HudNoTrack" xml:space="preserve"><value>no track</value></data>
+  <data name="HudNoPosition" xml:space="preserve"><value>no track position</value></data>
+  <data name="HudNoCar" xml:space="preserve"><value>no car</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (fake job)</value></data>
   <data name="NoJob" xml:space="preserve"><value>No job. Press New job, then drive.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press PICKUP.</value></data>
@@ -29,6 +47,20 @@
   <data name="Unlock" xml:space="preserve"><value>UNLOCK</value></data>
   <data name="FatalCrashTitle" xml:space="preserve"><value>AceDrive crashed</value></data>
   <data name="FatalCrashMessage" xml:space="preserve"><value>Something went wrong. Details were written to the log in {0}.</value></data>
+  <data name="OpeningTitle" xml:space="preserve"><value>WELCOME</value></data>
+  <data name="OpeningName" xml:space="preserve"><value>NAME</value></data>
+  <data name="OpeningCountry" xml:space="preserve"><value>COUNTRY</value></data>
+  <data name="OpeningCity" xml:space="preserve"><value>CITY</value></data>
+  <data name="OpeningStreet" xml:space="preserve"><value>STREET</value></data>
+  <data name="OpeningHouseNumber" xml:space="preserve"><value>HOUSE NUMBER</value></data>
+  <data name="OpeningContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <!-- First-run page (distance unit + UI language). The dropdown option
+       labels themselves are language-independent ("km"/"mi", endonyms),
+       so only this chrome re-reads when the language changes. -->
+  <data name="PreferencesTitle" xml:space="preserve"><value>SET UP ACEDRIVE</value></data>
+  <data name="PreferencesUnits" xml:space="preserve"><value>DISTANCE UNIT</value></data>
+  <data name="PreferencesLanguage" xml:space="preserve"><value>LANGUAGE</value></data>
+  <data name="PreferencesContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WHAT IS YOUR FAVORITE BRAND</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>WHAT CAR DOES GRANDMA DRIVE</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
@@ -47,6 +79,8 @@ For instance "{0}".</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>GRANDMA'S TO DO</value></data>
   <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>COME BACK ON {0} BETWEEN 8am AND 8pm</value></data>
+  <data name="HungerValue" xml:space="preserve"><value>HUNGER {0}/{1}</value></data>
+  <data name="FilthValue" xml:space="preserve"><value>FILTH {0}/{1}</value></data>
   <data name="DaySun" xml:space="preserve"><value>Sunday</value></data>
   <data name="DayMon" xml:space="preserve"><value>Monday</value></data>
   <data name="DayTue" xml:space="preserve"><value>Tuesday</value></data>
@@ -121,26 +155,99 @@ Accept this job?</value></data>
   <data name="ProposalLegHome" xml:space="preserve"><value>home, {0}</value></data>
   <data name="ProposalLegResidence" xml:space="preserve"><value>the {0} residence, {1}</value></data>
   <data name="ProposalRadiusHint" xml:space="preserve"><value>Limit how far from Grandma's place you're willing to accept taxi jobs by entering a radius below.</value></data>
-  <!-- Taxi receipt page (PORTPLAN 11, Unity TaxiReceiptScreen). {0} in the
-       tier lines is the range start in km, {1} the range end (open tier:
-       start only), then the per-km rate, the driven km in that tier and the
-       tier charge. Money in EUR, XP with two decimals like Unity. -->
+  <!-- Taxi receipt page (PORTPLAN 11, Unity TaxiReceiptScreen). Earnings
+       lines are two-column: one key for the explanation, one shared key
+       for the amount. {0} in the tier lines is the range start in km,
+       {1} the range end (open tier: start only), then the per-km rate and
+       the driven km in that tier; the tier charge is the amount. Money in
+       EUR, XP with two decimals like Unity. -->
   <data name="ReceiptTitle" xml:space="preserve"><value>TAXI RECEIPT</value></data>
   <data name="ReceiptDistance" xml:space="preserve"><value>Distance: {0:0.0} km</value></data>
   <data name="ReceiptCustomer" xml:space="preserve"><value>Customers: {0}. {1}</value></data>
-  <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km = €{4:0.00}</value></data>
-  <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km = €{3:0.00}</value></data>
-  <data name="ReceiptForfait" xml:space="preserve"><value>Forfait: €{0:0.00}</value></data>
-  <data name="ReceiptFare" xml:space="preserve"><value>Fare: {0} × €{1:0.00} = €{2:0.00}</value></data>
-  <data name="ReceiptTip" xml:space="preserve"><value>Customer tip: €{0:0.00}</value></data>
-  <data name="ReceiptFine" xml:space="preserve"><value>Speed fine: −€{0:0.00}</value></data>
-  <data name="ReceiptTotal" xml:space="preserve"><value>Total earned: €{0:0.00}</value></data>
+  <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km</value></data>
+  <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km</value></data>
+  <data name="ReceiptForfait" xml:space="preserve"><value>Forfait</value></data>
+  <data name="ReceiptFare" xml:space="preserve"><value>Fare: {0} × €{1:0.00}</value></data>
+  <!-- Brand sponsorship (PORTPLAN 35, Unity TaxiReceiptScreen's sponsorship
+       row + brand bonus detail). {0} the brand, {1} the rate in percent,
+       {2} the lifetime brand km; the bonus is the amount column.
+       Translators may reorder, never remove. -->
+  <data name="ReceiptSponsorship" xml:space="preserve"><value>{0} Sponsorship</value></data>
+  <data name="ReceiptBrandBonus" xml:space="preserve"><value>{0} sponsorship: {1:0.00}% for driving {2:0.00}km in their cars.</value></data>
+  <data name="ReceiptTip" xml:space="preserve"><value>Customer tip</value></data>
+  <data name="ReceiptFine" xml:space="preserve"><value>Speed fine</value></data>
+  <data name="ReceiptTotal" xml:space="preserve"><value>Total earned</value></data>
+  <!-- Amount column of the earnings lines; the fine amount keeps the minus
+       so the sign reads with the currency, like Unity's row. -->
+  <data name="ReceiptAmount" xml:space="preserve"><value>€{0:0.00}</value></data>
+  <data name="ReceiptFineAmount" xml:space="preserve"><value>−€{0:0.00}</value></data>
   <data name="ReceiptWallet" xml:space="preserve"><value>Wallet: €{0:0.00}</value></data>
   <data name="ReceiptShift" xml:space="preserve"><value>Shift: {0} jobs · €{1:0.00}</value></data>
   <data name="ReceiptXp" xml:space="preserve"><value>XP earned: {0:0.00}</value></data>
   <data name="ReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × class {1} × rarity {2}) / 100 × street knowledge {3}%</value></data>
   <data name="ReceiptTotalXp" xml:space="preserve"><value>Total XP: {0:0.00}</value></data>
+  <!-- XP world standings (PORTPLAN 60, Unity TaxiReceiptScreen rivals
+       block): {0} is the English ordinal rank, {1} the board size.
+       Translators may reorder, never remove. -->
+  <data name="ReceiptStandings" xml:space="preserve"><value>Your XP world standings is {0} of {1}.</value></data>
+  <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Your XP world standings is —/—.</value></data>
+  <data name="ReceiptStandingsGainedOne" xml:space="preserve"><value>You gained 1 position.</value></data>
+  <data name="ReceiptStandingsGained" xml:space="preserve"><value>You gained {0} positions.</value></data>
+  <data name="ReceiptStandingsLostOne" xml:space="preserve"><value>You lost 1 position.</value></data>
+  <data name="ReceiptStandingsLost" xml:space="preserve"><value>You lost {0} positions.</value></data>
+  <data name="ReceiptStandingsNoChange" xml:space="preserve"><value>No change in standings.</value></data>
   <data name="ReceiptContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <!-- Savings bank (PORTPLAN 48, Unity BankScript copy): saldo/preview
+       lines, the withdraw + back buttons and the temporary control-page entry.
+       {0} is the 2-decimal CR amount; the CR prefix is Unity's own currency
+       marker and stays inside the format. Placeholders survive
+       translation; translators may reorder, never remove. -->
+  <data name="BankTitle" xml:space="preserve"><value>BANK</value></data>
+  <data name="BankSaldo" xml:space="preserve"><value>Current Bank Saldo: CR{0:0.00}</value></data>
+  <data name="BankAfter" xml:space="preserve"><value>Balance After Withdrawal: CR{0:0.00}</value></data>
+  <data name="BankWithdraw" xml:space="preserve"><value>WITHDRAW</value></data>
+  <data name="BankBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="ControlBank" xml:space="preserve"><value>BANK</value></data>
+  <!-- Garage + car dealer (PORTPLAN items 29/30, Unity GarageScreen +
+       CarDealerScreen copy): page titles, the owned-car rows, the weekly floor
+       and the post-purchase choice. {0:0} = whole CR amounts, {0:0.00} = the
+       live wallet; both the CR marker and the · separators are ours and stay
+       inside the format. Placeholders survive translation; translators may
+       reorder, never remove. -->
+  <data name="ControlGarage" xml:space="preserve"><value>GARAGE</value></data>
+  <data name="ControlDealer" xml:space="preserve"><value>CAR DEALER</value></data>
+  <data name="GarageTitle" xml:space="preserve"><value>GARAGE</value></data>
+  <data name="GarageEmpty" xml:space="preserve"><value>No cars in the garage yet.</value></data>
+  <data name="GarageCurrent" xml:space="preserve"><value>CURRENT</value></data>
+  <data name="GarageCarSpecs" xml:space="preserve"><value>class {0} · {1} seats · trunk {2} L · {3:0} km</value></data>
+  <data name="GarageCarValue" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="GarageBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="DealerTitle" xml:space="preserve"><value>CAR DEALER</value></data>
+  <data name="DealerCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
+  <data name="DealerEmpty" xml:space="preserve"><value>Nothing for sale this week.</value></data>
+  <data name="DealerPick" xml:space="preserve"><value>Pick a car</value></data>
+  <data name="DealerCarSpecs" xml:space="preserve"><value>class {0} · {1} seats · trunk {2} L · {3} hp · {4} km/h</value></data>
+  <data name="DealerPrice" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="DealerBuy" xml:space="preserve"><value>BUY IT</value></data>
+  <data name="DealerCantAfford" xml:space="preserve"><value>CAN'T AFFORD</value></data>
+  <data name="BoughtTitle" xml:space="preserve"><value>NEW CAR</value></data>
+  <data name="BoughtBody" xml:space="preserve"><value>The keys are yours. Drive it now or keep your current car?</value></data>
+  <data name="BoughtDrive" xml:space="preserve"><value>DRIVE IT</value></data>
+  <data name="BoughtKeep" xml:space="preserve"><value>KEEP CURRENT</value></data>
+  <data name="BoughtSecondCar" xml:space="preserve"><value>Two cars in the garage. Pick the one you drive.</value></data>
+  <!-- Car wash + dirty-car refusal (PORTPLAN item 33, Unity CarWashScreen +
+       TaxiJobLifecycleHandler): the flat price, the reading, the post-wash
+       result and the refusal line. {0:0.00}/{1:0.00} = CR amounts; the CR
+       marker and the placeholders survive translation. -->
+  <data name="ControlCarWash" xml:space="preserve"><value>CAR WASH</value></data>
+  <data name="CarWashTitle" xml:space="preserve"><value>CAR WASH</value></data>
+  <data name="CarWashFilth" xml:space="preserve"><value>Filth: {0} / {1}</value></data>
+  <data name="CarWashPrice" xml:space="preserve"><value>Price to wash your car: CR{0:0.00}</value></data>
+  <data name="CarWashWash" xml:space="preserve"><value>WASH IT</value></data>
+  <data name="CarWashRemoved" xml:space="preserve"><value>Removed {0} filth for CR {1:0.00}</value></data>
+  <data name="CarWashNoCar" xml:space="preserve"><value>No car to wash yet.</value></data>
+  <data name="CarWashBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="TaxiTooDirty" xml:space="preserve"><value>No way I am getting into a car this dirty. You lost 1 friendship with {0}.</value></data>
   <!-- Familiarity box (PORTPLAN 45, Unity FriendshipHelper.GetDescription):
        one key per tier, {0} the first name, {1} the level. Translators may
        reorder, never remove. -->
@@ -150,4 +257,121 @@ Accept this job?</value></data>
   <data name="FriendshipGood" xml:space="preserve"><value>New familiarity with {0}: {1}. {0} is a good friend.</value></data>
   <data name="FriendshipClose" xml:space="preserve"><value>New familiarity with {0}: {1}. {0} is a close friend.</value></data>
   <data name="FriendshipBff" xml:space="preserve"><value>New familiarity with {0}: {1}. BFF with {0}!</value></data>
+  <!-- Delivery receipt page (PORTPLAN 16, Unity DeliveryReceiptScreen +
+       DeliveryJobHandler.ApplyStoreDeliveryEffects). Shares the taxi page's
+       tier/amount/standings/familiarity wording above; money-in labels are
+       delivery-specific because the goods trade wholesale for retail. -->
+  <data name="DelReceiptTitle" xml:space="preserve"><value>DELIVERY RECEIPT</value></data>
+  <data name="DelReceiptDistance" xml:space="preserve"><value>Total Distance: {0:0.0} km</value></data>
+  <data name="DelReceiptPaid" xml:space="preserve"><value>Paid for goods</value></data>
+  <data name="DelReceiptReceived" xml:space="preserve"><value>Received for goods</value></data>
+  <data name="DelReceiptFare" xml:space="preserve"><value>Fare</value></data>
+  <data name="DelReceiptTotalCr" xml:space="preserve"><value>Total CR: €{0:0.00}</value></data>
+  <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points earned: {0}</value></data>
+  <data name="DelReceiptCredPTotal" xml:space="preserve"><value>Total Credibility Points: {0}</value></data>
+  <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km) / 100 × street knowledge {1}%</value></data>
+  <!-- Car-haul receipt page (PORTPLAN 20, Unity CarHaulingScreen). Pay is
+       time-based: class band scales the driver rating into a per-minute
+       rate, the drive minutes price the total. No XP or standings block —
+       Unity settles the haul's cash alone. {0} in the car line is Unity's
+       CarModelDisplay; the spare string covers the unknown driven car (pool
+       gap, variant left unannounced). Translators may reorder, never
+       remove. -->
+  <data name="HaulReceiptTitle" xml:space="preserve"><value>CAR-HAULING RECEIPT</value></data>
+  <data name="HaulReceiptCar" xml:space="preserve"><value>{0}</value></data>
+  <data name="HaulReceiptCarUnknown" xml:space="preserve"><value>the customer's new car</value></data>
+  <!-- {0} the hours, {1} the hour word (singular/plural keys below), {2}
+       the minutes, {3} the minute word. Code picks singular vs plural word
+       by count; the sentence stays fully translator-owned. -->
+  <data name="HaulReceiptTime" xml:space="preserve"><value>The drive took you {0} {1} and {2} {3}</value></data>
+  <data name="HaulReceiptHour" xml:space="preserve"><value>hour</value></data>
+  <data name="HaulReceiptHours" xml:space="preserve"><value>hours</value></data>
+  <data name="HaulReceiptMinute" xml:space="preserve"><value>minute</value></data>
+  <data name="HaulReceiptMinutes" xml:space="preserve"><value>minutes</value></data>
+  <data name="HaulReceiptEarned" xml:space="preserve"><value>You earned</value></data>
+  <data name="HaulReceiptDriverRating" xml:space="preserve"><value>Your Driver Rating: {0:0.0}</value></data>
+  <data name="HaulReceiptTier" xml:space="preserve"><value>The current class is Tier {0}</value></data>
+  <data name="HaulReceiptRate" xml:space="preserve"><value>Resulting in a rate of €{0:0.00}/min</value></data>
+  <!-- Car mechanic (PORTPLAN items 31/32, Unity CarMechanicScreen): the engine
+       block, the part rows (efficiency, price, add label) and the queued
+       total/cash-after line. {0:0.00}/{1:0.00} = CR amounts; the placeholders
+       survive translation. Part names resolve by the data key in
+       MechanicPartNames, so each key maps to its own resx entry. -->
+  <data name="ControlMechanic" xml:space="preserve"><value>MECHANIC</value></data>
+  <data name="MechanicTitle" xml:space="preserve"><value>CAR MECHANIC</value></data>
+  <data name="MechanicCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
+  <data name="MechanicNoCar" xml:space="preserve"><value>No car to service yet.</value></data>
+  <data name="MechanicCarLine" xml:space="preserve"><value>{0} · class {1}</value></data>
+  <data name="MechanicBreakdown" xml:space="preserve"><value>Breakdown chance currently: {0:0.0000}%</value></data>
+  <data name="MechanicEngineCondition" xml:space="preserve"><value>Engine condition currently: {0:0.00000}%</value></data>
+  <data name="MechanicEngineFailure" xml:space="preserve"><value>Your engine has failed and your car was picked up.</value></data>
+  <data name="MechanicRepairEngineCost" xml:space="preserve"><value>Repair: CR{0:0.00} (keeps the odometer)</value></data>
+  <data name="MechanicNewEngineCost" xml:space="preserve"><value>New engine: CR{0:0.00} (odometer resets to 0)</value></data>
+  <data name="MechanicEfficiency" xml:space="preserve"><value>{0:0.00}%</value></data>
+  <data name="MechanicPrice" xml:space="preserve"><value>CR{0:0.00}</value></data>
+  <data name="MechanicAdd" xml:space="preserve"><value>ADD</value></data>
+  <data name="MechanicNoCash" xml:space="preserve"><value>NO $</value></data>
+  <data name="MechanicServiced" xml:space="preserve"><value>✓</value></data>
+  <data name="MechanicTotal" xml:space="preserve"><value>Total parts: CR{0:0.00}   Cash remaining after: CR{1:0.00}</value></data>
+  <data name="MechanicRepairParts" xml:space="preserve"><value>REPAIR PARTS</value></data>
+  <data name="MechanicRepairEngine" xml:space="preserve"><value>REPAIR ENGINE</value></data>
+  <data name="MechanicNewEngine" xml:space="preserve"><value>BUY NEW ENGINE</value></data>
+  <data name="MechanicPartOilChange" xml:space="preserve"><value>Oil efficiency</value></data>
+  <data name="MechanicPartWipers" xml:space="preserve"><value>Wipers</value></data>
+  <data name="MechanicPartAirFilter" xml:space="preserve"><value>Air filter</value></data>
+  <data name="MechanicPartBrakePads" xml:space="preserve"><value>Brake pads</value></data>
+  <data name="MechanicPartTires" xml:space="preserve"><value>Tires</value></data>
+  <data name="MechanicPartBrakeFluid" xml:space="preserve"><value>Brake fluid</value></data>
+  <data name="MechanicPartTransmissionFluid" xml:space="preserve"><value>Transmission fluid</value></data>
+  <data name="MechanicPartCarBattery" xml:space="preserve"><value>Car battery</value></data>
+  <!-- Insurance broker (PORTPLAN item 34, Unity InsuranceScreen): the per-car
+       toggle, the daily-cost lines, the combined total and the escrow collect
+       block. {0:0.00} = CR amounts; the placeholders survive translation. -->
+  <data name="ControlInsurance" xml:space="preserve"><value>INSURANCE</value></data>
+  <data name="InsuranceTitle" xml:space="preserve"><value>INSURANCE</value></data>
+  <data name="InsuranceCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
+  <data name="InsuranceEmpty" xml:space="preserve"><value>No cars to insure yet.</value></data>
+  <data name="InsuranceDaily" xml:space="preserve"><value>Daily cost: CR{0:0.00}/day</value></data>
+  <data name="InsuranceNotCovered" xml:space="preserve"><value>Not insured</value></data>
+  <data name="InsuranceTotal" xml:space="preserve"><value>Total daily cost: CR{0:0.00}/day</value></data>
+  <data name="InsurancePending" xml:space="preserve"><value>Insurance to collect: CR{0:0.00}</value></data>
+  <data name="InsuranceCollect" xml:space="preserve"><value>COLLECT</value></data>
+  <data name="InsuranceAdd" xml:space="preserve"><value>ADD</value></data>
+  <data name="InsuranceRemove" xml:space="preserve"><value>REMOVE</value></data>
+  <!-- Breakdown session (PORTPLAN 39, Unity BreakdownPopup + BreakdownFlow):
+       the interrupted-trip message per kind, the stranded-engine variant, the
+       mechanic tow fee and the hint. {0:0.00} = the CR fee. -->
+  <data name="BreakdownTitle" xml:space="preserve"><value>BREAKDOWN</value></data>
+  <data name="BreakdownTaxi" xml:space="preserve"><value>Your car broke down. The trip is cancelled.</value></data>
+  <data name="BreakdownDelivery" xml:space="preserve"><value>Your car broke down. The delivery is cancelled.</value></data>
+  <data name="BreakdownFreeroam" xml:space="preserve"><value>Your car broke down on the road.</value></data>
+  <data name="BreakdownEngineFailure" xml:space="preserve"><value>Your engine has failed! The car mechanic is picking up your car.</value></data>
+  <data name="BreakdownHint" xml:space="preserve"><value>Visit the car mechanic to repair or replace your engine.</value></data>
+  <data name="BreakdownFee" xml:space="preserve"><value>The car mechanic will pick up your car for CR{0:0.00}.</value></data>
+  <!-- Shop interior (PORTPLAN items 24/26, Unity MaxsScreen + GrocerySelection):
+       the store name is content data; these are the shared shop labels. -->
+  <data name="StoreAvailable" xml:space="preserve"><value>Available Items:</value></data>
+  <data name="StoreCash" xml:space="preserve"><value>Your Cash: {0:0.00}CR</value></data>
+  <data name="StoreGreeting" xml:space="preserve"><value>&quot;Hello there, what can I get you today?&quot;</value></data>
+  <data name="StoreGreetingAfter" xml:space="preserve"><value>&quot;Anything else?&quot;</value></data>
+  <data name="StoreSoldOut" xml:space="preserve"><value>Sold Out</value></data>
+  <data name="StoreHunger" xml:space="preserve"><value>hunger -{0}</value></data>
+  <data name="StoreCost" xml:space="preserve"><value>CR{0:0.00}</value></data>
+  <data name="StoreSelection" xml:space="preserve"><value>  x  {0}</value></data>
+  <data name="StoreVolumeLine" xml:space="preserve"><value>VOLUME: {0:0.00}L</value></data>
+  <data name="StorePriceLine" xml:space="preserve"><value>PRICE: CR{0:0.00}</value></data>
+  <data name="StoreTrunkFree" xml:space="preserve"><value>TRUNK: {0:0.00}L free</value></data>
+  <data name="StoreTrunkOverflow" xml:space="preserve"><value>TRUNK: {0:0.00}L (OVERFLOW)</value></data>
+  <data name="StoreDecrease" xml:space="preserve"><value>-</value></data>
+  <data name="StoreIncrease" xml:space="preserve"><value>+</value></data>
+  <data name="StoreBuy" xml:space="preserve"><value>BUY</value></data>
+  <data name="StoreBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="StoreBought" xml:space="preserve"><value>You have bought {0} x {1}</value></data>
+  <data name="StoreFriendship" xml:space="preserve"><value>New familiarity level with {0}: {1}. {2}</value></data>
+  <data name="StoreFriendshipStranger" xml:space="preserve"><value>Still a stranger though.</value></data>
+  <data name="StoreFriendshipAcquaintance" xml:space="preserve"><value>An acquaintance now.</value></data>
+  <data name="StoreFriendshipFriend" xml:space="preserve"><value>{0} is a friend.</value></data>
+  <data name="StoreFriendshipGoodFriend" xml:space="preserve"><value>{0} is a good friend.</value></data>
+  <data name="StoreFriendshipCloseFriend" xml:space="preserve"><value>{0} is a close friend.</value></data>
+  <data name="StoreFriendshipBff" xml:space="preserve"><value>BFF with {0}!</value></data>
 </root>

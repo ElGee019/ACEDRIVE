@@ -20,7 +20,9 @@ public sealed class OnboardingTests
     private static DeliveryCareer HubCareerShell() =>
         new(HubCatalog.Default, DeliveryCatalog.Default.StartCredP);
 
-    private static MainViewModel Create(OnboardingState? start = null, FakeClock? clock = null)
+    private static MainViewModel Create(
+        OnboardingState? start = null, FakeClock? clock = null,
+        FakeProfileStore? profiles = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var store = new FakeOnboardingStore();
@@ -30,30 +32,89 @@ public sealed class OnboardingTests
             new FakeStore(), new NullLogger(), FareTable.Default,
             new TaxiJobProposer(NamePoolTable.Default, seed: 0),
             store, new FakeContentSource(Content),
+            profiles ?? new FakeProfileStore(), AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
+            DeliveryFareTable.Default,
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
+            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
+            new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
+            new Hunger(HungerRules.Default), new FakeHungerStore(),
+            new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
+            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService());
+    }
+
+    // The first-run page (unit + language) sits before the name form; its
+    // CONTINUE is the only way into the walk.
+    private static void ContinuePreferences(MainViewModel vm) =>
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen).ContinueCommand.Execute(null);
+
+    // Preferences page -> name + address form -> brand page.
+    private static void ToBrandPage(MainViewModel vm)
+    {
+        ContinuePreferences(vm);
+        Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen).ContinueCommand.Execute(null);
     }
 
     [Fact]
-    public void FreshBoot_ShowsBrandScreen()
+    public void FreshBoot_ShowsPreferencesThenOpeningThenBrand()
     {
-        var vm = Create();
+        var profiles = new FakeProfileStore();
+        var vm = Create(profiles: profiles);
         Assert.True(vm.IsOnboarding);
         Assert.False(vm.JobsVisible);
+
+        var preferences = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(2, preferences.UnitOptions.Count);
+        Assert.Equal(2, preferences.LanguageOptions.Count);
+        preferences.ContinueCommand.Execute(null);
+
+        var opening = Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("ElGee", opening.DisplayName);
+        Assert.Equal("Germany", opening.Country);
+        Assert.Equal("Brands", opening.City);
+        Assert.Equal(2, opening.Streets.Count);
+        Assert.Equal(33, opening.HouseNumbers.Count);
+        Assert.True(opening.CanContinue);
+
+        opening.ContinueCommand.Execute(null);
         var brands = Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(["Honda", "Mazda"], brands.Brands);
+
+        PlayerProfile saved = Assert.IsType<PlayerProfile>(profiles.Profile);
+        Assert.Equal("ElGee", saved.DisplayName);
+        Assert.Equal("street-1", saved.StreetId);
+        Assert.Equal(1, saved.HouseNumber);
+    }
+
+    [Fact]
+    public void SavedProfile_PrefillsOpeningScreen()
+    {
+        var saved = new PlayerProfile("Edited Name", "Germany", "Brands", "street-2", 17);
+        var vm = Create(profiles: new FakeProfileStore(saved));
+
+        ContinuePreferences(vm);
+        var opening = Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen);
+        // The saved profile wins over the Steam name on later launches so a
+        // manual edit is never overwritten at boot.
+        Assert.Equal("Edited Name", opening.DisplayName);
+        Assert.Equal("street-2", opening.SelectedStreet!.Id);
+        Assert.Equal(17, opening.SelectedHouseNumber);
     }
 
     [Fact]
     public void DoneBoot_ReplaysTheIntroThenEndsOnControlPage()
     {
-        // Past onboarding, calling the app still opens the introduction: the
+        // Past onboarding, first paint still opens the introduction: the
         // main control page (PORTPLAN item 54) is reached through the walk,
         // not around it, and the taps re-save the picks on the way.
         var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
+        ContinuePreferences(vm);
+        var opening = Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen);
+        opening.ContinueCommand.Execute(null);
         Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
 
         vm.ChooseBrand("Mazda");
@@ -67,11 +128,11 @@ public sealed class OnboardingTests
     }
 
     [Fact]
-    public void HotkeyCall_ReopensTheIntroFromAnyPage()
+    public void HotkeyCall_OpensControlPageFromAnyPage()
     {
         // Ctrl+Shift+C is a call to the app like the wake word: the hidden ->
-        // shown edge reopens the introduction instead of resuming the page the
-        // player was last on.
+        // shown edge opens the main control page instead of resuming the page
+        // the player was last on.
         var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
         vm.ChooseBrand("Honda");
         vm.ChooseCar("ks_mazda_mx5_na");
@@ -84,7 +145,7 @@ public sealed class OnboardingTests
 
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back
-        Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -101,6 +162,7 @@ public sealed class OnboardingTests
     public void ChooseUnknownBrand_Ignored()
     {
         var vm = Create();
+        ToBrandPage(vm);
         vm.ChooseBrand("Nope");
         Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
     }
@@ -115,11 +177,19 @@ public sealed class OnboardingTests
             new FakeStore(), new NullLogger(), FareTable.Default,
             new TaxiJobProposer(NamePoolTable.Default, seed: 0),
             store, new FakeContentSource(Content),
+            new FakeProfileStore(), AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
+            DeliveryFareTable.Default,
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
+            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
+            new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
+            new Hunger(HungerRules.Default), new FakeHungerStore(),
+            new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
+            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService());
 
         vm.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);
@@ -147,6 +217,7 @@ public sealed class OnboardingTests
         // Companion parity: brand/car pages expose no voice commands at all;
         // clicks drive them. Only the dialogue's Continue responds to speech.
         var vm = Create();
+        ToBrandPage(vm);
         var brands = Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
         brands.ChooseBrandCommand.Execute("Mazda");
         Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);

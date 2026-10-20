@@ -62,9 +62,24 @@ public sealed class JsonHubCatalog
     // Unity tracks hubs by name across the whole catalog, so names must be
     // globally unique or ownership checks (and the CredP ramp keys) collide.
     // Enabled tiers need at least one career; every career needs an id to
-    // gate stores on, a label to show and priced, named levels.
+    // gate stores on, a label to show and priced, named levels. The ramp
+    // arrays must be parallel (one rate + cap per level), and owner names
+    // must be non-empty and unique like the hub names they label.
     private static bool IsValid(HubCatalog catalog)
     {
+        if (catalog.Ramp is { } ramp
+            && (ramp.StartRates.Count == 0
+                || ramp.StartRates.Count != ramp.Caps.Count
+                || ramp.StartRates.Any(r => r <= 0)
+                || ramp.Caps.Any(c => c <= 0)))
+        {
+            return false;
+        }
+        var ownerNames = new HashSet<string>();
+        foreach (string owner in catalog.OwnerNames ?? [])
+        {
+            if (owner.Length == 0 || !ownerNames.Add(owner)) return false;
+        }
         var tierIds = new HashSet<int>();
         var hubNames = new HashSet<string>();
         foreach (HubTier tier in catalog.Tiers)

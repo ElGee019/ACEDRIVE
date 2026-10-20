@@ -1,4 +1,10 @@
 {
+  "Ramp": { "StartRates": [1, 2, 4, 7, 12], "Caps": [10, 20, 40, 70, 120] },
+  "OwnerNames": [
+    "Elena Marchetti", "Luca Barbieri", "Sofia Romano", "Marco Conti",
+    "Alessia Ferrari", "Matteo Bianchi", "Giulia Rossi", "Andrea Esposito",
+    "Francesca Colombo", "Antonio Ricci", "Chiara Gallo", "Paolo Moretti"
+  ],
   "Tiers": [
     {
       "Id": 1,

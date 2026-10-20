@@ -38,12 +38,12 @@ public sealed class JsonDriverStore : IDriverStore
             if (!File.Exists(_file)) return null;
             DriverState? state = JsonSerializer.Deserialize<DriverState>(
                 File.ReadAllText(_file), JsonOptions);
-            if (state is null || state.Cash < 0 || state.Xp < 0)
+            if (state is null || state.Cash < 0 || state.Xp < 0 || state.Bank < 0)
             {
                 _log.LogWarning($"driver.json invalid at {_file}; starting a fresh driver");
                 return null;
             }
-            _log.LogInfo($"driver loaded: cash={state.Cash:0.00} xp={state.Xp:0.00}");
+            _log.LogInfo($"driver loaded: cash={state.Cash:0.00} xp={state.Xp:0.00} bank={state.Bank:0.00}");
             return state;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)

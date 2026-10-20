@@ -10,12 +10,14 @@ namespace AceDrive.Core;
 /// rounded to cents by <see cref="TaxiFare"/>. The friendship tail is the
 /// Unity TaxiJobEarnings.customerName + friendshipTierIncreased pair:
 /// empty name means the passenger matched no known resident, so the
-/// receipt hides the box.
+/// receipt hides the box. The brand tail is the Unity sponsorship pair:
+/// empty brand (or zero km) means no sponsorship, so the receipt hides
+/// those lines like any other zero row.
 /// </summary>
 public sealed record TaxiReceipt(
     double DistanceKm,
     int Capacity,
-    IReadOnlyList<TaxiReceiptTier> TierLines,
+    IReadOnlyList<ReceiptTier> TierLines,
     double DistanceCharge,
     double Forfait,
     double BaseTotal,
@@ -29,8 +31,15 @@ public sealed record TaxiReceipt(
     int StreetKnowledgePct,
     string FriendshipName,
     int FriendshipLevel,
-    bool FriendshipTierIncreased)
+    bool FriendshipTierIncreased,
+    string BrandName = "",
+    double BrandDistanceKm = 0.0,
+    double BrandBonusRate = 0.0,
+    double BrandBonus = 0.0)
 {
     /// <summary>False when the passenger matched no known resident.</summary>
     public bool HasFriendship => FriendshipName.Length > 0;
+
+    /// <summary>False when the ride earned no brand sponsorship.</summary>
+    public bool HasBrandBonus => BrandBonus > 0.0;
 }

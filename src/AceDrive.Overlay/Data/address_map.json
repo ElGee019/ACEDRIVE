@@ -1,0 +1,20 @@
+{
+  "country": "Germany",
+  "city": "Brands",
+  "trackLengthMeters": 1929,
+  "houseSpacingMeters": 30,
+  "streets": [
+    {
+      "id": "street-1",
+      "name": "Street 1",
+      "fromFraction": 0.0,
+      "toFraction": 0.5
+    },
+    {
+      "id": "street-2",
+      "name": "Street 2",
+      "fromFraction": 0.5,
+      "toFraction": 1.0
+    }
+  ]
+}

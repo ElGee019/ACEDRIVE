@@ -97,4 +97,58 @@ public sealed class RoadTestLedgerTests
         Assert.Null(ledger.Current);
         Assert.Empty(ledger.TestedIds);
     }
+
+    [Fact]
+    public void Variants_RotateAndBankSeparately()
+    {
+        // One folder, two showroom presets (PORTPLAN 62): each row is its own
+        // road test; banking the base never skips the M Performance.
+        var pool = new List<CarSpec>
+        {
+            new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe"),
+            new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe m performance") { Preset = "preset_m2_mperf_1" },
+            new("ks_mazda_mx5_na", 1990, "Mazda", "MX-5 NA"),
+        };
+        var ledger = new RoadTestLedger(pool, seed: 3);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < pool.Count; i++)
+        {
+            Assert.NotNull(ledger.Current);
+            Assert.True(seen.Add(ledger.Current.Key));
+            ledger.MarkTested();
+        }
+
+        Assert.Equal(pool.Count, seen.Count);
+        Assert.Contains("ks_bmw_m2_coupe", seen);
+        Assert.Contains("ks_bmw_m2_coupe#preset_m2_mperf_1", seen);
+    }
+
+    [Fact]
+    public void Resume_VariantKey_ReopensThatVariant()
+    {
+        var pool = new List<CarSpec>
+        {
+            new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe") { Preset = "preset_m2_mech_1" },
+            new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe m performance") { Preset = "preset_m2_mperf_1" },
+        };
+        var ledger = new RoadTestLedger(
+            pool, seed: 7, new RoadTestSnapshot("ks_bmw_m2_coupe#preset_m2_mperf_1", []));
+        Assert.Equal("preset_m2_mperf_1", ledger.Current?.Preset);
+    }
+
+    [Fact]
+    public void Resume_FolderKey_ResolvesNullPresetRow()
+    {
+        // Pre-variant roadtest.json: a plain folder id still opens the row
+        // whose Key is that id (the null-preset row), old bank included.
+        var pool = new List<CarSpec>
+        {
+            new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe"),
+            new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe m performance") { Preset = "preset_m2_mperf_1" },
+        };
+        var ledger = new RoadTestLedger(pool, seed: 7, new RoadTestSnapshot(
+            "ks_bmw_m2_coupe", ["ks_bmw_m2_coupe#preset_m2_mperf_1"]));
+        Assert.Equal("m2 g87 coupe", ledger.Current?.Model);
+        Assert.Contains("ks_bmw_m2_coupe#preset_m2_mperf_1", ledger.TestedIds);
+    }
 }

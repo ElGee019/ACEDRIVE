@@ -5,7 +5,7 @@ namespace AceDrive.Core.Tests;
 /// <summary>Shared road-test pool so the calendar and ViewModel tests pin the same picks.</summary>
 internal static class TestRoadCars
 {
-    internal static readonly IReadOnlyList<RoadTestCar> Pool =
+    internal static readonly IReadOnlyList<CarSpec> Pool =
     [
         new("ks_mazda_mx5_na", 1990, "Mazda", "MX-5 NA", 1),
         new("ks_abarth_695_biposto", 2014, "Abarth", "695 Biposto", 1),
@@ -16,6 +16,6 @@ internal static class TestRoadCars
         new(Pool, seed, saved);
 
     /// <summary>Button copy for a pick, as the control page shows it.</summary>
-    internal static string Button(RoadTestCar car) =>
+    internal static string Button(CarSpec car) =>
         "Road test: " + $"{car.Year} {car.Brand} {car.Model}".ToUpperInvariant();
 }

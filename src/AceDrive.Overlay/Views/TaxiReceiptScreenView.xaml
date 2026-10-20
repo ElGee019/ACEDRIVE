@@ -5,10 +5,15 @@
     <!-- Receipt page skeleton like the other job pages: viewport-pinned
          MinHeight, title row, body centered below it, CONTINUE in the bottom
          row. The body mirrors the Unity TaxiReceiptScreen lines: distance,
-         customer, per-tier fare breakdown, forfait, fare, tip and fine
-         (zero rows collapse), totals, wallet and shift, XP with its
+         customer, per-tier fare breakdown, forfait, fare, brand sponsorship
+         and tip (zero rows collapse) and the fine, totals, wallet and
+         shift, XP with its calculation line. The fine row never collapses:
+         with no fine it hides but keeps its empty line, so the rows below
+         never shift. Type runs larger than the surrounding
          calculation line. Type runs larger than the surrounding pages: the
-         receipt is read at a glance while driving. -->
+         receipt is read at a glance while driving. Earnings lines render as
+         two left-aligned columns (explanation + amount); the block stays
+         centered, the single-sentence lines keep centering. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -16,7 +21,7 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=ReceiptTitle}"/>
-        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Grid.IsSharedSizeScope="True">
             <TextBlock Text="{Binding DistanceLine}" Foreground="#FFF" FontSize="18"
                        TextAlignment="Center" Margin="0,6,0,2"/>
             <TextBlock Text="{Binding CustomerLine}" Foreground="#FFBFC4C9" FontSize="14"
@@ -35,36 +40,104 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
-            <ItemsControl ItemsSource="{Binding TierLines}" Margin="0,0,0,4">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding}" Foreground="#FFBFC4C9" FontSize="14"
-                                   TextAlignment="Center"/>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <TextBlock Text="{Binding ForfaitLine}" Foreground="#FFF" FontSize="16"
-                       TextAlignment="Center"/>
-            <TextBlock Text="{Binding FareLine}" Foreground="#FFF" FontSize="16"
-                       TextAlignment="Center"/>
-            <TextBlock Text="{Binding TipLine}" Foreground="#FFF" FontSize="16"
-                       TextAlignment="Center"
-                       Visibility="{Binding HasTip, Converter={StaticResource BoolToVis}}"/>
-            <TextBlock Text="{Binding FineLine}" Foreground="#FFFF9D9D" FontSize="16"
-                       TextAlignment="Center"
-                       Visibility="{Binding HasFine, Converter={StaticResource BoolToVis}}"/>
-            <TextBlock Text="{Binding TotalLine}" Foreground="#FF97EAD2" FontSize="20"
-                       TextAlignment="Center" Margin="0,6,0,2"/>
+            <ItemsControl ItemsSource="{Binding TierLines}" Foreground="#FFBFC4C9" FontSize="14"
+                          ItemTemplate="{StaticResource ReceiptLineTemplate}" Margin="0,0,0,4"/>
+            <ContentPresenter Content="{Binding ForfaitLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FFF" TextElement.FontSize="16"/>
+            <ContentPresenter Content="{Binding FareLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FFF" TextElement.FontSize="16"/>
+            <ContentPresenter Content="{Binding SponsorshipLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FFF" TextElement.FontSize="16"
+                              Visibility="{Binding HasBrandBonus, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding BrandBonusLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap"
+                       Visibility="{Binding HasBrandBonus, Converter={StaticResource BoolToVis}}"/>
+            <ContentPresenter Content="{Binding TipLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FFF" TextElement.FontSize="16"
+                              Visibility="{Binding HasTip, Converter={StaticResource BoolToVis}}"/>
+            <!-- WHY Hidden, not Collapsed: the fine is gone for now, but its
+                 empty line stays put so the total below never moves. -->
+            <ContentPresenter Content="{Binding FineLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FFFF9D9D" TextElement.FontSize="16"
+                              Visibility="{Binding HasFine, Converter={StaticResource BoolToHiddenVis}}"/>
+            <ContentPresenter Content="{Binding TotalLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FF97EAD2" TextElement.FontSize="20"
+                              Margin="0,6,0,2"/>
             <TextBlock Text="{Binding WalletLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center"/>
+            <!-- Two blank lines of separation between the shift total and
+                 the XP award: the money block and the XP block read as
+                 distinct sections (8 existing beat + ~2 × 14pt body lines). -->
             <TextBlock Text="{Binding ShiftLine}" Foreground="#FFBFC4C9" FontSize="14"
-                       TextAlignment="Center" Margin="0,0,0,8"/>
+                       TextAlignment="Center" Margin="0,0,0,45"/>
             <TextBlock Text="{Binding XpLine}" Foreground="#FFF" FontSize="16"
                        TextAlignment="Center"/>
             <TextBlock Text="{Binding XpCalcLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" TextWrapping="Wrap"/>
             <TextBlock Text="{Binding TotalXpLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" Margin="0,0,0,4"/>
+            <!-- XP world standings (PORTPLAN 60, Unity rivals block): rank
+                 line + delta line under Total XP. Gained AND lost both
+                 render teal #97EAD2 — kept verbatim from Unity, whose
+                 "RedColor" constant is the same teal value. The standings
+                 line scale-pulses 1x->1.5x twice over 2 s when the rank
+                 moved (ReceiptValuePop); a render-scale keeps the sibling
+                 lines from shifting like the Unity rect-scale does. -->
+            <TextBlock Text="{Binding Standings.Line}" Foreground="#FFF" FontSize="16"
+                       TextAlignment="Center" RenderTransformOrigin="0.5,0.5">
+                <TextBlock.RenderTransform>
+                    <ScaleTransform/>
+                </TextBlock.RenderTransform>
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Standings.Changed}" Value="True">
+                                <DataTrigger.EnterActions>
+                                    <BeginStoryboard Name="StandingsPulse">
+                                        <Storyboard>
+                                            <DoubleAnimationUsingKeyFrames Duration="0:0:2"
+                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)">
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0.5" Value="1.5"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:1" Value="1"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:1.5" Value="1.5"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:2" Value="1"/>
+                                            </DoubleAnimationUsingKeyFrames>
+                                            <DoubleAnimationUsingKeyFrames Duration="0:0:2"
+                                                Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)">
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0" Value="1"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:0.5" Value="1.5"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:1" Value="1"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:1.5" Value="1.5"/>
+                                                <LinearDoubleKeyFrame KeyTime="0:0:2" Value="1"/>
+                                            </DoubleAnimationUsingKeyFrames>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </DataTrigger.EnterActions>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding Standings.DeltaLine}" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#FFFFFFFF"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Standings.Changed}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

@@ -127,4 +127,89 @@ public sealed class HubCareerTests
         Assert.False(career.CanBuy(1, 0, 0));
         Assert.Equal(100, career.CredP);
     }
+
+    // Owner + CredP ramp (Unity ApplyStoreDeliveryEffects, PORTPLAN 18):
+    // every delivered store pays its producing hub's ramp rate.
+    [Fact]
+    public void RegisterDelivery_EarnsTheRamp_PerHubLevel()
+    {
+        // Level 1 tier 1: min(start 1 + deliveries before, cap 10) — 1, 2, 3.
+        var career = Fresh();
+        Assert.True(career.TryOpenCareer(1, 0, 0));
+        Assert.Equal(1, career.RegisterDelivery("groceries").CredPEarned);
+        Assert.Equal(2, career.RegisterDelivery("groceries").CredPEarned);
+        Assert.Equal(3, career.RegisterDelivery("groceries").CredPEarned);
+        // ...still climbing toward the cap (start 1 + count)...
+        for (int earned = 4; earned <= 10; earned++)
+        {
+            Assert.Equal(earned, career.RegisterDelivery("groceries").CredPEarned);
+        }
+        // ...then pinned at 10, table times tier.
+        for (int i = 0; i < 5; i++)
+        {
+            Assert.Equal(10, career.RegisterDelivery("groceries").CredPEarned);
+        }
+        // 100 CredP fell to 0 on the purchase, then the ramp paid 105 back.
+        Assert.Equal(105, career.CredP);
+    }
+
+    [Fact]
+    public void RegisterDelivery_ScalesByHubLevel()
+    {
+        // Level 2 of the column (The Food Hub): start rate 2, cap 20.
+        var career = Fresh(250);
+        Assert.True(career.TryOpenCareer(1, 0, 1));
+        Assert.Equal(2, career.RegisterDelivery("groceries").CredPEarned);
+
+        // No hub of the category: nothing earned, no owner.
+        var none = new DeliveryCareer(HubCatalog.Default, 100);
+        Assert.Equal(0, none.RegisterDelivery("groceries").CredPEarned);
+        Assert.Equal("", none.RegisterDelivery("groceries").OwnerName);
+    }
+
+    [Fact]
+    public void RegisterDelivery_NewestOwnedHubIsTheGoodsSource()
+    {
+        // Buying the next level is the player's upgrade, so the ramp (and
+        // its count) follows the newest purchase of the category.
+        var career = Fresh(250);
+        career.TryOpenCareer(1, 0, 0); // Grocers and Sons, level 1
+        career.TryOpenCareer(1, 0, 1); // The Food Hub, level 2
+        Assert.Equal(2, career.RegisterDelivery("groceries").CredPEarned);
+        Assert.Equal(3, career.RegisterDelivery("groceries").CredPEarned);
+        // 250 - 100 - 150 = 0 spent, +5 ramped back.
+        Assert.Equal(5, career.CredP);
+    }
+
+    // Unity's owner pool (PORTPLAN 18): the data file carries it; the test
+    // fixture mirrors the built-in Unity names.
+    private static readonly string[] OwnerPool =
+    [
+        "Elena Marchetti", "Luca Barbieri", "Sofia Romano", "Marco Conti",
+        "Alessia Ferrari", "Matteo Bianchi", "Giulia Rossi", "Andrea Esposito",
+        "Francesca Colombo", "Antonio Ricci", "Chiara Gallo", "Paolo Moretti",
+    ];
+
+    [Fact]
+    public void Owner_ResolvesOncePerHub_StableAcrossCareers()
+    {
+        // Unity assigns the owner (GetHubOwnerName) at purchase, keyed off
+        // the hub name — the same name always carries the same person, so
+        // the freeroam map can pin its POI to them later.
+        var realized = new HubCatalog(
+            [new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
+            CredPRamp.UnityDefault, OwnerPool);
+        var first = new DeliveryCareer(realized, 100);
+        first.TryOpenCareer(1, 0, 0);
+        var second = new DeliveryCareer(realized, 100);
+        second.TryOpenCareer(1, 0, 0);
+        Assert.Equal(first.Owned[0].OwnerName, second.Owned[0].OwnerName);
+
+        // The pick comes from the catalog's pool and the delivery hands it
+        // to the receipt as the friendship owner.
+        string owner = first.RegisterDelivery("groceries").OwnerName;
+        Assert.Contains(owner, OwnerPool);
+        Assert.Equal(first.Owned[0].OwnerName, owner);
+    }
 }

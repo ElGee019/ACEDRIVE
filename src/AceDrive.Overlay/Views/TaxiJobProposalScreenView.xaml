@@ -17,6 +17,11 @@
         <StackPanel Grid.Row="1" VerticalAlignment="Center">
             <TextBlock Text="{Binding Phrase}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap"
                        TextAlignment="Center" Margin="0,6,0,12"/>
+            <!-- Dirty-car refusal (PORTPLAN 33): the host sets the copy when a
+                 filth-25 pickup is declined; the line rides above ACCEPT. -->
+            <TextBlock Text="{Binding RefusalText}" Foreground="#FFA600" FontSize="13"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,12"
+                       Visibility="{Binding HasRefusal, Converter={StaticResource BoolToVis}}"/>
             <Button Content="{loc:Loc Key=ProposalAccept}" Margin="0,0,0,6"
                     HorizontalAlignment="Stretch" Command="{Binding AcceptCommand}">
                 <Button.Style>

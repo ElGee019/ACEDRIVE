@@ -30,8 +30,45 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
-            <!-- Job buttons: centered between the date header and the calendar. -->
+            <!-- Job buttons: centered between the date header and the calendar.
+                 The hunger meter line (PORTPLAN 26, Unity map HUD) leads the
+                 job entries; the amber band carries the Unity trunk colour,
+                 teal everywhere else. The filth line (PORTPLAN 33, Unity
+                 MapScreen HUD) sits beside it: grey when calm, amber in the
+                 15..cap band, mint at the cap. -->
             <StackPanel Grid.Row="0" VerticalAlignment="Center">
+                <TextBlock Text="{Binding HungerText}" FontSize="13" Margin="0,0,0,6"
+                           HorizontalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HungerAmber}" Value="True">
+                                    <Setter Property="Foreground" Value="#FFA600"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding FilthText}" FontSize="13" Margin="0,0,0,6"
+                           HorizontalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#FF999999"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding FilthAmber}" Value="True">
+                                    <Setter Property="Foreground" Value="#FFA600"/>
+                                </DataTrigger>
+                                <!-- Order matters: the cap's mint must win over
+                                     the amber edge when both bindings could
+                                     ever be true (they are exclusive bands). -->
+                                <DataTrigger Binding="{Binding FilthFullyDirty}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
                 <Button Content="{Binding TaxiLabel}" Margin="0,0,0,6"
                         Command="{Binding TaxiCommand}">
                     <Button.Style>
@@ -57,11 +94,95 @@
                     </Button.Style>
                 </Button>
                 <Button Content="{Binding HaulLabel}"
-                        Command="{Binding HaulCommand}">
+                        Command="{Binding HaulCommand}" Margin="0,0,0,6">
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HaulFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- Temporary bank entry (PORTPLAN 48): moves behind the bank
+                     POI marker (items 24/59), label and command travel with it. -->
+                <Button Content="{Binding BankLabel}"
+                        Command="{Binding BankCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BankFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- Temporary garage + dealer entries (PORTPLAN 29/30): the
+                     garage is a You-menu page and the dealer a POI in Unity;
+                     both move behind the marker network (items 24/59). -->
+                <Button Content="{Binding GarageLabel}" Margin="0,6,0,0"
+                        Command="{Binding GarageCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding GarageFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Content="{Binding DealerLabel}"
+                        Command="{Binding DealerCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding DealerFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- Temporary car-wash entry (PORTPLAN 33): a POI in Unity,
+                     moving behind the marker network (items 24/59) like the
+                     garage and dealer entries. -->
+                <Button Content="{Binding CarWashLabel}"
+                        Command="{Binding CarWashCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CarWashFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- Temporary mechanic entry (PORTPLAN items 31/32): a POI in
+                     Unity, moving behind the marker network with the rest. -->
+                <Button Content="{Binding MechanicLabel}"
+                        Command="{Binding MechanicCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding MechanicFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- Temporary insurance-broker entry (PORTPLAN 34): a POI in
+                     Unity, moving behind the marker network with the rest. -->
+                <Button Content="{Binding InsuranceLabel}"
+                        Command="{Binding InsuranceCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding InsuranceFlash}" Value="True">
                                     <Setter Property="Foreground" Value="#FF97EAD2"/>
                                 </DataTrigger>
                             </Style.Triggers>

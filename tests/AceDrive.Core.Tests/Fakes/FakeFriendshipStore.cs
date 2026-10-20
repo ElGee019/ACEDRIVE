@@ -9,12 +9,21 @@ internal sealed class FakeFriendshipStore : IFriendshipStore
 
     public IReadOnlyCollection<string> Names => _levels.Keys;
 
+    /// <summary>Every explicit penalty call, so a test can assert the dirty-car
+    /// refusal hit the drawn customer with the Unity −1.</summary>
+    public List<(string Owner, int Delta)> Deltas { get; } = [];
+
     public int GetLevel(string ownerName) =>
         _levels.GetValueOrDefault(((ownerName ?? "").Trim()));
 
     public FriendshipOutcome RegisterRide(string ownerName) => Apply(ownerName, 1);
 
-    public void AddFamiliarity(string ownerName, int delta) => _ = Apply(ownerName, delta);
+    public void AddFamiliarity(string ownerName, int delta)
+    {
+        string key = (ownerName ?? "").Trim();
+        Deltas.Add((key, delta));
+        _ = Apply(key, delta);
+    }
 
     private FriendshipOutcome Apply(string ownerName, int delta)
     {

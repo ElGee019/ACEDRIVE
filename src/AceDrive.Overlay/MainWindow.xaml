@@ -3,11 +3,17 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AceDrive.Overlay.ViewModels"
         xmlns:views="clr-namespace:AceDrive.Overlay.Views"
-        Title="AceDrive" Width="360" SizeToContent="Height"
+        Title="AceDrive" Width="413.6" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" ShowActivated="False"
         Background="Transparent" Topmost="True"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="True" MinWidth="200" MinHeight="80">
     <Window.Resources>
+        <DataTemplate DataType="{x:Type vm:PreferencesScreenViewModel}">
+            <views:PreferencesScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:OpeningScreenViewModel}">
+            <views:OpeningScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:BrandScreenViewModel}">
             <views:BrandScreenView/>
         </DataTemplate>
@@ -34,6 +40,39 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:DeliveryHubScreenViewModel}">
             <views:DeliveryHubScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DeliveryReceiptScreenViewModel}">
+            <views:DeliveryReceiptScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CarHaulReceiptScreenViewModel}">
+            <views:CarHaulReceiptScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:BankScreenViewModel}">
+            <views:BankScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:GarageScreenViewModel}">
+            <views:GarageScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:DealerScreenViewModel}">
+            <views:DealerScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:BoughtFirstCarScreenViewModel}">
+            <views:BoughtFirstCarScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CarWashScreenViewModel}">
+            <views:CarWashScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MechanicScreenViewModel}">
+            <views:MechanicScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:StoreScreenViewModel}">
+            <views:StoreScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:InsuranceScreenViewModel}">
+            <views:InsuranceScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:BreakdownScreenViewModel}">
+            <views:BreakdownScreenView/>
         </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes

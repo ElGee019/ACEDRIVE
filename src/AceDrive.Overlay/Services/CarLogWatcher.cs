@@ -8,9 +8,10 @@ namespace AceDrive.Overlay.Services;
 /// <summary>
 /// Watches %USERPROFILE%\Saved Games\ACE\Logs for the player's current car and
 /// publishes its spoken brand (wake word "hey {brand}" follows the car you
-/// actually drive, per the companion spec — NOT the saved favorite brand).
-/// Runs on its own background thread; the UI Poll() loop stays allocation-
-/// free. Logs brand transitions only, never per poll.
+/// actually drive, per the companion spec — NOT the saved favorite brand) and
+/// full identity (ks folder + mechanical preset, so showroom variants stay
+/// apart). Runs on its own background thread; the UI Poll() loop stays
+/// allocation-free. Logs brand transitions only, never per poll.
 /// </summary>
 public sealed class CarLogWatcher : ICarBrandSource
 {
@@ -25,9 +26,9 @@ public sealed class CarLogWatcher : ICarBrandSource
     private long _offset;
     private string _pending = "";
     private string? _brand;
-    private string? _ksId;
+    private CarIdentity? _identity;
 
-    public string? CurrentKsId => _ksId;
+    public CarIdentity? CurrentIdentity => _identity;
 
     public CarLogWatcher(ILog log, DirectoryInfo? logsDir = null)
     {
@@ -46,11 +47,11 @@ public sealed class CarLogWatcher : ICarBrandSource
         {
             try
             {
-                string? ks = CarBrand.FindCurrentKs(File.ReadLines(log.FullName).TakeLast(500));
-                if (ks is not null && CarBrand.BrandOf(ks) is string brand)
+                CarIdentity? seen = CarBrand.FindCurrentIdentity(File.ReadLines(log.FullName).TakeLast(500));
+                if (seen is not null && CarBrand.BrandOf(seen.KsId) is string brand)
                 {
                     _brand = brand;
-                    _ksId = ks;
+                    _identity = seen;
                     return brand;
                 }
             }
@@ -132,13 +133,21 @@ public sealed class CarLogWatcher : ICarBrandSource
 
     private void HandleLine(string line)
     {
-        string? ksId = CarBrand.KsIdOfLogLine(line);
-        string? brand = ksId is not null ? CarBrand.BrandOf(ksId) : null;
-        if (brand is not null && (brand != _brand || ksId != _ksId))
+        CarIdentity? seen = CarBrand.IdentityOfLogLine(line);
+        string? brand = seen is not null ? CarBrand.BrandOf(seen.KsId) : null;
+        if (brand is null)
+        {
+            return;
+        }
+
+        // Refined: a preset-less echo of the same car keeps the known variant;
+        // any other line replaces it. Fires on brand or variant switches.
+        CarIdentity? merged = _identity is null ? seen : _identity.RefinedBy(seen!);
+        if (brand != _brand || merged != _identity)
         {
             _brand = brand;
-            _ksId = ksId;
-            BrandChanged?.Invoke(this, new CarBrandChangedEventArgs(brand, ksId));
+            _identity = merged;
+            BrandChanged?.Invoke(this, new CarBrandChangedEventArgs(brand, merged));
         }
     }
 

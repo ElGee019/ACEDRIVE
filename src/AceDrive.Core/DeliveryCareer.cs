@@ -1,20 +1,23 @@
 // Pure gameplay logic. No WPF / Windows / telemetry / backend references.
 // Kept dependency-free on purpose so a future Lua port can transliterate
-// this file instead of the UI. Spec source: PORTPLAN.md item 18 (wholesale
-// hub ownership + credibility/CredP ramp), port of Unity DeliveryHubScreen
-// + StoreListView eligibility rules.
+// this file instead of the UI. Spec source: PORTPLAN.md item 18 (Unity
+// HubCareerCatalog/DeliveryHubScreen) + item 19 (escrow cart run).
 namespace AceDrive.Core;
 
 /// <summary>
 /// The player's delivery career: the CredP balance (seeded by Max's intro
 /// gift, PORTPLAN Career Start item 5) plus the hubs bought with it.
 /// Unity: player.credP + player.ownedWholesaleHubs, in memory until the
-/// save lands (PORTPLAN 51). Earning CredP is the pickup run's job; this
-/// class only ever spends it.
+/// save lands (PORTPLAN 51). Buying spends it; a delivered store earns it
+/// back through <see cref="RegisterDelivery"/>'s ramp.
 /// </summary>
 public sealed class DeliveryCareer
 {
     private readonly List<OwnedHub> _owned = [];
+    // Per-hub delivery counts (Unity player.hubDeliveryStats), keyed by the
+    // hub name — the same unit ownership is keyed on. Cold path: one entry
+    // per delivered store, never inside a tick loop.
+    private readonly Dictionary<string, int> _deliveries = new(StringComparer.OrdinalIgnoreCase);
 
     public DeliveryCareer(HubCatalog hubs, double startCredP)
     {
@@ -75,6 +78,9 @@ public sealed class DeliveryCareer
     /// <summary>Unity OnOpenCareerClicked: spend the CredP, add the hub and
     /// clear the selection. Category-less stores stay unconnected only until
     /// a hub of their category is bought — buying never rewires other careers.
+    /// The owner person is assigned here like Unity does (Unity
+    /// GetHubOwnerName at buy time), deterministically from the catalog's
+    /// pool so the freeroam map can pin its POI to the same person later.
     /// Returns false (and changes nothing) when the pick is not buyable.</summary>
     public bool TryOpenCareer(int tierId, int careerIndex, int levelIndex)
     {
@@ -85,10 +91,55 @@ public sealed class DeliveryCareer
         if (IsOwned(level!.Name) || CredP < level.Cost) return false;
 
         // Unity numbers the owned level from 1 (its CredP ramp indexes by it).
-        _owned.Add(new OwnedHub(level.Name, career!.Id, level.Cost, tierId, levelIndex + 1));
+        _owned.Add(new OwnedHub(
+            level.Name, career!.Id, level.Cost, tierId, levelIndex + 1,
+            HubOwnerNames.Pick(level.Name, Hubs.OwnersInForce)));
         CredP -= level.Cost;
         return true;
     }
+
+    /// <summary>
+    /// One delivered store's progression effect (Unity
+    /// ApplyStoreDeliveryEffects): the producing hub earns the ramp rate
+    /// through its per-hub delivery count and holds the run's friendship.
+    /// When several hubs serve one category the newest purchase is the goods
+    /// source the player upgraded to (the older hub merely connected the
+    /// category). No owned hub means nothing earned and no owner: the
+    /// caller hides the friendship block and skips the CredP line.
+    /// Returns the owner to befriend and the CredP earned.
+    /// </summary>
+    public DeliveryEarning RegisterDelivery(string category)
+    {
+        if (NewestOwned(category) is not { } hub)
+        {
+            return new DeliveryEarning("", 0);
+        }
+
+        int before = _deliveries.GetValueOrDefault(hub.Name);
+        int earned = Hubs.RampInForce.Earn(hub.Tier, hub.Level, before);
+        _deliveries[hub.Name] = before + 1;
+        CredP += earned;
+        return new DeliveryEarning(hub.OwnerName, earned);
+    }
+
+    // The purchase that supplies the category is the newest one: buying a
+    // further level of a career is the player's upgrade, so the goods source
+    // moves with it (Unity leaves the old contract behind on the map).
+    private OwnedHub? NewestOwned(string category)
+    {
+        for (int i = _owned.Count - 1; i >= 0; i--)
+        {
+            if (_owned[i].Category == category) return _owned[i];
+        }
+        return null;
+    }
+
+    /// <summary>The owner a run of this category would befriend, without moving
+    /// any state: the same newest owned hub <see cref="RegisterDelivery"/>
+    /// credits. Empty when no owned hub supplies the category. Read-only so a
+    /// failed trip (a breakdown) can charge familiarity without crediting the
+    /// ramp.</summary>
+    public string OwnerFor(string category) => NewestOwned(category)?.OwnerName ?? "";
 
     private bool TryResolve(
         int tierId, int careerIndex, int levelIndex,

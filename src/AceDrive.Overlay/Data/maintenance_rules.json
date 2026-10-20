@@ -1,0 +1,36 @@
+{
+  "Parts": [
+    { "Key": "oil_change", "IntervalKm": 1200, "FullPrice": 250 },
+    { "Key": "wipers", "IntervalKm": 1000, "FullPrice": 90 },
+    { "Key": "air_filter", "IntervalKm": 1500, "FullPrice": 110 },
+    { "Key": "brake_pads", "IntervalKm": 2700, "FullPrice": 350 },
+    { "Key": "tires", "IntervalKm": 2500, "FullPrice": 900 },
+    { "Key": "brake_fluid", "IntervalKm": 3000, "FullPrice": 180 },
+    { "Key": "transmission_fluid", "IntervalKm": 3000, "FullPrice": 350 },
+    { "Key": "car_battery", "IntervalKm": 3600, "FullPrice": 400 }
+  ],
+  "ClassBands": [
+    { "MinClass": 16, "Multiplier": 1.0 },
+    { "MinClass": 11, "Multiplier": 0.8 },
+    { "MinClass": 7, "Multiplier": 0.6 },
+    { "MinClass": 0, "Multiplier": 0.4 }
+  ],
+  "EngineBands": [
+    { "MaxCc": 1000, "RedKm": 250000 },
+    { "MaxCc": 2000, "RedKm": 300000 },
+    { "MaxCc": 3000, "RedKm": 350000 },
+    { "MaxCc": 4000, "RedKm": 400000 },
+    { "MaxCc": 5000, "RedKm": 450000 },
+    { "MaxCc": 2147483647, "RedKm": 500000 }
+  ],
+  "CurveExponent": 2.0,
+  "MaxBreakdownChance": 0.10,
+  "BreakdownFractionMin": 0.10,
+  "BreakdownFractionMax": 0.90,
+  "PickupFee": 100.0,
+  "EngineRepairFraction": 0.10,
+  "NewEngineFraction": 0.30,
+  "WeeklyIntervalDays": 7,
+  "YearIntervalDays": 364,
+  "YearJitterDays": 8
+}

@@ -49,16 +49,30 @@ public sealed class VoiceTests
         var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
             new FakeStore(), log ?? new NullLogger(), FareTable.Default,
             new TaxiJobProposer(NamePoolTable.Default, seed: 0),
-            new FakeOnboardingStore(), new FakeContentSource(Content), mic, car, TodoTable.Default,
+            new FakeOnboardingStore(), new FakeContentSource(Content),
+            new FakeProfileStore(), AddressMap.Default, "ElGee",
+            mic, car, TodoTable.Default,
             DeliveryCatalog.Default, HubCareerShell(),
+            DeliveryFareTable.Default,
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0),
-            new FakeRoadTestStore(), new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
+            new FakeRoadTestStore(), new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(),
+            new FakeDriverStore(), new DailyStreak(clock, null), new OperatingZone(null, seed: 0),
+            new FakeFriendshipStore(), [],
+            new FakeBrandMileageStore(), new FakeRivals(),
+            new Hunger(HungerRules.Default), new FakeHungerStore(),
+            new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
+            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService());
         return (vm, clock, mic, car);
     }
 
     // Brand page -> grandma's car -> voice info -> birthday dialogue, the
     // spoken route onto the main control page (shared by the tests below).
+    // The last tap hands the screen to the HUD and hides the panel, so call
+    // it back the way a hotkey or wake word does before testing the control
+    // page's own voice buttons.
     private static MainControlScreenViewModel ToControlPage(MainViewModel vm)
     {
         vm.ChooseBrand("Honda");
@@ -67,8 +81,12 @@ public sealed class VoiceTests
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null); // page 2
-        dialogue.ContinueCommand.Execute(null); // finishes: control page shows
-        return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        dialogue.ContinueCommand.Execute(null); // finishes: control page is built
+        Assert.False(vm.IsShown);
+        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        vm.Show();
+        Assert.True(vm.IsShown);
+        return control;
     }
 
     [Fact]
@@ -120,12 +138,12 @@ public sealed class VoiceTests
     }
 
     [Fact]
-    public void WakeWord_ShowsOverlay()
+    public void WakeWord_ShowsFirstRunPage()
     {
         var (vm, _, mic, _) = Create();
         mic.Fire("hey mazda");
         Assert.True(vm.IsShown);
-        Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -212,6 +230,7 @@ public sealed class VoiceTests
         dialogue.ContinueCommand.Execute(null); // page 2
         dialogue.ContinueCommand.Execute(null); // finishes
         Assert.True(dialogue.IsComplete);
+        vm.Show(); // call the panel back after the HUD hand-over
 
         clock.Advance(TimeSpan.FromSeconds(14));
         mic.Fire("start taxi shift"); // control-page voice button fires -> activity at t=14
@@ -239,8 +258,9 @@ public sealed class VoiceTests
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
-        dialogue.ContinueCommand.Execute(null); // finishes: control page shows
+        dialogue.ContinueCommand.Execute(null); // finishes: control page is built
         var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        vm.Show(); // call the panel back after the HUD hand-over
 
         clock.Advance(TimeSpan.FromSeconds(8));
         mic.Fire("market valuation"); // fires: activity at t=8
@@ -534,11 +554,20 @@ public sealed class VoiceTests
         var vm = new MainViewModel(tel, clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
             new FakeStore(), new NullLogger(), FareTable.Default,
             new TaxiJobProposer(NamePoolTable.Default, seed: 0),
-            new FakeOnboardingStore(), new FakeContentSource(Content), new FakeVoiceListener(),
+            new FakeOnboardingStore(), new FakeContentSource(Content),
+            new FakeProfileStore(), AddressMap.Default, "ElGee",
+            new FakeVoiceListener(),
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
+            DeliveryFareTable.Default,
             new CityEconomy([], CityRules.Default), new FakeCityStore(),
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(), new FakeFriendshipStore(), []);
+            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
+            new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
+            new Hunger(HungerRules.Default), new FakeHungerStore(), new Garage([]), new FakeGarageStore(),
+            InsuranceRules.Default,
+            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService());
         vm.Show();
         clock.Advance(TimeSpan.FromSeconds(15.1));
         vm.Poll();
@@ -612,39 +641,39 @@ public sealed class VoiceTests
     {
         // Regression: the wake phrase's FINAL result ("hey mazda") used to
         // arrive after the brand page appeared and fired the Mazda button.
-        // Brand/car pages are mouse-only now, so it must be ignored.
+        // The first-run page has no voice labels, so the tail must land there
+        // inert: no brand tap, no page change.
         var (vm, _, mic, _) = Create();
-        mic.Fire("hey mazda"); // partial: wakes, shows brand page
-        Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
+        mic.Fire("hey mazda"); // partial: wakes, shows the first-run page
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
         mic.Fire("hey mazda", isFinal: true); // same utterance, must not select
-        Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
-    public void WakeAgain_ReplaysTheIntro()
+    public void WakeAgain_OpensControlPage()
     {
-        // Calling the app with the wake word walks the introduction again:
-        // idle-hide parks the player on the control page, the next wake
-        // reopens the brand page, and the chain leads back down to the
-        // control page.
+        // Calling the app with the wake word opens the intro the first time;
+        // once the intro was shown, idle-hide parks the player on the control
+        // page and the next wake returns straight there, no intro walk.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
         vm.ChooseBrand("Honda");
         vm.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
-        dialogue.ContinueCommand.Execute(null); // finishes: control page shows
+        dialogue.ContinueCommand.Execute(null); // finishes: panel hands over
+        Assert.False(vm.IsShown);
         clock.Advance(TimeSpan.FromSeconds(16));
-        vm.Poll(); // idle hides
+        vm.Poll(); // stays hidden while idle
         Assert.False(vm.IsShown);
         clock.Advance(TimeSpan.FromSeconds(4)); // wake cooldown over
         mic.Fire("hey mazda");
         Assert.True(vm.IsShown);
-        Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
-
-        ToControlPage(vm); // the walk answers again
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -698,8 +727,8 @@ public sealed class VoiceTests
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
-        vm.Show(); // a call replays the intro...
-        ToControlPage(vm); // ...so the walk answers the next utterance
+        vm.Show(); // a call opens the control page directly
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         mic.Fire("where is willie");
         // Willy is DayOfWeek 4: a Wednesday.
         CalendarRow willyDay = Assert.Single(control.Days, d => d.DayLabel == "Wednesday");
@@ -707,8 +736,8 @@ public sealed class VoiceTests
 
         clock.Advance(TimeSpan.FromMinutes(212)); // ~4 more game days: Sunday
         vm.Poll();
-        vm.Show();
-        ToControlPage(vm);
+        vm.Show(); // a call opens the control page directly
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         mic.Fire("chant amelia");
         CalendarRow sunday = Assert.Single(control.Days, d => d.DayLabel == "Sunday");
         Assert.True(sunday.Flash);
@@ -730,11 +759,9 @@ public sealed class VoiceTests
     {
         // Regression for the logged 2026-10-14 surprise: "continue" closing
         // the birthday dialogue turned START TAXI SHIFT into CONTINUE without
-        // the player ever asking. The page change waits out the beat, so the
-        // utterance's FINAL fragment arrives while the control page is
-        // already up — and its dictionary owns a bare "continue" taxi
-        // keyword under a different label and delegate than the dialogue's.
-        // The text mute must recognise the same utterance across screens.
+        // the player ever asking. The last tap now hands the screen to the
+        // HUD, so the utterance's FINAL tail lands while the panel is hidden
+        // and cannot touch the control page's bare "continue" taxi keyword.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
         vm.ChooseBrand("Honda");
@@ -746,16 +773,18 @@ public sealed class VoiceTests
 
         mic.Fire("continue"); // partial: finishes the dialogue
         clock.Advance(TimeSpan.FromSeconds(0.51));
-        vm.Poll(); // beat drains: the control page is up
+        vm.Poll(); // beat drains: control page built, panel handed over
         var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
 
-        mic.Fire("continue", isFinal: true); // same utterance's tail: muted
+        mic.Fire("continue", isFinal: true); // same utterance's tail: hidden
         Assert.False(control.TaxiFlash);
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
 
-        // The mute cleared with the final, so the NEXT "continue" is a new
-        // utterance and still taps the taxi entry (the keyword stands).
+        // Calling the panel back shows the untouched control page; the NEXT
+        // "continue" is a new utterance and still taps the taxi entry.
+        vm.Show();
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         mic.Fire("continue");
         Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
     }
@@ -765,12 +794,10 @@ public sealed class VoiceTests
     {
         // Literal 2026-10-14 18:37:33/34 transcripts from the repro session:
         // the closing dialogue line answered to the partial "we continue",
-        // and the page change waited out the beat. The utterance's final
-        // landed as "the continue" - Vosk re-scored the leading word - while
-        // the control page was already up, where bare "continue" is a taxi
-        // keyword. Exact-text mute missed the tail and the shift started
-        // unasked. The fired label's word run survives the re-score, so the
-        // tail must stay muted.
+        // and its final landed as "the continue" - Vosk re-scored the leading
+        // word - after the page had changed. The hand-over now hides the
+        // panel first, so that tail cannot reach the control page's bare
+        // "continue" taxi keyword.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
         vm.ChooseBrand("Honda");
@@ -784,13 +811,16 @@ public sealed class VoiceTests
         clock.Advance(TimeSpan.FromSeconds(0.51));
         vm.Poll();
         var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
 
         mic.Fire("the continue", isFinal: true); // same utterance, re-scored
         Assert.False(control.TaxiFlash);
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
 
-        // Cleared with the final: a real next utterance still taps through.
+        // Calling the panel back leaves the page untouched; a real next
+        // utterance still taps through.
+        vm.Show();
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         mic.Fire("the back"); // no "back" key on the control page: inert
         mic.Fire("continue");
         Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
@@ -829,8 +859,8 @@ public sealed class VoiceTests
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
-        vm.Show(); // a call replays the intro, so walk back to the control page
-        ToControlPage(vm);
+        vm.Show(); // a call opens the control page directly
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         mic.Fire("where is"); // partial: alias fires
         mic.Fire("where is willy", isFinal: true); // final: same tap, muted
 

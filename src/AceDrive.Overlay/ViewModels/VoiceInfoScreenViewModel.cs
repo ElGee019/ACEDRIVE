@@ -6,8 +6,8 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// Onboarding page 3: how voice control works (Career Start insert after
-/// grandma's car). Explains app activation via the wake word plus
-/// button-by-voice, then continues to the birthday dialogue.
+/// grandma's car). Explains app activation via the wake word
+/// plus button-by-voice, then continues to the birthday dialogue.
 /// </summary>
 public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
 {

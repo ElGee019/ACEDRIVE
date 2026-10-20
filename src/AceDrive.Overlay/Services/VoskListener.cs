@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using AceDrive.Core;
+using NAudio.CoreAudioApi;
 using NAudio.Wave;
 using Vosk;
 
@@ -13,17 +14,19 @@ public sealed class VoskListener : IVoiceListener
     private readonly string _modelPath;
     private readonly ILog _log;
     private readonly int _sampleRate;
+    private readonly string? _micPreference;
     private Model? _model;
     private VoskRecognizer? _rec;
     private WaveIn? _mic;
     private bool _running;
     private bool _disposed;
 
-    public VoskListener(string modelPath, ILog log, int sampleRate = 16000)
+    public VoskListener(string modelPath, ILog log, int sampleRate = 16000, string? micPreference = null)
     {
         _modelPath = modelPath;
         _log = log;
         _sampleRate = sampleRate;
+        _micPreference = micPreference;
     }
 
     public bool IsAvailable => true;
@@ -39,11 +42,13 @@ public sealed class VoskListener : IVoiceListener
             _model = new Model(_modelPath);
             _rec = new VoskRecognizer(_model, _sampleRate);
             _rec.SetWords(false);
-            _mic = new WaveIn { WaveFormat = new WaveFormat(_sampleRate, 1) };
+            int device = ResolveDeviceIndex(ListDeviceNames(), _micPreference, DefaultCaptureName());
+            string name = DeviceDisplayName(device);
+            _mic = new WaveIn { DeviceNumber = device, WaveFormat = new WaveFormat(_sampleRate, 1) };
             _mic.DataAvailable += OnAudio;
             _mic.StartRecording();
             _running = true;
-            _log.LogInfo($"voice listening (model {_modelPath})");
+            _log.LogInfo($"voice listening (model {_modelPath} mic {device}: {name})");
         }
         // WHY: every realistic way voice can fail to start is a model-file
         // error (IO/access), a native Vosk DLL error (load/format) or a mic
@@ -125,6 +130,92 @@ public sealed class VoskListener : IVoiceListener
         _rec = null;
         _model?.Dispose();
         _model = null;
+    }
+
+    // Picks the WaveIn device to open: EVO_MIC substring wins so a rig with
+    // headphones + array can pin one; otherwise the Windows default capture
+    // endpoint (which follows the "mic turned on" toggle); else device 0.
+    // Pure over the already-listed names so it stays unit-testable.
+    internal static int ResolveDeviceIndex(
+        IReadOnlyList<string> names, string? preference, string? defaultName)
+    {
+        if (names.Count == 0)
+        {
+            throw new InvalidOperationException("no capture devices");
+        }
+        if (!string.IsNullOrWhiteSpace(preference))
+        {
+            for (int i = 0; i < names.Count; i++)
+            {
+                if (names[i].Contains(preference, StringComparison.OrdinalIgnoreCase))
+                {
+                    return i;
+                }
+            }
+        }
+        if (!string.IsNullOrWhiteSpace(defaultName))
+        {
+            string def = defaultName.Trim();
+            for (int i = 0; i < names.Count; i++)
+            {
+                // WHY Contains both ways: WaveIn caps ProductName at 31 chars
+                // ("Microphone Array (Intel Smart ") while the MMDevice
+                // friendly name is full, so either side can hold the other.
+                string n = names[i].Trim();
+                if (n.Length > 0 && (def.Contains(n, StringComparison.OrdinalIgnoreCase) ||
+                    n.Contains(def, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return i;
+                }
+            }
+        }
+        return 0;
+    }
+
+    private static List<string> ListDeviceNames()
+    {
+        List<string> names = new(WaveIn.DeviceCount);
+        for (int i = 0; i < WaveIn.DeviceCount; i++)
+        {
+            try
+            {
+                names.Add(WaveIn.GetCapabilities(i).ProductName);
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+            {
+                names.Add($"device {i}");
+            }
+        }
+        return names;
+    }
+
+    private static string DeviceDisplayName(int index)
+    {
+        try
+        {
+            return WaveIn.GetCapabilities(index).ProductName;
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or NotSupportedException)
+        {
+            return $"device {index}";
+        }
+    }
+
+    // WHY null on failure instead of throwing: the default endpoint is a hint
+    // for picking among WaveIn devices, never a reason to go voice-off when
+    // device 0 would do. The COM/lookup failure modes are the same mic-device
+    // set StartListening already degrades on.
+    private static string? DefaultCaptureName()
+    {
+        try
+        {
+            MMDeviceEnumerator enumerator = new();
+            return enumerator.GetDefaultAudioEndpoint(DataFlow.Capture, Role.Communications).FriendlyName;
+        }
+        catch (Exception ex) when (ex is COMException or InvalidOperationException or NotSupportedException)
+        {
+            return null;
+        }
     }
 
     public void Dispose()

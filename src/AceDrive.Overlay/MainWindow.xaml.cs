@@ -26,19 +26,22 @@ public partial class MainWindow : Window
     private const double BackdropOpacity = 0.95;
 
     private readonly MainViewModel _vm;
+    private readonly ILog _log;
 
     public MainWindow(MainViewModel vm, ILog log)
     {
         _vm = vm;
+        _log = log;
         DataContext = vm;
         InitializeComponent();
         TryApplyBackdrop(log);
 
         // Fresh position always; size only restores once past onboarding, so a
         // stale small window never clips the first-run screens. The gate reads
-        // the saved progress, not the page on screen: the introduction replays
-        // on every call, so a returning player opens on the brand page and must
-        // still get the window they resized (its pages scroll if it is small).
+        // the saved progress, not the page on screen: first paint still opens
+        // on the opening screen, so a returning player replays the introduction
+        // and must still get the window they resized (its pages scroll if it
+        // is small).
         var saved = _vm.LoadPlacement();
         if (saved is not null)
         {
@@ -51,6 +54,30 @@ public partial class MainWindow : Window
             }
         }
 
+
+        // Hotkey must be wired BEFORE anything can create the handle:
+        // SourceInitialized fires exactly once, when the HwndSource is born.
+        // ApplyShown() further down (and App.Show() after this ctor) creates
+        // it immediately on voice-less starts — subscribing any later means
+        // the event already fired and RegisterHotKey never runs at all, not
+        // even to fail and log. Hidden starts are covered by EnsureHandle().
+        SourceInitialized += (_, _) =>
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+            if (!Native.RegisterHotKey(hwnd, Native.HOTKEY_ID,
+                Native.MOD_CONTROL | Native.MOD_SHIFT, Native.VK_C))
+            {
+                _log.LogWarning("hotkey Ctrl+Shift+C not registered; use the wake word");
+            }
+        };
+        // WHY: App only calls Show() when the VM wants the window visible at
+        // boot, and a hidden WPF window has no HwndSource — so a wake-word
+        // start left the hotkey unregistered and the app unreachable by
+        // keyboard until a wake word happened to show it. Forcing the handle
+        // makes SourceInitialized (and the hotkey) live from startup without
+        // flashing the window.
+        new WindowInteropHelper(this).EnsureHandle();
 
         // App.Show() runs after this ctor: re-assert the VM's visibility once
         // the window is really loaded, else a hidden-at-start window would be
@@ -70,21 +97,6 @@ public partial class MainWindow : Window
         PreviewMouseWheel += (_, _) => _vm.RecordActivity();
         PreviewKeyDown += (_, _) => _vm.RecordActivity();
         PreviewMouseLeftButtonDown += OnDragMove;
-
-        SourceInitialized += (_, _) =>
-        {
-            var hwnd = new WindowInteropHelper(this).Handle;
-            HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
-            Native.RegisterHotKey(hwnd, Native.HOTKEY_ID,
-                Native.MOD_CONTROL | Native.MOD_SHIFT, Native.VK_C);
-        };
-        // WHY: App only calls Show() when the VM wants the window visible at
-        // boot, and a hidden WPF window has no HwndSource — so a wake-word
-        // start left Ctrl+Shift+C unregistered and the app unreachable by
-        // keyboard until a wake word happened to show it. Forcing the handle
-        // makes SourceInitialized (and the hotkey) live from startup without
-        // flashing the window.
-        new WindowInteropHelper(this).EnsureHandle();
         Closed += (_, _) =>
         {
             try
@@ -101,6 +113,8 @@ public partial class MainWindow : Window
             _vm.SavePlacement(new WindowBounds(Left, Top, Width, Height));
             _vm.SaveClock();
             _vm.SaveCity();
+            _vm.SaveHunger();
+            _vm.SaveGarage();
             _vm.Dispose();
         };
 
@@ -128,9 +142,10 @@ public partial class MainWindow : Window
                 Opacity = BackdropOpacity,
             };
             // Base resolution follows the backdrop's native aspect: the design
-            // width (360) stays, the height is derived from the decoded image
-            // (960x1024 -> 384) so the panel shows the whole artwork without
-            // UniformToFill cropping. Saved placement below still overrides it.
+            // width (413.6, the panel width the player settled on) stays, the
+            // height is derived from the decoded image (946x2149 -> 939.6) so
+            // the panel shows the whole artwork without UniformToFill cropping.
+            // Saved placement below still overrides it.
             SizeToContent = SizeToContent.Manual;
             Height = Width * art.PixelHeight / art.PixelWidth;
         }

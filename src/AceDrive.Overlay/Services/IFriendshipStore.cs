@@ -16,8 +16,9 @@ public interface IFriendshipStore
     FriendshipOutcome RegisterRide(string ownerName);
 
     /// <summary>
-    /// Applies a familiarity penalty (−1 per failed pickup). Ships now for
-    /// the map/driving slice (wrong address, dirty car); unused until then.
+    /// Applies a familiarity penalty (−1 per failed pickup). The dirty-car
+    /// taxi refusal (item 33) is the first caller; the map's wrong-address
+    /// cancellation joins it with the driving slice.
     /// </summary>
     void AddFamiliarity(string ownerName, int delta);
 }

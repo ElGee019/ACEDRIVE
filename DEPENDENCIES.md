@@ -1,8 +1,17 @@
+are streetnames included
+is there a minimap
+are houses / businesses locations embedded
+
+
+
+EVO uses presets within the same ks_bmw_m2_coupe car folder.
+nenkai unpack
+
+
 Reasons to drive
 
 Storyline
 	-history -- detective style
-	-car journalist
 
 Jobs independent of calendar
 	-Taxi Jobs
@@ -10,12 +19,13 @@ Jobs independent of calendar
 	-Car hauling Jobs
 
 Calendar-linked jobs
-	-road test
+	-road test / car journalist
 	-where is willy
 	-cento miglia
 	-Market Valuation
 
-car collecting
+earning money for car collecting
+earning xp for asynchronous competition
 	
 
 a-synchronous competition
@@ -26,13 +36,16 @@ a-synchronous competition
 
 operating zone expansion
 exploring - street knowledge	
-friendship 
+friendship - every successful job results in friendship growing, every house has a citizen assigned
 
 insurance
 fuelstation
 police
 bank
 mechanic
+	-chances of breakdown (8 parts)
+	-engine state
+
 cardealer
 employees when more than 1 car
 	-carsharing
@@ -43,6 +56,13 @@ during drive:
 	-customer requests
 	-car quizzes
 	-passing car brand
+
+
+Resource Drains
+Breakdown
+Accidents
+Wrong Address
+Failing a request
 	
 
 
@@ -85,27 +105,28 @@ during drive:
 
 Town economy
 
-- First hub owned -> unlocks store stock depletion (before it, stock is static)
-- Deliveries + employee runs -> shop stock up -> citizens grow -> car-share demand +
-  road-test audience size + shopping availability -> money + XP -> back to hubs.
+Stores bring citizens. If stores stocked, amount of citizens go up. If stores empty citizens leave. more citizens means more possible readers for car magazines, also means more demand for carsharing
 
 
-Zone growth
 
-- Every few finished jobs -> one new street discovered (StreetPool + Overpass) ->
-  POI respawn pass (new carwash/stores/fuel/dealer/bank/mechanic per placement interval) ->
-  more houses/shops -> more and better jobs -> more job completions -> growth again.
+Operating Zone growth
+
+- Every few finished jobs -> one new street discovered ->
+  new carwash/stores/fuel/dealer/bank/mechanic per placement interval ->
+  more houses/shops -> more and better jobs.
 - Real-world add-street: GPS -> employee drives there -> street joins the pool -> same chain.
 
 
 Weekly stories
 
 - All five depend on: Calendar gate + Clock + Driving + a system to score:
-  race (car class, borrowed physics, rival NPCs), show (engine health, price, rivals),
-  road test (garage, store citizens as audience), Willy (shop list, friendship),
-  Grandma (houses, dialogue, pancake -> hunger pause).
-- Onboarding influences every other system once: starter car, first-hire -> taxi license,
-  intro flags -> when hunger/clock/jobs switch on at all.
+  
+Cento Miglia (car class, borrowed physics, rival NPCs), 
+Market Valuation (engine health, price, rivals),
+Road Test (garage, store citizens as audience), 
+Willy (shop list, friendship),
+Grandma (houses, dialogue, pancake -> hunger pause).
+
 
 
 Online (Firebase)
@@ -113,7 +134,6 @@ Online (Firebase)
 - Influences: standings names on receipts, rival lists, valuation entries, car rarity
   (global km -> rarity tier -> fare multiplier), car sprites, name reservation.
 - Is influenced by: km, XP, zone, shift results (fire-and-forget pushes).
-- **Never gates gameplay** — offline play is identical; only decoration is missing.
 
 
 
@@ -127,54 +147,4 @@ Loops (circular influence)
 
 
 
-Sources and sinks
 
-Pure sources (influence, depend on nothing gameplay-side):
-- ScriptableObject configs (GameTimeConfig, StoreEconomyConfig, PoliceConfig, Car/Item databases)
-- Map data pipeline (Overpass/HOT packs/OSRM) — external ground truth
-- Game clock (real time in, game time out)
-
-Pure sinks (influenced only, influence nothing):
-- Screens/HUD and receipts — display state, never decide it
-- Job alarm notifications, audio (SFX only)
-- All Firestore writes and leaderboard reads (the one exception: rarity feeding fare math)
-
----
-
-## 6. What stops if you remove one
-
-| Remove | Stops |
-|---|---|
-| Save/PlayerData | Everything; no state exists |
-| Game clock | Hunger, fuel price, premiums, car-share, employee trips, stock depletion, weekly preloads |
-| Calendar | All weekly content refreshes and weekday events |
-| Map data | Streets/houses/shops: no job can generate or finish |
-| Driving | Every job, fuel, wear, accidents, fines, race, road test |
-| Stores | Groceries, restock targets, citizen counts -> car-share and audience collapse |
-| Job-completion accounting | XP, money, todos, zone growth, receipts, streaks |
-| Firebase | Nothing gameplay-side |
-
----
-
-## Appendix — system -> main classes
-
-| System | Classes |
-|---|---|
-| Save | `Models/PlayerData.cs`, `Managers/SaveManager.cs`, `Composition/GameInitializer.cs` |
-| Clock | `Managers/GameClockManager.cs`, `ScriptableObjects/GameTimeConfigSO.cs` |
-| Calendar | `Managers/CalendarManager.cs`, `UI/YearTransitionScreen.cs` |
-| Map data | `Map/StreetPool.cs`, `API/OverpassService.cs`, `Map/MapDataPackService.cs`, `Map/HouseNumberGenerator.cs`, `Map/Services/MapMarkerServices.cs` |
-| Driving | `Managers/DrivingManager.cs`, `Driving/Services/*` (FuelSimulator, StandardBreakdownStrategy, RouteServiceWrapper…) |
-| Taxi | `Utils/TaxiJobGenerator.cs`, `UI/Handlers/TaxiJobLifecycleHandler.cs`, `UI/TaxiReceiptScreen.cs`, `Utils/TaxiShiftService.cs` |
-| Delivery/hubs | `UI/Handlers/DeliveryJobHandler.cs`, `Utils/HubCareerCatalog.cs`, `Utils/DeliveryCartAccounting.cs`, `UI/DeliveryHubScreen.cs` |
-| Stores | `Managers/StoreManager.cs`, `Models/ItemDatabase.cs`, `Utils/StorePlacementHelper.cs` |
-| Cars | `Utils/CarMaintenanceService.cs`, `Utils/EngineHealthService.cs`, `Utils/AccidentService.cs`, `Utils/CarWashService.cs`, `UI/CarDealerScreen.cs`, `UI/GarageScreen.cs`, `Utils/InsurancePricing.cs` |
-| Money | `UI/BankScript.cs`, `Utils/BankInterestHelper.cs`, `Utils/DailyStreakService.cs`, `Utils/CarShareService.cs`, `Utils/EmployeeService.cs` |
-| Progression | `Utils/XpEarningHelper.cs`, `Utils/StreetKnowledgeHelper.cs`, `Utils/FriendshipHelper.cs`, `Utils/DriverRatingService.cs`, `Todo/TodoManager.cs`, `Utils/CarePackageService.cs`, `Utils/RewardCatalog.cs` |
-| Zone | `UI/MapScreen.cs` (expansion flow), `Utils/ZoneExpansionService.cs`, `Map/LocationService.cs` |
-| Weekly events | `Managers/MilleMigliaManager.cs`, `Utils/ValuationService.cs`, `UI/RoadTestScreen.cs`, `UI/Handlers/WhereIsWillyHandler.cs`, `UI/Grandma01DialogueScreen.cs` |
-| Car hauling | `Utils/CarHaulOfferService.cs`, `UI/Handlers/CarHaulDeliveryHandler.cs`, `UI/CarHaulingScreen.cs` |
-| Onboarding | `UI/ScreenStart.cs`, `UI/SetupScreen.cs`, `UI/FavBrandScreen.cs`, `UI/GrandmaCarScreen.cs`, `UI/TutScreen.cs` |
-| Offline jobs | `Managers/JobAlarmService.cs`, `Utils/DriveEtaEstimator.cs`, `Utils/MultiLegEtaEstimator.cs` |
-| Online | `API/FirestoreService.cs`, `API/RivalsService.cs`, `API/*StandingsService.cs`, `API/ValuationEntriesService.cs` |
-| Screens | `UI/ScreenManager.cs`, `UI/ScreenRegistry.cs`, `UI/IScreen.cs`, `UI/NavigationEvents.cs` |

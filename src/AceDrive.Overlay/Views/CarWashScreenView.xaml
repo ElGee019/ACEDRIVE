@@ -1,0 +1,44 @@
+<UserControl x:Class="AceDrive.Overlay.Views.CarWashScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Car wash page (PORTPLAN 33, Unity CarWashScreen): title band, the car
+         driven now, its filth reading and the flat price centered, the result
+         block after a wash, WASH IT above BACK in the bottom band (the
+         bank page's two-button stack). -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=CarWashTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CarLine}" Foreground="#FFF" FontSize="16"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,6"/>
+            <TextBlock Text="{Binding FilthLine}" Foreground="#FFF" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding PriceLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+            <!-- The post-wash result (Unity's _textRemovedFilth block). -->
+            <TextBlock Text="{Binding ResultLine}" Foreground="#FF97EAD2" FontSize="14"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding ResultVisible, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=CarWashWash}"
+                    Command="{Binding WashCommand}" Margin="0,0,0,6"/>
+            <Button Content="{loc:Loc Key=CarWashBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

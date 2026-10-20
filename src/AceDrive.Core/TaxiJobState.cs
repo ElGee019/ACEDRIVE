@@ -22,7 +22,10 @@ public sealed class TaxiJobState
     public double DistanceKm { get; set; }
     public double Fare { get; set; }
     public double Tip { get; set; }
+    /// <summary>Brand sponsorship on the settled receipt (Unity's
+    /// brandLoyaltyBonus, 0 until the mileage store knows the brand).</summary>
+    public double BrandBonus { get; set; }
     /// <summary>Speed-fine deduction on the settled receipt (0 until dropoff).</summary>
     public double Fine { get; set; }
-    public double Total => Fare + Tip - Fine;
+    public double Total => Fare + BrandBonus + Tip - Fine;
 }

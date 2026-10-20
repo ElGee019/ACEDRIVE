@@ -1,0 +1,9 @@
+{
+  "Tiers": [
+    { "WidthKm": 2.0, "RatePerKm": 20.0 },
+    { "WidthKm": 3.0, "RatePerKm": 17.0 },
+    { "WidthKm": 5.0, "RatePerKm": 12.0 },
+    { "WidthKm": 40.0, "RatePerKm": 6.0 },
+    { "WidthKm": 0.0, "RatePerKm": 3.0 }
+  ]
+}

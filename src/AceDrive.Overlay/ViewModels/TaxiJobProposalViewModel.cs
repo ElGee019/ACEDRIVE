@@ -68,6 +68,26 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     /// semantics. In-memory until the persistent save lands (PORTPLAN 51).</summary>
     public int RadiusKm => _radiusKm;
 
+    /// <summary>The dirty-car refusal line (PORTPLAN item 33, Unity
+    /// TaxiJobLifecycleHandler's "No way I am getting into a car this dirty"):
+    /// the host sets it when a filth-25 pickup is refused, and using it as the
+    /// copy is resx. Cleared on every fresh proposal.</summary>
+    public string RefusalText
+    {
+        get => _refusalText;
+        private set
+        {
+            if (SetField(ref _refusalText, value))
+            {
+                OnPropertyChanged(nameof(HasRefusal));
+            }
+        }
+    }
+    private string _refusalText = "";
+
+    /// <summary>Whether the refusal line shows (a message is on screen).</summary>
+    public bool HasRefusal => RefusalText.Length > 0;
+
     /// <summary>Which leg is the customer's home on the shown proposal
     /// (Unity's isCustomerHomePickup): true = home is the pickup.</summary>
     public bool HomeIsPickup => _current.HomeIsPickup;
@@ -91,8 +111,14 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     /// drawn and the home/residence coin flip.</summary>
     public void Open() => Generate();
 
+    /// <summary>Shows the host's dirty-car refusal on the page (the job is
+    /// never accepted). The host owns the friendship penalty; the page only
+    /// paints the copy it is handed.</summary>
+    public void ShowRefusal(string message) => RefusalText = message;
+
     private void Generate()
     {
+        RefusalText = "";
         TaxiProposal proposal = _proposals.Next();
         // Address A is the customer's home, Address B the second address;
         // the flip says which one becomes the pickup leg, exactly like

@@ -1,0 +1,98 @@
+<UserControl x:Class="AceDrive.Overlay.Views.DealerScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- Picked row: teal edge and text, the hub page's activation tell. -->
+        <Style x:Key="DealerRowButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="BorderBrush" Value="#FF97EAD2"/>
+                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Price below the list: white, hidden with no pick so the block
+             collapses to the hint. -->
+        <Style x:Key="DealerPriceText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding SelectedPriceLine}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <!-- Car dealer page (PORTPLAN 29, Unity CarDealerScreen): the week's floor on
+         top, the picked car's specs and price underneath, BUY and BACK at the
+         bottom. Every row is a button whose text is the car name; the price shows
+         below once a car is picked. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=DealerTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CashLine}" Foreground="#FFF" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Margin="0,2" Padding="4,3" FontSize="12"
+                                Style="{StaticResource DealerRowButton}"
+                                Content="{Binding Title}"
+                                Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding SelectedLine}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                       TextAlignment="Center" Margin="0,8,0,2"/>
+            <TextBlock Text="{Binding SelectedPriceLine}" FontSize="14" FontWeight="Bold"
+                       TextAlignment="Center" Margin="0,0,0,2"
+                       Style="{StaticResource DealerPriceText}"/>
+            <TextBlock Text="{Binding SpecsLine}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center"/>
+        </StackPanel>
+        <!-- Button bar: buy on top, back flush with the panel edge below, the
+             bank page's stack. The buy button's own label carries the reason it
+             cannot be used. Teal is the shared voice-ack highlight: the button
+             the mic tapped glows for one beat before the page waits it out. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{Binding BuyLabel}" Command="{Binding BuyCommand}" Margin="0,0,0,6">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BuyFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                            <!-- CAN'T AFFORD: nothing to tap, so the note drops
+                                 the outline and reads as plain text. The border
+                                 stays transparent (not zero) so the text keeps
+                                 its place in the bar. -->
+                            <DataTrigger Binding="{Binding CantAfford}" Value="True">
+                                <Setter Property="BorderBrush" Value="Transparent"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

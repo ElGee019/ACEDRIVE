@@ -1,0 +1,74 @@
+<UserControl x:Class="AceDrive.Overlay.Views.GarageScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- The current car wears the teal edge and text (Unity's CURRENT CAR
+             row) instead of the white every other row shows; the row is not
+             pickable, so the edge is the whole tell. -->
+        <Style x:Key="GarageRowButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                    <Setter Property="BorderBrush" Value="#FF97EAD2"/>
+                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <!-- Garage page (PORTPLAN 30, Unity GarageScreen): one row per owned car,
+         title + specs + value, the current car marked and non-pickable. Tapping
+         another row makes it the car that is driven. Same page skeleton as the
+         bank page: title band, body centered, BACK flush at the bottom. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=GarageTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Margin="0,0,0,6" Padding="4,3"
+                                Style="{StaticResource GarageRowButton}"
+                                IsEnabled="{Binding IsSelectable}"
+                                Command="{Binding DataContext.SwitchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Title}" FontWeight="Bold"/>
+                                    <TextBlock Text="{loc:Loc Key=GarageCurrent}" Margin="8,0,0,0" FontSize="12"
+                                               Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding SpecsLine}" FontSize="12" Foreground="#FFBFC4C9"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="{Binding ValueLine}" FontSize="12" Foreground="#FFBFC4C9"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+        <!-- Button bar: own bottom band so BACK stretches the full panel width
+             like the delivery page's buttons; teal is the shared voice-ack
+             highlight (the mic-tapped button glows for one beat). -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=GarageBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>
