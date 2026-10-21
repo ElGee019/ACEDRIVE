@@ -6,13 +6,15 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// One generated job proposal: the passenger resident, the resident of the
-/// second address (their surname names "the X residence"), and the coin
-/// flip deciding whether the customer's home is the pickup or the drop-off
-/// leg (Unity's isCustomerHomePickup). Resident persistence — Unity reuses
-/// the POI owner once a home is known — arrives with the POI network
-/// (PORTPLAN 24); until then every proposal draws both residents fresh.
+/// second address (their surname names "the X residence"), the coin flip
+/// deciding whether the customer's home is the pickup or the drop-off leg
+/// (Unity's isCustomerHomePickup), and the two doors themselves. Residents
+/// are reused per address through <see cref="ResidentBook"/>, like Unity's
+/// persisted resident POIs.
 /// </summary>
 public sealed record TaxiProposal(
     ProceduralName Customer,
     ProceduralName SecondResident,
-    bool HomeIsPickup);
+    bool HomeIsPickup,
+    AddressLocation? CustomerHome = null,
+    AddressLocation? SecondResidence = null);

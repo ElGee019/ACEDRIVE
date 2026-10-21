@@ -1,7 +1,10 @@
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Threading;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
@@ -19,6 +22,7 @@ public partial class HudWindow : Window
     private const double DefaultMargin = 24.0;
 
     private readonly ISettingsStore _store;
+    private bool _panelOpen;
 
     public HudWindow(
         HudViewModel viewModel, ISettingsStore store,
@@ -54,10 +58,17 @@ public partial class HudWindow : Window
 
         // WHY no-activate: dragging the HUD must not pull keyboard focus away
         // from the game. ShowActivated only covers the first Show; this covers
-        // every later click on the strip.
+        // every later click on the strip. Answering WM_MOUSEACTIVATE as well
+        // closes the gap where a click still activated the strip and killed
+        // EVO's input despite the extended style.
         SourceInitialized += (_, _) =>
-            Native.SetNoActivate(new WindowInteropHelper(this).Handle);
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            Native.SetNoActivate(hwnd);
+            HwndSource.FromHwnd(hwnd)?.AddHook(OnMessage);
+        };
         PreviewMouseLeftButtonDown += OnDrag;
+        AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(OnButtonClick));
         Closed += OnClosed;
         viewModel.PropertyChanged += OnViewModelChanged;
         ApplyShown();
@@ -70,6 +81,19 @@ public partial class HudWindow : Window
         {
             Width = width;
         }
+    }
+
+    /// <summary>
+    /// The companion and the main panel share the same screen corner. While
+    /// the panel is open the HUD steps aside: a topmost, no-activate strip on
+    /// top of a page would cover a row and turn its click into a HUD drag
+    /// (logged at Max's store), so it returns only once the player drives and
+    /// the panel hides again.
+    /// </summary>
+    public void SetPanelOpen(bool open)
+    {
+        _panelOpen = open;
+        ApplyShown();
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -89,7 +113,7 @@ public partial class HudWindow : Window
             return;
         }
 
-        if (vm.IsRevealed)
+        if (vm.IsRevealed && !_panelOpen)
         {
             if (!IsVisible)
             {
@@ -114,6 +138,38 @@ public partial class HudWindow : Window
         {
             DragMove();
         }
+    }
+
+    // WHY deferred: the ENTER command may open the panel or swap screens
+    // first. Handing the foreground back on the next idle turn puts the game
+    // on top with the click fully processed, so driving resumes at once.
+    private void RestoreGameFocus() =>
+        Dispatcher.BeginInvoke(
+            DispatcherPriority.Background, new Action(Native.FocusGame));
+
+    // The source test keeps template parts (a future ComboBox arrow, a
+    // scrollbar) from bouncing focus to the game mid-interaction.
+    private void OnButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (e.Source is Button)
+        {
+            RestoreGameFocus();
+        }
+    }
+
+    // WHY: answering WM_MOUSEACTIVATE directly is stronger than the extended
+    // style alone — the click reaches WPF, but Windows never activates us, so
+    // EVO keeps the foreground and its driving input.
+    private IntPtr OnMessage(
+        IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == Native.WM_MOUSEACTIVATE)
+        {
+            handled = true;
+            return new IntPtr(Native.MA_NOACTIVATE);
+        }
+
+        return IntPtr.Zero;
     }
 
     private void OnClosed(object? sender, EventArgs e) =>

@@ -5,6 +5,7 @@ using AceDrive.Core;
 using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
+using AceDrive.Overlay.Views;
 
 namespace AceDrive.Overlay;
 
@@ -25,6 +26,18 @@ public partial class App : Application, IDisposable
 
         _log = new FileLogger();
         _log.LogInfo("AceDrive starting...");
+        // The car-thumbnail loader: the converter declared in App.xaml gets
+        // its file boundary here, so no view ever decodes a file itself.
+        if (Resources["ThumbnailImage"] is ImagePathConverter thumbnails)
+        {
+            thumbnails.Source = new ThumbnailImageSource();
+        }
+        // Embedded menu artwork rides the same seam, with the WIC-safe decode
+        // that keeps a WebP-less machine on the plain backdrop.
+        if (Resources["PackImage"] is PackImageConverter artwork)
+        {
+            artwork.Source = new PackImageSource();
+        }
         // WHY the saved language first, before any Strings.Get: every screen's
         // copy resolves through the UI culture, so the language the player
         // picked on the first-run page must already be in place at boot. A
@@ -35,11 +48,20 @@ public partial class App : Application, IDisposable
         culture.Apply(preferences.Language);
         var fares = new JsonFareStore(_log).Load();
         var todos = new JsonTodoStore(_log).Load();
-        // WHY TickCount: like the road-test ledger, the proposal draw wants
-        // its own seeded instance (never the shared global) and only the taxi
-        // page uses it; tests pin the seed.
-        var taxiProposals = new TaxiJobProposer(
-            new JsonNamePoolStore(_log).Load(), Environment.TickCount);
+        // The placeholder address map grounds the HUD, the onboarding home and
+        // the taxi job doors; load it before the proposal draw.
+        var addressMap = new JsonAddressMapStore(_log).Load();
+        // WHY TickCount: like the road-test ledger, the draws want their own
+        // seeded instances (never the shared global) and tests pin the seed.
+        // Resident names and the address/flip draw are independent streams,
+        // so their seeds are offset to keep the first resident from tracking
+        // the first proposal.
+        int taxiSeed = Environment.TickCount;
+        var residents = new ResidentBook(
+            new JsonResidentStore(_log),
+            new ProceduralNameGenerator(new JsonNamePoolStore(_log).Load(), taxiSeed),
+            _log);
+        var taxiProposals = new TaxiJobProposer(addressMap, residents, taxiSeed + 1);
         var content = new JsonOnboardingContent(_log);
         // WHY touch Content once at startup: the same eager first read (and
         // "content:" log line) the old Load() call gave, so a missing/corrupt
@@ -50,11 +72,10 @@ public partial class App : Application, IDisposable
         // address map, and the Steam display name that fills a first run.
         // The profile wins on later launches so edits survive a restart.
         var profileStore = new JsonProfileStore(_log);
-        var addressMap = new JsonAddressMapStore(_log).Load();
-        // The story POIs (PORTPLAN 5/24/27): names from Data/pois.json, each
-        // launch drawing a fresh random house for the birthday errand. WHY
-        // TickCount: its own seeded instance, never the shared global; tests
-        // pin the seed.
+        // The story POIs (PORTPLAN 5/24/27): names from Data/pois.json. The
+        // flow banks each random house on its first draw and reuses it, so the
+        // generator only seeds the doors that do not exist yet. WHY TickCount:
+        // its own seeded instance, never the shared global; tests pin the seed.
         var poiTable = new JsonPoiStore(_log).Load();
         var poiGenerator = new PoiGenerator(addressMap, poiTable, Environment.TickCount);
         // Shop content (PORTPLAN items 24/26): the item database + per-store
@@ -157,7 +178,22 @@ public partial class App : Application, IDisposable
         [
             new StorePoiHandler(stores, trunk, driver, garage, friendships, beat),
         ]);
-        var hud = new HudViewModel(addressMap, preferences, beat);
+        var taxiRules = new JsonTaxiRulesStore(_log).Load();
+        // Customer request content (PORTPLAN item 11): suffix lines, quiz
+        // categories and tier chances. Its own seeded stream, offset from the
+        // proposal/resident draws so a request roll never reshuffles them.
+        var requestTable = new JsonCustomerRequestStore(_log).Load();
+        var requests = new CustomerRequestRoller(cars, requestTable, taxiSeed + 2);
+        // Speed-challenge patrols (Phase C): one seeded plan per accepted job,
+        // offset from the other draws so it never reshuffles them.
+        var policeRules = new JsonPoliceRulesStore(_log).Load();
+        var police = new PolicePatrolPlanner(addressMap, policeRules, taxiSeed + 3);
+        var hud = new HudViewModel(addressMap, preferences, beat, wall, taxiRules);
+        // WHY: temporary until the persistent career save lands — every launch
+        // replays the whole tour from the first page. The banked doors and the
+        // profile stay put; only the tour's leg flags reset.
+        var onboardingStore = new JsonOnboardingStore();
+        onboardingStore.Save(onboardingStore.Load().RestartTour());
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -167,7 +203,7 @@ public partial class App : Application, IDisposable
             _log,
             fares,
             taxiProposals,
-            new JsonOnboardingStore(),
+            onboardingStore,
             content,
             profileStore,
             addressMap,
@@ -203,7 +239,7 @@ public partial class App : Application, IDisposable
             new BreakdownStrategy(maintenanceRules, Environment.TickCount),
             poiGenerator,
             preferencesStore, preferences, culture,
-            hud, trunk, poiArrivals);
+            trunk, taxiRules, hud, poiArrivals, requests, requestTable, police);
 
         MainWindow = new MainWindow(vm, _log);
         // The 200 px companion: own placement file, width follows the main
@@ -213,12 +249,26 @@ public partial class App : Application, IDisposable
         var hudWindow = new HudWindow(
             hud, HudSettings(), MainWindow.Left, MainWindow.Top, MainWindow.Width);
         MainWindow.SizeChanged += (_, _) => hudWindow.MatchWidth(MainWindow.ActualWidth);
-        // The VM owns visibility: with a mic we start hidden until the wake
-        // word. Showing first and hiding on Loaded left a visible flash.
-        if (vm.IsShown)
+        // The companion sits in the same corner as the panel; hide it while
+        // the panel is on screen so it cannot cover page rows or eat clicks.
+        // Closing the panel (app exit) must not count as "back to driving".
+        bool closing = false;
+        MainWindow.Closing += (_, _) => closing = true;
+        MainWindow.IsVisibleChanged += (_, _) =>
         {
-            MainWindow.Show();
-        }
+            if (!closing)
+            {
+                hudWindow.SetPanelOpen(MainWindow.IsVisible);
+            }
+        };
+        // WHY: the app opens on the intro even when the microphone is ready.
+        // A wake-word-only start used to leave the panel hidden (and the
+        // first-run pages unseen) until the player happened to say the
+        // phrase. The VM still owns visibility, so idle-hide, the hotkey and
+        // the wake word keep working; the companion HUD stays hidden until
+        // the birthday hand-over reveals it.
+        vm.Show();
+        MainWindow.Show();
     }
 
     // The HUD banks its own placement beside the main window.json so resizing

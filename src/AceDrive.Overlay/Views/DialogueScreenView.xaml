@@ -3,23 +3,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Same page skeleton as GrandmaCarScreenView: viewport-pinned MinHeight,
-         title row at a fixed height, body centered below it. The button sits
-         in its own bottom row: the inner border's 10 px padding leaves exactly
-         the same gap to the edge line as the title has at the top. The *2*/*
-         column split below centres it at half the text column's width. -->
+         title row above the centered body. The button sits in its own bottom
+         row: the inner border's 10 px padding leaves exactly the same gap to
+         the edge line as the title has at the top. The *2*/* column split below
+         centres it at half the text column's width. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=BirthdayTitle}"/>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="21"
+                   TextWrapping="Wrap" Text="{Binding Title}"/>
         <StackPanel Grid.Row="1" VerticalAlignment="Center">
-            <TextBlock Text="{Binding SpeakerName}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
-                       HorizontalAlignment="Center" Margin="0,6,0,2"/>
-            <!-- Two blank lines between speaker and body: 2 x 14 pt lines (~38 px total with the margin above). -->
-            <TextBlock Text="{Binding Body}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
-                       Margin="0,36,0,8"/>
+            <TextBlock Text="{Binding SpeakerName}" Foreground="#FFF" FontSize="16" FontWeight="Bold"
+                       HorizontalAlignment="Center" Margin="0,9,0,3"/>
+            <!-- Dialogue text matches the HUD's task line (16 px), so both read
+                 at the same size from the driver's seat. Spacing follows that
+                 font: two blank lines between speaker and body (~42 px). -->
+            <TextBlock Text="{Binding Body}" Foreground="#FFF" FontSize="16" TextWrapping="Wrap" TextAlignment="Center"
+                       Margin="0,42,0,12"/>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
@@ -33,8 +36,9 @@
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                         <Style.Triggers>
-                            <!-- Teal voice-ack glow: the final page waits out
-                                 the beat on this button before flipping. -->
+                            <!-- Teal voice-ack glow: every CONTINUE tap (a
+                                 page turn or the finish) waits out the beat
+                                 on this button before advancing. -->
                             <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
                                 <Setter Property="Foreground" Value="#FF97EAD2"/>
                             </DataTrigger>

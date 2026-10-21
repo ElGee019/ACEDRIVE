@@ -5,22 +5,25 @@ using AceDrive.Overlay.Localization;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// Onboarding page 3: how voice control works (Career Start insert after
-/// grandma's car). Explains app activation via the wake word
-/// plus button-by-voice, then continues to the birthday dialogue.
+/// Voice-control page: first the Career Start insert after grandma's car,
+/// later the ride-home explanation after the community centre grants the
+/// taxi license. The flow owns the copy and what CONTINUE means, so one page
+/// serves both lessons without a second view.
 /// </summary>
 public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
 {
-    private readonly IVoiceInfoNavigator _navigator;
     private readonly VoiceBeat _beat;
+    private readonly Action _onContinue;
 
-    public VoiceInfoScreenViewModel(IVoiceInfoNavigator navigator, VoiceBeat beat)
+    public VoiceInfoScreenViewModel(
+        string leadText, string detailText, VoiceBeat beat, Action onContinue,
+        string? hintText = null)
     {
-        _navigator = navigator;
         _beat = beat;
-        WakeText = Strings.Get("VoiceInfoWake");
-        ButtonsText = Strings.Format("VoiceInfoButtons",
-            Strings.Get("DialogueContinue").ToUpperInvariant());
+        _onContinue = onContinue;
+        LeadText = leadText;
+        DetailText = detailText;
+        HintText = hintText;
         ContinueCommand = new RelayCommand(Continue);
         // Voice continue flashes teal first and the page waits out the
         // shared beat, so the glow shows before the flip. A click acts at
@@ -39,11 +42,17 @@ public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
         };
     }
 
-    /// <summary>Wake-word explanation with a literal {BRAND} placeholder.</summary>
-    public string WakeText { get; }
+    /// <summary>First explanation line: what the page teaches.</summary>
+    public string LeadText { get; }
 
-    /// <summary>Formatted button-by-voice line, example matches the real button label.</summary>
-    public string ButtonsText { get; }
+    /// <summary>Second line: an example or the alternative hotkey.</summary>
+    public string DetailText { get; }
+
+    /// <summary>Optional third line: the next step after the lesson.</summary>
+    public string? HintText { get; }
+
+    /// <summary>True only for the pages that carry a next-step line.</summary>
+    public bool HasHint => !string.IsNullOrWhiteSpace(HintText);
 
     public ICommand ContinueCommand { get; }
 
@@ -54,5 +63,5 @@ public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
     public bool ContinueFlash { get => _continueFlash; private set => SetField(ref _continueFlash, value); }
     private bool _continueFlash;
 
-    private void Continue() => _navigator.ShowDialogue();
+    private void Continue() => _onContinue();
 }

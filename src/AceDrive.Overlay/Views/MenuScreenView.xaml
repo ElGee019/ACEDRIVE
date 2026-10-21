@@ -1,0 +1,65 @@
+<UserControl x:Class="AceDrive.Overlay.Views.MenuScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <UserControl.Resources>
+        <!-- A tile is already drawn as artwork (fill, outline, label), so the
+             button template is the bare image; the hover fade is the only
+             chrome. Without this the shared white-outline Button style would
+             frame the art in a second box. -->
+        <Style x:Key="MenuTile" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Opacity" Value="0.85"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <!-- Home page skeleton: viewport-pinned MinHeight like every other page.
+         The tile row is placed with the ontwerpdesign.psd coordinates: the
+         design canvas is 1080 x 2280, its first tile row starts at y = 942
+         (41.3 %) with tiles at x = 105 / 400 / 697, 244 x 310 each. The two
+         star rows reproduce that 942 : 1338 split, and the Viewbox keeps the
+         row proportional to the panel width (the PSD's pixel grid scaled).
+         The negative side margin reclaims MainWindow's 22 px chrome (10 px
+         padding + 2 px edge + 10 px padding), so 1080 design px map to the
+         whole 413.6 px panel like the backdrop; scaled to the scroll content
+         instead, the row would sit ~11 % too small and shifted inward.
+         Artwork goes through the PackImage converter so a machine whose WIC
+         has no WebP codec drops the tiles instead of the overlay. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="942*"/>
+            <RowDefinition Height="1338*"/>
+        </Grid.RowDefinitions>
+        <Viewbox Grid.Row="1" Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
+            <Canvas Width="1080" Height="310">
+                <Button Canvas.Left="105" Style="{StaticResource MenuTile}"
+                        Command="{Binding JobsCommand}">
+                    <Image Width="244"
+                           RenderOptions.BitmapScalingMode="HighQuality"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonJobs.webp"
+                           Source="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+                </Button>
+                <Image Canvas.Left="400" Width="244"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHome.webp"
+                       Source="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+                <Image Canvas.Left="697" Width="244"
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonWallet.webp"
+                       Source="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+            </Canvas>
+        </Viewbox>
+    </Grid>
+</UserControl>

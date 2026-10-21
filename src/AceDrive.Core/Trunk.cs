@@ -57,6 +57,28 @@ public sealed class Trunk
     public void Add(StoreItem item, int quantity) =>
         Add(item.Name, quantity, item.Volume);
 
+    /// <summary>
+    /// True when a stack with this name is carried. Story errands use it to
+    /// see whether their guaranteed item was bought, regardless of stack size.
+    /// </summary>
+    public bool Contains(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        foreach (TrunkItem item in _items)
+        {
+            if (string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return item.Quantity > 0;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>Merges a stack; invalid/zero quantities are ignored.</summary>
     public void Add(string name, int quantity, double unitVolume)
     {

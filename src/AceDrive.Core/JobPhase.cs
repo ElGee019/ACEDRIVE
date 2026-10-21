@@ -8,6 +8,7 @@ public enum JobPhase
 {
     None,
     Proposed,   // offered, waiting for accept
+    ToPickup,   // accepted, driving to the customer
     EnRoute,    // passenger aboard, meter running
     Complete,   // dropped off, receipt shown
 }

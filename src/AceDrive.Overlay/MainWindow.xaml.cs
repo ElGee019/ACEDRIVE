@@ -1,11 +1,13 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using AceDrive.Core;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
@@ -97,6 +99,13 @@ public partial class MainWindow : Window
         PreviewMouseWheel += (_, _) => _vm.RecordActivity();
         PreviewKeyDown += (_, _) => _vm.RecordActivity();
         PreviewMouseLeftButtonDown += OnDragMove;
+        // WHY: the panel is a normal activating window, so every click on it
+        // takes the foreground from EVO and silently kills the driving input
+        // until the game is clicked again. Hand the foreground back after the
+        // button's command has navigated or hidden the panel. The source test
+        // keeps template ToggleButton/RepeatButton parts (ComboBox arrow,
+        // scrollbars) from stealing focus mid-interaction.
+        AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(OnButtonClick));
         Closed += (_, _) =>
         {
             try
@@ -185,26 +194,54 @@ public partial class MainWindow : Window
         }
         else if (IsVisible)
         {
+            // WHY: hiding the panel while it owns the foreground (a click on a
+            // form field, then the idle timer) leaves Windows with no active
+            // window to hand input back to, so EVO stays deaf until clicked.
+            bool ownedForeground =
+                Native.IsForeground(new WindowInteropHelper(this).Handle);
             Hide();
+            if (ownedForeground)
+            {
+                Native.FocusGame();
+            }
         }
     }
 
+    // WHY deferred: the click's command may swap screens or hide the panel
+    // first. Handing the game the foreground on the next idle turn lets that
+    // work finish, then driving input resumes without a click into EVO.
+    private void OnButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (e.Source is Button)
+        {
+            Dispatcher.BeginInvoke(
+                DispatcherPriority.Background, new Action(Native.FocusGame));
+        }
+    }
+
+    // Controls that own a click keep it; everything else is window chrome.
+    // ComboBoxItem matters: while the dropdown is open the ComboBox captures
+    // the mouse, so a row's press tunnels through this window's preview
+    // handler. DragMove() there steals the click and the row only commits on
+    // Enter; letting the row keep it is what selects on a normal click.
+    private static bool OwnsClick(DependencyObject source) =>
+        source is ButtonBase or ComboBoxItem;
+
     private void OnDragMove(object sender, MouseButtonEventArgs e)
     {
-        // Buttons keep their clicks; anywhere else drags the borderless window.
         // The walk-up must never throw: inline content (Run/Hyperlink) is a
         // ContentElement, not a Visual, and VisualTreeHelper.GetParent on it
         // crashed the app in a live session (2026-10-13 log). Such an origin
-        // simply stops the walk and counts as "not a button" -> drag allowed.
-        // 2D-only overlay, so checking Visual (not Visual3D) is enough.
+        // simply stops the walk and counts as "not interactive" -> drag
+        // allowed. 2D-only overlay, so checking Visual (not Visual3D) is enough.
         DependencyObject? source = e.OriginalSource as DependencyObject;
-        while (source is not null && source is not ButtonBase)
+        while (source is not null && !OwnsClick(source))
         {
             if (source is not Visual) break;
             source = VisualTreeHelper.GetParent(source);
         }
 
-        if (source is not ButtonBase)
+        if (source is null || !OwnsClick(source))
         {
             DragMove();
         }

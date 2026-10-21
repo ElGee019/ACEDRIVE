@@ -29,11 +29,17 @@
         <DataTemplate DataType="{x:Type vm:MainControlScreenViewModel}">
             <views:MainControlScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:MenuScreenViewModel}">
+            <views:MenuScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TaxiJobProposalViewModel}">
             <views:TaxiJobProposalScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TaxiReceiptScreenViewModel}">
             <views:TaxiReceiptScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CustomerRequestScreenViewModel}">
+            <views:CustomerRequestScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:DeliveryJobScreenViewModel}">
             <views:DeliveryJobScreenView/>

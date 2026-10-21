@@ -1,0 +1,27 @@
+// Pure gameplay logic. No WPF / Windows / telemetry / backend references.
+// Spec source: PORTPLAN item 11 (Unity TaxiJobGenerator tiers).
+namespace AceDrive.Core;
+
+/// <summary>
+/// The loaded request content: suffix-triggered passive lines, the quiz
+/// categories, the speed-challenge line and the tier chances/timer. Shipped
+/// values live in Data/customer_requests.json; this default is the test-shell
+/// fallback and deliberately asks nothing, so a missing file never invents a
+/// request.
+/// </summary>
+public sealed record CustomerRequestTable(
+    IReadOnlyDictionary<string, string> SuffixRequests,
+    IReadOnlyList<CarStatCategory> QuestionCategories,
+    string SpeedChallengeText,
+    double Tier2Chance,
+    double Tier3Chance,
+    int TimerSeconds)
+{
+    public static readonly CustomerRequestTable Empty = new(
+        new Dictionary<string, string>(StringComparer.Ordinal),
+        [],
+        SpeedChallengeText: string.Empty,
+        Tier2Chance: 0.0,
+        Tier3Chance: 0.0,
+        TimerSeconds: 14);
+}

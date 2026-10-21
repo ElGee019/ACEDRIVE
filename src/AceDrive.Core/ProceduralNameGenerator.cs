@@ -25,11 +25,6 @@ public sealed class ProceduralNameGenerator(NamePoolTable table, int seed)
             table.Suffixes[_rng.Next(table.Suffixes.Count)]);
     }
 
-    /// <summary>Coin flip for a proposal (Unity's isCustomerHomePickup
-    /// Random.value roll), drawn from the same seeded stream so one seed
-    /// replays whole proposals, names and flip alike.</summary>
-    public bool NextCoinFlip() => _rng.Next(2) == 0;
-
     // Unity's loop kept shape-for-shape: roll inside the total weight,
     // subtract pool by pool, the pool that takes the roll below zero wins;
     // the first pool answers any floating-point drift that never reaches zero.

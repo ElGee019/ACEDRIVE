@@ -21,7 +21,7 @@ public interface ITelemetryHud
     /// absent or the physics read was torn; <paramref name="odometerKm"/> is
     /// the driven car's persistent mileage, null when no car is owned.
     /// <paramref name="wrongCar"/> is true when the live car is not the
-    /// garage's current car; the HUD then replaces the errand line with the
+    /// garage's current car; the HUD then replaces the destination line with the
     /// career warning but keeps the live position and mileage.
     /// </summary>
     void Update(
@@ -34,14 +34,29 @@ public interface ITelemetryHud
     void ApplyPreferences(PlayerPreferences preferences);
 
     /// <summary>
-    /// Pins the active errand's destination on the HUD, or clears it with
-    /// null. Called when the birthday dialogue hands the errand over, never
-    /// per poll.
+    /// Pins the destination the story hands over on the HUD, or clears it with
+    /// null. <paramref name="copy"/> is an optional story-authored set of
+    /// resource keys with the same placeholders as the generic drive-to
+    /// sentence. Called when a story beat moves the player on, never per poll.
     /// </summary>
-    void SetDestination(PointOfInterest? destination);
+    void SetDestination(PointOfInterest? destination, HudDestinationCopy? copy = null);
 
     /// <summary>
-    /// True while the car is parked on the errand house; the ENTER button is
+    /// Pins one taxi leg on the HUD or clears it with null when the job ends.
+    /// Job guidance wins over a story destination; the wrong-car warning still
+    /// wins over both. Called on phase changes, never per poll.
+    /// </summary>
+    void SetJobGuidance(HudJobGuidance? guidance);
+
+    /// <summary>
+    /// Shows a transient line under the banner (a police fine, a refusal
+    /// hint). The host formats the text; the HUD expires it on the clock, so
+    /// a stalled poll cannot leave it up forever.
+    /// </summary>
+    void ShowNotice(string text, TimeSpan duration);
+
+    /// <summary>
+    /// True while the car is parked on the destination house; the ENTER button is
     /// up and voice may fire it.
     /// </summary>
     bool AtDestination { get; }
@@ -58,4 +73,11 @@ public interface ITelemetryHud
     /// state.
     /// </summary>
     event EventHandler? EnterRequested;
+
+    /// <summary>
+    /// Raised when the player taps ENTER while parked at the pinned job door.
+    /// The host decides whether that confirms a pickup or a drop-off; the HUD
+    /// only knows which leg it painted.
+    /// </summary>
+    event EventHandler? JobEnterRequested;
 }

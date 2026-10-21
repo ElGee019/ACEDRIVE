@@ -21,16 +21,36 @@
   <data name="HudAddressWithCity" xml:space="preserve"><value>{0}, {1}</value></data>
   <data name="HudWrongCar" xml:space="preserve"><value>Carrièremodus uitgeschakeld. Stap in een auto die je bezit.</value></data>
   <data name="HudDestination" xml:space="preserve"><value>Rij naar {0}, {1} nr. {2} in {3}</value></data>
+  <data name="HudHintJustin" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3}. Je jeugdvriend woont nog steeds in de straat waar je opgroeide.</value></data>
+  <data name="HudHintAnnabella" xml:space="preserve"><value>Vrijdag was altijd pannenkoekendag bij oma! Laten we die traditie nieuw leven inblazen. Rijd naar {0}, {1} nr. {2} in {3} en haal Annabella op zoals vroeger.</value></data>
+  <data name="HudHintHome" xml:space="preserve"><value>Rijd terug naar {0}, {1} nr. {2} in {3}. Ze wacht waarschijnlijk op die ahornsiroop.</value></data>
+  <data name="HudHintCommunityCentre" xml:space="preserve"><value>Rijd naar het {0}, {1} nr. {2} in {3}. Ze geven vandaag gratis taxipasjes uit.</value></data>
   <data name="HudArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}, ga naar binnen om ahornsiroop voor oma te kopen.</value></data>
+  <data name="HudArrivedPerson" xml:space="preserve"><value>Je bent aangekomen bij {0}.</value></data>
+  <data name="HudArrivedHome" xml:space="preserve"><value>Je bent aangekomen bij het huis van oma.</value></data>
+  <data name="HudArrivedCommunityCentre" xml:space="preserve"><value>Je bent aangekomen bij {0}. Ga naar binnen om je taxipasje op te halen.</value></data>
   <data name="HudEnter" xml:space="preserve"><value>BINNENGAAN</value></data>
+  <data name="HudPickUp" xml:space="preserve"><value>OPHALEN</value></data>
+  <data name="HudPancakes" xml:space="preserve"><value>PANNEKOEKEN!</value></data>
   <data name="HudTrack" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="HudNoTrack" xml:space="preserve"><value>geen baan</value></data>
   <data name="HudNoPosition" xml:space="preserve"><value>geen positie op de baan</value></data>
   <data name="HudNoCar" xml:space="preserve"><value>geen auto</value></data>
+  <data name="HudJobPickupDrive" xml:space="preserve"><value>Haal {0} op bij {1} nr. {2} in {3}</value></data>
+  <data name="HudJobPickupArrived" xml:space="preserve"><value>Je bent bij de ophaalplek. Druk op ENTER om {0} in te laten stappen.</value></data>
+  <data name="HudJobPickupAction" xml:space="preserve"><value>OPHALEN</value></data>
+  <data name="HudJobDropoffDrive" xml:space="preserve"><value>Zet {0} af bij {1} nr. {2} in {3}</value></data>
+  <data name="HudJobDropoffArrived" xml:space="preserve"><value>Je bent bij de bestemming. Druk op ENTER om de rit af te ronden.</value></data>
+  <data name="HudJobDropoffAction" xml:space="preserve"><value>AFZETTEN</value></data>
+  <data name="HudJobDistanceMeters" xml:space="preserve"><value>{0:0} m</value></data>
+  <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
+  <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
+  <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (nepklus)</value></data>
   <data name="NoJob" xml:space="preserve"><value>Geen klus. Druk op Nieuwe klus en rijd.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op OPHALEN.</value></data>
   <data name="JobEnRoute" xml:space="preserve"><value>Onderweg: {0} → {1} · {2:0.0} km</value></data>
+  <data name="JobToPickup" xml:space="preserve"><value>Naar ophalen: {0} → {1}. Druk op OPHALEN als je geparkeerd staat.</value></data>
   <data name="JobComplete" xml:space="preserve"><value>Klaar: {0} → {1} · fooi €{2:0.00}</value></data>
   <data name="NewJob" xml:space="preserve"><value>NIEUWE KLUS</value></data>
   <data name="Pickup" xml:space="preserve"><value>OPHALEN</value></data>
@@ -59,11 +79,17 @@
   <data name="BrandTitle" xml:space="preserve"><value>WAT IS JE FAVORIETE MERK</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>IN WELKE AUTO RIJDT OMA</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
+  <data name="PancakeTitle" xml:space="preserve"><value>PANNEKOEKEN EN EEN AMERIKAANSE AUTO</value></data>
+  <data name="CommunityCentreTitle" xml:space="preserve"><value>BUURTHUIS</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="SpeakerGrandma" xml:space="preserve"><value>Oma</value></data>
   <data name="SpeakerYou" xml:space="preserve"><value>Jij</value></data>
+  <data name="SpeakerSignoreMoro" xml:space="preserve"><value>Signore Moro</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>SPRAAKBEDIENING</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {BRAND}" om de app te activeren. Bijvoorbeeld "HEY ALPINE".</value></data>
+  <data name="VoiceInfoIntro" xml:space="preserve"><value>Bedien de navigatie met je stem.</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {0}" om de app te activeren. Bijvoorbeeld "HEY {0}".</value></data>
+  <data name="VoiceInfoHotkey" xml:space="preserve"><value>Je kunt ook CTRL+Shift+C indrukken.</value></data>
+  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Zeg "{0}" om het banencentrum te openen en je eerste taxiopdracht aan te nemen.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Spreek de tekst van een knop uit om op die knop te drukken.
 Bijvoorbeeld "{0}".</value></data>
   <data name="ControlTaxi" xml:space="preserve"><value>START TAXIDIENST</value></data>
@@ -112,11 +138,47 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DeliveryCancelOrder" xml:space="preserve"><value>BESTELLING ANNULEREN</value></data>
   <data name="DeliveryEmpty" xml:space="preserve"><value>Nog geen winkels beschikbaar voor bezorging. Gebruik je Vertrouwenspunten om je eerste bezorgcarrière te starten met HIERONDER NIEUW CARRIERE OPENEN.</value></data>
   <data name="DeliverySelectHint" xml:space="preserve"><value>Kies een of meer winkels om een bezorgklus voor hen te starten.</value></data>
+  <data name="DeliveryNumber1" xml:space="preserve"><value>EEN</value></data>
+  <data name="DeliveryNumber2" xml:space="preserve"><value>TWEE</value></data>
+  <data name="DeliveryNumber3" xml:space="preserve"><value>DRIE</value></data>
+  <data name="DeliveryNumber4" xml:space="preserve"><value>VIER</value></data>
   <data name="HubTitle" xml:space="preserve"><value>BEZORGHUB</value></data>
   <data name="HubSubtitle" xml:space="preserve"><value>Kies wel groothandelscentrum je wilt openen.</value></data>
   <data name="HubTier" xml:space="preserve"><value>NIVEAU {0}</value></data>
+  <data name="HubPrice" xml:space="preserve"><value>{0} - {1:0}CredP</value></data>
+  <data name="HubCellPrice" xml:space="preserve"><value>- {0:0}CredP</value></data>
   <data name="HubComingSoon" xml:space="preserve"><value>BINNENKORT</value></data>
   <data name="HubOpenCareer" xml:space="preserve"><value>CARRIERE OPENEN</value></data>
+  <data name="ProposalTitle" xml:space="preserve"><value>TAXIVOORSTEL</value></data>
+  <data name="ProposalPhrase" xml:space="preserve"><value>{0}
+wil graag een rit
+van {1}
+naar {2}
+
+Deze klus aannemen?</value></data>
+  <data name="ProposalAccept" xml:space="preserve"><value>ACCEPTEREN</value></data>
+  <data name="ProposalDecline" xml:space="preserve"><value>WEIGEREN</value></data>
+  <data name="ProposalAddress" xml:space="preserve"><value>{0}, {1}</value></data>
+  <data name="ProposalAddressA" xml:space="preserve"><value>Adres A</value></data>
+  <data name="ProposalAddressB" xml:space="preserve"><value>Adres B</value></data>
+  <data name="ProposalLegHome" xml:space="preserve"><value>thuis, {0}</value></data>
+  <data name="ProposalLegResidence" xml:space="preserve"><value>het huis van de familie {0}, {1}</value></data>
+  <data name="ProposalRadiusHint" xml:space="preserve"><value>Beperk hoe ver je van oma's huis vandaan taxi's wilt aannemen door hieronder een straal in te voeren.</value></data>
+  <data name="RequestTitle" xml:space="preserve"><value>KLANTVERZOEK</value></data>
+  <data name="RequestTime" xml:space="preserve"><value>RESTERENDE TIJD: {0}s</value></data>
+  <data name="RequestAccept" xml:space="preserve"><value>Ja hoor...</value></data>
+  <data name="RequestDecline" xml:space="preserve"><value>Echt niet, dat is te veel gevraagd</value></data>
+  <data name="RequestCorrect" xml:space="preserve"><value>Indrukwekkend, dank je. Ik geef je een goede fooi.</value></data>
+  <data name="RequestWrong" xml:space="preserve"><value>Dat kan niet kloppen. Geen fooi voor jou!</value></data>
+  <data name="RequestTimeout" xml:space="preserve"><value>Dan geen fooi.</value></data>
+  <data name="RequestAccepted" xml:space="preserve"><value>Bedankt. Ik geef je een fooi als we aankomen.</value></data>
+  <data name="RequestDeclined" xml:space="preserve"><value>Prima. Dan geen fooi.</value></data>
+  <data name="QuizUnitKg" xml:space="preserve"><value>{0:0} kg</value></data>
+  <data name="QuizUnitHp" xml:space="preserve"><value>{0:0} pk</value></data>
+  <data name="QuizUnitKmh" xml:space="preserve"><value>{0:0} km/u</value></data>
+  <data name="QuizUnitCc" xml:space="preserve"><value>{0:0} cc</value></data>
+  <data name="QuizUnitFuel" xml:space="preserve"><value>{0:0.#} L/100km</value></data>
+  <data name="QuizUnitEuro" xml:space="preserve"><value>€{0:0}</value></data>
   <data name="ReceiptTitle" xml:space="preserve"><value>TAXIBON</value></data>
   <data name="ReceiptDistance" xml:space="preserve"><value>Afstand: {0:0.0} km</value></data>
   <data name="ReceiptCustomer" xml:space="preserve"><value>Klanten: {0}. {1}</value></data>

@@ -26,6 +26,7 @@
     <!-- UI art ships inside the exe (pack URI), unlike Data/ which is loose.
          Not auto-globbed as Resource by the SDK: .webp is unknown to it. -->
     <Resource Include="Assets\backdrop.webp" />
+    <Resource Include="Assets\Buttons\*.webp" />
   </ItemGroup>
 
   <ItemGroup>

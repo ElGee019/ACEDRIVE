@@ -26,16 +26,41 @@
   <data name="HudAddressWithCity" xml:space="preserve"><value>{0}, {1}</value></data>
   <data name="HudWrongCar" xml:space="preserve"><value>Career mode disabled. Change into a car you own.</value></data>
   <data name="HudDestination" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3}</value></data>
+  <data name="HudHintJustin" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3}. Your childhood friend still lives in the street where you grew up.</value></data>
+  <data name="HudHintAnnabella" xml:space="preserve"><value>Friday has always been Pancake Day at grandma's! Let's bring that tradition back. Drive to {0}, {1} No. {2} in {3} and pick up Annabella like old times.</value></data>
+  <data name="HudHintHome" xml:space="preserve"><value>Head back to {0}, {1} No. {2} in {3}. She's probably waiting on that maple syrup by now.</value></data>
+  <data name="HudHintCommunityCentre" xml:space="preserve"><value>Drive to the {0}, {1} No. {2} in {3}. They're handing out free taxi licenses today.</value></data>
   <data name="HudArrived" xml:space="preserve"><value>You have arrived at {0}, enter to buy maple syrup for grandma.</value></data>
+  <data name="HudArrivedPerson" xml:space="preserve"><value>You have arrived at {0}.</value></data>
+  <data name="HudArrivedHome" xml:space="preserve"><value>You have arrived at grandma's house.</value></data>
+  <data name="HudArrivedCommunityCentre" xml:space="preserve"><value>You have arrived at the {0}. Enter to pick up your taxi license.</value></data>
   <data name="HudEnter" xml:space="preserve"><value>ENTER</value></data>
+  <data name="HudPickUp" xml:space="preserve"><value>PICK UP</value></data>
+  <data name="HudPancakes" xml:space="preserve"><value>PANCAKES!</value></data>
   <data name="HudTrack" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="HudNoTrack" xml:space="preserve"><value>no track</value></data>
   <data name="HudNoPosition" xml:space="preserve"><value>no track position</value></data>
   <data name="HudNoCar" xml:space="preserve"><value>no car</value></data>
+  <!-- Taxi job guidance: the leg pinned while the job is active. The line
+       under the banner carries the remaining distance in the step from
+       Data/taxi_rules.json; placeholders survive translation. -->
+  <data name="HudJobPickupDrive" xml:space="preserve"><value>Pick up {0} at {1} No. {2} in {3}</value></data>
+  <data name="HudJobPickupArrived" xml:space="preserve"><value>You are at the pickup point. Press ENTER to let {0} in.</value></data>
+  <data name="HudJobPickupAction" xml:space="preserve"><value>PICK UP</value></data>
+  <data name="HudJobDropoffDrive" xml:space="preserve"><value>Drop off {0} at {1} No. {2} in {3}</value></data>
+  <data name="HudJobDropoffArrived" xml:space="preserve"><value>You are at the drop-off. Press ENTER to finish the ride.</value></data>
+  <data name="HudJobDropoffAction" xml:space="preserve"><value>DROP OFF</value></data>
+  <data name="HudJobDistanceMeters" xml:space="preserve"><value>{0:0} m</value></data>
+  <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
+  <!-- Speed-challenge police (PORTPLAN 11, Phase C): a warning on approach and
+       the fine notice when a patrol catches the car over its limit. -->
+  <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>
+  <data name="HudPoliceFine" xml:space="preserve"><value>Speeding fine: €{0:0}</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (fake job)</value></data>
   <data name="NoJob" xml:space="preserve"><value>No job. Press New job, then drive.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press PICKUP.</value></data>
   <data name="JobEnRoute" xml:space="preserve"><value>En route: {0} → {1} · {2:0.0} km</value></data>
+  <data name="JobToPickup" xml:space="preserve"><value>To pickup: {0} → {1}. Press PICKUP when parked.</value></data>
   <data name="JobComplete" xml:space="preserve"><value>Complete: {0} → {1} · tip €{2:0.00}</value></data>
   <data name="NewJob" xml:space="preserve"><value>NEW JOB</value></data>
   <data name="Pickup" xml:space="preserve"><value>PICKUP</value></data>
@@ -64,13 +89,21 @@
   <data name="BrandTitle" xml:space="preserve"><value>WHAT IS YOUR FAVORITE BRAND</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>WHAT CAR DOES GRANDMA DRIVE</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
+  <data name="PancakeTitle" xml:space="preserve"><value>PANCAKES AND AN AMERICAN CAR</value></data>
+  <data name="CommunityCentreTitle" xml:space="preserve"><value>COMMUNITY CENTRE</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Say "HEY {BRAND}" to activate the app. For instance "HEY ALPINE".</value></data>
+  <data name="VoiceInfoIntro" xml:space="preserve"><value>Control navigation with your voice.</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Say "HEY {0}" to activate the app. For instance "HEY {0}".</value></data>
+  <data name="VoiceInfoHotkey" xml:space="preserve"><value>You can also press CTRL+Shift+C.</value></data>
+  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Say "{0}" to open the job centre and accept your first taxi job.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Say a button's text to click that button.
 For instance "{0}".</value></data>
   <data name="SpeakerGrandma" xml:space="preserve"><value>Grandma</value></data>
   <data name="SpeakerYou" xml:space="preserve"><value>You</value></data>
+  <data name="SpeakerAnnabella" xml:space="preserve"><value>Annabella</value></data>
+  <data name="SpeakerJustin" xml:space="preserve"><value>Justin</value></data>
+  <data name="SpeakerSignoreMoro" xml:space="preserve"><value>Signore Moro</value></data>
   <data name="ControlTaxi" xml:space="preserve"><value>START TAXI SHIFT</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>CONTINUE TAXI SHIFT</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
@@ -136,8 +169,9 @@ For instance "{0}".</value></data>
   <data name="HubOpenCareer" xml:space="preserve"><value>OPEN CAREER</value></data>
   <!-- Taxi job proposal page (PORTPLAN 11, Unity TaxiJobProposalScreen). The
        phrase carries Unity's line layout: {0} the drawn passenger identity,
-       {1} pickup, {2} drop-off. Addresses are placeholder names until the
-       Eifel table lands (Step 1); BACK reuses DeliveryBack. -->
+       {1} pickup, {2} drop-off. The legs use the address map's real houses
+       (street, number and city); Address A/B stay as the fallback when the
+       map cannot supply two streets. BACK reuses DeliveryBack. -->
   <data name="ProposalTitle" xml:space="preserve"><value>TAXI JOB PROPOSAL</value></data>
   <data name="ProposalPhrase" xml:space="preserve"><value>{0}
 need a ride
@@ -147,6 +181,10 @@ to {2}
 Accept this job?</value></data>
   <data name="ProposalAccept" xml:space="preserve"><value>ACCEPT</value></data>
   <data name="ProposalDecline" xml:space="preserve"><value>DECLINE</value></data>
+  <!-- A leg's door: {0} the shared street shape (HudAddress), {1} the map's
+       city, Unity's town. -->
+  <data name="ProposalAddress" xml:space="preserve"><value>{0}, {1}</value></data>
+  <!-- Fallback legs only when the address map cannot supply two streets. -->
   <data name="ProposalAddressA" xml:space="preserve"><value>Address A</value></data>
   <data name="ProposalAddressB" xml:space="preserve"><value>Address B</value></data>
   <!-- Leg descriptions, Unity TaxiJobGenerator's fromDescription/toDescription:
@@ -155,6 +193,25 @@ Accept this job?</value></data>
   <data name="ProposalLegHome" xml:space="preserve"><value>home, {0}</value></data>
   <data name="ProposalLegResidence" xml:space="preserve"><value>the {0} residence, {1}</value></data>
   <data name="ProposalRadiusHint" xml:space="preserve"><value>Limit how far from Grandma's place you're willing to accept taxi jobs by entering a radius below.</value></data>
+  <!-- Customer request interstitial (PORTPLAN 11, Unity CustomerRequestScreen):
+       the countdown, the two passive/speed answers, the four feedback lines
+       and the six option units. The Unity assertivity clause is dropped until
+       the stat exists. -->
+  <data name="RequestTitle" xml:space="preserve"><value>CUSTOMER REQUEST</value></data>
+  <data name="RequestTime" xml:space="preserve"><value>TIME REMAINING: {0}s</value></data>
+  <data name="RequestAccept" xml:space="preserve"><value>Sure sure...</value></data>
+  <data name="RequestDecline" xml:space="preserve"><value>No way, you are asking too much</value></data>
+  <data name="RequestCorrect" xml:space="preserve"><value>That is impressive, thank you. I will tip you well.</value></data>
+  <data name="RequestWrong" xml:space="preserve"><value>That can't be right. No tip for you!</value></data>
+  <data name="RequestTimeout" xml:space="preserve"><value>No tip then.</value></data>
+  <data name="RequestAccepted" xml:space="preserve"><value>Thank you. I'll tip you when we arrive.</value></data>
+  <data name="RequestDeclined" xml:space="preserve"><value>Fair enough. No tip then.</value></data>
+  <data name="QuizUnitKg" xml:space="preserve"><value>{0:0} kg</value></data>
+  <data name="QuizUnitHp" xml:space="preserve"><value>{0:0} hp</value></data>
+  <data name="QuizUnitKmh" xml:space="preserve"><value>{0:0} km/h</value></data>
+  <data name="QuizUnitCc" xml:space="preserve"><value>{0:0} cc</value></data>
+  <data name="QuizUnitFuel" xml:space="preserve"><value>{0:0.#} L/100km</value></data>
+  <data name="QuizUnitEuro" xml:space="preserve"><value>€{0:0}</value></data>
   <!-- Taxi receipt page (PORTPLAN 11, Unity TaxiReceiptScreen). Earnings
        lines are two-column: one key for the explanation, one shared key
        for the amount. {0} in the tier lines is the range start in km,

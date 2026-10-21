@@ -15,11 +15,14 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=VoiceInfoTitle}"/>
         <StackPanel Grid.Row="1" VerticalAlignment="Center">
-            <TextBlock Text="{Binding WakeText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+            <TextBlock Text="{Binding LeadText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
                        Margin="0,6,0,6"/>
-            <!-- One blank line between the two explanations: 1 x 14 pt line (~19 px). -->
-            <TextBlock Text="{Binding ButtonsText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+            <!-- One blank line between the explanations, one per idea. -->
+            <TextBlock Text="{Binding DetailText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
                        Margin="0,19,0,8"/>
+            <TextBlock Text="{Binding HintText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+                       Margin="0,19,0,8"
+                       Visibility="{Binding HasHint, Converter={StaticResource BoolToVis}}"/>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

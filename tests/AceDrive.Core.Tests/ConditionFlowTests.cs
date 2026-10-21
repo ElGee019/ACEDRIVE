@@ -147,19 +147,17 @@ public sealed class ConditionFlowTests
     }
 
     [Fact]
-    public void TaxiAccept_BanksTheJobDistanceIntoTheCurrentCar()
+    public void TaxiDrive_BanksTheDistanceIntoTheCurrentCar()
     {
-        // Testing hook (no driving slice yet): a settled ride adds its 8.2 km
-        // to the current car's odometer, on top of the telemetry feed.
+        // The odometer feed banks the passenger leg's live distance into the
+        // current car, so the settle must not add it a second time.
         var garage = new Garage(TestRoadCars.Pool);
         OwnedCar car = garage.Add(TestRoadCars.Pool[0], week: 1);
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        var (vm, clock, tel, _) = MainViewModelTests.Create(
             speedKmh: 0f, garage: garage, garageStore: new FakeGarageStore(),
             progress: Done);
 
-        vm.TaxiShiftCommand.Execute(null);
-        var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
-        proposal.AcceptCommand.Execute(null);
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
         Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(8.2, car.Odometer, 6);

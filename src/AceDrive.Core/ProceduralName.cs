@@ -9,7 +9,10 @@ namespace AceDrive.Core;
 /// group; that rule waits for per-car passenger capacity in ACE.</summary>
 public sealed record ProceduralName(string FirstName = "", string Surname = "", string Suffix = "")
 {
+    /// <summary>The resident's name without the companion suffix: Unity's
+    /// customerBaseName, and the key familiarity and the resident table use.</summary>
+    public string BaseName => $"{FirstName} {Surname}".Trim();
+
     /// <summary>The spoken identity, "Klaus Berger and some colleagues".</summary>
-    public string Full =>
-        Suffix.Length == 0 ? $"{FirstName} {Surname}" : $"{FirstName} {Surname} {Suffix}";
+    public string Full => Suffix.Length == 0 ? BaseName : $"{BaseName} {Suffix}";
 }

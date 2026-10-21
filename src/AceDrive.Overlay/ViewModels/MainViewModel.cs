@@ -1,6 +1,4 @@
-using System.ComponentModel;
 using System.Globalization;
-using System.Runtime.CompilerServices;
 using System.Windows.Input;
 using System.Windows.Threading;
 using AceDrive.Core;
@@ -14,22 +12,24 @@ namespace AceDrive.Overlay.ViewModels;
 /// time, telemetry, logging and fares are abstracted so every flow is
 /// unit-testable with fakes. Knows NOTHING about HWNDs or files.
 /// </summary>
-public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, IVoiceInfoNavigator, IDisposable
+public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStoryHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
     private readonly GameClock _game;
     private readonly RoadTestLedger _roads;
-    // Persists the pick so every session reopens the same road-test car
-    // until its test is driven (PORTPLAN 49).
-    private readonly IRoadTestStore _roadTestStore;
+    // The single writer of every save file: the stores, the snapshot assembly
+    // and the write throttles live there, never in this class (SRP).
+    private readonly GameStateSaver _saver;
+    // The fleet's condition (odometer, inspections, filth, insurance): every
+    // path that wears an owned car goes through it.
+    private readonly FleetService _fleet;
     private readonly TaxiShift _shift;
     private readonly ISettingsStore _store;
     private readonly ILog _log;
     private readonly FareTable _fares;
     private readonly DriverWallet _wallet;
-    private readonly IDriverStore _driverStore;
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
     private readonly IFriendshipStore _friends;
@@ -42,33 +42,14 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // The car pool behind the road-test ledger, reused for the receipt's
     // passenger lookup (the driven car's ks id resolves against it).
     private readonly IReadOnlyList<CarSpec> _cars;
-    private readonly IOnboardingStore _onboarding;
     private readonly IContentSource _content;
-    // Player identity + home address (Career Start Screen 1): the opening
-    // screen reads the saved profile, falls back to the Steam display name,
-    // and banks the confirmed address in its own file.
-    private readonly IProfileStore _profiles;
-    private readonly AddressMap _addressMap;
-    private readonly string? _detectedPlayerName;
-    // The POI behind the birthday errand (PORTPLAN 5/24/27): one random
-    // address per walk, filled into the dialogue and pinned on the HUD.
-    private readonly PoiGenerator _pois;
-    private PointOfInterest? _poi;
-    // The typed arrival seam (PORTPLAN 24): the router turns an entered POI
-    // into its interior screen, so a new business never edits EnterPoi.
-    private readonly PoiArrivalRouter? _poiArrivals;
-    // Goods the player bought (PORTPLAN 26), banked with the driver state.
-    private readonly Trunk _trunk;
-    // The one way a POI interior gets back to the control page.
-    private readonly ICommand _controlBackCommand;
-    // The first-run choices (distance unit + UI language): the HUD and the
-    // resource lookup read them, and they survive a re-run of the intro.
-    private readonly IPreferencesStore _preferencesStore;
-    private readonly ICultureService _culture;
     // WHY read through on demand: Data/*.json edits (wake aliases, transcript
     // confusions) take effect while the overlay runs; screens built later pick
     // up the new snapshot automatically.
     private OnboardingContent Content => _content.Content;
+    // The introduction walk + its errand (PORTPLAN Career Start 1-5): owns the
+    // persisted progress, the profile, the errand POI and the trunk read.
+    private readonly OnboardingFlow _story;
     private readonly TodoTable _todos;
     private readonly IVoiceListener _voice;
     private readonly ICarBrandSource _carBrands;
@@ -79,24 +60,38 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // CredP balance + owned hubs, shared by the board and the hub page.
     // In-memory until the persistent save lands (PORTPLAN 51).
     private readonly DeliveryCareer _career;
-    // The proposal draw behind the taxi page: passenger, second-address
-    // resident and the home/residence flip (Data/name_pools.json, Germany
-    // pools + Unity suffix list, PORTPLAN 11/13/61).
+    // The proposal draw behind the taxi page: two map addresses, the
+    // persisted resident at each door and the home/residence flip
+    // (Data/name_pools.json, Germany pools + Unity suffix list, PORTPLAN
+    // 11/13/45/61).
     private readonly TaxiJobProposer _proposals;
+    // The customer request draw (PORTPLAN item 11): suffix/passive, speed
+    // challenge and the car-stat quiz, with its own seeded stream.
+    private readonly ICustomerRequestRoller? _requests;
+    // Timer length, tier chances and quiz categories; the host also uses the
+    // category count for the per-car asked-history reset.
+    private readonly CustomerRequestTable _requestTable;
+    // Speed-challenge patrols (Phase C): one seeded plan per accepted job.
+    private readonly PolicePatrolPlanner? _police;
+    // The last live track length, so a patrol planned after the request page
+    // sits on the same lap offsets the HUD resolves.
+    private double? _trackLengthMeters;
+    // The placeholder free-roam map: the HUD, the onboarding home and the
+    // taxi draw all read the same streets and lap geometry (PORTPLAN Step 1).
+    private readonly AddressMap _addressMap;
+    // The driving-slice balance the meter, the HUD radius and the distance
+    // line share (Data/taxi_rules.json).
+    private readonly TaxiRules _taxiRules;
     // The town itself: citizens drift with the shelves, demand empties them,
     // and the size is banked on exit (PORTPLAN 25).
     private readonly CityEconomy _city;
-    private readonly ICityStore _cityStore;
     // The appetite: +1 per crossed game hour, banked with the reading for the
     // next session (PORTPLAN 26).
     private readonly Hunger _hunger;
-    private readonly IHungerStateStore _hungerStateStore;
-    private readonly IGameClockStore _clocks;
     // The owned cars + the car driven now (PORTPLAN item 30). The garage banks
     // its own garage.json: the catalogue row behind each car is the data, the
     // per-car state (odometer, insurance) grows with items 31/32/34.
     private readonly Garage _garage;
-    private readonly IGarageStore _garageStore;
     // The insurance table (PORTPLAN 34): the nightly charge rate and the broker
     // page's daily-cost math (Data/insurance_rules.json).
     private readonly InsuranceRules _insuranceRules;
@@ -106,12 +101,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // The 200 px companion: the poll pushes it one snapshot so
     // the HUD never opens its own timer or shared-memory handle.
     private readonly ITelemetryHud? _hud;
-    private OnboardingState _progress;
-    private PlayerProfile? _profile;
-    private PlayerPreferences _preferences;
     private MainControlScreenViewModel? _control;
     private DeliveryJobScreenViewModel? _deliveryScreen;
     private TaxiJobProposalViewModel? _proposal;
+    private CustomerRequestScreenViewModel? _requestScreen;
     private ParameterizedCommand<TaxiJobState>? _acceptJobAction;
     private ParameterizedCommand<int>? _openDayAction;
     private int _lastDay = -1;
@@ -128,19 +121,12 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // away, too coarse while playing, so Poll() also banks on wall time.
     // One 51-byte write per interval, never per 10 Hz tick.
     private const double ClockSaveSec = 60.0;
-    private DateTime _lastClockSave;
 
     // Same idea for the odometer: the wear feed writes the current car's
     // distance to garage.json on a wall-time throttle, never per 10 Hz tick.
     // One garage record write per interval; the day flip and the settles bank
     // it too, so a kill costs at most this window of kilometres.
     private const double OdometerSaveSec = 60.0;
-    private DateTime _lastGarageSave;
-
-    // WHY a clamp: EVO reports a per-tick speed, and a teleport/hiccup can
-    // report an absurd value for one frame; capping the sample keeps a torn or
-    // glitched read from banking a bogus jump into the wear ledger.
-    private const double MaxTelemetrySpeedKmh = 500.0;
 
     // The warning fires on the transition into the blocked band (Unity's
     // TOO HUNGRY edge), not per poll and not per hour.
@@ -149,21 +135,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // Companion parity: hidden until "hey {brand}", idle hides after 15 s,
     // one utterance fires one button (muted until the final fragment).
     private const double IdleHideSec = 15.0;
-    private const double WakeCooldownSec = 3.0;
     private const string DefaultBrand = "mazda";
 
-    // The HUD ENTER button answers to the one word the English mic model
-    // hears reliably, whatever the UI language shows on the button.
-    private static readonly string[] EnterKeywords = ["enter"];
     private DateTime _lastActivity;
-    private DateTime _lastWake = DateTime.MinValue;
     // The intro (opening screen) is the constructor's first paint; the first
     // hidden -> shown edge must reveal it instead of jumping to control. Every
     // later call keeps the existing "open control" rule.
     private bool _introShown;
-    private string? _mutedLabel;
-    private Action? _mutedAction;
-    private string _mutedText = string.Empty;
     private bool _resizing;
 
     // Wake brand = the car currently driven in ACE (watcher-published),
@@ -174,16 +152,35 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // 4-seaters, one folder spans showroom variants).
     private CarIdentity? _carIdentity;
     private readonly DispatcherTimer _timer;
+    private readonly VoiceRouter _voiceRouter;
     private DateTime _lastTick;
     private bool _disposed;
 
     private TaxiJobState _job = new();
+    // The passenger-leg distance. Lives outside the job so a refused pickup or
+    // a breakdown can discard the ride without leaving a half-run meter.
+    private readonly TaxiDriveMeter _meter;
     // WHICH shown proposal already paid the dirty-car friendship penalty
     // (Unity's _tooDirtyArrived guard): tapping ACCEPT twice on the same
     // proposal must not charge the customer twice. A fresh proposal is a new
     // TaxiJobState instance (Unity's new job).
     private TaxiJobState? _dirtyRefusedJob;
     private int _lastShiftSecs = -1;
+
+    // The last painted telemetry readouts. The 10 Hz poll re-formats only when
+    // the shown (quantised) value changes, so a parked car or a paused game
+    // costs no string work per tick (AGENTS.md hot-path discipline). The
+    // sentinels force the first paint.
+    private const int Unpainted = -1;
+    private int _lastPacketId = Unpainted;
+    private int _lastSpeedKmh = Unpainted;
+    private int _lastGear = int.MinValue;
+    private int _lastRpm = Unpainted;
+    private int _lastThrottlePct = Unpainted;
+    private int _lastBrakePct = Unpainted;
+    // Which "no physics yet" line is painted, so the waiting state also costs
+    // one lookup on its first tick instead of one per tick.
+    private string? _lastWaitingKey;
 
     // Dropoff placeholders until the driving slice feeds real inputs: the
     // agreed 8.2 km ride with every extra on except the speeding fine (the
@@ -195,9 +192,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     private const int PlaceholderCarClass = 1;
     private const int PlaceholderCarRarity = 1;
     private const int PlaceholderStreetKnowledgePct = 100;
-    private const int PlaceholderFines = 0;
-
-    public event PropertyChangedEventHandler? PropertyChanged;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, GameClock game,
@@ -219,32 +213,32 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         BreakdownStrategy breakdowns,
         PoiGenerator pois,
         IPreferencesStore preferencesStore, PlayerPreferences preferences, ICultureService culture,
+        Trunk trunk,
+        TaxiRules taxiRules,
         ITelemetryHud? hud = null,
-        Trunk? trunk = null,
-        PoiArrivalRouter? poiArrivals = null)
+        PoiArrivalRouter? poiArrivals = null,
+        ICustomerRequestRoller? requests = null,
+        CustomerRequestTable? requestTable = null,
+        PolicePatrolPlanner? police = null)
     {
         _telemetry = telemetry;
         _clock = clock;
         _beat = beat;
         _game = game;
         _roads = roadTests;
-        _roadTestStore = roadTestStore;
-        _clocks = clockStore;
         _displayWeek = startWeek;
         _shift = shift;
         _store = store;
         _log = log;
         _fares = fares;
         _proposals = proposals;
-        _onboarding = onboarding;
-        _content = content;
-        _profiles = profiles;
+        _requests = requests;
+        _requestTable = requestTable ?? CustomerRequestTable.Empty;
+        _police = police;
         _addressMap = addressMap;
-        _detectedPlayerName = detectedPlayerName;
-        _pois = pois;
-        _preferencesStore = preferencesStore;
-        _preferences = preferences;
-        _culture = culture;
+        _taxiRules = taxiRules;
+        _meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        _content = content;
         _todos = todos;
         _voice = voice;
         _carBrands = carBrands;
@@ -252,39 +246,48 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         _deliveryFares = deliveryFares;
         _career = career;
         _city = city;
-        _cityStore = cityStore;
         _hunger = hunger;
-        _hungerStateStore = hungerStore;
         _garage = garage;
-        _garageStore = garageStore;
         _insuranceRules = insuranceRules;
         _breakdowns = breakdowns;
         _hud = hud;
-        _trunk = trunk ?? new Trunk();
-        _poiArrivals = poiArrivals;
-        _controlBackCommand = new RelayCommand(() => SetScreen(CreateControlScreen()));
         if (_hud is not null)
         {
-            _hud.EnterRequested += (_, _) => EnterPoi();
+            // The HUD only knows it is parked at the pinned door; the job
+            // phase decides whether that confirms the pickup or the drop-off.
+            _hud.JobEnterRequested += (_, _) => OnJobEntered();
         }
         _wallet = wallet;
-        _driverStore = driverStore;
         _streak = streak;
         _zone = zone;
         _friends = friendships;
         _brands = brands;
         _rivals = rivals;
         _cars = cars;
+        // The persistence collaborator is built from the injected services, so
+        // the early banks below (garage seed, streak bonus) already route
+        // through it instead of assembling snapshots here.
+        _saver = new GameStateSaver(
+            clock, game, clockStore, driverStore, garageStore, cityStore,
+            hungerStore, roadTestStore, wallet, streak, zone, trunk,
+            garage, city, hunger, roadTests);
+        _fleet = new FleetService(
+            garage, cars, game, wallet, insuranceRules, log, this, PlaceholderDriverRating);
+        // The story collaborator owns the persisted walk + profile + errand POI;
+        // it is built before the garage seed below reads its progress.
+        _story = new OnboardingFlow(
+            onboarding, content, profiles, addressMap, detectedPlayerName,
+            pois, poiArrivals, trunk, preferencesStore, preferences,
+            culture, beat, hud, garage, () => _displayWeek, SaveGarage,
+            () => _carBrand, log, this);
         _carBrands.BrandChanged += (_, e) => OnCarBrand(e.Brand, e.Identity);
-        _progress = _onboarding.Load();
-        _profile = _profiles.Load();
         // Grandma's car is the first OwnedCar (PORTPLAN Career Start item 3 +
         // item 30): a save whose onboarding already ran but whose garage is
         // still empty — every save written before this slice — seeds the car
         // it picked instead of opening on an empty garage. Unity creates the
         // starter OwnedCar at the pick itself, so this is the same state one
         // session later; the key resolves through the catalogue for specs.
-        if (OnboardingDone && _garage.Cars.Count == 0 && _progress.GrandmaCarId is { Length: > 0 } starter)
+        if (OnboardingDone && _garage.Cars.Count == 0 && _story.Progress.GrandmaCarId is { Length: > 0 } starter)
         {
             _garage.Add(starter, _displayWeek);
             SaveGarage();
@@ -305,15 +308,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
             _log.LogInfo($"[Streak] consecutive-day bonus granted: {bonus} CR (day {days})");
         }
         _lastActivity = _clock.UtcNow;
+        // The router's warn-free reads go through IVoiceHost (see the explicit
+        // implementations below), so the host surface stays small.
+        _voiceRouter = new VoiceRouter(this, clock, log, hud);
         _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _timer.Tick += (_, _) => Poll();
         _lastTick = _clock.UtcNow;
-        // WHY not DateTime.MinValue: the first throttled write must land a full
-        // interval into the session, so a startup read that failed for a
-        // transient reason (locked file) can never be immediately clobbered.
-        _lastClockSave = _clock.UtcNow;
-        _lastGarageSave = _clock.UtcNow;
 
         TaxiShiftCommand = new RelayCommand(OpenTaxiShift);
         BankCommand = new RelayCommand(OpenBank);
@@ -322,8 +323,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         CarWashCommand = new RelayCommand(OpenCarWash);
         MechanicCommand = new RelayCommand(OpenMechanic);
         InsuranceCommand = new RelayCommand(OpenInsurance);
-        PickupCommand = new RelayCommand(Pickup, () => _job.Phase == JobPhase.Proposed);
-        DropoffCommand = new RelayCommand(Dropoff, () => _job.Phase == JobPhase.EnRoute);
+        PickupCommand = new RelayCommand(ConfirmPickup, () => _job.Phase == JobPhase.ToPickup);
+        DropoffCommand = new RelayCommand(ConfirmDropoff, () => _job.Phase == JobPhase.EnRoute);
         ToggleShowCommand = new RelayCommand(() =>
         {
             if (IsShown) Hide(); else Show();
@@ -339,17 +340,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         // items 1-5): opening screen, brand page, grandma's car, voice info,
         // birthday dialogue, and only then the main control page (PORTPLAN
         // item 54). The first call after a hidden start reveals that page;
-        // every later call (Ctrl+Shift+C, wake word) opens the control page
+        // every later call (Ctrl+Shift+C, wake word) opens the menu page
         // directly instead of replaying the walk. The intro taps re-save the
         // picks, so a returning player walks the same pages as a first-timer.
         // Missing content degrades to the control page (past the birthday)
         // or a blank screen (before it) instead of trapping the user on a
         // broken page.
 
-        SetScreen(HomeScreen());
+        SetScreen(_story.Home());
 
-        // With a mic we start hidden until the wake word; without one the
-        // window stays up so the app remains usable (and testable).
+        // The VM's default: hidden until called when a mic is present, visible
+        // otherwise so the shell stays usable (and testable). The app root
+        // calls Show() at launch, so a real start opens on the intro either way.
         IsShown = !voice.IsAvailable;
         // A visible start has already shown the intro; a hidden start keeps
         // the intro on the first wake (see Show).
@@ -418,7 +420,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     /// Unity, moving behind the marker network with the rest.</summary>
     public ICommand InsuranceCommand { get; }
 
-    // ---- onboarding navigation (IScreenController) ---------------------------
+    // ---- onboarding navigation -----------------------------------------------
 
     private object? _currentScreen;
 
@@ -443,119 +445,28 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     /// True once the birthday dialogue is done on disk. The view needs this
     /// instead of <see cref="IsOnboarding"/> to decide whether a saved window
     /// size may be restored: first paint may still be the introduction while
-    /// every later call opens the control page, so the page on screen no
+    /// every later call opens the menu page, so the page on screen no
     /// longer says whether the player is past onboarding.
     /// </summary>
-    public bool OnboardingDone => _progress.IsComplete;
+    public bool OnboardingDone => _story.Done;
 
-    public void ChooseBrand(string brand)
-    {
-        if (!Content.Brands.Contains(brand)) return;
-        _progress = _progress with { FavoriteBrand = brand };
-        _onboarding.Save(_progress);
-        _log.LogInfo($"favorite brand: {brand}");
-        SetScreen(new GrandmaCarScreenViewModel(this, Content.Cars));
-    }
+    public void ChooseBrand(string brand) => _story.ChooseBrand(brand);
 
-    public void ChooseCar(string carId)
-    {
-        if (!Content.Cars.Any(c => c.Id == carId)) return;
-        _progress = _progress with { GrandmaCarId = carId };
-        _onboarding.Save(_progress);
-        // Unity GrandmaCarScreen: the pick IS the first OwnedCar (odometer 0,
-        // no insurance) and the car driven from here on. Walking the
-        // introduction again keeps an owned car, but the pick still becomes
-        // current: the player just told us which car they drive.
-        bool added = false;
-        if (!_garage.Owns(carId))
-        {
-            _garage.Add(carId, _displayWeek);
-            added = true;
-            _log.LogInfo($"grandma car: {carId} (first OwnedCar)");
-        }
-        else
-        {
-            _log.LogInfo($"grandma car: {carId}");
-        }
-        bool selected = _garage.SetCurrent(carId);
-        if (added || selected)
-        {
-            SaveGarage();
-        }
-        SetScreen(new VoiceInfoScreenViewModel(this, _beat));
-    }
+    public void ChooseCar(string carId) => _story.ChooseCar(carId);
 
-    public void ShowDialogue()
-    {
-        _log.LogInfo("voice info acknowledged: showing birthday dialogue");
-        _poi = _pois.Spawn();
-        SetScreen(new DialogueScreenViewModel(
-            this, FillDialogue(Content.Dialogue, _poi), _beat));
-    }
+    public void ShowDialogue() => _story.ShowDialogue();
 
-    // The errand line names the business and a random house; ordinary pages
-    // pass through untouched. A null POI (no content or no usable address)
-    // leaves the authored text as-is instead of trapping the walk.
-    private static IReadOnlyList<DialogueLine> FillDialogue(
-        IReadOnlyList<DialogueLine> lines, PointOfInterest? poi) =>
-        poi is { } destination
-            ? DialogueText.Fill(
-                lines, destination.Name, AddressFormatter.Format(destination.Address))
-            : lines;
+    public void FinishDialogue() => _story.FinishDialogue();
 
-    public void FinishDialogue()
-    {
-        _progress = _progress with { BirthdayDone = true };
-        _onboarding.Save(_progress);
-        // The HUD is the reminder of where to drive; pin the errand as the
-        // dialogue hands it over (PORTPLAN 5/24/27).
-        _hud?.SetDestination(_poi);
-        if (_poi is { } poi)
-        {
-            _log.LogInfo($"birthday errand: {poi.Name} at {AddressFormatter.Format(poi.Address)}");
-        }
-        _log.LogInfo("birthday dialogue done: main control page unlocked");
-        SetScreen(CreateControlScreen());
-        // The birthday is the hand-over from the intro panel to the companion:
-        // the HUD appears here, the panel leaves until the player calls it
-        // back with the hotkey or wake word.
-        Hide();
-        _hud?.Reveal();
-    }
-
-    // The HUD's ENTER button fires only once the player is parked on the
-    // errand's house. The typed router builds the interior (PORTPLAN 24);
-    // an unclaimed type keeps the log-only fallback so no POI is a dead end.
-    // A second ENTER while already inside is ignored.
-    private void EnterPoi()
-    {
-        if (_poi is not { } poi)
-        {
-            return;
-        }
-
-        // Already inside: a second ENTER only brings a hidden panel back,
-        // never rebuilds the page (and never loses the basket).
-        if (CurrentScreen is IPoiScreen current)
-        {
-            if (!IsShown)
-            {
-                Present(current);
-            }
-            return;
-        }
-
-        object? screen = _poiArrivals?.Open(poi, _controlBackCommand, OnPoiChanged);
-        _log.LogInfo($"entered {poi.Name} at {AddressFormatter.Format(poi.Address)}");
-        if (screen is not null)
-        {
-            Present(screen);
-        }
-    }
-
-    // A shop purchase moves cash + trunk; the driver save is the one bank
-    // both live in (PORTPLAN 51 interim).
-    private void OnPoiChanged() => SaveDriver(_rivals.LastResult);
+    // The host slice the story flow sees (interface segregation): page swaps,
+    // panel reveal/hide, the control page and the shared driver save.
+    object? IStoryHost.CurrentScreen => CurrentScreen;
+    bool IStoryHost.IsShown => IsShown;
+    void IStoryHost.ShowScreen(object? screen) => SetScreen(screen);
+    void IStoryHost.Present(object screen) => Present(screen);
+    void IStoryHost.Hide() => Hide();
+    object IStoryHost.ControlScreen() => CreateControlScreen();
+    void IStoryHost.SaveDriver() => SaveDriver(_rivals.LastResult);
 
     // Reveal the panel on the requested POI screen. Show() deliberately
     // resets a hidden start to the control page; entering a shop must land
@@ -567,71 +478,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         SetScreen(screen);
         IsShown = true;
         _log.LogInfo("overlay shown (POI)");
-    }
-
-    // Introduction home: the first page of the walk first paint opens on.
-    // The chain it starts (preferences -> opening screen -> brand -> grandma's
-    // car -> voice info -> birthday dialogue) ends on the main control page, so
-    // the walk is never a dead end, and its taps re-save the picks like a first
-    // run. No new IScreenController verbs: each page takes its actions by
-    // constructor (composition over interface growth).
-    private PreferencesScreenViewModel HomeScreen() =>
-        new(_preferences, OnPreferencesChanged, ShowOpening);
-
-    // Preferences page CONTINUE: the name + address form is the next step.
-    // Missing content degrades instead of trapping the player on a page with
-    // nothing to tap: past the birthday the control page still opens, before it
-    // there is no home to show.
-    private void ShowOpening()
-    {
-        if (Content.Brands.Count == 0)
-        {
-            SetScreen(_progress.IsComplete ? CreateControlScreen() : null);
-            return;
-        }
-        SetScreen(new OpeningScreenViewModel(
-            _addressMap, _profile, _detectedPlayerName, CompleteOpening));
-    }
-
-    // Preferences change: bank the choice, point the resource lookup at the
-    // language, and repaint the companion HUD (unit + labels) so the first
-    // run never shows a stale language on the one window that is always up.
-    private void OnPreferencesChanged(PlayerPreferences preferences)
-    {
-        _preferences = preferences;
-        _preferencesStore.Save(preferences);
-        _culture.Apply(preferences.Language);
-        _hud?.ApplyPreferences(preferences);
-    }
-
-    // Opening screen CONFIRM: the name + address is progress the player just
-    // committed, so it banks its own file before the brand page opens. The
-    // Steam name only fills an empty profile; a returning player's edited
-    // name is never overwritten.
-    private void CompleteOpening(PlayerProfile profile)
-    {
-        _profile = profile;
-        _profiles.Save(profile);
-        _log.LogInfo($"opening confirmed: {profile.DisplayName}, " +
-            $"{profile.Country}, {profile.City}, {StreetName(profile.StreetId)} {profile.HouseNumber}");
-        if (Content.Brands.Count == 0)
-        {
-            SetScreen(_progress.IsComplete ? CreateControlScreen() : null);
-            return;
-        }
-        SetScreen(new BrandScreenViewModel(this, Content.Brands));
-    }
-
-    private string StreetName(string streetId)
-    {
-        foreach (AddressStreet street in _addressMap.Streets)
-        {
-            if (string.Equals(street.Id, streetId, StringComparison.OrdinalIgnoreCase))
-            {
-                return street.Name;
-            }
-        }
-        return streetId;
     }
 
     // Built once and reused: the date header stays live across wakes.
@@ -654,11 +500,11 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
                 _beat, _game, _clock, _roads, _todos, _hunger, _garage,
                 CalendarStamp.Default with { Week = _displayWeek },
                 _shift,
-                TaxiShiftCommand, new RelayCommand(OpenDelivery),
-                new RelayCommand(OnCarHaul),
-                BankCommand, GarageCommand, DealerCommand, CarWashCommand, MechanicCommand,
-                InsuranceCommand,
-                _openDayAction);
+                new ControlActions(
+                    TaxiShiftCommand, new RelayCommand(OpenDelivery),
+                    new RelayCommand(OnCarHaul),
+                    BankCommand, GarageCommand, DealerCommand, CarWashCommand,
+                    MechanicCommand, InsuranceCommand, _openDayAction));
             _lastDay = _control.Today;
         }
         return _control;
@@ -796,11 +642,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     /// so every bank path (day flip, checkpoint, interval, window close) keeps
     /// the interval honest. Never throws (the store swallows IO).
     /// </summary>
-    public void SaveClock()
-    {
-        _lastClockSave = _clock.UtcNow;
-        _clocks.Save(new GameClockState(_game.GameNow, _displayWeek));
-    }
+    public void SaveClock() => _saver.SaveClock(_displayWeek);
 
     /// <summary>
     /// Banks the road-test pick. Two moments need it: a session opening (a
@@ -808,7 +650,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     /// the next session must offer that very same car) and a completion (the
     /// only event allowed to move the car). Never throws (the store swallows IO).
     /// </summary>
-    private void SaveRoadTest() => _roadTestStore.Save(_roads.Snapshot());
+    private void SaveRoadTest() => _saver.SaveRoadTest();
 
     /// <summary>
     /// Banks the town for the next session (PORTPLAN 25): the city size plus
@@ -817,7 +659,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     /// killed process costs an hour of growth and no player progress. Never
     /// throws (the store swallows IO).
     /// </summary>
-    public void SaveCity() => _cityStore.Save(_city.Snapshot());
+    public void SaveCity() => _saver.SaveCity();
 
     /// <summary>
     /// Banks the hunger reading for the next session (Unity PlayerData.hunger
@@ -825,7 +667,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     /// instead of re-seeding at 0. Exit-only, like the city. Never throws
     /// (the store swallows IO).
     /// </summary>
-    public void SaveHunger() => _hungerStateStore.Save(_hunger.Snapshot());
+    public void SaveHunger() => _saver.SaveHunger();
 
     // ---- core loop (public so tests drive it directly) --------------------
 
@@ -847,17 +689,29 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         // hiding it mid-basket would lose the visit, so it keeps the panel up
         // until BACK (the dialog rule applies to the same reason).
         bool poiOpen = CurrentScreen is IPoiScreen;
-        if (IsShown && !_resizing && !dialogueOpen && !poiOpen
+        // A customer request runs on its own 14 s countdown; hiding the panel
+        // mid-answer would lose the ask, so it opts out like a POI page.
+        bool requestOpen = CurrentScreen is IKeepPanelOpen;
+        if (IsShown && !_resizing && !dialogueOpen && !poiOpen && !requestOpen
             && (now - _lastActivity).TotalSeconds >= IdleHideSec)
         {
             Hide();
         }
 
+        // The request countdown is part of the one allowed loop: integer
+        // seconds only, and a timeout finishes the ask exactly once. It runs
+        // whether or not EVO is still attached so a closed game cannot freeze
+        // an open request.
+        _requestScreen?.Tick(now);
+
         // The control page date stays live whether or not EVO is attached.
         // Refresh self-guards on the minute: no per-tick allocations.
         // A timed-out shift ends here (Unity 30-min idle rule) so the taxi
         // button flips back to START even when the player never taps it.
-        if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
+        // WHY the job guard: an accepted job is work in progress, and a long
+        // drive to a far door must not idle the shift out mid-ride.
+        bool jobActive = _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute;
+        if (!jobActive && _shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
         {
             _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
                 $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
@@ -934,14 +788,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
 
         // Nightly insurance charge (PORTPLAN 34, Unity GameClockManager.
         // UpdateInsurance): once per game date, in the charge hour. Runs on the
-        // game clock, so it lands whether or not EVO is attached.
-        ChargeDailyInsurance();
+        // game clock, so it lands whether or not EVO is attached. A charged
+        // premium is progress the player loses on a kill, so it banks now.
+        if (_fleet.ChargeDailyInsurance())
+        {
+            SaveDriver(_rivals.LastResult);
+        }
 
         // Wall-clock bank: runs before the telemetry read so it also holds
         // while EVO is closed, and before the shift paths because a banked
         // moment is exactly what a kill between sessions would otherwise
         // lose. SaveClock restamps, so this costs one write per ClockSaveSec.
-        if ((now - _lastClockSave).TotalSeconds >= ClockSaveSec)
+        if ((now - _saver.LastClockSave).TotalSeconds >= ClockSaveSec)
         {
             SaveClock();
         }
@@ -967,41 +825,118 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         if (s is null)
         {
             IsLive = false;
-            StatusText = Strings.Get(_telemetry.GameRunning ? "EvoNoShm" : "WaitingForEvo");
-            SpeedText = Strings.Format("SpeedKmh", 0);
+            ShowWaitingReadouts();
             _hud?.Update(null, _garage.Current?.Odometer, _telemetry.GameRunning);
             return;
         }
 
         IsLive = true;
-        StatusText = Strings.Format("EvoLive", s.PacketId);
-        SpeedText = Strings.Format("SpeedKmh", s.SpeedKmh);
-        GearText = TelemetryConventions.GearDisplay(s.Gear);
-        DetailText = Strings.Format("EvoDetail", s.Rpm, s.Gas, s.Brake);
+        if (s.Track is { LengthMeters: > 0.0 } track && double.IsFinite(track.LengthMeters))
+        {
+            _trackLengthMeters = track.LengthMeters;
+        }
+        ShowLiveReadouts(s);
 
         // Odometer feed (PORTPLAN items 31/32, Unity DrivingManager's odometer
         // integration): every live tick banks the distance the current car
         // covered into the wear deck's input, and the engine inspections ride
         // the drive. The garage file is banked on the same wall-time throttle
         // as the clock, so a kill costs at most the window.
-        IntegrateOdometer(s, dt);
+        _fleet.IntegrateOdometer(s, dt);
         _hud?.Update(
-            s, _garage.Current?.Odometer, gameRunning: true, IsDrivingWrongCar());
-        if ((now - _lastGarageSave).TotalSeconds >= OdometerSaveSec)
+            s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
+        if ((now - _saver.LastGarageSave).TotalSeconds >= OdometerSaveSec)
         {
             SaveGarage();
         }
 
-        // Meter runs while the passenger is aboard.
-        if (_job.Phase == JobPhase.EnRoute && dt is > 0 and < 1)
+        // Meter runs while the passenger is aboard: the accumulator applies
+        // the stalled-frame guard and the speed clamp, so a torn read cannot
+        // inflate the fare.
+        if (_job.Phase == JobPhase.EnRoute)
         {
-            _job.DistanceKm += Math.Max(0, s.SpeedKmh) / 3600.0 * dt;
-            _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
-            RefreshJob();
+            double before = _meter.DistanceKm;
+            _meter.Add(s.SpeedKmh, dt);
+            if (_meter.DistanceKm != before)
+            {
+                _job.DistanceKm = _meter.DistanceKm;
+                _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
+                RefreshJob();
+            }
+
+            if (_job.SpeedChallengeAgreed)
+            {
+                CheckPolice(s);
+            }
         }
     }
 
+    // Live readouts: one format per changed value, never one per tick. Each
+    // guard quantises to what the resx actually prints, so the cache can
+    // never hold a stale-looking value.
+    private void ShowLiveReadouts(TelemetrySample sample)
+    {
+        _lastWaitingKey = null;
+        if (sample.PacketId != _lastPacketId)
+        {
+            _lastPacketId = sample.PacketId;
+            StatusText = Strings.Format("EvoLive", sample.PacketId);
+        }
+        int speed = (int)Math.Round(sample.SpeedKmh);
+        if (speed != _lastSpeedKmh)
+        {
+            _lastSpeedKmh = speed;
+            SpeedText = Strings.Format("SpeedKmh", sample.SpeedKmh);
+        }
+        if (sample.Gear != _lastGear)
+        {
+            _lastGear = sample.Gear;
+            GearText = TelemetryConventions.GearDisplay(sample.Gear);
+        }
+        int rpm = sample.Rpm;
+        int throttle = (int)Math.Round(sample.Gas * 100.0f);
+        int brake = (int)Math.Round(sample.Brake * 100.0f);
+        if (rpm != _lastRpm || throttle != _lastThrottlePct || brake != _lastBrakePct)
+        {
+            _lastRpm = rpm;
+            _lastThrottlePct = throttle;
+            _lastBrakePct = brake;
+            DetailText = Strings.Format("EvoDetail", sample.Rpm, sample.Gas, sample.Brake);
+        }
+    }
+
+    // The "no physics yet" state paints once per entering it, then stays put
+    // (the string never changes while EVO is absent, so re-formatting it per
+    // tick would be pure waste).
+    private void ShowWaitingReadouts()
+    {
+        _lastPacketId = Unpainted;
+        _lastSpeedKmh = Unpainted;
+        _lastGear = int.MinValue;
+        _lastRpm = Unpainted;
+        _lastThrottlePct = Unpainted;
+        _lastBrakePct = Unpainted;
+        string key = _telemetry.GameRunning ? "EvoNoShm" : "WaitingForEvo";
+        if (key == _lastWaitingKey)
+        {
+            return;
+        }
+
+        _lastWaitingKey = key;
+        StatusText = Strings.Get(key);
+        SpeedText = Strings.Format("SpeedKmh", 0);
+    }
+
     // ---- visibility + voice --------------------------------------------------
+
+    // The host slices the collaborators see (interface segregation): only the
+    // reads they actually make. IsShown, CurrentScreen, Show, RecordActivity
+    // and OnboardingDone are already public and satisfy their interfaces
+    // directly.
+    OnboardingContent IVoiceHost.Content => Content;
+    public CarIdentity? CarIdentity => _carIdentity;
+    public string CarBrand => _carBrand;
+    public IReadOnlyList<string> Brands => Content.Brands;
 
     /// <summary>Called by the view on any mouse/key activity.</summary>
     public void RecordActivity() => _lastActivity = _clock.UtcNow;
@@ -1022,13 +957,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         RecordActivity();
         if (IsShown) return;
         IsShown = true;
-        // The single "the app was called" seam: the Ctrl+Shift+C hotkey
-        // and the wake word all land here. The first show of a hidden start
+        // The single "the app was called" seam: the Ctrl+Shift+C hotkey and
+        // the wake word both land here. The first show of a hidden start
         // reveals the intro already built in the constructor; every later
-        // show opens the main control page directly instead of resuming
-        // whatever page was last open. It rides the hidden -> shown edge only
-        // — a Show() while already visible must not yank the player off the
-        // page they are using.
+        // show opens the menu page (Jobs leads back to the control page)
+        // instead of resuming whatever page was last open. It rides the
+        // hidden -> shown edge only — a reveal while already visible must not
+        // yank the player off the page they are using.
         if (!_introShown && CurrentScreen is not null)
         {
             _introShown = true;
@@ -1036,17 +971,16 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
             return;
         }
         _introShown = true;
-        SetScreen(CreateControlScreen());
-        _log.LogInfo("overlay shown");
+        SetScreen(new MenuScreenViewModel(
+            new RelayCommand(() => SetScreen(CreateControlScreen()))));
+        _log.LogInfo("overlay shown (menu)");
     }
 
     private void Hide()
     {
         if (!IsShown) return;
         IsShown = false;
-        _mutedLabel = null;
-        _mutedAction = null;
-        _mutedText = string.Empty;
+        _voiceRouter.ResetMute();
         _log.LogInfo("overlay hidden");
     }
 
@@ -1077,7 +1011,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     {
         try
         {
-            _timer.Dispatcher.Invoke(() => HandleVoice(text, isFinal));
+            _timer.Dispatcher.Invoke(() => _voiceRouter.Handle(text, isFinal));
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {
@@ -1085,114 +1019,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
             // UI-thread run can meet a dispatcher that is going down. Screen
             // commands only touch VM state and stores that swallow their own
             // IO, so these two types are the whole recoverable set; a bug
-            // inside HandleVoice stays visible instead of being muted here.
+            // inside the router stays visible instead of being muted here.
         }
-    }
-
-    internal void HandleVoice(string text, bool isFinal)
-    {
-        // Diagnostic: one line per finished utterance. Non-English names
-        // ("Cento Miglia") arrive as whatever the English model believes it
-        // heard; reading the real transcripts from the log lets us extend
-        // the keyword tables from data instead of guesses.
-        if (isFinal) _log.LogInfo($"voice heard: {text}");
-
-        // The companion HUD sits outside the main screen stack, so its
-        // ENTER button answers even while the overlay is hidden for driving.
-        // Finals only: one utterance must not enter twice.
-        if (isFinal && TryEnterPoi(text))
-        {
-            return;
-        }
-
-        if (!IsShown)
-        {
-            string brand = _carBrand;
-            if (VoiceMatch.IsWake(text, brand, AliasesFor(brand), Content.Confusions, isFinal))
-            {
-                DateTime now = _clock.UtcNow;
-                if ((now - _lastWake).TotalSeconds < WakeCooldownSec) return;
-                _lastWake = now;
-                _log.LogInfo($"wake heard: {text}");
-                Show();
-
-            }
-
-            return;
-        }
-
-        if (CurrentScreen is not IVoiceScreen screen) return;
-        string? label = VoiceMatch.MatchLabel(text, screen.VoiceActions.Keys, Content.Confusions);
-        if (label is null)
-        {
-            // A failed attempt is still the user being present. The logged
-            // 2026-10-13 session hid mid-retry ("open your career" x3, then
-            // the 15 s window expired and the next phrase woke to home
-            // instead of pressing the button). Unmatched FINAL transcripts
-            // restart the idle window; partials do not, so a background
-            // voice that never finalizes keeps the old hide timing.
-            if (isFinal) RecordActivity();
-            return;
-        }
-        // Voice control counts as user input: same idle-reset as a click.
-        // Repeats of the same tap still count as presence (restarting the
-        // 15 s window) even though the repeat itself stays muted below.
-        RecordActivity();
-        // Mute repeats of the same tap until the utterance's final fragment.
-        // One utterance can reach a button under two different keys (a
-        // partial hearing "where is" alias, the final "Where is Willy"
-        // label), so the shared action delegate counts as the same tap too.
-        // WHY the utterance text and the fired label's word run join the
-        // mute: a beat-deferred page change can hand the FINAL fragment to
-        // the new screen, where the same words map to a different label and
-        // delegate. Logged 2026-10-14 18:37: "we continue" closed the
-        // birthday dialogue and its final re-scored to "the continue" one
-        // second later — already on the control page, where bare
-        // "continue" is a taxi keyword: the tail tapped the button and the
-        // shift started with nobody asking for it. Exact text missed it
-        // (leading word rewritten), the label's word run survives:
-        // fragments answering the fired label are the same utterance,
-        // whichever page is now on screen.
-        Action action = screen.VoiceActions[label];
-        string heard = VoiceMatch.Normalize(text);
-        if (label == _mutedLabel || action == _mutedAction || heard == _mutedText
-            || (_mutedLabel is not null && VoiceMatch.AnswersText(_mutedLabel, heard)))
-        {
-            if (isFinal) { _mutedLabel = null; _mutedAction = null; _mutedText = string.Empty; }
-            return;
-        }
-
-        _mutedLabel = label;
-        _mutedAction = action;
-        _mutedText = heard;
-        _log.LogInfo($"voice button: {text}");
-        action.Invoke();
-    }
-
-    // HUD arrival voice tap: only while the button is up, and only a finished
-    // utterance. The HUD owns the teal acknowledgment and the half-second
-    // wait; the host still owns what entering means.
-    private bool TryEnterPoi(string text)
-    {
-        if (_hud is not { AtDestination: true })
-        {
-            return false;
-        }
-        if (VoiceMatch.MatchLabel(text, EnterKeywords, Content.Confusions) is null)
-        {
-            return false;
-        }
-
-        RecordActivity();
-        _log.LogInfo($"voice button: {text}");
-        _hud.RequestEnter();
-        return true;
-    }
-
-    private string[] AliasesFor(string brand)
-    {
-        if (Content.Aliases.TryGetValue(brand, out string[]? hit)) return hit;
-        return Content.Aliases.TryGetValue(VoiceMatch.Normalize(brand), out string[]? norm) ? norm : [];
     }
 
     // ---- job commands ------------------------------------------------------
@@ -1226,7 +1054,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         // survives leaving the page, and every visit opens on a fresh
         // proposal (the Unity screen shows a newly generated job per visit).
         _proposal ??= new TaxiJobProposalViewModel(
-            _proposals, _log, _beat,
+            _proposals, _addressMap, () => AddressBook.Home(_addressMap, _story.Profile),
+            _log, _beat,
             new RelayCommand(() => SetScreen(CreateControlScreen())),
             _acceptJobAction ??= new ParameterizedCommand<TaxiJobState>(TaxiAccepted));
         _proposal.Open();
@@ -1235,44 +1064,89 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         _control?.Refresh();
     }
 
-    // Accepting settles the job straight into its receipt: with no driving
-    // slice the PICKUP/DROPOFF meter flow has no inputs, so the placeholder
-    // ride (8.2 km, tip eligible, no fine) settles here and the receipt
-    // screen shows at once. Pickup()/Dropoff() below are the driving
-    // slice's hooks and stay dormant until telemetry feeds them.
+    // ACCEPT only commits the proposal: the customer is not aboard yet, so
+    // the dirt gate and the breakdown roll wait at the pickup door (Unity's
+    // TaxiJobLifecycleHandler). The overlay steps aside and the HUD pins the
+    // pickup, counting the drive down to the arrival radius.
     private void TaxiAccepted(TaxiJobState? job)
     {
         if (job is null) return;
-        // Dirt gate (PORTPLAN 33, Unity TaxiJobLifecycleHandler's pickup
-        // arrival): a car at max filth refuses the ride — the customer walks
-        // and familiarity drops 1. Unity cancels the accepted job when the
-        // pickup is reached, but this placeholder settles on ACCEPT, so the
-        // gate sits here until the driving slice gives the pickup its own
-        // moment. Unity also costs concentration -1 on the refusal; parked
-        // for item 06 (no driver rating yet).
-        if (RefuseDirtyPickup(job)) return;
+        _job = job;
+        _job.Phase = JobPhase.ToPickup;
+        _job.DistanceKm = 0.0;
+        _job.Fare = 0.0;
+        _job.Patrols = [];
+        _job.FinedPatrolIds.Clear();
+        _job.WarnedPatrolIds.Clear();
+        _meter.Reset();
+        ShowPickupGuidance();
+        Hide();
+        _log.LogInfo($"job accepted: {job.Customer.Full} {job.PickupName} -> {job.DropoffName}");
+        RefreshJob();
+    }
+
+    // Unity's pickup moment: the car is parked at the customer's door. The
+    // dirt gate and the trip-start breakdown roll live here, not at ACCEPT,
+    // because the customer only sees the car on arrival.
+    private void ConfirmPickup()
+    {
+        if (_job.Phase != JobPhase.ToPickup) return;
+        if (RefuseDirtyPickup(_job))
+        {
+            AbandonJob();
+            if (_proposal is { } proposal)
+            {
+                ShowJobScreen(proposal);
+            }
+            return;
+        }
+
         // Breakdown roll at the trip start (PORTPLAN 39, Unity
         // BeginTripSession): a triggered trip is cut before it pays — the job
-        // never becomes active, the customer loses 1 familiarity, the mechanic's
-        // tow fee is charged, and the breakdown page replaces the receipt.
+        // never becomes active, the customer loses 1 familiarity, the
+        // mechanic's tow fee is charged, and the breakdown page replaces the
+        // proposal.
         if (RollTripStart(BreakdownKind.Taxi) is { } breakdown)
         {
-            _friends.AddFamiliarity(BaseCustomerName(job.Customer), -1);
-            _log.LogInfo($"taxi job cut by breakdown: {job.Customer.Full} " +
-                $"{job.PickupName} -> {job.DropoffName}");
+            _friends.AddFamiliarity(_job.Customer.BaseName, -1);
+            _log.LogInfo($"taxi job cut by breakdown: {_job.Customer.Full} " +
+                $"{_job.PickupName} -> {_job.DropoffName}");
+            AbandonJob();
             ShowBreakdown(breakdown);
             return;
         }
-        _job = job;
-        _log.LogInfo($"job accepted: {job.Customer.Full} {job.PickupName} -> {job.DropoffName}");
-        SettleReceipt();
+
+        _meter.Reset();
+        _job.Phase = JobPhase.EnRoute;
+        _job.DistanceKm = 0.0;
+        _job.Fare = TaxiFare.ComputeBase(0.0, _fares);
+        _log.LogInfo($"job pickup: {_job.PickupName}");
+        // Unity rolls the special request at the pickup, while the customer
+        // is still parked at the door. The page opens before the meter starts
+        // moving; the drop-off guidance resumes once BACK reports the outcome.
+        CustomerRequest? request = _requests?.Roll(
+            _job.Customer, CurrentCarSpec(), _game.GameNow.Year,
+            _garage.Current?.AskedCategories ?? []);
+        if (request is not null)
+        {
+            _job.Request = request;
+            _requestScreen = new CustomerRequestScreenViewModel(
+                request, _job.Customer.Full, _requestTable.TimerSeconds,
+                _clock, _beat, OnRequestFinished);
+            ShowJobScreen(_requestScreen);
+            _log.LogInfo($"customer request: {request.Kind} for {_job.Customer.Full}");
+            RefreshJob();
+            return;
+        }
+        ShowDropoffGuidance();
+        RefreshJob();
     }
 
-    // Unity's dirty-car refusal: the customer refuses the ride, familiarity
-    // with them drops by one (the store banks itself), and the proposal page
-    // shows the reason. The page never starts a job on this path. A repeated
-    // ACCEPT on the same proposal shows the reason again but does not charge
-    // the customer twice (Unity's _tooDirtyArrived).
+    // Unity's dirty-car refusal at the pickup door: the customer refuses the
+    // ride, familiarity drops by one (the store banks itself), and the
+    // proposal page shows the reason. A repeated ACCEPT on the same proposal
+    // shows it again but never charges the customer twice
+    // (Unity's _tooDirtyArrived).
     private bool RefuseDirtyPickup(TaxiJobState job)
     {
         if (_garage.Current is not { } car || !car.Filth.RefusesPickup)
@@ -1280,7 +1154,8 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
             _dirtyRefusedJob = null;
             return false;
         }
-        string customer = BaseCustomerName(job.Customer);
+
+        string customer = job.Customer.BaseName;
         if (!ReferenceEquals(job, _dirtyRefusedJob))
         {
             _dirtyRefusedJob = job;
@@ -1292,48 +1167,206 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         return true;
     }
 
-    private void Pickup()
-    {
-        if (_job.Phase != JobPhase.Proposed) return;
-        _job.Phase = JobPhase.EnRoute;
-        _job.DistanceKm = 0;
-        _log.LogInfo($"job pickup: {_job.PickupName}");
-        RefreshJob();
-    }
-
-    private void Dropoff()
+    // The customer is at the drop-off door: settle, show the receipt and drop
+    // the HUD guidance.
+    private void ConfirmDropoff()
     {
         if (_job.Phase != JobPhase.EnRoute) return;
         _job.Phase = JobPhase.Complete;
+        _hud?.SetJobGuidance(null);
         SettleReceipt();
+        _job.Patrols = [];
+        _job.FinedPatrolIds.Clear();
+        _job.WarnedPatrolIds.Clear();
     }
 
-    // Prices the placeholder ride, banks it to the wallet, the driver save
-    // and the shift, and shows the receipt. Shared by ACCEPT now and the
-    // meter DROPOFF once the driving slice lands.
+    // A refused or broken-down pickup leaves no active job: the HUD line goes
+    // away and the command guards close until the next ACCEPT.
+    private void AbandonJob()
+    {
+        _job.Phase = JobPhase.None;
+        _job.Patrols = [];
+        _job.FinedPatrolIds.Clear();
+        _job.WarnedPatrolIds.Clear();
+        _requestScreen = null;
+        _hud?.SetJobGuidance(null);
+        RefreshJob();
+    }
+
+    private void OnJobEntered()
+    {
+        if (PickupCommand.CanExecute(null))
+        {
+            PickupCommand.Execute(null);
+        }
+        else if (DropoffCommand.CanExecute(null))
+        {
+            DropoffCommand.Execute(null);
+        }
+    }
+
+    // BACK on the request page lands here exactly once: copy the outcome onto
+    // the job, bank the quiz history for this car, resume the drop-off
+    // guidance and close the panel. The police patrols arm from the speed flag
+    // in the police slice; this host stays the single owner of job state.
+    private void OnRequestFinished(CustomerRequestOutcome outcome)
+    {
+        _requestScreen = null;
+        _job.TipEligible = outcome.TipEligible;
+        _job.QuizAnsweredCorrectly = outcome.QuizAnsweredCorrectly;
+        _job.SpeedChallengeAgreed = outcome.SpeedChallengeAgreed;
+
+        if (outcome.SpeedChallengeAgreed && _police is { } planner)
+        {
+            // Unity spawns at the pickup for every job; this loop only needs
+            // the plan when the gamble is on, and once per accepted job.
+            _job.Patrols = planner.Plan(
+                _job.PickupAddress, _job.DropoffAddress,
+                TrackLengthMeters(), planner.Rules.PatrolsPerJob);
+            _job.FinedPatrolIds.Clear();
+            _job.WarnedPatrolIds.Clear();
+            _log.LogInfo(
+                $"speed challenge armed: {_job.Patrols.Count} patrol(s), " +
+                $"limit {planner.Rules.SpeedLimitKmh} km/h");
+        }
+
+        if (_job.Request?.Quiz is { } quiz && _garage.Current is { } car)
+        {
+            // Unity marks the category on answer AND on timeout (HandleAnswer
+            // covers both), then saves; the at-count reset lives in Core.
+            car.MarkAskedCategory(quiz.Category.Key, _requestTable.QuestionCategories.Count);
+            SaveGarage();
+        }
+
+        ShowDropoffGuidance();
+        Hide();
+        _log.LogInfo($"customer request done: {_job.Request?.Kind} " +
+            $"answered={outcome.Answered} tip={outcome.TipEligible} " +
+            $"quiz={outcome.QuizAnsweredCorrectly} speed={outcome.SpeedChallengeAgreed}");
+        RefreshJob();
+    }
+
+    // The quiz asks about the car in the garage, like Unity's playerCar: the
+    // catalogue row behind the current key, never a copy taken at purchase.
+    private CarSpec? CurrentCarSpec() =>
+        _garage.Current is { } car ? _garage.SpecOf(car) : null;
+
+    private double TrackLengthMeters() =>
+        _trackLengthMeters ?? _addressMap.TrackLengthMeters;
+
+    // Speed-challenge police check, once per live poll while the passenger is
+    // aboard. A warning shows once per patrol on approach; a fine lands once
+    // per patrol, clears the ordinary tip and adds the receipt deduction.
+    private void CheckPolice(TelemetrySample sample)
+    {
+        if (_police is not { } planner)
+        {
+            return;
+        }
+
+        double length = TrackLengthMeters();
+        double offset = sample.NormalizedPosition is { } position
+            ? LapGeometry.OffsetMeters(position, length)
+            : double.NaN;
+        if (double.IsFinite(offset))
+        {
+            foreach (PolicePatrol patrol in _job.Patrols)
+            {
+                if (_job.FinedPatrolIds.Contains(patrol.Id)
+                    || _job.WarnedPatrolIds.Contains(patrol.Id))
+                {
+                    continue;
+                }
+
+                double distance = LapGeometry.DistanceMeters(
+                    offset, patrol.LapOffsetMeters, length);
+                if (distance <= planner.Rules.WarningRadiusMeters)
+                {
+                    _job.WarnedPatrolIds.Add(patrol.Id);
+                    _hud?.ShowNotice(
+                        Strings.Format("HudPoliceWarning", patrol.SpeedLimitKmh),
+                        TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
+                }
+            }
+        }
+
+        PolicePatrol? caught = SpeedChallengeFines.Check(
+            _job.Patrols, sample.NormalizedPosition ?? double.NaN,
+            length, sample.SpeedKmh, _job.FinedPatrolIds,
+            _job.SpeedChallengeAgreed);
+        if (caught is not { } fine)
+        {
+            return;
+        }
+
+        _job.FinedPatrolIds.Add(fine.Id);
+        _job.SpeedChallengeFines++;
+        // Unity's OR tip rule: the fine kills the ordinary ask tip but a
+        // correct quiz tip rides its own flag through the settle.
+        _job.TipEligible = false;
+        _hud?.ShowNotice(
+            Strings.Format("HudPoliceFine", _fares.FineAmount),
+            TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
+        _log.LogWarning(
+            $"speed challenge fine: €{_fares.FineAmount:0} " +
+            $"(patrol {fine.Id}, {sample.SpeedKmh:0} km/h in {fine.SpeedLimitKmh} zone)");
+    }
+
+    private void ShowPickupGuidance() =>
+        _hud?.SetJobGuidance(Guidance(
+            _job.PickupName, _job.PickupAddress,
+            "HudJobPickupDrive", "HudJobPickupArrived", "HudJobPickupAction"));
+
+    private void ShowDropoffGuidance() =>
+        _hud?.SetJobGuidance(Guidance(
+            _job.DropoffName, _job.DropoffAddress,
+            "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction"));
+
+    // A proposal generated on a map that cannot supply two doors has no
+    // structured address; the HUD then has nothing to route to and stays
+    // unpinned rather than showing a wrong street.
+    private HudJobGuidance? Guidance(
+        string name, AddressLocation? target, string driveKey,
+        string arrivedKey, string actionKey) =>
+        target is { } door
+            ? new HudJobGuidance(
+                name, door, driveKey, arrivedKey, actionKey,
+                _taxiRules.ArrivalRadiusMeters)
+            : null;
+
+    // Reveals the panel on a job page (refusal, breakdown, receipt). Show()
+    // deliberately opens the menu instead, so the page must be set first.
+    private void ShowJobScreen(object screen)
+    {
+        RecordActivity();
+        _introShown = true;
+        SetScreen(screen);
+        IsShown = true;
+        _log.LogInfo("overlay shown (job)");
+    }
+
+    // Prices the live meter, banks it to the wallet, the driver save and the
+    // shift, and shows the receipt. The odometer already banked the wear per
+    // poll, so the settle must not add the distance a second time.
     private void SettleReceipt()
     {
-        // No driving slice yet: the placeholder ride settles here instead
-        // of the live meter, wherever the settle was triggered.
         _job.Phase = JobPhase.Complete;
-        _job.DistanceKm = PlaceholderDistanceKm;
-        // Testing hook: the settled ride wears the car by its own distance.
-        BankJobDistance(_job.DistanceKm);
-        int capacity = ResolveCapacity();
+        int capacity = _fleet.PassengerCapacity();
         // Unity keys familiarity off the base name (no companion suffix):
         // every completed ride is +1 for that resident, strangers included
         // (0 -> 1 on the first ride). The outcome rides the receipt so the
         // page renders it; transitions log, quiet rides do not.
-        string baseName = BaseCustomerName(_job.Customer);
+        string baseName = _job.Customer.BaseName;
         FriendshipOutcome friendship = _friends.RegisterRide(baseName);
         // Unity banks the trip km into the driven brand before pricing, so
         // the current ride already counts toward its own sponsorship rate.
-        string brandName = ResolveBrandName();
+        string brandName = _fleet.SponsorBrand();
         double brandKm = _brands.RegisterRide(brandName, _job.DistanceKm);
         TaxiReceipt receipt = TaxiReceiptBuilder.Build(
             _job.DistanceKm, capacity, PlaceholderCarClass,
             PlaceholderCarRarity, PlaceholderStreetKnowledgePct,
-            tipEligible: true, PlaceholderFines, _fares, _wallet.Xp,
+            tipEligible: _job.TipEligible || _job.QuizAnsweredCorrectly,
+            fines: _job.SpeedChallengeFines, _fares, _wallet.Xp,
             new FriendshipResult(friendship.OwnerName, friendship.Level, friendship.TierIncreased),
             brandName, brandKm);
         if (friendship.TierIncreased)
@@ -1356,7 +1389,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         _shift.RecordCompleted(_job, _clock.UtcNow);
         // Dirt tick (PORTPLAN 33, Unity TaxiJobLifecycleHandler's dropoff
         // block): every completed ride is +1 on the car driven now.
-        DirtyCurrentCar();
+        _fleet.AddDirt();
         // Checkpoint bank: a paid job is progress the player can see, so the
         // moment goes to disk now instead of waiting for the throttle. The
         // garage rides along so the dirt tick is not lost with the process.
@@ -1366,35 +1399,18 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
                   $"dist={receipt.DistanceKm:0.00}km total={receipt.Total:0.00} xp={receipt.XpEarned:0.00} " +
                   $"brand={receipt.BrandName} bonus={receipt.BrandBonus:0.00} " +
                   $"wallet={_wallet.Cash:0.00} shift={_shift.JobsDone} jobs / {_shift.Earned:0.00}");
-        SetScreen(new TaxiReceiptScreenViewModel(
+        ShowJobScreen(new TaxiReceiptScreenViewModel(
             receipt, _job.Customer.Full, _wallet, _shift, _beat,
             new RelayCommand(() => SetScreen(CreateControlScreen())), _rivals));
         RefreshJob();
     }
 
     // One driver save the whole VM shares (PORTPLAN 51 interim): every state
-    // owner contributes its slice, so a save from any path can never clobber
-    // another owner with stale numbers. Standings ride along from the caller
-    // that just refreshed them; null keeps the last known board snapshot
-    // (OfflineRivals seeds it from the driver save at boot).
-    private void SaveDriver(RivalsResult? standings)
-    {
-        _driverStore.Save(_wallet.Snapshot() with
-        {
-            RivalsRank = standings?.CurrentRank ?? 0,
-            RivalsTotal = standings?.TotalCompetitors ?? 0,
-            DaysInARow = _streak.DaysInARow,
-            LastLoginDate = _streak.LastLoginDate,
-            LastDailyBonusDate = _streak.LastDailyBonusDate,
-            ExpansionJobs = _zone.CountedJobs,
-            ExpansionCount = _zone.ExpansionCount,
-            StreetIds = _zone.StreetIds,
-            ZoneKm = _zone.Km,
-            Bank = _wallet.BankBalance,
-            HasEnteredBank = _wallet.HasEnteredBank,
-            Trunk = _trunk.Snapshot(),
-        });
-    }
+    // owner contributes its slice through the saver, so a save from any path
+    // can never clobber another owner with stale numbers. Standings ride along
+    // from the caller that just refreshed them; null keeps the last known board
+    // snapshot (OfflineRivals seeds it from the driver save at boot).
+    private void SaveDriver(RivalsResult? standings) => _saver.SaveDriver(standings);
 
     /// <summary>The standings tail both receipts share (Unity
     /// TaxiJobLifecycleHandler's dropoff block + ApplyStoreDeliveryEffects,
@@ -1406,49 +1422,10 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         RivalsResult? standings = _rivals.Refresh(_wallet.Xp);
         // The opening screen supplies the display name; before it is
         // confirmed the push stays nameless like the old placeholder.
-        _rivals.PushXp(_wallet.Xp, _profile?.DisplayName ?? string.Empty);
+        _rivals.PushXp(_wallet.Xp, _story.Profile?.DisplayName ?? string.Empty);
         SaveDriver(standings);
         LogStandingsMove(standings);
         return standings;
-    }
-
-    // The nightly per-car insurance premium (PORTPLAN 34, Unity
-    // GameClockManager.UpdateInsurance): once per game date, inside the rules'
-    // charge hour, for every insured car with a price. The charge takes what
-    // the cash covers (a premium is a commitment, not a purchase), and the
-    // stamp rides the driver save so a restart inside the same hour never
-    // double-charges.
-    private void ChargeDailyInsurance()
-    {
-        DateTime now = _game.GameNow;
-        if (now.Hour != _insuranceRules.ChargeHour)
-        {
-            return;
-        }
-        string date = now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
-        if (string.Equals(_wallet.LastInsuranceChargeDate, date, StringComparison.Ordinal))
-        {
-            return;
-        }
-        _wallet.MarkInsuranceCharged(date);
-        double total = 0.0;
-        int insured = 0;
-        foreach (OwnedCar car in _garage.Cars)
-        {
-            if (!car.HasInsurance || _garage.SpecOf(car) is not { Price: > 0.0 } spec)
-            {
-                continue;
-            }
-            double premium = InsurancePricing.DiscountedDailyCost(spec.Price, PlaceholderDriverRating, _insuranceRules);
-            total += _wallet.ChargeUnavoidable(premium);
-            insured++;
-        }
-        if (insured > 0)
-        {
-            _log.LogInfo($"[Insurance] daily premium {total:0.00} CR for {insured} car(s) " +
-                $"(cash {_wallet.Cash:0.00})");
-            SaveDriver(_rivals.LastResult);
-        }
     }
 
     // One trip-start roll (PORTPLAN 39, Unity DrivingManager.BeginTripSession):
@@ -1481,7 +1458,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         _log.LogWarning($"[Breakdown] {breakdown.Kind}" +
             $"{(breakdown.EngineFailure ? " engine failure" : $" at {breakdown.Fraction:0.00} of the route")}," +
             $" tow fee {fee:0.00} CR (cash {_wallet.Cash:0.00})");
-        SetScreen(new BreakdownScreenViewModel(
+        ShowJobScreen(new BreakdownScreenViewModel(
             breakdown, _beat,
             new RelayCommand(() => SetScreen(CreateControlScreen()))));
     }
@@ -1705,121 +1682,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
     // dead process between the two must not lose the car that was just paid
     // for. Also runs at window close (the odometer's last bank) and on the
     // poll's throttle. Restamps so the throttle stays honest.
-    public void SaveGarage()
-    {
-        _lastGarageSave = _clock.UtcNow;
-        _garageStore.Save(_garage.Snapshot());
-    }
-
-    // The career follows the garage's current car; a live car that is not
-    // that row is a free-roam detour, and the HUD says so. An unknown
-    // identity (the log watcher has not caught up yet) is not a mismatch:
-    // warning on a guess would flag every fresh session.
-    private bool IsDrivingWrongCar() =>
-        _carIdentity is { } identity
-        && _garage.Current is { } current
-        && !identity.Matches(current.Key);
-
-    // The odometer feed (PORTPLAN items 31/32, Unity DrivingManager's speed
-    // integration): bank this tick's distance into the car driven now, then run
-    // the engine inspections. The same dt guard as the fare meter keeps a
-    // stalled, torn or teleported poll out of the ledger; the speed clamp keeps
-    // a one-frame glitch out of it too.
-    private void IntegrateOdometer(TelemetrySample sample, double dt)
-    {
-        if (_garage.Current is not { } car)
-        {
-            return;
-        }
-        double speed = double.IsFinite(sample.SpeedKmh)
-            ? Math.Clamp(sample.SpeedKmh, 0.0, MaxTelemetrySpeedKmh)
-            : 0.0;
-        if (speed <= 0.0)
-        {
-            return;
-        }
-        // Only a sane tick banks distance; a stalled or lagged poll skips the
-        // add (the guard the fare meter uses) but still lets the inspections
-        // run, so a long frame never delays a due engine check.
-        if (dt is > 0 and < 1)
-        {
-            car.Drive(speed / 3600.0 * dt);
-        }
-        // Unity runs the inspections only while driving and only past the intro
-        // (firstSceneComplete); the whole engine system is dormant before it.
-        if (OnboardingDone)
-        {
-            RunEngineChecks(car);
-        }
-    }
-
-    // Unity DrivingManager.RunEngineInspections: the weekly check is
-    // informational (the schedule rolls forward), the annual one can strand the
-    // car. Both fire at most once per period because the schedule rolls on the
-    // due tick (EngineHealth, Unity parity).
-    private void RunEngineChecks(OwnedCar car)
-    {
-        DateTime now = _game.GameNow;
-        car.Engine.EnsureInitialized(now);
-        if (car.Engine.IsWeeklyDue(now))
-        {
-            car.Engine.CompleteWeekly(now);
-            _log.LogInfo($"[Engine] {car.Key} weekly inspection " +
-                $"({car.Engine.BrokenPercent(EngineCcOf(car), car.Odometer) * 100.0:0.0000}% broken)");
-        }
-        if (car.Engine.IsAnnualDue(now))
-        {
-            bool failed = car.Engine.RunAnnual(EngineCcOf(car), car.Odometer, now);
-            if (failed)
-            {
-                _log.LogWarning($"[Engine] {car.Key} failed its annual inspection at " +
-                    $"{car.Odometer:0} km — stranded until the mechanic");
-            }
-            else
-            {
-                _log.LogInfo($"[Engine] {car.Key} passed its annual inspection at {car.Odometer:0} km");
-            }
-        }
-    }
-
-    // The catalogue cc behind the driven car; an unknown key reads 0 and rides
-    // the smallest red-km band, never throws.
-    private int EngineCcOf(OwnedCar car) => _garage.SpecOf(car)?.EngineCc ?? 0;
-
-    // One completed job's dirt (PORTPLAN 33, Unity IncrementFilth): +1 on the
-    // car driven now, clamped at the rules' cap. A settled job on an already
-    // filthy car is no transition, so nothing logs. The caller banks the garage.
-    private void DirtyCurrentCar()
-    {
-        if (_garage.Current is not { } car)
-        {
-            return;
-        }
-        int before = car.Filth.Value;
-        car.Filth.Add(1);
-        if (car.Filth.Value != before)
-        {
-            _log.LogInfo($"[Filth] {car.Key} {car.Filth.Value}/{car.Filth.Max} after the job");
-        }
-    }
-
-    // TESTING HOOK (PORTPLAN items 31/32, remove when the driving slice
-    // lands): a settled job's placeholder km is banked into the current car's
-    // odometer so a completed taxi/delivery leg wears the mechanic without the
-    // player having to drive the route. Live telemetry already banks the
-    // odometer per tick, so once the real pickup/drop-off feeds distances this
-    // would double-count and must go. Nothing banks on an empty garage or a
-    // zero distance; the caller banks the garage.
-    private void BankJobDistance(double distanceKm)
-    {
-        if (_garage.Current is not { } car || distanceKm <= 0.0 || !double.IsFinite(distanceKm))
-        {
-            return;
-        }
-        car.Drive(distanceKm);
-        _log.LogInfo($"[Odometer] job distance {distanceKm:0.00} km banked into " +
-            $"{car.Key} (odometer {car.Odometer:0.00} km)");
-    }
+    public void SaveGarage() => _saver.SaveGarage();
 
     private void LogStandingsMove(RivalsResult? standings)
     {
@@ -1899,7 +1762,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
             }
         }
         // Testing hook: the settled run wears the car by its own distance.
-        BankJobDistance(PlaceholderDistanceKm);
+        _fleet.BankJobDistance(PlaceholderDistanceKm);
         DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
             PlaceholderDistanceKm, run.PaidForGoods, run.ReceivedForGoods,
             _deliveryFares, PlaceholderStreetKnowledgePct, _wallet.Xp,
@@ -1913,7 +1776,7 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         RefreshStandings();
         // Dirt tick, delivery twin (PORTPLAN 33, Unity DeliveryJobHandler's
         // store arrival): a completed run is +1 on the car driven now.
-        DirtyCurrentCar();
+        _fleet.AddDirt();
         // Checkpoint bank, same rule as the taxi dropoff: the paid run is
         // progress the player can see, so it goes to disk now.
         SaveClock();
@@ -1929,50 +1792,13 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
                 SetScreen(_deliveryScreen ?? (object)CreateControlScreen())), _rivals));
     }
 
-    // Passenger seats of the driven car (Unity: passengerCapacity scales
-    // the distance charge). Unknown car (EVO quiet, pool gap), ambiguous
-    // variant (multi-variant folder, no preset announced) or 0-seat race
-    // entry rides solo; a 0-seat entry still takes one customer. Builder
-    // clamps too.
-    private int ResolveCapacity()
-    {
-        if (_carIdentity?.FindIn(_cars) is { } car)
-        {
-            return Math.Max(1, car.Passengers);
-        }
-
-        return 1;
-    }
-
-    // Display brand for the receipt's sponsorship lines: the watcher's
-    // spoken brand ("mazda") canonicalized to the onboarding spelling
-    // ("Mazda") so the receipt reads like the brand page. Unknown brands
-    // ride through untouched; the mileage store matches case-insensitively.
-    private string ResolveBrandName()
-    {
-        string spoken = (_carBrand ?? "").Trim();
-        foreach (string known in Content.Brands)
-        {
-            if (string.Equals(known, spoken, StringComparison.OrdinalIgnoreCase))
-            {
-                return known;
-            }
-        }
-        return spoken;
-    }
-
-    // Unity's customerBaseName: first + surname without the companion
-    // suffix ("Klaus Berger and some colleagues" -> "Klaus Berger"), so
-    // repeat rides find the same resident.
-    private static string BaseCustomerName(ProceduralName customer) =>
-        $"{customer.FirstName} {customer.Surname}".Trim();
-
     private void RefreshJob()
     {
         JobLine = _job.Phase switch
         {
             JobPhase.None => Strings.Get("NoJob"),
             JobPhase.Proposed => Strings.Format("JobProposed", _job.PickupName, _job.DropoffName),
+            JobPhase.ToPickup => Strings.Format("JobToPickup", _job.PickupName, _job.DropoffName),
             JobPhase.EnRoute => Strings.Format("JobEnRoute", _job.PickupName, _job.DropoffName, _job.DistanceKm),
             JobPhase.Complete => Strings.Format("JobComplete", _job.PickupName, _job.DropoffName, _job.Tip),
             _ => string.Empty,
@@ -2002,19 +1828,6 @@ public sealed class MainViewModel : INotifyPropertyChanged, IScreenController, I
         }
         return -1;
     }
-
-    // ---- plumbing ------------------------------------------------------------
-
-    private bool SetField<T>(ref T field, T value, [CallerMemberName] string? name = null)
-    {
-        if (EqualityComparer<T>.Default.Equals(field, value)) return false;
-        field = value;
-        OnPropertyChanged(name);
-        return true;
-    }
-
-    private void OnPropertyChanged(string? name) =>
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
 
     public void Dispose()
     {

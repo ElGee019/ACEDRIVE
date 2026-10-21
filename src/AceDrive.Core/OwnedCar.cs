@@ -32,6 +32,7 @@ public sealed class OwnedCar
         MaintenanceRules maintenance = maintenanceRules ?? MaintenanceRules.Default;
         Condition = new CarCondition(maintenance, saved?.Parts, Odometer);
         Engine = new EngineHealth(maintenance, saved?.Engine, Odometer, seed);
+        _askedCategories = CleanAsked(saved?.AskedCategories);
     }
 
     /// <summary>Catalogue key of the bought car (<see cref="CarSpec.Key"/>).</summary>
@@ -56,6 +57,23 @@ public sealed class OwnedCar
     /// <summary>The engine health (PORTPLAN item 32, Unity EngineHealthService).</summary>
     public EngineHealth Engine { get; }
 
+    // The quiz history: category keys already asked on this car. Reset once
+    // every category has been asked (CarStatQuiz.MarkAsked owns that rule).
+    private IReadOnlyList<string> _askedCategories;
+
+    /// <summary>Car-stat categories already asked on this car (oldest first).</summary>
+    public IReadOnlyList<string> AskedCategories => _askedCategories;
+
+    /// <summary>
+    /// Records one asked quiz category and applies the at-count reset. The
+    /// caller saves the garage once after this call.
+    /// </summary>
+    public void MarkAskedCategory(string key, int categoryCount) =>
+        _askedCategories = CarStatQuiz.MarkAsked(_askedCategories, key, categoryCount);
+
+    /// <summary>Clears the quiz history (a new car, or a hand-edited reset).</summary>
+    public void ResetAskedCategories() => _askedCategories = [];
+
     /// <summary>Banks kilometres driven (Unity OwnedCar.odometer). Never negative,
     /// never NaN — a torn telemetry read must not poison the ledger.</summary>
     public void Drive(double distanceKm)
@@ -75,5 +93,25 @@ public sealed class OwnedCar
     public void ResetOdometer() => Odometer = 0.0;
 
     public OwnedCarState Snapshot() => new(
-        Key, PurchaseWeek, Odometer, HasInsurance, Filth.Value, Condition.Snapshot(), Engine.Snapshot());
+        Key, PurchaseWeek, Odometer, HasInsurance, Filth.Value,
+        Condition.Snapshot(), Engine.Snapshot(), _askedCategories);
+
+    private static List<string> CleanAsked(IReadOnlyList<string>? saved)
+    {
+        if (saved is not { Count: > 0 })
+        {
+            return [];
+        }
+
+        List<string> cleaned = [];
+        foreach (string value in saved)
+        {
+            string key = (value ?? "").Trim();
+            if (key.Length > 0 && !cleaned.Contains(key, StringComparer.OrdinalIgnoreCase))
+            {
+                cleaned.Add(key);
+            }
+        }
+        return cleaned;
+    }
 }

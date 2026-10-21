@@ -90,6 +90,9 @@ public sealed class JsonOnboardingContent : IContentSource
         var aliases = Read("brand_aliases.json", () => new Dictionary<string, string[]>()) ?? new();
         var cars = Read("grandma_cars.json", () => new List<RawCar>()) ?? new();
         var dialogue = Read("grandma_dialogue.json", () => new List<RawLine>()) ?? new();
+        var pancakes = Read("pancake_dialogue.json", () => new List<RawLine>()) ?? new();
+        var communityCentre = Read(
+            "community_centre_dialogue.json", () => new List<RawLine>()) ?? new();
         var confusions = CleanConfusions(
             Read("voice_confusions.json", () => new Dictionary<string, string>()) ?? new());
 
@@ -104,10 +107,19 @@ public sealed class JsonOnboardingContent : IContentSource
             dialogue.Where(l => !string.IsNullOrWhiteSpace(l.Text))
                 .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
                 .ToArray(),
+            pancakes.Where(l => !string.IsNullOrWhiteSpace(l.Text))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .ToArray(),
+            communityCentre.Where(l => !string.IsNullOrWhiteSpace(l.Text))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .ToArray(),
             confusions);
         _log.LogInfo($"content: {content.Brands.Count} brands, {content.Cars.Count} cars " +
             $"({content.Cars.Count(c => c.ImagePath is not null)} with thumbs), " +
-            $"{content.Dialogue.Count} dialogue lines, {confusions.Count} transcript aliases");
+            $"{content.Dialogue.Count} dialogue lines, " +
+            $"{content.PancakeDialogue.Count} pancake lines, " +
+            $"{content.CommunityCentreDialogue.Count} community centre lines, " +
+            $"{confusions.Count} transcript aliases");
         return content;
     }
 

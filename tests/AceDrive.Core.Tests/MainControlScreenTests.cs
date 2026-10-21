@@ -30,18 +30,19 @@ public sealed class MainControlScreenTests
             garage ?? new Garage([]),
             CalendarStamp.Default,
             shiftState,
-            taxiStartsShift
-                ? new RelayCommand(() => shiftState.Start(tick.UtcNow))
-                : new RelayCommand(() => { }),
-            new RelayCommand(() => { }, () => deliveryOpen),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            carWashCommand ?? new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new ParameterizedCommand<int>(_ => { }, day => day == game.Today));
+            new ControlActions(
+                taxiStartsShift
+                    ? new RelayCommand(() => shiftState.Start(tick.UtcNow))
+                    : new RelayCommand(() => { }),
+                new RelayCommand(() => { }, () => deliveryOpen),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                carWashCommand ?? new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new ParameterizedCommand<int>(_ => { }, day => day == game.Today)));
     }
 
     [Fact]
@@ -271,16 +272,17 @@ public sealed class MainControlScreenTests
             beat, game, clock, TestRoadCars.Ledger(), TodoTable.Default,
             new Hunger(HungerRules.Default), new Garage([]),
             CalendarStamp.Default, new TaxiShift(),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => fired = true),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new RelayCommand(() => { }),
-            new ParameterizedCommand<int>(_ => { }, day => day == game.Today));
+            new ControlActions(
+                new RelayCommand(() => { }),
+                new RelayCommand(() => fired = true),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new RelayCommand(() => { }),
+                new ParameterizedCommand<int>(_ => { }, day => day == game.Today)));
 
         vm.VoiceActions["DELIVERY JOB"].Invoke();
         Assert.True(vm.DeliveryFlash);

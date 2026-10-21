@@ -1,0 +1,252 @@
+{
+    "timerSeconds": 14,
+    "tier2Chance": 0.2,
+    "tier3Chance": 0.2,
+    "speedChallengeText": "Please get there quickly!",
+    "suffixRequests": {
+        "and some boxing partners": "[name] are in a hurry for a match.",
+        "and some tea loving friends": "[name] are asking you to avoid sudden stops.",
+        "and some motorsport enthusiasts": "[name] are asking you to keep the revs up; they enjoy the sound of the engine.",
+        "and modelling office colleagues": "[name] are asking you to drive smoothly to avoid wrinkles and motion sickness.",
+        "and some business partners": "[name] are asking you to keep the ride professional so they can work, and to keep the radio quiet.",
+        "and some jazz band members": "[name] are asking if you can put on jazz.",
+        "and some poker friends": "[name] are asking you not to talk about luck or odds during the ride.",
+        "and some not very well-liked people": "[name] are asking you to keep interaction minimal and just focus on the road.",
+        "and some yoga classmates": "[name] are asking you to drive gently and avoid aggressive acceleration.",
+        "and some amateur astronomers": "[name] are complaining about light pollution and asking you to turn off the interior lights.",
+        "and some birdwatchers": "[name] are asking you to slow down near parks and trees, just in case.",
+        "and some metalheads": "[name] are asking if you can turn the music up.",
+        "and some people who believe pigeons are government spies": "[name] are asking you to keep the windows closed.",
+        "and some people who only listen to classical music": "[name] are asking you to turn the radio to classical.",
+        "and some sugar addicts": "[name] are asking you to avoid sudden braking.",
+        "and some people who think their pets are family": "[name] are asking you to drive extra carefully because their pet is stressed.",
+        "and some videogame fanatics who never skip a dialogue": "[name] are asking you not to interrupt them while they are talking.",
+        "and some people who read medicine leaflets": "[name] are asking you to drive within the speed limit at all times.",
+        "and some friends who smoke": "[name] are asking if cracking a window slightly would be okay.",
+        "and some people who do not talk much": "[name] are asking you to keep the ride quiet and peaceful.",
+        "and some Twin Peaks fans": "[name] are asking you to keep the radio low because something strange might happen.",
+        "and some Trekkies": "[name] are asking you to keep the ride smooth and logical, with no unnecessary risks.",
+        "and some bureaucrats": "[name] are asking you to follow traffic rules precisely.",
+        "and some ecologists": "[name] are asking you to drive efficiently and avoid unnecessary idling.",
+        "and some amateur photographers": "[name] are asking you to slow down occasionally.",
+        "and some chess club members": "[name] are asking you to plan your moves ahead and avoid last-second lane changes.",
+        "and some choir members": "[name] are asking you to turn down the radio so they can rest their voice.",
+        "and some sailing crew mates": "[name] are asking you to take turns smoothly, sailing through traffic.",
+        "and some open-mic regulars": "[name] are asking you to keep the radio off so they can rehearse silently.",
+        "and some community radio hosts": "[name] are asking you to keep the engine noise low so they can record a voice note.",
+        "and some people who record voice notes to not forget": "[name] are asking you not to interrupt while they are recording.",
+        "and some friends who name their houseplants": "[name] are asking you to turn off the airco.",
+        "and some former time-travelers": "[name] are asking you to take the same route as last time.",
+        "and some acquaintances who clap when their plane lands": "[name] are asking whether you are a safe driver and if you can take it slow.",
+        "and some amateur weather prophets": "[name] are asking you to drive carefully because the weather is no good today.",
+        "and some friends who refuse to sit with their back to a door": "[name] are asking you to adjust the seating.",
+        "and some people who claim to remember their previous life": "[name] are asking you to pass a familiar street.",
+        "and some lovers of obscure national anthems": "[name] are asking if you can put on the radio and search for something ceremonial.",
+        "and some friends who test chairs before trusting them": "[name] are asking you not to brake suddenly.",
+        "and some late-night philosophers": "[name] are asking you to keep a slow, thoughtful pace.",
+        "and some people who never turn mirrors toward their beds": "[name] are asking you to adjust the rear-view mirror away from them.",
+        "and some friends who keep old voicemails they can't bring themselves to delete": "[name] are asking you to keep the ride quiet.",
+        "and some neighbors who know exactly when the neighbor leaves the building": "[name] are asking you to check whether someone is tailing.",
+        "and some acquaintances who like to gossip": "[name] are asking if you have heard anything interesting about the area.",
+        "and some people who insist they have already lived before": "[name] are asking you to take another route than last time.",
+        "and some people who count steps without knowing why": "[name] are asking you to stop at crossings.",
+        "and some friends who keep packed bags read for you never know": "[name] are asking you not to put their bags in the trunk.",
+        "and some neighbors who do not finish their sentences": "[name] are asking you to just\u2026",
+        "and some people who avoid specific dates": "[name] are asking you to avoid mentioning the time."
+    },
+    "questionCategories": [
+        {
+            "key": "weight",
+            "stat": "MassKg",
+            "unitKey": "QuizUnitKg",
+            "bands": [
+                {
+                    "tier": "heavy",
+                    "min": 1800,
+                    "variants": [
+                        "Thank you for picking me up. I can imagine this is quite a heavy car, what is its weight exactly?",
+                        "Thanks for taking me. I bet this thing's got some weight to it. How much does it weigh, exactly?",
+                        "Hello there, I have to say this looks like a pretty hefty vehicle. Do you happen to know its exact weight?"
+                    ]
+                },
+                {
+                    "tier": "light",
+                    "max": 1200,
+                    "variants": [
+                        "Hi! This car looks pretty lightweight. Do you know how much it actually weighs?",
+                        "Hello there! What's the curb weight of this model? It looks lighter than most.",
+                        "Thank you for picking me up! With how bloated modern vehicles have become, this one actually looks refreshingly light. What's its weight?",
+                        "Thanks for taking me! Considering how unnecessarily heavy most new cars are, I'm curious: what's the weight on this model?"
+                    ]
+                },
+                {
+                    "tier": "medium",
+                    "variants": [
+                        "Hi! I've always wondered how much these cars weigh. Do you happen to know?",
+                        "Oh hello, I like this vehicle! What weight does it have?",
+                        "Oh wow, you must be so happy with this car. Is it heavy? Do you know its weight?"
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "power",
+            "stat": "Horsepower",
+            "unitKey": "QuizUnitHp",
+            "bands": [
+                {
+                    "tier": "high",
+                    "min": 200,
+                    "variants": [
+                        "Wow, this looks like a powerful car! Do you know how much horsepower it has?",
+                        "The acceleration's impressive. What is the horsepower spec on this model?",
+                        "Whoa, this thing's got some serious muscle! How much horsepower does it pack?",
+                        "This feels like a sports car! What's the horsepower you have on this beauty?"
+                    ]
+                },
+                {
+                    "tier": "normal",
+                    "variants": [
+                        "I've been trying to learn more about cars. Any idea what the horsepower is on this one?",
+                        "That's some car... Mind if I ask how many horses are under the hood here?",
+                        "I'm not a car expert, but still curious: how much horsepower does this thing have?",
+                        "I hope I'm not overstepping, but I like knowing these things. What kind of horsepower does your car have?"
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "topSpeed",
+            "stat": "TopSpeedKmh",
+            "unitKey": "QuizUnitKmh",
+            "bands": [
+                {
+                    "tier": "high",
+                    "min": 180,
+                    "variants": [
+                        "This thing feels fast. What is its top speed? Do you know?",
+                        "This car's got some serious pace. What's the top speed on it?",
+                        "I wouldn't be surprised if this thing could break 200. What's the official top speed of your car?",
+                        "This car's got a sporty vibe. Any idea what its top speed is?"
+                    ]
+                },
+                {
+                    "tier": "normal",
+                    "variants": [
+                        "Do you happen to know the top speed of this model?",
+                        "Just curious, what is the top speed for this car?",
+                        "Interesting car you have! What's its top speed?",
+                        "I guess this is not one of those models with a high top speed. Do you know how fast it can go?"
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "engineSize",
+            "stat": "EngineCc",
+            "unitKey": "QuizUnitCc",
+            "bands": [
+                {
+                    "tier": "large",
+                    "min": 2500,
+                    "variants": [
+                        "I can hear this has a proper engine. Must be a three-liter or something?",
+                        "This feels like it's got a big engine under the hood. How many cc's are we talking?",
+                        "This must have quite a large engine. Do you know the displacement?",
+                        "Sounds like a proper engine up front. Any idea what the size of it is?"
+                    ]
+                },
+                {
+                    "tier": "small",
+                    "variants": [
+                        "Seems like the engine of your car must be quite economical. Do you know the capacity of it?",
+                        "A nice smooth engine note on your car! How many cc's does it have?",
+                        "I bet this car is good on fuel. What's the engine capacity?",
+                        "Modern engines are so clever these days. Do you happen to know what size this engine is?",
+                        "Your car feels like it has just the right amount of power. Do you know the displacement?"
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "fuelConsumption",
+            "stat": "FuelPer100Km",
+            "unitKey": "QuizUnitFuel",
+            "bands": [
+                {
+                    "tier": "efficient",
+                    "max": 6,
+                    "variants": [
+                        "This car feels really efficient! What is the fuel consumption like?",
+                        "With prices these days, efficiency matters, I can tell. Is this car good on fuel consumption?",
+                        "This car must be great for the city. What's the fuel consumption like?",
+                        "Oh, perfect for city driving! What's the official fuel economy for your car?",
+                        "This seems like it would be cheap to run, I'm impressed! Do you know what the consumption is like?",
+                        "A car great for the wallet and environment, I can imagine! How many km per liter does it get?"
+                    ]
+                },
+                {
+                    "tier": "thirsty",
+                    "min": 10,
+                    "variants": [
+                        "Power comes at a price at the pump, right? How thirsty is this thing?",
+                        "This car must love petrol stations! How many liters per 100 kilometers does it consume?",
+                        "This feels like it goes well but drinks fuel! What is the consumption like?",
+                        "Oh wow, this car seems thirsty! No pain, no gain, as they say. How's the fuel consumption?",
+                        "Proper car with proper thirst, I always say! How many liters per 100 km does it average?"
+                    ]
+                },
+                {
+                    "tier": "moderate",
+                    "variants": [
+                        "Hello there, just curious, what's the fuel consumption of this car? Might get me one myself one day...",
+                        "Just right for everyday use, this car, right? What's the consumption like?",
+                        "This car must be practical for daily driving. How many liters per hundred kilometers do you get?",
+                        "This car seems like the perfect all-rounder! How economical is it?",
+                        "Your ride must be great for both city and highway, am I right? How's the fuel consumption?"
+                    ]
+                }
+            ]
+        },
+        {
+            "key": "price",
+            "stat": "Price",
+            "unitKey": "QuizUnitEuro",
+            "bands": [
+                {
+                    "tier": "luxury",
+                    "min": 80000,
+                    "variants": [
+                        "Quite a premium vehicle, this! If you don't mind me asking, what does such a thing cost nowadays?",
+                        "Nice ride, you clearly value quality! What does a car like this cost?",
+                        "Wow, this car has luxury written all over it! Mind if I ask what the price was?",
+                        "This beauty must have been a significant investment! Can I ask what the purchase price is for a model like that?",
+                        "That's a luxury ride for a cab! Do you mind sharing the price?"
+                    ]
+                },
+                {
+                    "tier": "budget",
+                    "max": 30000,
+                    "variants": [
+                        "This car seems like great value for money! If you don't mind me asking, what did it cost?",
+                        "Oh well, this car is maybe not the fanciest but it looks like a smart purchase! Mind if I ask what the price was?",
+                        "Budget-conscious, huh? What did you pay for this car?",
+                        "This seems like excellent value. Do you mind sharing what it cost?",
+                        "This must have been a sensible financial decision. Is it your first car? What did you pay for it?"
+                    ]
+                },
+                {
+                    "tier": "mid",
+                    "variants": [
+                        "This seems like a quality vehicle. If you don't mind me asking, what is the purchase price for a vehicle like that?",
+                        "Great choice without breaking the bank, this vehicle! What's the price on this particular model?",
+                        "This seems like sensible money for a great car! What does it set one back?",
+                        "You get so much car for the money these days! What is the cost for this one?",
+                        "This car feels like excellent value for money! What's the price tag if you don't mind me asking?",
+                        "I can tell you did some smart spending on a proper car! Do you mind sharing the price?"
+                    ]
+                }
+            ]
+        }
+    ]
+}

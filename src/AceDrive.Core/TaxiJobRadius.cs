@@ -17,6 +17,21 @@ public static class TaxiJobRadius
     /// <summary>Unity TaxiJobGenerator.MinTaxiJobRadiusKm.</summary>
     public const int MinimumKm = 5;
 
+    /// <summary>
+    /// The limit in effect for a draw, Unity's EffectiveRadiusKm: 0 means
+    /// unlimited, a negative value is treated as unlimited, and any positive
+    /// value below the floor snaps to the floor.
+    /// </summary>
+    public static int Effective(int radiusKm)
+    {
+        if (radiusKm < 0)
+        {
+            return 0;
+        }
+
+        return radiusKm > 0 && radiusKm < MinimumKm ? MinimumKm : radiusKm;
+    }
+
     /// <summary>Commits typed field text to the radius in effect, applying
     /// Unity's end-edit rules. Empty field = 0 (no limit).</summary>
     public static int Normalize(string? raw, int current)

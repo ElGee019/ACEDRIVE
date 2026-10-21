@@ -47,6 +47,7 @@ public sealed class BreakdownFlowTests
         var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
         double before = wallet.Cash;
         proposal.AcceptCommand.Execute(null);
+        vm.PickupCommand.Execute(null);
 
         Assert.IsType<BreakdownScreenViewModel>(vm.CurrentScreen); // no receipt
         Assert.Equal(before - 100.0, wallet.Cash, 6);              // the tow fee
@@ -59,13 +60,11 @@ public sealed class BreakdownFlowTests
         MaintenanceRules rules = CertainBreakdown;
         Garage garage = WornGarage(rules);
         var friends = new FakeFriendshipStore();
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        var (vm, clock, tel, _) = MainViewModelTests.Create(
             speedKmh: 0f, garage: garage, friendships: friends,
             breakdowns: new BreakdownStrategy(rules, seed: 0)); // not onboarded
 
-        vm.TaxiShiftCommand.Execute(null);
-        var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
-        proposal.AcceptCommand.Execute(null);
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
         Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen); // the ride paid
         Assert.Empty(friends.Deltas);
@@ -81,6 +80,7 @@ public sealed class BreakdownFlowTests
 
         vm.TaxiShiftCommand.Execute(null);
         Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen).AcceptCommand.Execute(null);
+        vm.PickupCommand.Execute(null);
 
         var page = Assert.IsType<BreakdownScreenViewModel>(vm.CurrentScreen);
         Assert.True(page.FailureVisible);

@@ -67,6 +67,68 @@ public sealed class JsonGarageStoreTests
     }
 
     [Fact]
+    public void RoundTrip_KeepsAskedQuizCategories()
+    {
+        string file = Path.GetTempFileName();
+        try
+        {
+            var store = new JsonGarageStore(file, new TestLog());
+            store.Save(new GarageState("ks_mazda_mx5_na", [
+                new OwnedCarState("ks_mazda_mx5_na", AskedCategories: ["weight", "power"]),
+            ]));
+
+            GarageState? state = new JsonGarageStore(file, new TestLog()).Load();
+            Assert.NotNull(state);
+            Assert.Equal(["weight", "power"], Assert.Single(state.Cars!).AskedCategories!);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void PreQuizSave_LoadsAnEmptyAskedHistory()
+    {
+        // Every garage.json written before the request slice has no asked
+        // categories: the car must load with an empty history, not fail.
+        string file = Write("""
+            {"currentKey":"ks_mazda_mx5_na","cars":[
+              {"key":"ks_mazda_mx5_na","purchaseWeek":1,"odometer":4,"hasInsurance":false}
+            ]}
+            """);
+        try
+        {
+            GarageState? state = new JsonGarageStore(file, new TestLog()).Load();
+            Assert.NotNull(state);
+            OwnedCarState row = Assert.Single(state.Cars!);
+            Assert.Null(row.AskedCategories);
+            var car = new OwnedCar(row.Key, row.PurchaseWeek, saved: row);
+            Assert.Empty(car.AskedCategories);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public void OwnedCar_MarksAndResetsAtTheCategoryCount()
+    {
+        var car = new OwnedCar("ks_mazda_mx5_na", 1);
+
+        car.MarkAskedCategory("weight", categoryCount: 2);
+        Assert.Equal(["weight"], car.AskedCategories);
+
+        // The second of two categories completes the set and clears it.
+        car.MarkAskedCategory("power", categoryCount: 2);
+        Assert.Empty(car.AskedCategories);
+
+        car.MarkAskedCategory("weight", categoryCount: 2);
+        Assert.Equal(["weight"], car.Snapshot().AskedCategories!);
+    }
+
+    [Fact]
     public void UnusableRows_DropWithAWarning()
     {
         // No key, a duplicate key, a negative odometer: each would corrupt a

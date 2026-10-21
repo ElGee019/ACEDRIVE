@@ -1,47 +1,27 @@
-using System.Collections.Concurrent;
 using System.Globalization;
-using System.IO;
 using System.Windows.Data;
-using System.Windows.Media.Imaging;
+using AceDrive.Overlay.Services;
 
 namespace AceDrive.Overlay.Views;
 
 /// <summary>
-/// Path string to cached BitmapImage: Image.Source does not convert bound
-/// strings on its own, so the view maps them here. DecodeOnce + freeze keeps
-/// one instance per file on the UI thread. Missing/unreadable = no image,
-/// never an exception.
+/// Path string to cached <see cref="System.Windows.Media.Imaging.BitmapImage"/>:
+/// <c>Image.Source</c> does not convert bound strings on its own, so the view
+/// maps them here. The decode and its cache live in
+/// <see cref="ThumbnailImageSource"/> (Services); the startup wires that in
+/// once through <see cref="Source"/>, keeping the view free of file I/O.
 /// </summary>
 public sealed class ImagePathConverter : IValueConverter
 {
-    private static readonly ConcurrentDictionary<string, BitmapImage?> Cache = new();
+    /// <summary>
+    /// The image loader, set once by the composition root when it wires the
+    /// resource declared in App.xaml. Null until then (design time: no image).
+    /// </summary>
+    public ThumbnailImageSource? Source { get; set; }
 
     public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture) =>
-        value is string path ? Cache.GetOrAdd(path, Load) : null;
+        value is string path && Source is not null ? Source.Load(path) : null;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();
-
-    private static BitmapImage? Load(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) return null;
-            var bmp = new BitmapImage();
-            bmp.BeginInit();
-            bmp.CacheOption = BitmapCacheOption.OnLoad;
-            bmp.UriSource = new Uri(path);
-            bmp.EndInit();
-            bmp.Freeze();
-            return bmp;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
-            or NotSupportedException or UriFormatException or ArgumentException)
-        {
-            // Decode/permission/uri failure at the image boundary: a
-            // missing file or codec-less machine shows no thumbnail,
-            // never an exception (the view degrades, nothing else throws).
-            return null;
-        }
-    }
 }

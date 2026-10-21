@@ -1,0 +1,65 @@
+<UserControl x:Class="AceDrive.Overlay.Views.CustomerRequestScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Customer request page (PORTPLAN 11, Unity CustomerRequestScreen):
+         the ask, the 14 s countdown, three quiz values or ACCEPT/DECLINE,
+         then feedback and BACK. The host ticks the countdown. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=RequestTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding RequestText}" Foreground="#FFF" FontSize="14"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,10"/>
+            <TextBlock Text="{Binding TimeLine}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center" Margin="0,0,0,10"
+                       Visibility="{Binding TimerVisible, Converter={StaticResource BoolToVis}}"/>
+            <ItemsControl ItemsSource="{Binding Options}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Content="{Binding Text}" Command="{Binding Command}"
+                                HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding Feedback}" FontSize="13" TextWrapping="Wrap"
+                       TextAlignment="Center" Margin="0,8,0,0"
+                       Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVis}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#FFF"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding FeedbackPositive}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+        </StackPanel>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=DeliveryBack}" Padding="4"
+                    HorizontalAlignment="Stretch" Command="{Binding BackCommand}"
+                    Visibility="{Binding ShowBack, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

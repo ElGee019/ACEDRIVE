@@ -13,4 +13,6 @@ public sealed record OnboardingContent(
     IReadOnlyDictionary<string, string[]> Aliases,
     IReadOnlyList<GrandmaCar> Cars,
     IReadOnlyList<DialogueLine> Dialogue,
+    IReadOnlyList<DialogueLine> PancakeDialogue,
+    IReadOnlyList<DialogueLine> CommunityCentreDialogue,
     IReadOnlyDictionary<string, string>? Confusions = null);

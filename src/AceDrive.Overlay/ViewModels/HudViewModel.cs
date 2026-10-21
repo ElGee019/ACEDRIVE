@@ -19,6 +19,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     private readonly AddressMap _map;
     private readonly VoiceBeat _beat;
+    private readonly IClock _clock;
+    // The distance line quantises to this step, read from Data/taxi_rules.json
+    // by the composition root so the HUD never carries a balance literal.
+    private readonly double _distanceStepMeters;
 
     private PlayerPreferences _preferences;
 
@@ -31,13 +35,28 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private string _enterText = string.Empty;
     private string _wrongCarWarning = Strings.Get("HudWrongCar");
 
-    // The errand itself, kept so a language switch can repaint the line
-    // without the ViewModel pushing it again.
+    // The destination itself, kept so a language switch can repaint the line
+    // without the ViewModel pushing it again. The copy is a set of resource
+    // keys the story hands over, never sentences, so it repaints with the rest.
     private PointOfInterest? _destination;
+    private HudDestinationCopy? _copy;
+    // The active taxi leg, when any: it replaces the story destination in the
+    // banner until the job settles.
+    private HudJobGuidance? _jobGuidance;
     private bool _hasDestination;
     private bool _atDestination;
     private bool _wrongCar;
     private bool _isRevealed;
+
+    // The line under the banner: the remaining job distance, or a transient
+    // host notice (the notice wins). Both are empty outside a job.
+    private string _jobDistanceText = string.Empty;
+    private string _noticeText = string.Empty;
+    private DateTime _noticeUntil;
+    // The quantised distance already painted, so the 10 Hz poll only formats
+    // when the displayed step moves. Sentinels force the first paint.
+    private long _shownJobDistance = long.MinValue;
+    private bool _jobDistanceInKm;
 
     // Voice acknowledgment: the ENTER button glows teal for one shared beat,
     // then the deferred voice tap acts. Cleared by the 10 Hz poll on expiry.
@@ -65,11 +84,18 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private bool _lastGameRunning;
     private bool _lastWrongCar;
 
-    public HudViewModel(AddressMap map, PlayerPreferences preferences, VoiceBeat beat)
+    public HudViewModel(
+        AddressMap map, PlayerPreferences preferences, VoiceBeat beat,
+        IClock clock, TaxiRules rules)
     {
         _map = map;
         _preferences = preferences;
         _beat = beat;
+        _clock = clock;
+        _distanceStepMeters = double.IsFinite(rules.DisplayDistanceStepMeters)
+            && rules.DisplayDistanceStepMeters > 0.0
+                ? rules.DisplayDistanceStepMeters
+                : TaxiRules.Default.DisplayDistanceStepMeters;
         EnterCommand = new RelayCommand(Enter);
     }
 
@@ -110,7 +136,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     /// <summary>
     /// Drive-to sentence while en route, arrival sentence while parked;
-    /// empty with no errand.
+    /// empty with no destination.
     /// </summary>
     public string DestinationText
     {
@@ -124,7 +150,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         }
     }
 
-    /// <summary>"ENTER"/"BINNENGAAN"; empty with no errand.</summary>
+    /// <summary>"ENTER"/"PICK UP"; empty with no destination.</summary>
     public string EnterText
     {
         get => _enterText;
@@ -133,6 +159,22 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     /// <summary>Tap handler for the arrival button; the host decides what entering means.</summary>
     public RelayCommand EnterCommand { get; }
+
+    /// <summary>
+    /// Remaining distance on the pinned job leg ("120 m"/"1.4 km"), empty when
+    /// no leg is up or the live sample has no track position.
+    /// </summary>
+    public string JobDistanceText => _jobDistanceText;
+
+    /// <summary>A transient host notice (police fine, refusal hint); empty when none.</summary>
+    public string NoticeText => _noticeText;
+
+    public bool HasNotice => _noticeText.Length > 0;
+
+    /// <summary>The line under the banner: the notice wins over the distance.</summary>
+    public string HudLineText => HasNotice ? _noticeText : _jobDistanceText;
+
+    public bool HasHudLine => HudLineText.Length > 0;
 
     /// <summary>
     /// True once the birthday dialogue has handed the errand over. The window
@@ -144,22 +186,16 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         private set => SetField(ref _isRevealed, value);
     }
 
-    /// <summary>True while an errand destination is pinned; hides the top block otherwise.</summary>
+    /// <summary>True while a destination is pinned; hides the top block otherwise.</summary>
     public bool HasDestination
     {
         get => _hasDestination;
-        private set
-        {
-            if (SetField(ref _hasDestination, value))
-            {
-                OnPropertyChanged(nameof(HasBanner));
-            }
-        }
+        private set => SetField(ref _hasDestination, value);
     }
 
     /// <summary>
     /// True while the live car is not the garage's current car. The career
-    /// warning takes the errand line's place; the street and mileage readouts
+    /// warning takes the destination line's place; the street and mileage readouts
     /// below keep updating from the live poll.
     /// </summary>
     public bool WrongCar
@@ -172,19 +208,19 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 return;
             }
 
-            OnPropertyChanged(nameof(BannerText));
-            OnPropertyChanged(nameof(HasBanner));
+            RepaintBanner();
         }
     }
 
     /// <summary>
-    /// The warning when the wrong car is driven, else the errand sentence.
-    /// The HUD's top line binds this one property so both states share its
+    /// The warning when the wrong car is driven, else the destination line. The
+    /// HUD's top line binds this one property so both states share its
     /// position and font.
     /// </summary>
-    public string BannerText => WrongCar ? _wrongCarWarning : DestinationText;
+    public string BannerText =>
+        WrongCar ? _wrongCarWarning : DestinationText;
 
-    /// <summary>True while either the warning or an errand has a top line.</summary>
+    /// <summary>True while the warning or a destination has a top line.</summary>
     public bool HasBanner => WrongCar || HasDestination;
 
     /// <summary>
@@ -238,21 +274,62 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         MileageLabel = Strings.Get("HudMileageLabel");
         AddressLabel = Strings.Get("HudAddressLabel");
         _wrongCarWarning = Strings.Get("HudWrongCar");
-        OnPropertyChanged(nameof(BannerText));
+        // A notice is already-formatted host copy; a language switch would
+        // leave it stale, so drop it with the old strings.
+        SetNoticeText(string.Empty);
         RepaintDestination();
         Refresh(_lastSample, _lastOdometerKm, _lastGameRunning, _lastWrongCar, force: true);
     }
 
     /// <summary>
-    /// Shows the errand handed over by the birthday dialogue, or hides the
-    /// line again when <paramref name="destination"/> is null.
+    /// Shows the destination the story hands over, or hides the line again
+    /// when <paramref name="destination"/> is null. <paramref name="copy"/> is
+    /// an optional story-authored set of resource keys (drive-to, arrival and
+    /// action) that replaces the generic wording, e.g. the childhood-friend,
+    /// pancakes or home lines.
     /// </summary>
-    public void SetDestination(PointOfInterest? destination)
+    public void SetDestination(PointOfInterest? destination, HudDestinationCopy? copy = null)
     {
         _destination = destination;
-        HasDestination = destination is not null;
+        _copy = copy;
+        // A taxi leg already pinned keeps the banner: the job outranks a story
+        // destination until it settles.
+        HasDestination = destination is not null || _jobGuidance is not null;
         AtDestination = false;
         RepaintDestination();
+    }
+
+    /// <summary>
+    /// Pins the taxi leg the job is on, or clears it with null when the job
+    /// settles. The leg owns the banner until then; the story destination is
+    /// kept underneath and comes back when the leg clears.
+    /// </summary>
+    public void SetJobGuidance(HudJobGuidance? guidance)
+    {
+        _jobGuidance = guidance;
+        _shownJobDistance = long.MinValue;
+        SetJobDistanceText(string.Empty);
+        HasDestination = guidance is not null || _destination is not null;
+        AtDestination = false;
+        RepaintDestination();
+        UpdateJobDistance(_lastSample, force: true);
+    }
+
+    /// <summary>
+    /// Shows a transient line under the banner. The host formats the copy; the
+    /// HUD only owns its expiry, on the clock rather than a tick count.
+    /// </summary>
+    public void ShowNotice(string text, TimeSpan duration)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return;
+        }
+
+        _noticeUntil = duration > TimeSpan.Zero
+            ? _clock.UtcNow + duration
+            : _clock.UtcNow;
+        SetNoticeText(text);
     }
 
     /// <summary>
@@ -271,7 +348,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         _beat.Defer(() =>
         {
             EnterFlash = false;
-            EnterRequested?.Invoke(this, EventArgs.Empty);
+            RaiseEnter();
         });
     }
 
@@ -281,25 +358,67 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// </summary>
     public event EventHandler? EnterRequested;
 
+    /// <summary>
+    /// Raised when the player taps ENTER while parked at the pinned job door.
+    /// The host confirms the pickup or the drop-off from the job phase.
+    /// </summary>
+    public event EventHandler? JobEnterRequested;
+
+    // BannerText and HasBanner are one state machine (warning > destination), so
+    // every input change repaints through here instead of each setter raising
+    // the pair on its own.
+    private void RepaintBanner()
+    {
+        OnPropertyChanged(nameof(BannerText));
+        OnPropertyChanged(nameof(HasBanner));
+    }
+
+    // WHY two templates per state: a shop invites the player in for the errand,
+    // while a friend's house only has an address for now (no interior until the
+    // pickup slice), so the drive-to line carries the story hint and the
+    // arrival line stays a plain arrival with a PICK UP action.
     private void RepaintDestination()
     {
-        if (_destination is { } poi)
+        if (_jobGuidance is { } job)
         {
             DestinationText = AtDestination
-                ? Strings.Format("HudArrived", poi.Name)
+                ? Strings.Format(job.ArrivedKey, job.TargetName)
                 : Strings.Format(
-                    "HudDestination",
-                    poi.Name,
-                    poi.Address.StreetName,
-                    poi.Address.HouseNumber,
-                    _map.City);
-            EnterText = Strings.Get("HudEnter");
-            return;
+                    job.DriveKey, job.TargetName, job.Target.StreetName,
+                    job.Target.HouseNumber, _map.City);
+            EnterText = Strings.Get(job.ActionKey);
+        }
+        else if (_destination is { } poi)
+        {
+            bool person = poi.Type == PoiTypes.Person;
+            string arrivedKey = _copy?.ArrivedKey
+                ?? (person ? "HudArrivedPerson" : "HudArrived");
+            string actionKey = _copy?.ActionKey
+                ?? (person ? "HudPickUp" : "HudEnter");
+            DestinationText = AtDestination
+                ? Strings.Format(arrivedKey, poi.Name)
+                : DriveTo(poi);
+            EnterText = Strings.Get(actionKey);
+        }
+        else
+        {
+            DestinationText = string.Empty;
+            EnterText = string.Empty;
         }
 
-        DestinationText = string.Empty;
-        EnterText = string.Empty;
+        RepaintBanner();
     }
+
+    /// The hint replaces the generic drive-to wording (not appended): a story
+    /// leg reads as one authored sentence, with the same placeholders so a
+    /// translator keeps the address regardless of word order.
+    private string DriveTo(PointOfInterest poi) =>
+        Strings.Format(
+            _copy?.DriveKey ?? "HudDestination",
+            poi.Name,
+            poi.Address.StreetName,
+            poi.Address.HouseNumber,
+            _map.City);
 
     private void Enter()
     {
@@ -312,6 +431,19 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         // action so one arrival cannot enter twice.
         _beat.Cancel();
         FlashEnter();
+        RaiseEnter();
+    }
+
+    // The pinned job leg owns ENTER while it is up; otherwise the story
+    // destination does. One arrival can only mean one of the two.
+    private void RaiseEnter()
+    {
+        if (_jobGuidance is not null)
+        {
+            JobEnterRequested?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
         EnterRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -339,6 +471,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         _lastWrongCar = wrongCar;
 
         UpdateFlash();
+        UpdateNotice();
         // The warning describes the live car, so a dropped sample clears it
         // rather than leaving a stale mismatch while EVO is closed.
         WrongCar = wrongCar && sample is not null;
@@ -346,6 +479,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         UpdateMileage(odometerKm, force);
         UpdateAddress(location, force);
         UpdateArrival(sample, location);
+        UpdateJobDistance(sample, force);
 
         if (sample is null)
         {
@@ -370,16 +504,112 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     private void UpdateArrival(TelemetrySample? sample, AddressLocation? location)
     {
-        bool arrived = _destination is { } poi
-            && location is { } resolved
-            && resolved.HouseNumber == poi.Address.HouseNumber
-            && string.Equals(resolved.StreetName, poi.Address.StreetName, StringComparison.Ordinal)
-            && sample is { } live
-            && Math.Abs(live.SpeedKmh) <= StationarySpeedKmh;
+        bool arrived;
+        if (_jobGuidance is { } job)
+        {
+            arrived = sample is { } live
+                && Math.Abs(live.SpeedKmh) <= StationarySpeedKmh
+                && IsAtJobTarget(job, live);
+        }
+        else
+        {
+            arrived = _destination is { } poi
+                && location is { } resolved
+                && resolved.HouseNumber == poi.Address.HouseNumber
+                && string.Equals(resolved.StreetName, poi.Address.StreetName, StringComparison.Ordinal)
+                && sample is { } live
+                && Math.Abs(live.SpeedKmh) <= StationarySpeedKmh;
+        }
 
         // SetField inside AtDestination filters the 10 Hz repeat, so only the
         // parked/driving edge repaints.
         AtDestination = arrived;
+    }
+
+    // WHY the radius rule: the job door only has to be inside the taxi rules'
+    // radius, unlike the exact-house story arrival. The closed lap puts a door
+    // just behind the line next to a car just before it.
+    private bool IsAtJobTarget(HudJobGuidance job, TelemetrySample live)
+    {
+        if (live.NormalizedPosition is not { } position)
+        {
+            return false;
+        }
+
+        double length = live.Track?.LengthMeters ?? _map.TrackLengthMeters;
+        double target = AddressBook.LapOffsetMeters(_map, job.Target, length);
+        return LapGeometry.IsArrived(position, target, length, job.ArrivalRadiusMeters);
+    }
+
+    // The distance line only repaints when the shown step moves: metres below
+    // a kilometre (rules step), then tenths of a kilometre. The lookup and the
+    // arithmetic are cheap enough for the 10 Hz poll; the format is not.
+    private void UpdateJobDistance(TelemetrySample? sample, bool force)
+    {
+        if (_jobGuidance is not { } job
+            || sample?.NormalizedPosition is not { } position)
+        {
+            _shownJobDistance = long.MinValue;
+            SetJobDistanceText(string.Empty);
+            return;
+        }
+
+        double length = sample.Track?.LengthMeters ?? _map.TrackLengthMeters;
+        double target = AddressBook.LapOffsetMeters(_map, job.Target, length);
+        double distance = LapGeometry.DistanceMeters(
+            LapGeometry.OffsetMeters(position, length), target, length);
+        if (!double.IsFinite(distance))
+        {
+            _shownJobDistance = long.MinValue;
+            SetJobDistanceText(string.Empty);
+            return;
+        }
+
+        bool inKm = distance >= 1000.0;
+        long key = inKm
+            ? (long)Math.Floor(distance / 100.0)
+            : (long)Math.Floor(distance / _distanceStepMeters);
+        if (!force && key == _shownJobDistance && inKm == _jobDistanceInKm)
+        {
+            return;
+        }
+
+        _shownJobDistance = key;
+        _jobDistanceInKm = inKm;
+        SetJobDistanceText(inKm
+            ? Strings.Format("HudJobDistanceKm", key / 10.0)
+            : Strings.Format("HudJobDistanceMeters", key * _distanceStepMeters));
+    }
+
+    private void UpdateNotice()
+    {
+        if (_noticeText.Length > 0 && _clock.UtcNow >= _noticeUntil)
+        {
+            SetNoticeText(string.Empty);
+        }
+    }
+
+    private void SetJobDistanceText(string value)
+    {
+        if (!SetField(ref _jobDistanceText, value, nameof(JobDistanceText)))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(HudLineText));
+        OnPropertyChanged(nameof(HasHudLine));
+    }
+
+    private void SetNoticeText(string value)
+    {
+        if (!SetField(ref _noticeText, value, nameof(NoticeText)))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(HasNotice));
+        OnPropertyChanged(nameof(HudLineText));
+        OnPropertyChanged(nameof(HasHudLine));
     }
 
     private void UpdateMileage(double? odometerKm, bool force)

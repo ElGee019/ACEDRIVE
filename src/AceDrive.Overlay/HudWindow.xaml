@@ -21,16 +21,16 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Errand destination or wrong-car warning (PORTPLAN
-                     5/24/27): hidden until the birthday dialogue hands the
-                     errand over, then pinned at the top while the player
-                     drives. Parked on the destination house, the sentence
-                     becomes the arrival line and the centered ENTER button
-                     appears. While a car other than the garage's current car
-                     is driven, the warning replaces the errand sentence in
-                     this same slot and font. -->
+                <!-- Destination or wrong-car warning (PORTPLAN 5/24/27):
+                     hidden until the birthday dialogue hands the errand over,
+                     then pinned at the top while the player drives. Parked on
+                     the destination house, the sentence becomes the arrival
+                     line and the centered ENTER button appears. While a car
+                     other than the garage's current car is driven, the warning
+                     replaces the destination line in this same slot and font. -->
                 <Grid Grid.Row="0" Grid.ColumnSpan="2">
                     <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
@@ -38,7 +38,24 @@
                                Foreground="#FFFFFFFF" FontSize="16"
                                TextWrapping="Wrap"
                                Visibility="{Binding HasBanner, Converter={StaticResource BoolToVis}}"/>
-                    <Button x:Name="EnterButton" Grid.Row="1" Content="{Binding EnterText}"
+                    <!-- Remaining job distance, or a transient host notice
+                         (police fine): the notice wins and turns the line teal
+                         so it reads as an event rather than guidance. -->
+                    <TextBlock Grid.Row="1" Text="{Binding HudLineText}"
+                               FontSize="13" TextTrimming="CharacterEllipsis"
+                               Visibility="{Binding HasHudLine, Converter={StaticResource BoolToVis}}">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#FFCCCCCC"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasNotice}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                    <Button x:Name="EnterButton" Grid.Row="2" Content="{Binding EnterText}"
                             Command="{Binding EnterCommand}"
                             HorizontalAlignment="Center" VerticalAlignment="Center"
                             FontSize="16" Padding="10,4"

@@ -1,0 +1,7 @@
+{
+  "patrolsPerJob": 1,
+  "patrolRadiusMeters": 30.0,
+  "speedLimitKmh": 50,
+  "excludedStopRadiusMeters": 60.0,
+  "warningRadiusMeters": 120.0
+}

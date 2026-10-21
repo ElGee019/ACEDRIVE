@@ -4,19 +4,25 @@ using AceDrive.Overlay.Localization;
 
 namespace AceDrive.Overlay.ViewModels;
 
-/// <summary>Onboarding page 4: birthday gift-handover, one entry per page (Career Start item 4).</summary>
+/// <summary>
+/// One dialogue, one entry per page: the birthday gift-handover (Career Start
+/// item 4) and later story beats such as grandma's pancakes. The caller owns
+/// what finishing means, so the same screen serves every conversation.
+/// </summary>
 public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDialogueScreen
 {
-    private readonly IScreenController _controller;
+    private readonly Action _onFinished;
     private readonly VoiceBeat _beat;
     private readonly IReadOnlyList<DialogueLine> _lines;
     private int _index;
 
-    public DialogueScreenViewModel(IScreenController controller, IReadOnlyList<DialogueLine> lines, VoiceBeat beat)
+    public DialogueScreenViewModel(
+        IReadOnlyList<DialogueLine> lines, string title, VoiceBeat beat, Action onFinished)
     {
-        _controller = controller;
+        _onFinished = onFinished;
         _beat = beat;
         _lines = lines;
+        Title = title;
         ContinueCommand = new RelayCommand(Continue);
         VoiceActions = new Dictionary<string, Action>
         {
@@ -24,6 +30,9 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
         };
         Refresh();
     }
+
+    /// <summary>Page heading, owned by the conversation that opened the screen.</summary>
+    public string Title { get; }
 
     public string SpeakerName { get => _speaker; private set => SetField(ref _speaker, value); }
     private string _speaker = "";
@@ -39,11 +48,33 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
     /// <summary>True once the last page has been acknowledged (idle-hide resumes).</summary>
     public bool IsComplete { get; private set; }
 
-    /// <summary>Teal-glow acknowledgment for a voice tap that finishes the dialogue.</summary>
+    /// <summary>Teal-glow acknowledgment for a voice tap on CONTINUE.</summary>
     public bool ContinueFlash { get => _continueFlash; private set => SetField(ref _continueFlash, value); }
     private bool _continueFlash;
 
     private void Continue()
+    {
+        // A click is newer input: drop a pending voice tap and its glow so the
+        // beat cannot turn a second page afterwards.
+        _beat.Cancel();
+        ContinueFlash = false;
+        Advance();
+    }
+
+    // Every page's voice Continue gets the same acknowledgment as the other
+    // screens: teal text for the shared half-second, then the turn or the
+    // finish. Clicks stay instant with no glow.
+    private void VoiceContinue()
+    {
+        ContinueFlash = true;
+        _beat.Defer(() =>
+        {
+            ContinueFlash = false;
+            Advance();
+        });
+    }
+
+    private void Advance()
     {
         if (_index + 1 < _lines.Count)
         {
@@ -56,29 +87,10 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
         }
     }
 
-    // Page turns stay on this screen and act at once like a click; only the
-    // finishing tap navigates, so only it flashes teal first and waits out
-    // the shared beat.
-    private void VoiceContinue()
-    {
-        if (_index + 1 < _lines.Count)
-        {
-            _index++;
-            Refresh();
-            return;
-        }
-        ContinueFlash = true;
-        _beat.Defer(() =>
-        {
-            ContinueFlash = false;
-            Finish();
-        });
-    }
-
     private void Finish()
     {
         IsComplete = true;
-        _controller.FinishDialogue();
+        _onFinished();
     }
 
     private void Refresh()
@@ -95,6 +107,9 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
         {
             "GRANDMA" => Strings.Get("SpeakerGrandma"),
             "YOU" => Strings.Get("SpeakerYou"),
+            "ANNABELLA" => Strings.Get("SpeakerAnnabella"),
+            "JUSTIN" => Strings.Get("SpeakerJustin"),
+            "SIGNORE MORO" => Strings.Get("SpeakerSignoreMoro"),
             _ => line.Speaker,
         };
         Body = line.Text;

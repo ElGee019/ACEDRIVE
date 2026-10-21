@@ -103,10 +103,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     public MainControlScreenViewModel(
         VoiceBeat beat, GameClock game, IClock clock, RoadTestLedger roads, TodoTable todos,
         Hunger hunger, Garage garage,
-        CalendarStamp stamp, TaxiShift shift, ICommand taxiCommand, ICommand deliveryCommand,
-        ICommand haulCommand, ICommand bankCommand, ICommand garageCommand, ICommand dealerCommand,
-        ICommand carWashCommand, ICommand mechanicCommand, ICommand insuranceCommand,
-        ICommand openDayAction)
+        CalendarStamp stamp, TaxiShift shift, ControlActions actions)
     {
         _beat = beat;
         _game = game;
@@ -119,30 +116,19 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         // year stays data-only, never shown in the overlay.
         _week = stamp.Week;
         _shift = shift;
-        TaxiCommand = taxiCommand;
-        DeliveryCommand = deliveryCommand;
-        HaulCommand = haulCommand;
-        // Temporary bank entry (PORTPLAN 48): the real door moves to the
-        // bank POI marker (items 24/59), then the button follows it.
-        BankCommand = bankCommand;
-        // Temporary garage + dealer entries (PORTPLAN 29/30): the garage is a
-        // You-menu page and the dealer a POI in Unity; both move behind the
-        // marker network (items 24/59) like the bank's.
-        GarageCommand = garageCommand;
-        DealerCommand = dealerCommand;
-        // Temporary car-wash entry (PORTPLAN 33): a POI door in Unity, moving
-        // behind the marker network like the garage and dealer entries.
-        CarWashCommand = carWashCommand;
-        // Temporary mechanic entry (PORTPLAN items 31/32): a POI door in Unity,
-        // moving behind the marker network with the rest.
-        MechanicCommand = mechanicCommand;
-        // Temporary insurance-broker entry (PORTPLAN 34): a POI door in Unity,
-        // moving behind the marker network with the rest.
-        InsuranceCommand = insuranceCommand;
+        TaxiCommand = actions.Taxi;
+        DeliveryCommand = actions.Delivery;
+        HaulCommand = actions.Haul;
+        BankCommand = actions.Bank;
+        GarageCommand = actions.Garage;
+        DealerCommand = actions.Dealer;
+        CarWashCommand = actions.CarWash;
+        MechanicCommand = actions.Mechanic;
+        InsuranceCommand = actions.Insurance;
         // The strip's one tap entry (click or voice): the page itself gates
         // taps, so off-gate rows answer with the warning instead of muting.
         DayCommand = new ParameterizedCommand<int>(TapDay);
-        _openDayAction = openDayAction;
+        _openDayAction = actions.OpenDay;
         DeliveryLabel = Strings.Get("ControlDelivery");
         HaulLabel = Strings.Get("ControlHaul");
         BankLabel = Strings.Get("ControlBank");
@@ -183,11 +169,24 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     public ICommand TaxiCommand { get; }
     public ICommand DeliveryCommand { get; }
     public ICommand HaulCommand { get; }
+
+    /// <summary>Temporary bank entry (PORTPLAN 48): the real door moves to the
+    /// bank POI marker (items 24/59), then the button follows it.</summary>
     public ICommand BankCommand { get; }
+
+    /// <summary>Temporary garage entry (PORTPLAN 30): a You-menu page in Unity.</summary>
     public ICommand GarageCommand { get; }
+
+    /// <summary>Temporary dealer entry (PORTPLAN 29): a POI in Unity.</summary>
     public ICommand DealerCommand { get; }
+
+    /// <summary>Temporary car-wash entry (PORTPLAN 33): a POI door in Unity.</summary>
     public ICommand CarWashCommand { get; }
+
+    /// <summary>Temporary mechanic entry (PORTPLAN items 31/32): a POI door.</summary>
     public ICommand MechanicCommand { get; }
+
+    /// <summary>Temporary insurance-broker entry (PORTPLAN 34): a POI door.</summary>
     public ICommand InsuranceCommand { get; }
 
     /// <summary>The meter line Unity's map HUD carries ("HUNGER 2/36"):

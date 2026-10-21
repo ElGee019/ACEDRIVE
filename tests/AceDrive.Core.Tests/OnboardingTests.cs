@@ -1,5 +1,6 @@
 using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
@@ -14,7 +15,9 @@ public sealed class OnboardingTests
         [new GrandmaCar("ks_mazda_mx5_na", "Mazda MX-5 NA", 1990, 12000, null),
          new GrandmaCar("ks_datsun_240z_fairlady", "Datsun 240Z", 1970, 35000, null)],
         [new DialogueLine("GRANDMA", "Happy birthday!"),
-         new DialogueLine("YOU", "Thanks!")]);
+         new DialogueLine("YOU", "Thanks!")],
+        [new DialogueLine("GRANDMA", "Pancakes!")],
+        []);
 
     // Test-shell career: no hub content, just Max's gift balance.
     private static DeliveryCareer HubCareerShell() =>
@@ -30,7 +33,7 @@ public sealed class OnboardingTests
         clock ??= new FakeClock();
         return new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
             new FakeStore(), new NullLogger(), FareTable.Default,
-            new TaxiJobProposer(NamePoolTable.Default, seed: 0),
+            TaxiTestData.Proposer(),
             store, new FakeContentSource(Content),
             profiles ?? new FakeProfileStore(), AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
@@ -44,7 +47,8 @@ public sealed class OnboardingTests
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
-            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService());
+            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
+            new Trunk(), TaxiRules.Default);
     }
 
     // The first-run page (unit + language) sits before the name form; its
@@ -128,11 +132,11 @@ public sealed class OnboardingTests
     }
 
     [Fact]
-    public void HotkeyCall_OpensControlPageFromAnyPage()
+    public void HotkeyCall_OpensMenuPageFromAnyPage()
     {
         // Ctrl+Shift+C is a call to the app like the wake word: the hidden ->
-        // shown edge opens the main control page instead of resuming the page
-        // the player was last on.
+        // shown edge opens the menu page instead of resuming the page the
+        // player was last on.
         var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
         vm.ChooseBrand("Honda");
         vm.ChooseCar("ks_mazda_mx5_na");
@@ -145,7 +149,7 @@ public sealed class OnboardingTests
 
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -175,7 +179,7 @@ public sealed class OnboardingTests
         var clock = new FakeClock();
         var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
             new FakeStore(), new NullLogger(), FareTable.Default,
-            new TaxiJobProposer(NamePoolTable.Default, seed: 0),
+            TaxiTestData.Proposer(),
             store, new FakeContentSource(Content),
             new FakeProfileStore(), AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
@@ -189,7 +193,8 @@ public sealed class OnboardingTests
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
-            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService());
+            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
+            new Trunk(), TaxiRules.Default);
 
         vm.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);
@@ -200,6 +205,7 @@ public sealed class OnboardingTests
 
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(Strings.Get("BirthdayTitle"), dialogue.Title);
         Assert.Equal("Grandma", dialogue.SpeakerName);
 
         dialogue.ContinueCommand.Execute(null);
@@ -230,8 +236,9 @@ public sealed class OnboardingTests
         vm.ChooseBrand("Mazda");
         vm.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        Assert.Contains("HEY {BRAND}", voice.WakeText, StringComparison.Ordinal);
-        Assert.Contains("HEY ALPINE", voice.WakeText, StringComparison.Ordinal);
+        Assert.Contains("Control navigation with your voice.", voice.LeadText, StringComparison.Ordinal);
+        Assert.DoesNotContain("HEY", voice.LeadText, StringComparison.Ordinal);
+        Assert.Null(voice.HintText);
     }
 
     [Fact]
@@ -268,9 +275,13 @@ public sealed class OnboardingTests
     }
 
     [Fact]
-    public void DialogueVoiceContinue_AdvancesPages()
+    public void DialogueVoiceContinue_GlowsThenAdvancesPages()
     {
-        var vm = Create();
+        // Every dialogue page acknowledges the voice tap for the shared beat:
+        // the teal text is shown before the page turns, not only on the last
+        // page.
+        var clock = new FakeClock();
+        var vm = Create(clock: clock);
         vm.ChooseBrand("Honda");
         vm.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
@@ -279,6 +290,12 @@ public sealed class OnboardingTests
         string? label = VoiceMatch.MatchLabel("could you please continue", dialogue.VoiceActions.Keys);
         Assert.Equal("CONTINUE", label);
         dialogue.VoiceActions[label!].Invoke();
+        Assert.True(dialogue.ContinueFlash);
+        Assert.Equal("Happy birthday!", dialogue.Body); // still glowing on page 1
+
+        clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
+        vm.Poll();
+        Assert.False(dialogue.ContinueFlash);
         Assert.Equal("Thanks!", dialogue.Body);
     }
 
@@ -294,6 +311,10 @@ public sealed class OnboardingTests
                 """[{"id":"ks_mazda_mx5_na","name":"Mazda MX-5 NA","year":1990,"price":12000}]""");
             File.WriteAllText(Path.Combine(dir, "grandma_dialogue.json"),
                 """[{"speaker":"GRANDMA","text":"Hi!"}]""");
+            File.WriteAllText(Path.Combine(dir, "pancake_dialogue.json"),
+                """[{"speaker":"GRANDMA","text":"Pancakes!"}]""");
+            File.WriteAllText(Path.Combine(dir, "community_centre_dialogue.json"),
+                """[{"speaker":"SIGNORE MORO","text":"Welcome!"}]""");
             File.WriteAllText(Path.Combine(dir, "voice_confusions.json"),
                 """{"Your":"NEW","dear":"tier","two words":"x","y":"y","":"z"}""");
             var log = new TestLog();
@@ -303,6 +324,8 @@ public sealed class OnboardingTests
             Assert.Single(loaded.Cars);
             Assert.Null(loaded.Cars[0].ImagePath); // no Thumbs shipped in temp dir
             Assert.Single(loaded.Dialogue);
+            Assert.Single(loaded.PancakeDialogue);
+            Assert.Single(loaded.CommunityCentreDialogue);
             // "Your"/"NEW" normalized; multi-word, self-map and empty halves dropped.
             Assert.Equal(2, loaded.Confusions!.Count);
             Assert.Equal("new", loaded.Confusions["your"]);
@@ -334,6 +357,8 @@ public sealed class OnboardingTests
         Assert.Contains("nathan", loaded.Aliases["datsun"]); // live 17:17 Datsun garble
         Assert.Contains("henderson", loaded.Aliases["datsun"]); // live 17:17:36 Datsun fused-word garble
         Assert.Equal("mazda", loaded.Confusions["him"]); // live 17:30:04 "the him"
+        Assert.NotEmpty(loaded.PancakeDialogue); // home leg's dialogue ships with the build
+        Assert.NotEmpty(loaded.CommunityCentreDialogue); // post-pancake leg's dialogue ships too
         Assert.Empty(log.Warnings);
     }
 
@@ -346,8 +371,10 @@ public sealed class OnboardingTests
         Assert.Empty(loaded.Brands);
         Assert.Empty(loaded.Cars);
         Assert.Empty(loaded.Dialogue);
+        Assert.Empty(loaded.PancakeDialogue);
+        Assert.Empty(loaded.CommunityCentreDialogue);
         Assert.Empty(loaded.Confusions!); // loader always passes a (possibly empty) table
-        Assert.Equal(5, log.Warnings.Count);
+        Assert.Equal(7, log.Warnings.Count);
     }
 
     [Fact]
@@ -381,11 +408,41 @@ public sealed class OnboardingTests
         {
             var store = new JsonOnboardingStore(file);
             Assert.Equal(OnboardingState.Fresh, store.Load());
-            var state = new OnboardingState("Mazda", "ks_mazda_mx5_na", true);
+            var state = new OnboardingState(
+                "Mazda", "ks_mazda_mx5_na", true,
+                MaxStoreId: "max-grocery",
+                MaxStoreAddress: new AddressLocation("Street 1", 12, HouseSide.Left),
+                CommunityCentreAddress: new AddressLocation("Street 2", 7, HouseSide.Right));
             store.Save(state);
             Assert.Equal(state, new JsonOnboardingStore(file).Load());
         }
         finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void RestartTour_ClearsTheLegsButKeepsTheBankedDoors()
+    {
+        var max = new AddressLocation("Street 1", 12, HouseSide.Left);
+        var centre = new AddressLocation("Street 2", 7, HouseSide.Right);
+        var state = new OnboardingState(
+            "Mazda", "ks_mazda_mx5_na", BirthdayDone: true,
+            JustinPickedUp: true, AnnabellaPickedUp: true, PancakesDone: true,
+            MaxStoreId: "max-grocery", MaxStoreAddress: max,
+            CommunityCentreAddress: centre, CommunityCentreDone: true,
+            MaxErrandDone: true);
+
+        OnboardingState restarted = state.RestartTour();
+
+        Assert.True(restarted.BirthdayDone);
+        Assert.False(restarted.MaxErrandDone);
+        Assert.False(restarted.JustinPickedUp);
+        Assert.False(restarted.AnnabellaPickedUp);
+        Assert.False(restarted.PancakesDone);
+        Assert.False(restarted.CommunityCentreDone);
+        Assert.Equal(max, restarted.MaxStoreAddress);
+        Assert.Equal(centre, restarted.CommunityCentreAddress);
+        Assert.Equal(state.FavoriteBrand, restarted.FavoriteBrand);
+        Assert.Equal(state.GrandmaCarId, restarted.GrandmaCarId);
     }
 
     [Fact]

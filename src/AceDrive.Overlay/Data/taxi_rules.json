@@ -1,0 +1,6 @@
+{
+  "ArrivalRadiusMeters": 25.0,
+  "MaxMeterSpeedKmh": 400.0,
+  "DisplayDistanceStepMeters": 10.0,
+  "NoticeSeconds": 3.0
+}

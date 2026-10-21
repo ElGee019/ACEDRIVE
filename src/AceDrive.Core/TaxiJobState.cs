@@ -13,9 +13,20 @@ public sealed class TaxiJobState
     public ProceduralName Customer { get; set; } = new();
 
     /// <summary>True when the customer's home is the pickup leg (Unity's
-    /// isCustomerHomePickup roll). With placeholder addresses it says which
-    /// of the two is "home"; the other one is the X residence.</summary>
+    /// isCustomerHomePickup roll): the home door becomes the pickup and the
+    /// second address the X residence, or the other way around.</summary>
     public bool HomeIsPickup { get; set; }
+
+    /// <summary>The customer's home door, null when the map cannot supply two
+    /// addresses and the page falls back to the placeholder copy.</summary>
+    public AddressLocation? CustomerHome { get; set; }
+
+    /// <summary>The structured pickup door (the home or the second residence
+    /// after the flip); the future driving slice routes to it.</summary>
+    public AddressLocation? PickupAddress { get; set; }
+
+    /// <summary>The structured drop-off door.</summary>
+    public AddressLocation? DropoffAddress { get; set; }
 
     public string PickupName { get; set; } = "";
     public string DropoffName { get; set; } = "";
@@ -28,4 +39,37 @@ public sealed class TaxiJobState
     /// <summary>Speed-fine deduction on the settled receipt (0 until dropoff).</summary>
     public double Fine { get; set; }
     public double Total => Fare + BrandBonus + Tip - Fine;
+
+    /// <summary>The special request drawn at the pickup, null when this ride
+    /// asks nothing. Kept with the job so the receipt and a later save can
+    /// replay the same ask.</summary>
+    public CustomerRequest? Request { get; set; }
+
+    /// <summary>True when the customer will tip (Unity's isTipEligible): only
+    /// an accepted passive/speed ask or a correct quiz sets it. A police fine
+    /// clears it; a correct quiz tip survives through its own flag.</summary>
+    public bool TipEligible { get; set; }
+
+    /// <summary>True only when the car-stat quiz was answered correctly
+    /// (Unity's quizAnsweredCorrectly). Tips on its own, even after a fine.</summary>
+    public bool QuizAnsweredCorrectly { get; set; }
+
+    /// <summary>True when the speed challenge was accepted; the police
+    /// patrols and fine checks are armed for the rest of the ride.</summary>
+    public bool SpeedChallengeAgreed { get; set; }
+
+    /// <summary>How many speed-challenge fines this ride collected.</summary>
+    public int SpeedChallengeFines { get; set; }
+
+    /// <summary>The patrols drawn when the speed challenge was accepted;
+    /// empty for every other request and after the job ends.</summary>
+    public IReadOnlyList<PolicePatrol> Patrols { get; set; } = [];
+
+    /// <summary>Patrol ids that already charged this ride, so one patrol can
+    /// fine once even if the car circles back through it.</summary>
+    public HashSet<int> FinedPatrolIds { get; } = [];
+
+    /// <summary>Patrol ids whose HUD warning already showed, so the notice
+    /// stays once per patrol instead of repainting every tick.</summary>
+    public HashSet<int> WarnedPatrolIds { get; } = [];
 }

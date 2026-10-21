@@ -13,19 +13,21 @@ namespace AceDrive.Overlay.ViewModels;
 /// Like Unity's generator, a proposal pairs the customer's home address with
 /// a second address and a coin flip decides which leg is the pickup: the
 /// home leg reads "home, {address}", the other "the {surname} residence,
-/// {address}" after its drawn resident. Addresses stay placeholder names
-/// until the Eifel table lands (PORTPLAN Step 1), so every proposal fits
-/// every radius: Unity's RegenerateForRadius swap needs real coordinates and
-/// arrives with the map, the field only commits its value meanwhile. Names
-/// draw from the Germany cultural pools (PORTPLAN 61); DECLINE rolls a fresh
-/// passenger like the Unity button does. Voice parity with the other pages:
-/// every button answers to its text; the navigating taps glow first and wait
-/// out the shared beat, DECLINE stays on the page and acts at once like a
-/// click.
+/// {address}" after its resident. Addresses come from the address map's real
+/// streets and houses, and the optional radius filters the draw like Unity's
+/// TaxiJobGenerator (both legs within the committed km of home, 5 km floor).
+/// Residents are reused per address through the persisted resident book, so
+/// the same door keeps its homeowner (PORTPLAN 11/45/61); DECLINE rolls a
+/// fresh proposal like the Unity button does. Voice parity with the other
+/// pages: every button answers to its text; the navigating taps glow first
+/// and wait out the shared beat, DECLINE stays on the page and acts at once
+/// like a click.
 /// </summary>
 public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
 {
     private readonly TaxiJobProposer _proposals;
+    private readonly AddressMap _map;
+    private readonly Func<AddressLocation?> _home;
     private readonly ILog _log;
     private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
@@ -34,10 +36,12 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     private int _radiusKm;
 
     public TaxiJobProposalViewModel(
-        TaxiJobProposer proposals, ILog log, VoiceBeat beat,
-        ICommand backCommand, ICommand acceptCommand)
+        TaxiJobProposer proposals, AddressMap map, Func<AddressLocation?> home,
+        ILog log, VoiceBeat beat, ICommand backCommand, ICommand acceptCommand)
     {
         _proposals = proposals;
+        _map = map;
+        _home = home;
         _log = log;
         _beat = beat;
         _backCommand = backCommand;
@@ -119,12 +123,12 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     private void Generate()
     {
         RefusalText = "";
-        TaxiProposal proposal = _proposals.Next();
-        // Address A is the customer's home, Address B the second address;
-        // the flip says which one becomes the pickup leg, exactly like
-        // Unity steps the two resolved residents through isCustomerHomePickup.
-        string home = Strings.Get("ProposalAddressA");
-        string residence = Strings.Get("ProposalAddressB");
+        TaxiProposal proposal = _proposals.Next(_home(), _radiusKm);
+        // Both legs are described before the flip (Unity resolves the two
+        // residents first); the flip then decides which door becomes the
+        // pickup, exactly like isCustomerHomePickup.
+        string home = Describe(proposal.CustomerHome, "ProposalAddressA");
+        string residence = Describe(proposal.SecondResidence, "ProposalAddressB");
         string homeLeg = Strings.Format("ProposalLegHome", home);
         string residenceLeg = Strings.Format(
             "ProposalLegResidence", proposal.SecondResident.Surname, residence);
@@ -133,6 +137,13 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
             Phase = JobPhase.Proposed,
             Customer = proposal.Customer,
             HomeIsPickup = proposal.HomeIsPickup,
+            CustomerHome = proposal.CustomerHome,
+            PickupAddress = proposal.HomeIsPickup
+                ? proposal.CustomerHome
+                : proposal.SecondResidence,
+            DropoffAddress = proposal.HomeIsPickup
+                ? proposal.SecondResidence
+                : proposal.CustomerHome,
             PickupName = proposal.HomeIsPickup ? home : residence,
             DropoffName = proposal.HomeIsPickup ? residence : home,
         };
@@ -141,8 +152,18 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
             proposal.Customer.Full,
             proposal.HomeIsPickup ? homeLeg : residenceLeg,
             proposal.HomeIsPickup ? residenceLeg : homeLeg);
-        _log.LogInfo($"job proposed: {proposal.Customer.Full}");
+        _log.LogInfo(
+            $"job proposed: {proposal.Customer.Full} " +
+            $"{_current.PickupName} -> {_current.DropoffName}");
     }
+
+    // The street shape is shared with the HUD; the proposal adds the map's
+    // city, Unity's town in FormatAddress. A missing address (the map cannot
+    // supply two streets) keeps the placeholder leg so the page stays usable.
+    private string Describe(AddressLocation? address, string fallbackKey) =>
+        address is { } a
+            ? Strings.Format("ProposalAddress", AddressFormatter.Format(a), _map.City)
+            : Strings.Get(fallbackKey);
 
     private void Accept()
     {
@@ -165,19 +186,31 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     private void CommitRadius(string? raw)
     {
         int next = TaxiJobRadius.Normalize(raw, _radiusKm);
-        if (next != _radiusKm)
+        bool changed = next != _radiusKm;
+        if (changed)
         {
-            // No filtering yet: placeholder addresses carry no distance, so
-            // the edit can only ever commit the limit for the map's arrival.
+            _radiusKm = next;
             _log.LogInfo(next == 0
                 ? "proposal radius cleared: no limit"
                 : $"proposal radius: {next} km");
-            _radiusKm = next;
         }
+
         SetField(ref _radiusText, next == 0
             ? string.Empty
             : next.ToString(CultureInfo.CurrentCulture));
+
+        // Unity swaps in a proposal that fits the new limit
+        // (RegenerateForRadius). Resident resolution is synchronous here, so
+        // the page needs no "looking" state.
+        if (changed && !CurrentFitsRadius())
+        {
+            Generate();
+        }
     }
+
+    private bool CurrentFitsRadius() =>
+        AddressBook.JobFitsRadius(
+            _map, _home(), _current.PickupAddress, _current.DropoffAddress, _radiusKm);
 
     // Accept and back navigate, so a voice tap flashes teal first and the
     // page waits out the shared beat (delivery precedent); a click (or the

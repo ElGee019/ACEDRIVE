@@ -5,8 +5,9 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Draws one named POI and one house number from the map. The generator
-/// advances its own RNG, so replaying the intro in one session yields a new
-/// errand address; the composition root seeds it per launch.
+/// advances its own RNG; the onboarding flow banks the first draw so a later
+/// launch reuses the same door, while a fresh save still gets a new address.
+/// The composition root seeds it per launch.
 /// </summary>
 public sealed class PoiGenerator
 {
@@ -46,6 +47,61 @@ public sealed class PoiGenerator
             ? _definitions[0]
             : _definitions[_rng.Next(_definitions.Count)];
 
+        return DrawAddress(total) is { } address
+            ? new PointOfInterest(
+                definition.Id,
+                definition.Name,
+                address,
+                definition.Type,
+                definition.OwnerName,
+                definition.Category,
+                definition.GuaranteedItems)
+            : null;
+    }
+
+    /// <summary>
+    /// Draws one house from the whole map. Story destinations that only need a
+    /// door (the community centre) use this; the same random walk keeps every
+    /// house equally likely. Null when the map has no house. Never throws.
+    /// </summary>
+    public AddressLocation? DrawAddress()
+    {
+        if (_map.Streets is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        int total = TotalHouses();
+        return total <= 0 ? null : DrawAddress(total);
+    }
+
+    /// <summary>
+    /// Rebuilds a previously banked POI from its id and address without
+    /// advancing the RNG. Null when the content table no longer carries the
+    /// business, so an edited data file degrades to a fresh draw.
+    /// </summary>
+    public PointOfInterest? Place(string id, AddressLocation address)
+    {
+        foreach (PoiDefinition definition in _definitions)
+        {
+            if (string.Equals(definition.Id, id, StringComparison.Ordinal))
+            {
+                return new PointOfInterest(
+                    definition.Id,
+                    definition.Name,
+                    address,
+                    definition.Type,
+                    definition.OwnerName,
+                    definition.Category,
+                    definition.GuaranteedItems);
+            }
+        }
+
+        return null;
+    }
+
+    private AddressLocation? DrawAddress(int total)
+    {
         int pick = _rng.Next(total);
         foreach (AddressStreet? street in _map.Streets)
         {
@@ -58,14 +114,8 @@ public sealed class PoiGenerator
             if (pick < count)
             {
                 int number = pick + 1;
-                return new PointOfInterest(
-                    definition.Id,
-                    definition.Name,
-                    new AddressLocation(
-                        street.Name, number, HouseNumberPlan.SideOf(number)),
-                    definition.Type,
-                    definition.OwnerName,
-                    definition.Category);
+                return new AddressLocation(
+                    street.Name, number, HouseNumberPlan.SideOf(number));
             }
             pick -= count;
         }
@@ -86,5 +136,81 @@ public sealed class PoiGenerator
             }
         }
         return total;
+    }
+
+    /// <summary>
+    /// Draws one house on one street. The friends' places sit in the street
+    /// where the player grew up, so the street is data (the profile's) instead
+    /// of a random pick. Excluded numbers (the player's own house, a friend
+    /// already placed) are skipped so two people never share a door; a
+    /// one-house street still answers it (a neighbour is impossible there, a
+    /// missing destination is worse). Null when the street has no free house.
+    /// </summary>
+    public AddressLocation? DrawHouse(AddressStreet street, params int[] excludeHouseNumbers)
+    {
+        int count = HouseNumberPlan.Count(street, _map);
+        if (count <= 0)
+        {
+            return null;
+        }
+
+        if (DrawHouseNumber(count, excludeHouseNumbers) is not { } number)
+        {
+            return null;
+        }
+
+        return new AddressLocation(street.Name, number, HouseNumberPlan.SideOf(number));
+    }
+
+    // Walks the numbers that are still free and picks one slot uniformly, so
+    // every remaining house stays equally likely (no retry loop).
+    private int? DrawHouseNumber(int count, int[] exclude)
+    {
+        int free = 0;
+        for (int number = 1; number <= count; number++)
+        {
+            if (!IsExcluded(number, exclude))
+            {
+                free++;
+            }
+        }
+
+        if (free == 0)
+        {
+            // A street with a single house cannot host a second door: keeping
+            // the only address beats having no destination at all.
+            return count == 1 ? 1 : null;
+        }
+
+        int slot = _rng.Next(free);
+        for (int number = 1; number <= count; number++)
+        {
+            if (IsExcluded(number, exclude))
+            {
+                continue;
+            }
+
+            if (slot == 0)
+            {
+                return number;
+            }
+
+            slot--;
+        }
+
+        return null;
+    }
+
+    private static bool IsExcluded(int number, int[] exclude)
+    {
+        foreach (int candidate in exclude)
+        {
+            if (candidate == number)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

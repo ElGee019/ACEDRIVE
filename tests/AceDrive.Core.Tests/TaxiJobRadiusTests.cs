@@ -42,4 +42,17 @@ public sealed class TaxiJobRadiusTests
         Assert.Equal(13, TaxiJobRadius.Normalize("12.5", 0)); // Unity rounds halves away from zero
         Assert.Equal(12, TaxiJobRadius.Normalize("12,4", 0));
     }
+
+    [Fact]
+    public void Effective_NormalizesTheLimitUsedByTheDraw()
+    {
+        // Unity's EffectiveRadiusKm: negative means unlimited, positive
+        // values below the floor snap to it, 0 stays unlimited.
+        Assert.Equal(0, TaxiJobRadius.Effective(-4));
+        Assert.Equal(0, TaxiJobRadius.Effective(0));
+        Assert.Equal(TaxiJobRadius.MinimumKm, TaxiJobRadius.Effective(1));
+        Assert.Equal(TaxiJobRadius.MinimumKm, TaxiJobRadius.Effective(4));
+        Assert.Equal(TaxiJobRadius.MinimumKm, TaxiJobRadius.Effective(5));
+        Assert.Equal(12, TaxiJobRadius.Effective(12));
+    }
 }

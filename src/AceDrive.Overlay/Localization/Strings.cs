@@ -20,4 +20,16 @@ public static class Strings
     // user's formatting culture. The two are intentionally different.
     public static string Format(string key, params object?[] args) =>
         string.Format(CultureInfo.CurrentCulture, Get(key), args);
+
+    // Overloads for the hot call sites: one, two and three placeholders skip
+    // the params-array allocation the 10 Hz telemetry readouts would otherwise
+    // pay on every repaint (AGENTS.md hot-path discipline).
+    public static string Format(string key, object? arg0) =>
+        string.Format(CultureInfo.CurrentCulture, Get(key), arg0);
+
+    public static string Format(string key, object? arg0, object? arg1) =>
+        string.Format(CultureInfo.CurrentCulture, Get(key), arg0, arg1);
+
+    public static string Format(string key, object? arg0, object? arg1, object? arg2) =>
+        string.Format(CultureInfo.CurrentCulture, Get(key), arg0, arg1, arg2);
 }

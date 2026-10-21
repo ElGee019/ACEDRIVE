@@ -12,7 +12,9 @@ public sealed record GarageState(
     public static readonly GarageState Empty = new();
 }
 
-/// <summary>Persisted per-car state (Unity OwnedCar fields this port keeps).</summary>
+/// <summary>Persisted per-car state (Unity OwnedCar fields this port keeps).
+/// AskedCategories is the car-stat quiz history; a save written before the
+/// request slice has none and loads as empty.</summary>
 public sealed record OwnedCarState(
     string Key,
     int PurchaseWeek = 0,
@@ -20,7 +22,8 @@ public sealed record OwnedCarState(
     bool HasInsurance = false,
     int Filth = 0,
     IReadOnlyList<MaintenancePartState>? Parts = null,
-    EngineConditionState? Engine = null);
+    EngineConditionState? Engine = null,
+    IReadOnlyList<string>? AskedCategories = null);
 
 /// <summary>One part's baseline (Unity CarMaintenancePart: partKey +
 /// lastServiceOdometer).</summary>

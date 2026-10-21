@@ -6,9 +6,9 @@ namespace AceDrive.Core;
 /// <summary>
 /// A destination the player can be sent to: the business identity plus the
 /// resolved street and house number. The side stays internal metadata, like
-/// <see cref="AddressLocation.Side"/>. Type/Owner/Category ride along from
-/// <see cref="PoiDefinition"/> so the arrival handler never needs a second
-/// lookup.
+/// <see cref="AddressLocation.Side"/>. Type/Owner/Category/GuaranteedItems ride
+/// along from <see cref="PoiDefinition"/> so the arrival handler and the host
+/// never need a second lookup.
 /// </summary>
 public sealed record PointOfInterest(
     string Id,
@@ -16,4 +16,5 @@ public sealed record PointOfInterest(
     AddressLocation Address,
     string Type = PoiTypes.Grocery,
     string OwnerName = "",
-    string Category = "");
+    string Category = "",
+    IReadOnlyList<string>? GuaranteedItems = null);

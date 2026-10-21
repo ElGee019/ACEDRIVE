@@ -1,0 +1,8 @@
+[
+  {"speaker": "SIGNORE MORO", "text": "Hello and welcome to the Community Centre. How can I help you today?"},
+  {"speaker": "YOU", "text": "I was told I could pick up a taxi driver's license here. Can you tell me where to go?"},
+  {"speaker": "SIGNORE MORO", "text": "Well, you have found the right place. May I have your name, please?"},
+  {"speaker": "YOU", "text": "It's [YOU]."},
+  {"speaker": "SIGNORE MORO", "text": "That's a mighty fine name, [YOU], please sign below."},
+  {"speaker": "SIGNORE MORO", "text": "Congratulations! You are officially a licensed taxi driver! To launch your career, the local authorities are providing a Starter Business Bonus. Best of luck with your new endeavor!"}
+]

@@ -24,7 +24,7 @@ public sealed class GarageFlowTests
         new Dictionary<string, string[]>(),
         [new GrandmaCar(Mx5.Id, "Mazda MX-5 NA", 1990, 12000, null),
          new GrandmaCar(Junior.Id, "Alfa Romeo Junior", 2024, 47500, null)],
-        []);
+        [], [], []);
 
     [Fact]
     public void Boot_SeedsGrandmasCarIntoAnEmptyGarage()
@@ -58,6 +58,23 @@ public sealed class GarageFlowTests
         Assert.Equal(12.0, car.Odometer);
         Assert.True(car.HasInsurance);
         Assert.Equal(0, store.Saves);
+    }
+
+    [Fact]
+    public void Boot_ResumesTheAskQuizHistoryAndSnapshotsItBack()
+    {
+        // The car-stat quiz history is per car (PORTPLAN item 11): a resumed
+        // garage must hand it to the quiz and write it back on the next save.
+        var garage = new Garage(Pool, new GarageState(
+            Junior.Key,
+            [new OwnedCarState(Junior.Key, AskedCategories: ["weight", "power"])]));
+
+        OwnedCar car = Assert.Single(garage.Cars);
+        Assert.Equal(["weight", "power"], car.AskedCategories);
+
+        car.MarkAskedCategory("topSpeed", categoryCount: 6);
+        Assert.Equal(["weight", "power", "topSpeed"],
+            Assert.Single(garage.Snapshot().Cars!).AskedCategories!);
     }
 
     [Fact]
@@ -209,7 +226,10 @@ public sealed class GarageFlowTests
             cars: Pool, garage: garage, content: Content(),
             progress: OnboardingState.Fresh with { GrandmaCarId = Mx5.Key, BirthdayDone = true });
         vm.ToggleShowCommand.Execute(null); // hide
-        vm.ToggleShowCommand.Execute(null); // call it back: the control page
+        vm.ToggleShowCommand.Execute(null); // call it back: the menu page
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        // The Jobs tile opens the control page carrying every job door.
+        menu.JobsCommand.Execute(null);
         var page = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
 
         Assert.Contains("GARAGE", page.VoiceActions.Keys);

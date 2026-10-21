@@ -2,7 +2,7 @@ using AceDrive.Core;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>The errand tokens turn authored dialogue into a concrete address.</summary>
+/// <summary>The authored tokens turn dialogue into a concrete address and speaker.</summary>
 public sealed class DialogueTextTests
 {
     [Fact]
@@ -16,6 +16,19 @@ public sealed class DialogueTextTests
         DialogueLine page = Assert.Single(filled);
         Assert.Equal("Stop by Max's Grocery Store on Street 2 · No. 17.", page.Text);
         Assert.Equal("GRANDMA", page.Speaker);
+    }
+
+    [Fact]
+    public void Fill_ReplacesThePlayerToken_WithTheNameOrPronoun()
+    {
+        DialogueLine[] lines = [new("GRANDMA", "[YOU], dinner is ready.")];
+
+        Assert.Equal(
+            "Ace, dinner is ready.",
+            Assert.Single(DialogueText.Fill(lines, "", "", "Ace")).Text);
+        Assert.Equal(
+            "you, dinner is ready.",
+            Assert.Single(DialogueText.Fill(lines, "", "")).Text);
     }
 
     [Fact]
