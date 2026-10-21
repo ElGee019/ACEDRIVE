@@ -1064,10 +1064,10 @@ public sealed class MainViewModelTests
         var (restarted, _, _, _) = Create(
             progress: OnboardingState.Fresh with { BirthdayDone = true },
             clocks: store, gameStart: saved.GameNow, startWeek: saved.Week);
-        // The first-run page opens first (the intro replays); its CONTINUE ->
-        // missing content degrades to the control page whose header we read.
-        Assert.IsType<PreferencesScreenViewModel>(restarted.CurrentScreen)
-            .ContinueCommand.Execute(null);
+        // A finished introduction opens on the menu; its Jobs tile leads to
+        // the control page whose header we read.
+        var menu = Assert.IsType<MenuScreenViewModel>(restarted.CurrentScreen);
+        menu.JobsCommand.Execute(null);
         var resumed = Assert.IsType<MainControlScreenViewModel>(restarted.CurrentScreen);
         Assert.Equal(control.DateHeader, resumed.DateHeader);
     }
@@ -1572,6 +1572,43 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void BootAfterBirthday_OpensTheMenuAndRevealsTheTourLeg()
+    {
+        var justin = new AddressLocation("Street 2", 12, HouseSide.Left);
+        var progress = new OnboardingState(
+            null, null, BirthdayDone: true, JustinAddress: justin, MaxErrandDone: true);
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(
+            progress: progress, hud: hud,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5));
+
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.True(hud.Revealed);
+        Assert.Equal(StoryFriends.Justin.Id, hud.Destination?.Id);
+        Assert.Equal(justin, hud.Destination?.Address);
+    }
+
+    [Fact]
+    public void BootAfterBirthday_ResumesTheErrandBeforeTheFriends()
+    {
+        // The birthday hands Max's store over first; a relaunch must not skip
+        // it and jump straight to the friend tour.
+        var address = new AddressLocation("Street 1", 9, HouseSide.Left);
+        var progress = new OnboardingState(
+            null, null, BirthdayDone: true,
+            MaxStoreId: "max-grocery", MaxStoreAddress: address);
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(
+            progress: progress, hud: hud, content: OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5));
+
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        PointOfInterest errand = Assert.IsType<PointOfInterest>(hud.Destination);
+        Assert.Equal("max-grocery", errand.Id);
+        Assert.Equal(address, errand.Address);
+    }
+
+    [Fact]
     public void ReturningAfterTheJustinPickup_StartsAtAnnabellasPlace()
     {
         var justin = new AddressLocation("Street 2", 12, HouseSide.Left);
@@ -1712,13 +1749,13 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void CompletedOnboarding_BootsToTheFirstRunPageThenControl()
+    public void CompletedOnboarding_BootsToTheMenuPage()
     {
-        // The unit/language page is content-free, so it opens even with no
-        // brand data; continuing then degrades straight to the control page
-        // instead of trapping the player on a page with nothing to tap.
+        // A finished introduction opens on the menu; Jobs is the door into
+        // the career page.
         var (vm, _, _, _) = Create(progress: OnboardingState.Fresh with { BirthdayDone = true });
-        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen).ContinueCommand.Execute(null);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 

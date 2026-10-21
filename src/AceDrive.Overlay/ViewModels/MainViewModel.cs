@@ -336,18 +336,18 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         GearText = Strings.Get("GearUnknown");
         DetailText = string.Empty;
 
-        // First paint opens on the introduction (PORTPLAN Career Start
-        // items 1-5): opening screen, brand page, grandma's car, voice info,
-        // birthday dialogue, and only then the main control page (PORTPLAN
-        // item 54). The first call after a hidden start reveals that page;
-        // every later call (Ctrl+Shift+C, wake word) opens the menu page
-        // directly instead of replaying the walk. The intro taps re-save the
-        // picks, so a returning player walks the same pages as a first-timer.
-        // Missing content degrades to the control page (past the birthday)
-        // or a blank screen (before it) instead of trapping the user on a
-        // broken page.
-
-        SetScreen(_story.Home());
+        // First paint: a finished introduction opens on the menu (the three
+        // tiles); an unfinished one resumes the walk page the last session
+        // closed on (PORTPLAN Career Start items 1-5). The tour leg is
+        // re-pinned first so a save that is mid-tour still has its HUD
+        // destination after the relaunch, and the companion is revealed
+        // because the birthday hand-over that used to do it no longer replays.
+        _story.ResumeTour();
+        if (OnboardingDone)
+        {
+            _hud?.Reveal();
+        }
+        SetScreen(OnboardingDone ? CreateMenuScreen() : _story.StartPage());
 
         // The VM's default: hidden until called when a mic is present, visible
         // otherwise so the shell stays usable (and testable). The app root
@@ -444,9 +444,8 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     /// <summary>
     /// True once the birthday dialogue is done on disk. The view needs this
     /// instead of <see cref="IsOnboarding"/> to decide whether a saved window
-    /// size may be restored: first paint may still be the introduction while
-    /// every later call opens the menu page, so the page on screen no
-    /// longer says whether the player is past onboarding.
+    /// size may be restored: a finished introduction opens on the menu, while
+    /// an unfinished one resumes a walk page.
     /// </summary>
     public bool OnboardingDone => _story.Done;
 
@@ -959,22 +958,26 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         IsShown = true;
         // The single "the app was called" seam: the Ctrl+Shift+C hotkey and
         // the wake word both land here. The first show of a hidden start
-        // reveals the intro already built in the constructor; every later
-        // show opens the menu page (Jobs leads back to the control page)
-        // instead of resuming whatever page was last open. It rides the
-        // hidden -> shown edge only — a reveal while already visible must not
-        // yank the player off the page they are using.
+        // reveals the page already built in the constructor (the resumed walk
+        // page, or the menu past the introduction); every later show opens the
+        // menu page (Jobs leads to the control page) instead of resuming
+        // whatever page was last open. It rides the hidden -> shown edge only —
+        // a reveal while already visible must not yank the player off the page
+        // they are using.
         if (!_introShown && CurrentScreen is not null)
         {
             _introShown = true;
-            _log.LogInfo("overlay shown (intro)");
+            _log.LogInfo("overlay shown (first page)");
             return;
         }
         _introShown = true;
-        SetScreen(new MenuScreenViewModel(
-            new RelayCommand(() => SetScreen(CreateControlScreen()))));
+        SetScreen(CreateMenuScreen());
         _log.LogInfo("overlay shown (menu)");
     }
+
+    private MenuScreenViewModel CreateMenuScreen() =>
+        new MenuScreenViewModel(
+            new RelayCommand(() => SetScreen(CreateControlScreen())));
 
     private void Hide()
     {

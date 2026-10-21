@@ -122,27 +122,133 @@ public sealed class OnboardingFlow : IScreenController
     public bool Done => _progress.IsComplete;
 
     /// <summary>
-    /// Introduction home: the first page of the walk first paint opens on.
-    /// The chain it starts ends on the main control page, so the walk is never
-    /// a dead end, and its taps re-save the picks like a first run. No new
-    /// IScreenController verbs: each page takes its actions by constructor
-    /// (composition over interface growth).
+    /// The walk page first paint opens on: the one the player closed the
+    /// overlay on, or the preferences page for a fresh install. Past the
+    /// birthday the caller opens the menu instead, so this only ever returns
+    /// an introduction page. The chain ends on the main control page, so the
+    /// walk is never a dead end. No new IScreenController verbs: each page
+    /// takes its actions by constructor (composition over interface growth).
     /// </summary>
-    public object Home() => new PreferencesScreenViewModel(_preferences, OnPreferencesChanged, ShowOpening);
+    public object? StartPage() => ResumeStage() switch
+    {
+        OnboardingStage.Opening => OpeningPage(),
+        OnboardingStage.Brand => BrandPage(),
+        OnboardingStage.GrandmaCar => CarPage(),
+        OnboardingStage.VoiceInfo => VoiceIntroPage(),
+        OnboardingStage.Dialogue => BirthdayPage(),
+        _ => PreferencesPage(),
+    };
+
+    /// <summary>
+    /// Pins the tour leg a finished introduction hands over to, so a relaunch
+    /// that opens on the menu still tells the player where to drive. Every
+    /// leg is banked, so this only re-reads the current one.
+    /// </summary>
+    public void ResumeTour()
+    {
+        if (!Done) return;
+        // The birthday hands the errand over before the friend tour; resume
+        // the same first leg so a relaunch cannot skip Max's store.
+        if (!_progress.MaxErrandDone)
+        {
+            _poi = BirthdayErrand();
+            HandOverErrand();
+            return;
+        }
+
+        ShowNextLeg();
+    }
+
+    // Saves written before the stage was banked only carry their picks; the
+    // furthest page those picks imply is the closest honest resume point. A
+    // fresh install has none of them and still opens on preferences.
+    private OnboardingStage ResumeStage()
+    {
+        if (_progress.Stage != OnboardingStage.Preferences)
+        {
+            return _progress.Stage;
+        }
+
+        if (_progress.MaxStoreAddress is not null) return OnboardingStage.Dialogue;
+        if (_progress.GrandmaCarId is not null) return OnboardingStage.VoiceInfo;
+        if (_progress.FavoriteBrand is not null) return OnboardingStage.GrandmaCar;
+        return _profile is not null ? OnboardingStage.Brand : OnboardingStage.Preferences;
+    }
+
+    // The walk's page is part of the save, so exiting on any page resumes
+    // there next launch instead of replaying from the first one.
+    private void SaveStage(OnboardingStage stage)
+    {
+        if (_progress.Stage == stage) return;
+        _progress = _progress with { Stage = stage };
+        _onboarding.Save(_progress);
+    }
+
+    private PreferencesScreenViewModel PreferencesPage() =>
+        new PreferencesScreenViewModel(_preferences, OnPreferencesChanged, ShowOpening);
+
+    private object? OpeningPage()
+    {
+        // Missing content degrades like the first visit: past the birthday the
+        // control page still opens, before it there is no page to show.
+        if (Content.Brands.Count == 0)
+        {
+            return _progress.IsComplete ? _host.ControlScreen() : null;
+        }
+
+        return new OpeningScreenViewModel(
+            _addressMap, _profile, _detectedPlayerName, CompleteOpening);
+    }
+
+    private object? BrandPage()
+    {
+        if (Content.Brands.Count == 0)
+        {
+            return _progress.IsComplete ? _host.ControlScreen() : null;
+        }
+
+        return new BrandScreenViewModel(this, Content.Brands);
+    }
+
+    private GrandmaCarScreenViewModel CarPage() => new GrandmaCarScreenViewModel(this, Content.Cars);
+
+    private VoiceInfoScreenViewModel VoiceIntroPage() => new VoiceInfoScreenViewModel(
+        Strings.Get("VoiceInfoIntro"),
+        Strings.Format("VoiceInfoButtons",
+            Strings.Get("DialogueContinue").ToUpperInvariant()),
+        _beat, ShowDialogue);
+
+    // Rebuilds the birthday conversation on its own: resuming a page must not
+    // replay the voice-info acknowledgment log of the transition into it.
+    private DialogueScreenViewModel BirthdayPage()
+    {
+        _poi = BirthdayErrand();
+        return new DialogueScreenViewModel(
+            FillDialogue(Content.Dialogue, _poi), Strings.Get("BirthdayTitle"),
+            _beat, FinishDialogue);
+    }
 
     public void ChooseBrand(string brand)
     {
         if (!Content.Brands.Contains(brand)) return;
-        _progress = _progress with { FavoriteBrand = brand };
+        _progress = _progress with
+        {
+            FavoriteBrand = brand,
+            Stage = OnboardingStage.GrandmaCar,
+        };
         _onboarding.Save(_progress);
         _log.LogInfo($"favorite brand: {brand}");
-        _host.ShowScreen(new GrandmaCarScreenViewModel(this, Content.Cars));
+        _host.ShowScreen(CarPage());
     }
 
     public void ChooseCar(string carId)
     {
         if (!Content.Cars.Any(c => c.Id == carId)) return;
-        _progress = _progress with { GrandmaCarId = carId };
+        _progress = _progress with
+        {
+            GrandmaCarId = carId,
+            Stage = OnboardingStage.VoiceInfo,
+        };
         _onboarding.Save(_progress);
         // Unity GrandmaCarScreen: the pick IS the first OwnedCar (odometer 0,
         // no insurance) and the car driven from here on. Walking the
@@ -164,20 +270,14 @@ public sealed class OnboardingFlow : IScreenController
         {
             _saveGarage();
         }
-        _host.ShowScreen(new VoiceInfoScreenViewModel(
-            Strings.Get("VoiceInfoIntro"),
-            Strings.Format("VoiceInfoButtons",
-                Strings.Get("DialogueContinue").ToUpperInvariant()),
-            _beat, ShowDialogue));
+        _host.ShowScreen(VoiceIntroPage());
     }
 
     public void ShowDialogue()
     {
         _log.LogInfo("voice info acknowledged: showing birthday dialogue");
-        _poi = BirthdayErrand();
-        _host.ShowScreen(new DialogueScreenViewModel(
-            FillDialogue(Content.Dialogue, _poi), Strings.Get("BirthdayTitle"),
-            _beat, FinishDialogue));
+        SaveStage(OnboardingStage.Dialogue);
+        _host.ShowScreen(BirthdayPage());
     }
 
     // Unity banks maxsStoreAddress: the shop is drawn once, then every launch
@@ -678,19 +778,12 @@ public sealed class OnboardingFlow : IScreenController
     // both live in (PORTPLAN 51 interim).
     private void OnPoiChanged() => _host.SaveDriver();
 
-    // Preferences page CONTINUE: the name + address form is the next step.
-    // Missing content degrades instead of trapping the player on a page with
-    // nothing to tap: past the birthday the control page still opens, before it
-    // there is no home to show.
+    // Preferences page CONTINUE: bank the page, then show the name + address
+    // form as the next step of the walk.
     private void ShowOpening()
     {
-        if (Content.Brands.Count == 0)
-        {
-            _host.ShowScreen(_progress.IsComplete ? _host.ControlScreen() : null);
-            return;
-        }
-        _host.ShowScreen(new OpeningScreenViewModel(
-            _addressMap, _profile, _detectedPlayerName, CompleteOpening));
+        SaveStage(OnboardingStage.Opening);
+        _host.ShowScreen(OpeningPage());
     }
 
     // Preferences change: bank the choice, point the resource lookup at the
@@ -712,14 +805,10 @@ public sealed class OnboardingFlow : IScreenController
     {
         _profile = profile;
         _profiles.Save(profile);
+        SaveStage(OnboardingStage.Brand);
         _log.LogInfo($"opening confirmed: {profile.DisplayName}, " +
             $"{profile.Country}, {profile.City}, {StreetName(profile.StreetId)} {profile.HouseNumber}");
-        if (Content.Brands.Count == 0)
-        {
-            _host.ShowScreen(_progress.IsComplete ? _host.ControlScreen() : null);
-            return;
-        }
-        _host.ShowScreen(new BrandScreenViewModel(this, Content.Brands));
+        _host.ShowScreen(BrandPage());
     }
 
     private string StreetName(string streetId)

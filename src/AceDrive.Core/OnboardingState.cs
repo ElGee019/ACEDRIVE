@@ -4,12 +4,13 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// Persisted onboarding progress. The story POIs, both pickups and the
-/// pancake/community-centre visits are banked here: the walk replays on every
-/// launch, so a returning player drives back to the same doors and resumes on
-/// the right leg of the tour. The random story addresses are banked once and
-/// reused later (Unity's maxsStoreAddress / communityCentreAddress), so a
-/// relaunch never moves a door the player has already visited.
+/// Persisted onboarding progress. The walk banks the page it is on
+/// (<see cref="Stage"/>) so a relaunch resumes there; the story POIs, both
+/// pickups and the pancake/community-centre visits are banked too, so a
+/// returning player drives back to the same doors and resumes on the right
+/// leg of the tour. The random story addresses are banked once and reused
+/// later (Unity's maxsStoreAddress / communityCentreAddress), so a relaunch
+/// never moves a door the player has already visited.
 /// </summary>
 public sealed record OnboardingState(
     string? FavoriteBrand,
@@ -24,22 +25,11 @@ public sealed record OnboardingState(
     AddressLocation? MaxStoreAddress = null,
     AddressLocation? CommunityCentreAddress = null,
     bool CommunityCentreDone = false,
-    bool MaxErrandDone = false)
+    bool MaxErrandDone = false,
+    // Last argument so saves written before the stage existed deserialize
+    // with the fresh default (Preferences) instead of failing.
+    OnboardingStage Stage = OnboardingStage.Preferences)
 {
     public static readonly OnboardingState Fresh = new(null, null, false);
     public bool IsComplete => BirthdayDone;
-
-    /// <summary>
-    /// Temporary replay policy: clear the tour's leg flags while keeping the
-    /// profile picks and banked doors. Every launch then walks the opening
-    /// pages and the same houses again instead of resuming mid-tour.
-    /// </summary>
-    public OnboardingState RestartTour() => this with
-    {
-        MaxErrandDone = false,
-        JustinPickedUp = false,
-        AnnabellaPickedUp = false,
-        PancakesDone = false,
-        CommunityCentreDone = false,
-    };
 }

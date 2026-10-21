@@ -189,11 +189,7 @@ public partial class App : Application, IDisposable
         var policeRules = new JsonPoliceRulesStore(_log).Load();
         var police = new PolicePatrolPlanner(addressMap, policeRules, taxiSeed + 3);
         var hud = new HudViewModel(addressMap, preferences, beat, wall, taxiRules);
-        // WHY: temporary until the persistent career save lands — every launch
-        // replays the whole tour from the first page. The banked doors and the
-        // profile stay put; only the tour's leg flags reset.
         var onboardingStore = new JsonOnboardingStore();
-        onboardingStore.Save(onboardingStore.Load().RestartTour());
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -261,12 +257,14 @@ public partial class App : Application, IDisposable
                 hudWindow.SetPanelOpen(MainWindow.IsVisible);
             }
         };
-        // WHY: the app opens on the intro even when the microphone is ready.
-        // A wake-word-only start used to leave the panel hidden (and the
-        // first-run pages unseen) until the player happened to say the
-        // phrase. The VM still owns visibility, so idle-hide, the hotkey and
-        // the wake word keep working; the companion HUD stays hidden until
-        // the birthday hand-over reveals it.
+        // WHY: the app opens on the page the saved progress points at (a
+        // resumed walk page, or the menu once the introduction is done) even
+        // when the microphone is ready. A wake-word-only start used to leave
+        // the panel hidden (and the first-run pages unseen) until the player
+        // happened to say the phrase. The VM still owns visibility, so
+        // idle-hide, the hotkey and the wake word keep working; the companion
+        // HUD stays hidden through the walk until the birthday hand-over
+        // reveals it (a save past the birthday reveals it at startup).
         vm.Show();
         MainWindow.Show();
     }

@@ -39,11 +39,10 @@ public partial class MainWindow : Window
         TryApplyBackdrop(log);
 
         // Fresh position always; size only restores once past onboarding, so a
-        // stale small window never clips the first-run screens. The gate reads
-        // the saved progress, not the page on screen: first paint still opens
-        // on the opening screen, so a returning player replays the introduction
-        // and must still get the window they resized (its pages scroll if it
-        // is small).
+        // stale small window never clips the walk pages. The gate reads the
+        // saved progress, not the page on screen: an unfinished walk resumes
+        // where it left off and must still get the window the player resized
+        // (its pages scroll if it is small).
         var saved = _vm.LoadPlacement();
         if (saved is not null)
         {

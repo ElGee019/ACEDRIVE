@@ -25,10 +25,10 @@ public sealed class OnboardingTests
 
     private static MainViewModel Create(
         OnboardingState? start = null, FakeClock? clock = null,
-        FakeProfileStore? profiles = null)
+        FakeProfileStore? profiles = null, FakeOnboardingStore? onboarding = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
-        var store = new FakeOnboardingStore();
+        var store = onboarding ?? new FakeOnboardingStore();
         if (start is not null) store.Save(start);
         clock ??= new FakeClock();
         return new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
@@ -98,9 +98,10 @@ public sealed class OnboardingTests
     public void SavedProfile_PrefillsOpeningScreen()
     {
         var saved = new PlayerProfile("Edited Name", "Germany", "Brands", "street-2", 17);
-        var vm = Create(profiles: new FakeProfileStore(saved));
+        var vm = Create(
+            new OnboardingState(null, null, false, Stage: OnboardingStage.Opening),
+            profiles: new FakeProfileStore(saved));
 
-        ContinuePreferences(vm);
         var opening = Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen);
         // The saved profile wins over the Steam name on later launches so a
         // manual edit is never overwritten at boot.
@@ -110,25 +111,71 @@ public sealed class OnboardingTests
     }
 
     [Fact]
-    public void DoneBoot_ReplaysTheIntroThenEndsOnControlPage()
+    public void DoneBoot_StartsOnTheMenuPage()
     {
-        // Past onboarding, first paint still opens the introduction: the
-        // main control page (PORTPLAN item 54) is reached through the walk,
-        // not around it, and the taps re-save the picks on the way.
+        // A finished introduction is not replayed: the next launch opens the
+        // menu with its three tiles, and Jobs leads to the career page.
         var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsOnboarding);
+
+        menu.JobsCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Theory]
+    [InlineData(OnboardingStage.Opening, typeof(OpeningScreenViewModel))]
+    [InlineData(OnboardingStage.Brand, typeof(BrandScreenViewModel))]
+    [InlineData(OnboardingStage.GrandmaCar, typeof(GrandmaCarScreenViewModel))]
+    [InlineData(OnboardingStage.VoiceInfo, typeof(VoiceInfoScreenViewModel))]
+    [InlineData(OnboardingStage.Dialogue, typeof(DialogueScreenViewModel))]
+    public void SavedStage_ReopensThatPage(OnboardingStage stage, Type page)
+    {
+        var vm = Create(new OnboardingState(null, null, false, Stage: stage));
+
+        Assert.IsType(page, vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void EveryPage_IsBankedBeforeItOpens()
+    {
+        var store = new FakeOnboardingStore();
+        var vm = Create(onboarding: store);
+        Assert.Equal(OnboardingStage.Preferences, store.State.Stage);
+
         ContinuePreferences(vm);
-        var opening = Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen);
-        opening.ContinueCommand.Execute(null);
-        Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(OnboardingStage.Opening, store.State.Stage);
+
+        Assert.IsType<OpeningScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
+        Assert.Equal(OnboardingStage.Brand, store.State.Stage);
 
         vm.ChooseBrand("Mazda");
+        Assert.Equal(OnboardingStage.GrandmaCar, store.State.Stage);
+
         vm.ChooseCar("ks_mazda_mx5_na");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
+        Assert.Equal(OnboardingStage.VoiceInfo, store.State.Stage);
+
+        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
+        Assert.Equal(OnboardingStage.Dialogue, store.State.Stage);
+
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
-        dialogue.ContinueCommand.Execute(null); // last page: the walk ends
+        dialogue.ContinueCommand.Execute(null);
+
+        Assert.True(store.State.BirthdayDone);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void LegacySaveWithoutAStage_ResumesAtTheFurthestBankedPick()
+    {
+        // Saves written before the stage existed still carry their picks; the
+        // walk resumes at the page those picks imply instead of replaying.
+        var vm = Create(new OnboardingState("Mazda", "ks_mazda_mx5_na", BirthdayDone: false));
+
+        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -412,37 +459,12 @@ public sealed class OnboardingTests
                 "Mazda", "ks_mazda_mx5_na", true,
                 MaxStoreId: "max-grocery",
                 MaxStoreAddress: new AddressLocation("Street 1", 12, HouseSide.Left),
-                CommunityCentreAddress: new AddressLocation("Street 2", 7, HouseSide.Right));
+                CommunityCentreAddress: new AddressLocation("Street 2", 7, HouseSide.Right),
+                Stage: OnboardingStage.VoiceInfo);
             store.Save(state);
             Assert.Equal(state, new JsonOnboardingStore(file).Load());
         }
         finally { File.Delete(file); }
-    }
-
-    [Fact]
-    public void RestartTour_ClearsTheLegsButKeepsTheBankedDoors()
-    {
-        var max = new AddressLocation("Street 1", 12, HouseSide.Left);
-        var centre = new AddressLocation("Street 2", 7, HouseSide.Right);
-        var state = new OnboardingState(
-            "Mazda", "ks_mazda_mx5_na", BirthdayDone: true,
-            JustinPickedUp: true, AnnabellaPickedUp: true, PancakesDone: true,
-            MaxStoreId: "max-grocery", MaxStoreAddress: max,
-            CommunityCentreAddress: centre, CommunityCentreDone: true,
-            MaxErrandDone: true);
-
-        OnboardingState restarted = state.RestartTour();
-
-        Assert.True(restarted.BirthdayDone);
-        Assert.False(restarted.MaxErrandDone);
-        Assert.False(restarted.JustinPickedUp);
-        Assert.False(restarted.AnnabellaPickedUp);
-        Assert.False(restarted.PancakesDone);
-        Assert.False(restarted.CommunityCentreDone);
-        Assert.Equal(max, restarted.MaxStoreAddress);
-        Assert.Equal(centre, restarted.CommunityCentreAddress);
-        Assert.Equal(state.FavoriteBrand, restarted.FavoriteBrand);
-        Assert.Equal(state.GrandmaCarId, restarted.GrandmaCarId);
     }
 
     [Fact]
