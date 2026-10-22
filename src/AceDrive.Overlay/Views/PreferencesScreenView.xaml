@@ -1,9 +1,10 @@
 <UserControl x:Class="AceDrive.Overlay.Views.PreferencesScreenView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <!-- First page of the introduction. Copy is bound to the ViewModel instead
-         of {loc:Loc}: this page IS the language selector, so its own labels
-         must re-read the moment the player picks another language. -->
+    <!-- First page of the introduction, reused by the menu's Settings tile
+         until a fuller settings screen lands. Copy is bound to the ViewModel
+         instead of {loc:Loc}: this page IS the language selector, so its own
+         labels must re-read the moment the player picks another language. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

@@ -3,10 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AceDrive.Overlay.ViewModels"
         xmlns:views="clr-namespace:AceDrive.Overlay.Views"
-        Title="AceDrive" Width="413.6" SizeToContent="Height"
+        Title="AceDrive" Width="413.6" Height="917.2"
         WindowStyle="None" AllowsTransparency="True" ShowActivated="False"
         Background="Transparent" Topmost="True"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="True" MinWidth="200" MinHeight="80">
+    <!-- Standard panel: the home page's 1080 x 2280 design canvas mapped to
+         the 413.6 width gives 873.2 for the page; the 44 px of border chrome
+         around it (10 + 2 + 10 on each side) adds up to 917.2. At this size
+         the whole home page fits, so no scrollbar shows until the player
+         resizes the panel smaller. A saved size from a pre-standard layout
+         (no placement Version) is grown to this once on startup. -->
     <Window.Resources>
         <DataTemplate DataType="{x:Type vm:PreferencesScreenViewModel}">
             <views:PreferencesScreenView/>
@@ -31,6 +37,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:MenuScreenViewModel}">
             <views:MenuScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CalendarScreenViewModel}">
+            <views:CalendarScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TaxiJobProposalViewModel}">
             <views:TaxiJobProposalScreenView/>

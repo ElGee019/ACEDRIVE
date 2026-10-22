@@ -7,15 +7,21 @@ namespace AceDrive.Overlay.ViewModels;
 /// <summary>
 /// First page of the introduction (before the name + address form): the player
 /// picks the distance unit and the UI language once, so the HUD and every later
-/// screen read in their language. Mouse-only like the other setup pages.
+/// screen read in their language. The settings entry reuses this page until a
+/// fuller settings screen lands; it swaps the action label to BACK, returns to
+/// the menu, and answers the English voice label. The first-run page stays
+/// mouse-only like the other setup pages.
 /// The option labels are language-independent on purpose — "km"/"mi" symbols
 /// and endonyms ("English"/"Nederlands") — so switching the language never has
 /// to rebuild the dropdowns; only the page copy below re-reads.
 /// </summary>
-public sealed class PreferencesScreenViewModel : ViewModelBase
+public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
 {
+    private const string ContinueLabelKey = "PreferencesContinue";
+
     private readonly Action<PlayerPreferences> _changed;
     private readonly Action _done;
+    private readonly string _doneLabelKey;
 
     private PreferenceOption<MileageUnit> _unit;
     private PreferenceOption<UiLanguage> _language;
@@ -25,15 +31,25 @@ public sealed class PreferencesScreenViewModel : ViewModelBase
     private string _title = Strings.Get("PreferencesTitle");
     private string _unitsLabel = Strings.Get("PreferencesUnits");
     private string _languageLabel = Strings.Get("PreferencesLanguage");
-    private string _continueLabel = Strings.Get("PreferencesContinue");
+    private string _continueLabel = Strings.Get(ContinueLabelKey);
 
     public PreferencesScreenViewModel(
         PlayerPreferences current,
         Action<PlayerPreferences> changed,
-        Action done)
+        Action done,
+        string doneLabelKey = ContinueLabelKey,
+        string? voiceDoneLabel = null)
     {
         _changed = changed;
         _done = done;
+        _doneLabelKey = doneLabelKey;
+        _continueLabel = Strings.Get(doneLabelKey);
+        var voice = new Dictionary<string, Action>(StringComparer.Ordinal);
+        if (voiceDoneLabel is not null)
+        {
+            voice[voiceDoneLabel] = () => _done();
+        }
+        VoiceActions = voice;
         UnitOptions =
         [
             new(MileageUnit.Kilometres, "km"),
@@ -79,6 +95,9 @@ public sealed class PreferencesScreenViewModel : ViewModelBase
 
     public ICommand ContinueCommand { get; }
 
+    /// <summary>Spoken label -&gt; action; only the settings reuse registers BACK.</summary>
+    public IReadOnlyDictionary<string, Action> VoiceActions { get; }
+
     private void OnSelectionChanged()
     {
         // Push first: MainViewModel applies the UI culture, so the labels
@@ -87,6 +106,6 @@ public sealed class PreferencesScreenViewModel : ViewModelBase
         Title = Strings.Get("PreferencesTitle");
         UnitsLabel = Strings.Get("PreferencesUnits");
         LanguageLabel = Strings.Get("PreferencesLanguage");
-        ContinueLabel = Strings.Get("PreferencesContinue");
+        ContinueLabel = Strings.Get(_doneLabelKey);
     }
 }

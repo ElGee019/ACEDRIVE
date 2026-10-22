@@ -469,13 +469,17 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         var (vm, clock, tel, _) = Create(speedKmh: 0f, hud: hud);
 
-        TaxiFlow.Propose(vm);
+        TaxiJobProposalViewModel proposal = TaxiFlow.Propose(vm);
+        string customer = proposal.Phrase[..proposal.Phrase.IndexOf('\n')].TrimEnd('\r');
         Assert.NotNull(hud.JobGuidance);
         Assert.Equal("HudJobPickupDrive", hud.JobGuidance!.DriveKey);
+        // The line names the passenger; the template adds the door itself.
+        Assert.Equal(customer, hud.JobGuidance.TargetName);
         Assert.False(vm.IsShown);
 
         vm.PickupCommand.Execute(null);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
+        Assert.Equal(customer, hud.JobGuidance.TargetName);
 
         TaxiFlow.Drive(vm, clock, tel);
         hud.RaiseJobEnter();
@@ -863,12 +867,12 @@ public sealed class MainViewModelTests
         var log = new TestLog();
         var (vm, clock, _, _) = Create(speedKmh: 0f, log: log);
         vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(2, control.Today);
+        var calendar = ShowCalendar(vm);
+        Assert.Equal(2, calendar.Today);
 
         clock.Advance(TimeSpan.FromMinutes(53));
         vm.Poll();
-        Assert.Equal(3, control.Today);
+        Assert.Equal(3, calendar.Today);
         Assert.Contains(log.Infos, m => m.StartsWith("calendar day changed:", StringComparison.Ordinal));
     }
 
@@ -883,14 +887,14 @@ public sealed class MainViewModelTests
         var bank = new FakeRoadTestStore();
         var (vm, clock, _, _) = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
         vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(53)); // across Monday midnight: Tuesday noon
         vm.Poll();
-        string first = TuesdayButton(control);
+        string first = TuesdayButton(calendar);
         Assert.NotEqual(string.Empty, first);
 
-        control.DayCommand.Execute(3);
-        string second = TuesdayButton(control);
+        calendar.DayCommand.Execute(3);
+        string second = TuesdayButton(calendar);
         Assert.NotEqual(string.Empty, second);
         Assert.NotEqual(first, second);
         Assert.Contains(log.Infos, m => m.StartsWith("road test done:", StringComparison.Ordinal));
@@ -911,14 +915,14 @@ public sealed class MainViewModelTests
         var bank = new FakeRoadTestStore();
         var (vm, clock, _, _) = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
         vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(75)); // 2.2 s per game minute: Tuesday 22:0x
-        control.DayCommand.Execute(3);
-        Assert.True(Assert.Single(control.Days, d => d.DayOfWeek == 3).Flash);
+        calendar.DayCommand.Execute(3);
+        Assert.True(Assert.Single(calendar.Days, d => d.DayOfWeek == 3).Flash);
 
         clock.Advance(TimeSpan.FromSeconds(0.51)); // the beat drains on the poll
         vm.Poll();
-        Assert.Equal("COME BACK ON TUESDAY BETWEEN 8am AND 8pm", TuesdayButton(control));
+        Assert.Equal("COME BACK ON TUESDAY BETWEEN 8am AND 8pm", TuesdayButton(calendar));
         Assert.DoesNotContain(log.Infos, m => m.StartsWith("road test done:", StringComparison.Ordinal));
         Assert.Empty(bank.Saved);
     }
@@ -951,10 +955,10 @@ public sealed class MainViewModelTests
         CarSpec car = Assert.IsType<CarSpec>(restarted.Current);
         var (again, _, _, _) = Create(roads: restarted);
         again.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(again.CurrentScreen);
+        var calendar = ShowCalendar(again);
 
         Assert.Equal(saved.CarId, car.Id);
-        Assert.Equal(TestRoadCars.Button(car), TuesdayButton(control));
+        Assert.Equal(TestRoadCars.Button(car), TuesdayButton(calendar));
     }
 
     [Fact]
@@ -964,11 +968,11 @@ public sealed class MainViewModelTests
         var roads = TestRoadCars.Ledger();
         var (vm, _, _, _) = Create(speedKmh: 0f, log: log, roads: roads);
         vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        string first = TuesdayButton(control);
+        var calendar = ShowCalendar(vm);
+        string first = TuesdayButton(calendar);
 
-        control.DayCommand.Execute(2);
-        Assert.Equal(first, TuesdayButton(control));
+        calendar.DayCommand.Execute(2);
+        Assert.Equal(first, TuesdayButton(calendar));
         Assert.Contains(log.Infos, m => m.StartsWith("calendar day 2 tapped", StringComparison.Ordinal));
     }
 
@@ -1030,8 +1034,8 @@ public sealed class MainViewModelTests
         var roads = TestRoadCars.Ledger();
         var (vm, clock, _, _) = Create(speedKmh: 0f, log: log, roads: roads, clocks: store);
         vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        string first = TuesdayButton(control);
+        var calendar = ShowCalendar(vm);
+        string first = TuesdayButton(calendar);
 
         for (int i = 0; i < 8; i++)
         {
@@ -1039,8 +1043,8 @@ public sealed class MainViewModelTests
             vm.Poll();
         }
 
-        Assert.Contains("Week 2", control.DateHeader, StringComparison.Ordinal);
-        Assert.Equal(first, TuesdayButton(control));
+        Assert.Contains("WEEK 2", calendar.DayWeekText, StringComparison.Ordinal);
+        Assert.Equal(first, TuesdayButton(calendar));
         Assert.Contains(log.Infos, m => m.StartsWith("week 2 opened:", StringComparison.Ordinal));
         // Nothing was driven, so nothing was banked.
         Assert.Empty(roads.TestedIds);
@@ -1055,7 +1059,7 @@ public sealed class MainViewModelTests
         var store = new FakeGameClockStore();
         var (vm, clock, _, _) = Create(speedKmh: 0f, clocks: store);
         vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(53));
         vm.Poll();
         vm.SaveClock();
@@ -1064,12 +1068,13 @@ public sealed class MainViewModelTests
         var (restarted, _, _, _) = Create(
             progress: OnboardingState.Fresh with { BirthdayDone = true },
             clocks: store, gameStart: saved.GameNow, startWeek: saved.Week);
-        // A finished introduction opens on the menu; its Jobs tile leads to
-        // the control page whose header we read.
+        // A finished introduction opens on the menu; its Calendar tile leads
+        // to the calendar page whose header we read.
         var menu = Assert.IsType<MenuScreenViewModel>(restarted.CurrentScreen);
-        menu.JobsCommand.Execute(null);
-        var resumed = Assert.IsType<MainControlScreenViewModel>(restarted.CurrentScreen);
-        Assert.Equal(control.DateHeader, resumed.DateHeader);
+        menu.CalendarCommand.Execute(null);
+        var resumed = Assert.IsType<CalendarScreenViewModel>(restarted.CurrentScreen);
+        Assert.Equal(calendar.ClockText, resumed.ClockText);
+        Assert.Equal(calendar.DayWeekText, resumed.DayWeekText);
     }
 
     [Fact]
@@ -1132,8 +1137,18 @@ public sealed class MainViewModelTests
         Assert.Equal(2, store.Saved.Count);
     }
 
-    private static string TuesdayButton(MainControlScreenViewModel control) =>
-        Assert.Single(control.Days, d => d.DayLabel == "Tuesday").EventLabel;
+    private static string TuesdayButton(CalendarScreenViewModel calendar) =>
+        Assert.Single(calendar.Days, d => d.DayLabel == "Tuesday").EventLabel;
+
+    // A call lands on the menu; its Calendar tile opens the page whose week
+    // strip these tests read.
+    private static CalendarScreenViewModel ShowCalendar(MainViewModel vm)
+    {
+        vm.Show();
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.CalendarCommand.Execute(null);
+        return Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
+    }
 
     [Fact]
     public void ToggleShow_FlipsVisibility()
@@ -1150,8 +1165,7 @@ public sealed class MainViewModelTests
         var (vm, _, _, _) = Create();
         vm.FinishDialogue();
 
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("Monday 12:00 | Week 1", control.DateHeader);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         Assert.False(vm.IsOnboarding);
         // The birthday hands the screen to the HUD until the player calls the
         // panel back.

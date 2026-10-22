@@ -16,5 +16,4 @@ public sealed record ControlActions(
     ICommand Dealer,
     ICommand CarWash,
     ICommand Mechanic,
-    ICommand Insurance,
-    ICommand OpenDay);
+    ICommand Insurance);

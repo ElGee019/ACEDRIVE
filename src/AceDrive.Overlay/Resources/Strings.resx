@@ -86,6 +86,7 @@
   <data name="PreferencesUnits" xml:space="preserve"><value>DISTANCE UNIT</value></data>
   <data name="PreferencesLanguage" xml:space="preserve"><value>LANGUAGE</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="PreferencesBack" xml:space="preserve"><value>BACK</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WHAT IS YOUR FAVORITE BRAND</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>WHAT CAR DOES GRANDMA DRIVE</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
@@ -108,9 +109,10 @@ For instance "{0}".</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>CONTINUE TAXI SHIFT</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>CAR HAULING JOB</value></data>
+  <data name="ControlJobs" xml:space="preserve"><value>JOBS</value></data>
   <data name="ControlCalendar" xml:space="preserve"><value>CALENDAR</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>GRANDMA'S TO DO</value></data>
-  <data name="ControlDate" xml:space="preserve"><value>{0} {1:D2}:{2:D2} | Week {3}</value></data>
+  <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>COME BACK ON {0} BETWEEN 8am AND 8pm</value></data>
   <data name="HungerValue" xml:space="preserve"><value>HUNGER {0}/{1}</value></data>
   <data name="FilthValue" xml:space="preserve"><value>FILTH {0}/{1}</value></data>
@@ -121,6 +123,13 @@ For instance "{0}".</value></data>
   <data name="DayThu" xml:space="preserve"><value>Thursday</value></data>
   <data name="DayFri" xml:space="preserve"><value>Friday</value></data>
   <data name="DaySat" xml:space="preserve"><value>Saturday</value></data>
+  <data name="DayShortSun" xml:space="preserve"><value>SUN</value></data>
+  <data name="DayShortMon" xml:space="preserve"><value>MON</value></data>
+  <data name="DayShortTue" xml:space="preserve"><value>TUE</value></data>
+  <data name="DayShortWed" xml:space="preserve"><value>WED</value></data>
+  <data name="DayShortThu" xml:space="preserve"><value>THU</value></data>
+  <data name="DayShortFri" xml:space="preserve"><value>FRI</value></data>
+  <data name="DayShortSat" xml:space="preserve"><value>SAT</value></data>
   <data name="EventCentoMiglia" xml:space="preserve"><value>Cento Miglia</value></data>
   <data name="EventValuation" xml:space="preserve"><value>Market valuation</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Road test</value></data>

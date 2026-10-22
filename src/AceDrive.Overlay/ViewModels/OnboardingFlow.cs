@@ -59,6 +59,11 @@ public sealed class OnboardingFlow : IScreenController
     // [5]); the HUD joins the hint to the address it renders.
     private const string JustinHint = "HudHintJustin";
     private const string AnnabellaHint = "HudHintAnnabella";
+    // Settings reuses the first-run form but exits to the menu, not the walk.
+    private const string SettingsDoneLabelKey = "PreferencesBack";
+    // The Vosk model is English, so the spoken key stays BACK even when the
+    // button copy is translated to TERUG.
+    private const string SettingsVoiceBackLabel = "BACK";
 
     // Unity's TaskTexts[6] plus the PANCAKES! arrival from MapScreen: the home
     // leg owns all three HUD lines.
@@ -185,7 +190,18 @@ public sealed class OnboardingFlow : IScreenController
     }
 
     private PreferencesScreenViewModel PreferencesPage() =>
-        new PreferencesScreenViewModel(_preferences, OnPreferencesChanged, ShowOpening);
+        new(_preferences, OnPreferencesChanged, ShowOpening);
+
+    /// <summary>
+    /// Builds the preferences form for the settings entry: the same unit +
+    /// language picker the first-run walk opens on, labelled BACK instead of
+    /// CONTINUE and answering that word from the mic. Its action hands back to
+    /// the caller's page instead of advancing the walk, while a selection still
+    /// saves and applies through the walk's one preferences writer.
+    /// </summary>
+    public PreferencesScreenViewModel CreateSettingsPage(Action done) =>
+        new(_preferences, OnPreferencesChanged, done,
+            SettingsDoneLabelKey, SettingsVoiceBackLabel);
 
     private object? OpeningPage()
     {

@@ -1,6 +1,7 @@
 <UserControl x:Class="AceDrive.Overlay.Views.MenuScreenView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views">
     <UserControl.Resources>
         <!-- A tile is already drawn as artwork (fill, outline, label), so the
              button template is the bare image; the hover fade is the only
@@ -24,17 +25,31 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- One art height for every tile: the PSD's 244 x 310 cells, with the
+             Employees glow naturally wider like its design layer. -->
+        <Style x:Key="MenuArt" TargetType="Image">
+            <Setter Property="Height" Value="310"/>
+            <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
+            <Setter Property="Source"
+                    Value="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+        </Style>
     </UserControl.Resources>
     <!-- Home page skeleton: viewport-pinned MinHeight like every other page.
-         The tile row is placed with the ontwerpdesign.psd coordinates: the
+         The tile grid is placed with the ontwerpdesign.psd coordinates: the
          design canvas is 1080 x 2280, its first tile row starts at y = 942
-         (41.3 %) with tiles at x = 105 / 400 / 697, 244 x 310 each. The two
-         star rows reproduce that 942 : 1338 split, and the Viewbox keeps the
-         row proportional to the panel width (the PSD's pixel grid scaled).
-         The negative side margin reclaims MainWindow's 22 px chrome (10 px
-         padding + 2 px edge + 10 px padding), so 1080 design px map to the
-         whole 413.6 px panel like the backdrop; scaled to the scroll content
-         instead, the row would sit ~11 % too small and shifted inward.
+         (41.3 %) with tiles at x = 105 / 400 / 697, 244 x 310 each, and the
+         next rows sit 383 design px lower. The two star rows reproduce that
+         942 : 1338 split, and the Viewbox keeps the grid proportional to the
+         panel width (the PSD's pixel grid scaled). The negative side margin
+         reclaims MainWindow's 22 px chrome (10 px padding + 2 px edge +
+         10 px padding), so 1080 design px map to the whole 413.6 px panel
+         like the backdrop; scaled to the scroll content instead, the grid
+         would sit ~11 % too small and shifted inward.
+         The order is the player's row layout: wallet / jobs / calendar,
+         trunk / employees / home, hunger / filth / settings. Every tile is a
+         Button so a later feature can attach its action; Jobs opens the
+         control page, Calendar its weekly page and Settings the first-run
+         preferences form, the rest are voice-detectable placeholders.
          Artwork goes through the PackImage converter so a machine whose WIC
          has no WebP codec drops the tiles instead of the overlay. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
@@ -42,23 +57,55 @@
             <RowDefinition Height="942*"/>
             <RowDefinition Height="1338*"/>
         </Grid.RowDefinitions>
+        <!-- Design header (ontwerpdesign.psd, top band y = 0..942): the shared
+             game-clock view draws the outlined time over the weekday and
+             display week. Same width mapping as the tile grid below; the
+             Viewbox inside the view keeps both bands on the design's
+             proportions. -->
+        <views:GameClockView Grid.Row="0"
+                             ClockText="{Binding ClockText}"
+                             DayWeekText="{Binding DayWeekText}"/>
         <Viewbox Grid.Row="1" Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
-            <Canvas Width="1080" Height="310">
-                <Button Canvas.Left="105" Style="{StaticResource MenuTile}"
-                        Command="{Binding JobsCommand}">
-                    <Image Width="244"
-                           RenderOptions.BitmapScalingMode="HighQuality"
-                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonJobs.webp"
-                           Source="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+            <Canvas Width="1080" Height="1077">
+                <Button Canvas.Left="105" Canvas.Top="0" Style="{StaticResource MenuTile}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonWallet.webp"/>
                 </Button>
-                <Image Canvas.Left="400" Width="244"
-                       RenderOptions.BitmapScalingMode="HighQuality"
-                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHome.webp"
-                       Source="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
-                <Image Canvas.Left="697" Width="244"
-                       RenderOptions.BitmapScalingMode="HighQuality"
-                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonWallet.webp"
-                       Source="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+                <Button Canvas.Left="400" Canvas.Top="0" Style="{StaticResource MenuTile}"
+                        Command="{Binding JobsCommand}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonJobs.webp"/>
+                </Button>
+                <Button Canvas.Left="697" Canvas.Top="0" Style="{StaticResource MenuTile}"
+                        Command="{Binding CalendarCommand}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonCalendar.webp"/>
+                </Button>
+                <Button Canvas.Left="105" Canvas.Top="383" Style="{StaticResource MenuTile}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonTrunk.webp"/>
+                </Button>
+                <Button Canvas.Left="400" Canvas.Top="383" Style="{StaticResource MenuTile}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonEmployees.webp"/>
+                </Button>
+                <Button Canvas.Left="697" Canvas.Top="383" Style="{StaticResource MenuTile}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHome.webp"/>
+                </Button>
+                <Button Canvas.Left="105" Canvas.Top="767" Style="{StaticResource MenuTile}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHunger.webp"/>
+                </Button>
+                <Button Canvas.Left="400" Canvas.Top="767" Style="{StaticResource MenuTile}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonFilth.webp"/>
+                </Button>
+                <Button Canvas.Left="697" Canvas.Top="767" Style="{StaticResource MenuTile}"
+                        Command="{Binding SettingsCommand}">
+                    <Image Style="{StaticResource MenuArt}"
+                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonSettings.webp"/>
+                </Button>
             </Canvas>
         </Viewbox>
     </Grid>

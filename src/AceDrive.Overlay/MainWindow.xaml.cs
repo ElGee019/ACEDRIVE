@@ -42,13 +42,15 @@ public partial class MainWindow : Window
         // stale small window never clips the walk pages. The gate reads the
         // saved progress, not the page on screen: an unfinished walk resumes
         // where it left off and must still get the window the player resized
-        // (its pages scroll if it is small).
+        // (its pages scroll if it is small). A pre-standard placement keeps
+        // the XAML standard size: it predates the home page's proportions and
+        // would otherwise bring back the scrollbar the standard size removes.
         var saved = _vm.LoadPlacement();
         if (saved is not null)
         {
             Left = saved.Left;
             Top = saved.Top;
-            if (_vm.OnboardingDone)
+            if (_vm.OnboardingDone && saved.Version >= WindowBounds.CurrentVersion)
             {
                 Width = saved.Width;
                 Height = saved.Height;
@@ -88,10 +90,6 @@ public partial class MainWindow : Window
         ApplyShown();
         _vm.PropertyChanged += OnVmChanged;
 
-        // Freeze the first-rendered size: every later screen keeps the first
-        // screen's size instead of resizing to its own text.
-        ContentRendered += OnFirstRendered;
-
         // Any input resets the idle-hide timer; background drag moves the window.
         PreviewMouseMove += (_, _) => _vm.RecordActivity();
         PreviewMouseDown += (_, _) => _vm.RecordActivity();
@@ -118,7 +116,8 @@ public partial class MainWindow : Window
                 // refuses the Handle lookup. The hotkey dies with the
                 // process anyway — placement save below must still run.
             }
-            _vm.SavePlacement(new WindowBounds(Left, Top, Width, Height));
+            _vm.SavePlacement(new WindowBounds(
+                Left, Top, Width, Height, WindowBounds.CurrentVersion));
             _vm.SaveClock();
             _vm.SaveCity();
             _vm.SaveHunger();
@@ -149,13 +148,11 @@ public partial class MainWindow : Window
                 Stretch = Stretch.UniformToFill,
                 Opacity = BackdropOpacity,
             };
-            // Base resolution follows the backdrop's native aspect: the design
-            // width (413.6, the panel width the player settled on) stays, the
-            // height is derived from the decoded image (946x2149 -> 939.6) so
-            // the panel shows the whole artwork without UniformToFill cropping.
-            // Saved placement below still overrides it.
-            SizeToContent = SizeToContent.Manual;
-            Height = Width * art.PixelHeight / art.PixelWidth;
+            // The window keeps the XAML standard size (the home page's design
+            // proportions): the art fills it and crops the small difference
+            // between the 946 x 2149 backdrop and that panel aspect. Sizing
+            // the panel to the art instead would re-open a gap between the
+            // standard size and the page the player actually sees.
         }
         catch (Exception ex) when (ex is NotSupportedException or IOException)
         {
@@ -170,19 +167,6 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(MainViewModel.IsShown))
             ApplyShown();
-    }
-
-    private void OnFirstRendered(object? sender, EventArgs e)
-    {
-        ContentRendered -= OnFirstRendered;
-        if (SizeToContent != SizeToContent.Manual)
-        {
-            double width = ActualWidth;
-            double height = ActualHeight;
-            SizeToContent = SizeToContent.Manual;
-            Width = width;
-            Height = height;
-        }
     }
 
     private void ApplyShown()

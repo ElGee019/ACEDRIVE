@@ -9,8 +9,11 @@ public sealed class PreferencesScreenTests
 {
     private static PreferencesScreenViewModel Create(
         List<PlayerPreferences> changed, Action done,
-        PlayerPreferences? current = null) =>
-        new(current ?? PlayerPreferences.Default, changed.Add, done);
+        PlayerPreferences? current = null,
+        string doneLabelKey = "PreferencesContinue",
+        string? voiceDoneLabel = null) =>
+        new(current ?? PlayerPreferences.Default, changed.Add, done,
+            doneLabelKey, voiceDoneLabel);
 
     [Fact]
     public void Defaults_AreKilometresAndEnglish()
@@ -69,6 +72,83 @@ public sealed class PreferencesScreenTests
         vm.ContinueCommand.Execute(null);
 
         Assert.True(done);
+    }
+
+    [Fact]
+    public void FirstRunActionLabel_IsContinue()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+
+            var vm = Create([], () => { });
+
+            Assert.Equal("CONTINUE", vm.ContinueLabel);
+            // The first-run page stays mouse-only.
+            Assert.Empty(vm.VoiceActions);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void SettingsActionLabel_IsBack()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+
+            var vm = Create([], () => { },
+                doneLabelKey: "PreferencesBack", voiceDoneLabel: "BACK");
+
+            Assert.Equal("BACK", vm.ContinueLabel);
+            // BACK is the English Vosk key even when the button copy changes.
+            Assert.True(vm.VoiceActions.ContainsKey("BACK"));
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void SettingsVoiceBack_RunsTheDoneAction()
+    {
+        bool done = false;
+        var vm = Create([], () => done = true,
+            doneLabelKey: "PreferencesBack", voiceDoneLabel: "BACK");
+
+        vm.VoiceActions["BACK"]();
+
+        Assert.True(done);
+    }
+
+    [Fact]
+    public void SettingsActionLabel_FollowsLanguageChange()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            var vm = new PreferencesScreenViewModel(
+                PlayerPreferences.Default,
+                preferences => CultureInfo.CurrentUICulture =
+                    new CultureInfo(preferences.Language == UiLanguage.Dutch ? "nl-NL" : "en-US"),
+                () => { },
+                "PreferencesBack");
+
+            vm.SelectedLanguage = vm.LanguageOptions[1];
+
+            Assert.Equal("TERUG", vm.ContinueLabel);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
     }
 
     [Fact]

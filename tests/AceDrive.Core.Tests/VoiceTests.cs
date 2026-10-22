@@ -103,6 +103,26 @@ public sealed class VoiceTests
         Assert.Same(control, vm.CurrentScreen);
     }
 
+    // The calendar page's route: finish the walk to the control page, let the
+    // panel hand over, then call it back and tap the menu's Calendar tile.
+    private static CalendarScreenViewModel ToCalendarPage(MainViewModel vm)
+    {
+        ToControlPage(vm);
+        vm.ToggleShowCommand.Execute(null); // hide
+        return ShowCalendar(vm);
+    }
+
+    // A call lands on the menu page; its Calendar tile opens the cached
+    // calendar page, the same tap the player makes.
+    private static CalendarScreenViewModel ShowCalendar(MainViewModel vm)
+    {
+        vm.Show();
+        Assert.True(vm.IsShown);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.CalendarCommand.Execute(null);
+        return Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
+    }
+
     [Fact]
     public void WithVoice_StartsHidden()
     {
@@ -267,19 +287,11 @@ public sealed class VoiceTests
         // START/CONTINUE flip would re-target the next utterance anyway.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
-        var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
-        dialogue.ContinueCommand.Execute(null);
-        dialogue.ContinueCommand.Execute(null); // finishes: control page is built
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        ShowControl(vm, control); // call the panel back after the HUD hand-over
+        var calendar = ToCalendarPage(vm);
 
         clock.Advance(TimeSpan.FromSeconds(8));
         mic.Fire("market valuation"); // fires: activity at t=8
-        CalendarRow monday = Assert.Single(control.Days, d => d.DayLabel == "Monday");
+        CalendarRow monday = Assert.Single(calendar.Days, d => d.DayLabel == "Monday");
         Assert.True(monday.Flash);
         clock.Advance(TimeSpan.FromSeconds(8));
         mic.Fire("market valuation"); // muted repeat: no fire, still activity
@@ -719,6 +731,29 @@ public sealed class VoiceTests
     }
 
     [Fact]
+    public void VoiceSettings_OnMenu_SaysBackAndReturnsToMenu()
+    {
+        // Settings reuses the first-run preferences page, but its action is
+        // BACK and both the button and the mic return to the menu instead of
+        // advancing the walk.
+        var (vm, _, mic, _) = Create();
+        mic.Fire("hey mazda");
+        ToControlPage(vm);
+        vm.ToggleShowCommand.Execute(null); // hide
+        vm.ToggleShowCommand.Execute(null); // call it back: the menu page
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+
+        mic.Fire("settings");
+
+        var settings = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("BACK", settings.ContinueLabel);
+
+        mic.Fire("back");
+
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
     public void VoiceStartTaxi_ContinuesOnlyAfterFlash()
     {
         // The half-second acknowledgment glows on "START TAXI SHIFT"; the
@@ -766,21 +801,21 @@ public sealed class VoiceTests
         // triggerable, by click or by voice.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        var calendar = ToCalendarPage(vm);
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
-        ShowControl(vm, control); // a call lands on the menu; stay on control
+        ShowCalendar(vm); // a call lands on the menu; open the calendar again
         mic.Fire("where is willie");
         // Willy is DayOfWeek 4: a Wednesday.
-        CalendarRow willyDay = Assert.Single(control.Days, d => d.DayLabel == "Wednesday");
+        CalendarRow willyDay = Assert.Single(calendar.Days, d => d.DayLabel == "Wednesday");
         Assert.True(willyDay.Flash);
 
         clock.Advance(TimeSpan.FromMinutes(212)); // ~4 more game days: Sunday
         vm.Poll();
-        ShowControl(vm, control); // a call lands on the menu; stay on control
+        ShowCalendar(vm); // a call lands on the menu; open the calendar again
         mic.Fire("chant amelia");
-        CalendarRow sunday = Assert.Single(control.Days, d => d.DayLabel == "Sunday");
+        CalendarRow sunday = Assert.Single(calendar.Days, d => d.DayLabel == "Sunday");
         Assert.True(sunday.Flash);
     }
 
@@ -894,11 +929,11 @@ public sealed class VoiceTests
         var log = new TestLog();
         var (vm, clock, mic, _) = Create(log: log);
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        ToCalendarPage(vm);
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
-        ShowControl(vm, control); // a call lands on the menu; stay on control
+        ShowCalendar(vm); // a call lands on the menu; open the calendar again
         mic.Fire("where is"); // partial: alias fires
         mic.Fire("where is willy", isFinal: true); // final: same tap, muted
 

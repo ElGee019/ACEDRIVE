@@ -102,6 +102,12 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // the HUD never opens its own timer or shared-memory handle.
     private readonly ITelemetryHud? _hud;
     private MainControlScreenViewModel? _control;
+    // The calendar page is built once per session so its week and day rows
+    // survive leaving the page; the poll refreshes it on the minute guard.
+    private CalendarScreenViewModel? _calendar;
+    // The menu is built once per session so its clock keeps ticking behind
+    // another page; the poll refreshes it on the minute guard.
+    private MenuScreenViewModel? _menu;
     private DeliveryJobScreenViewModel? _deliveryScreen;
     private TaxiJobProposalViewModel? _proposal;
     private CustomerRequestScreenViewModel? _requestScreen;
@@ -307,6 +313,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             SaveDriver(_rivals.LastResult);
             _log.LogInfo($"[Streak] consecutive-day bonus granted: {bonus} CR (day {days})");
         }
+        // The day-flip detector starts on the session's opening day, so the
+        // first poll does not report a transition.
+        _lastDay = _game.Today;
         _lastActivity = _clock.UtcNow;
         // The router's warn-free reads go through IVoiceHost (see the explicit
         // implementations below), so the host surface stays small.
@@ -479,35 +488,41 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _log.LogInfo("overlay shown (POI)");
     }
 
-    // Built once and reused: the date header stays live across wakes.
-    // The taxi entry opens the job proposal page (port of Unity
-    // TaxiJobProposalScreen); delivery opens the career page (port of Unity
-    // DeliveryJobScreen); the calendar day buttons have
-    // no destinations until the freeroam map lands, so tapping the
-    // highlighted day just logs — except the road-test day, which banks the
-    // week's car as tested and switches to the next pick (manual stand-in
-    // until the road-test drive flow lands). Off-gate taps never reach this
-    // action: the page's own day command warns them before dispatching.
+    // Built once and reused. The taxi entry opens the job proposal page (port
+    // of Unity TaxiJobProposalScreen); delivery opens the career page (port
+    // of Unity DeliveryJobScreen). The weekly strip lives on its own page
+    // (see CreateCalendarScreen).
     private MainControlScreenViewModel CreateControlScreen()
     {
-        _openDayAction ??= new ParameterizedCommand<int>(OnDay);
-        if (_control is null)
-        {
-            // The page boots on the resumed week (if any), not the stamp
-            // default: the header is right on the first paint.
-            _control = new MainControlScreenViewModel(
-                _beat, _game, _clock, _roads, _todos, _hunger, _garage,
-                CalendarStamp.Default with { Week = _displayWeek },
-                _shift,
-                new ControlActions(
-                    TaxiShiftCommand, new RelayCommand(OpenDelivery),
-                    new RelayCommand(OnCarHaul),
-                    BankCommand, GarageCommand, DealerCommand, CarWashCommand,
-                    MechanicCommand, InsuranceCommand, _openDayAction));
-            _lastDay = _control.Today;
-        }
+        _control ??= new MainControlScreenViewModel(
+            _beat, _todos, _hunger, _garage, _shift,
+            new ControlActions(
+                TaxiShiftCommand, new RelayCommand(OpenDelivery),
+                new RelayCommand(OnCarHaul),
+                BankCommand, GarageCommand, DealerCommand, CarWashCommand,
+                MechanicCommand, InsuranceCommand));
         return _control;
     }
+
+    // Built once and reused; boots on the resumed week (if any), not the
+    // stamp default, so the header is right on the first paint. The calendar
+    // day buttons have no destinations until the freeroam map lands, so
+    // tapping the highlighted day just logs — except the road-test day, which
+    // banks the week's car as tested and switches to the next pick (manual
+    // stand-in until the road-test drive flow lands). Off-gate taps never
+    // reach this action: the page's own day command warns them before
+    // dispatching.
+    private CalendarScreenViewModel CreateCalendarScreen()
+    {
+        _openDayAction ??= new ParameterizedCommand<int>(OnDay);
+        _calendar ??= new CalendarScreenViewModel(
+            _beat, _game, _clock, _roads,
+            CalendarStamp.Default with { Week = _displayWeek },
+            _openDayAction, new RelayCommand(() => SetScreen(CreateMenuScreen())));
+        return _calendar;
+    }
+
+    private void OpenCalendar() => SetScreen(CreateCalendarScreen());
 
     private void OnDay(int day)
     {
@@ -517,7 +532,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             _roads.MarkTested();
             SaveRoadTest();
             _log.LogInfo($"road test done: {before} -> {DescribeRoadTest()}");
-            _control?.Refresh();
+            _calendar?.Refresh();
             return;
         }
         _log.LogInfo($"calendar day {day} tapped while locked: waiting on the freeroam map");
@@ -724,26 +739,37 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _beat.Poll();
         _control?.UpdateFlash();
         _control?.Refresh();
+        _calendar?.UpdateFlash();
+        _calendar?.Refresh();
+        _menu?.Refresh();
 
         // Game-day flip: the calendar highlight moved. One int compare per
         // tick, work only on transitions (hot-path discipline).
-        if (_control is not null && _control.Today != _lastDay)
+        int today = _game.Today;
+        if (today != _lastDay)
         {
             int prev = _lastDay;
-            _log.LogInfo($"calendar day changed: {prev} -> {_control.Today}");
-            _lastDay = _control.Today;
+            _log.LogInfo($"calendar day changed: {prev} -> {today}");
+            _lastDay = today;
             // Sunday-midnight crossing completes the week: the display week
             // rolls and the moment persists. The road-test pick deliberately
             // does NOT rotate here — an untested car stays on offer until it
             // is actually driven (PORTPLAN 49).
-            if (prev == ControlCalendar.Sunday && _control.Today == ControlCalendar.Monday)
+            if (prev == ControlCalendar.Sunday && today == ControlCalendar.Monday)
             {
                 _displayWeek++;
-                _control.DisplayWeek = _displayWeek;
+                if (_calendar is not null)
+                {
+                    _calendar.DisplayWeek = _displayWeek;
+                    // The header repaints now instead of on the next tick: a
+                    // week opening is the one transition the poll already ran
+                    // its refresh before.
+                    _calendar.Refresh();
+                }
+                if (_menu is not null) _menu.DisplayWeek = _displayWeek;
                 _log.LogInfo($"week {_displayWeek} opened: road test stays {DescribeRoadTest()}");
             }
             SaveClock();
-            _control.Refresh();
         }
 
         // The town ticks on game minutes, whether or not a page is open: one
@@ -976,8 +1002,18 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     }
 
     private MenuScreenViewModel CreateMenuScreen() =>
-        new MenuScreenViewModel(
-            new RelayCommand(() => SetScreen(CreateControlScreen())));
+        _menu ??= new MenuScreenViewModel(
+            new RelayCommand(() => SetScreen(CreateControlScreen())),
+            new RelayCommand(OpenCalendar),
+            new RelayCommand(OpenSettings),
+            _game,
+            _displayWeek);
+
+    // The Settings tile reuses the first-run unit + language page: selections
+    // save and apply immediately through the walk's writer, and BACK comes
+    // back here instead of advancing the introduction (the walk is done).
+    private void OpenSettings() =>
+        SetScreen(_story.CreateSettingsPage(() => SetScreen(CreateMenuScreen())));
 
     private void Hide()
     {
@@ -1315,14 +1351,18 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             $"(patrol {fine.Id}, {sample.SpeedKmh:0} km/h in {fine.SpeedLimitKmh} zone)");
     }
 
+    // The HUD line names the customer, not the leg: the templates carry the
+    // door's street, number and town from the structured address, so passing
+    // an address descriptor here would print it twice (Unity names the
+    // passenger on the PICK UP / DROP OFF prompt too).
     private void ShowPickupGuidance() =>
         _hud?.SetJobGuidance(Guidance(
-            _job.PickupName, _job.PickupAddress,
+            _job.Customer.Full, _job.PickupAddress,
             "HudJobPickupDrive", "HudJobPickupArrived", "HudJobPickupAction"));
 
     private void ShowDropoffGuidance() =>
         _hud?.SetJobGuidance(Guidance(
-            _job.DropoffName, _job.DropoffAddress,
+            _job.Customer.Full, _job.DropoffAddress,
             "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction"));
 
     // A proposal generated on a map that cannot supply two doors has no

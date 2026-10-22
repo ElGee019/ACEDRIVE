@@ -27,6 +27,19 @@
          Not auto-globbed as Resource by the SDK: .webp is unknown to it. -->
     <Resource Include="Assets\backdrop.webp" />
     <Resource Include="Assets\Buttons\*.webp" />
+    <!-- Tourney Thin (SIL OFL): the menu clock's outline face, as in
+         ontwerpdesign.psd. Ship the licence beside the exe. -->
+    <Resource Include="Assets\Fonts\Tourney-Thin.ttf" />
+    <Content Include="Assets\Fonts\Tourney-OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Inter Thin 100 (SIL OFL): the face the menu tiles label their
+         buttons in, reused by the calendar strip so both pages read as one
+         design. -->
+    <Resource Include="Assets\Fonts\Inter-Thin.ttf" />
+    <Content Include="Assets\Fonts\Inter-OFL.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>
