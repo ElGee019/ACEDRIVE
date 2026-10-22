@@ -44,6 +44,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // The persisted best single shift (PORTPLAN 12): the settle path banks it
     // and the online board receives it at the shift end.
     private readonly ShiftRecord _shifts;
+    // Best-single-shift world standings (Unity ShiftStandingsService): the
+    // shift-ended page reads it and the board updates arrive live.
+    private readonly IShiftStandings _shiftBoard;
     // Lifetime km per driven brand behind the receipt's sponsorship rate
     // (PORTPLAN 35, Unity PlayerData.brandDistanceDriven).
     private readonly IBrandMileageStore _brands;
@@ -228,6 +231,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         DailyStreak streak, OperatingZone zone, IFriendshipStore friendships, IReadOnlyList<CarSpec> cars,
         IBrandMileageStore brands, IRivalsService rivals,
         ICarRaritySource rarity, IPlayerTelemetry playerTelemetry, ShiftRecord shifts,
+        IShiftStandings shiftStandings,
         Hunger hunger, IHungerStateStore hungerStore,
         Garage garage, IGarageStore garageStore, InsuranceRules insuranceRules,
         BreakdownStrategy breakdowns,
@@ -286,6 +290,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _rarity = rarity;
         _online = playerTelemetry;
         _shifts = shifts;
+        _shiftBoard = shiftStandings;
         _cars = cars;
         // The persistence collaborator is built from the injected services, so
         // the early banks below (garage seed, streak bonus) already route
@@ -1108,7 +1113,11 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         DateTime now = _clock.UtcNow;
         if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
         {
+            // Unity parity: the shift-ended page takes over and the tap stops
+            // here. The player reads the result, comes back to the control
+            // page and taps TAXI again for a fresh shift.
             EndShift(idle);
+            return;
         }
         if (!_shift.IsStarted)
         {
@@ -1418,8 +1427,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
                 _taxiRules.ArrivalRadiusMeters)
             : null;
 
-    // Reveals the panel on a job page (refusal, breakdown, receipt). Show()
-    // deliberately opens the menu instead, so the page must be set first.
+    // Reveals the panel on a job page (refusal, breakdown, receipt, shift
+    // ended). Show() deliberately opens the menu instead, so the page must be
+    // set first.
     private void ShowJobScreen(object screen)
     {
         RecordActivity();
@@ -1651,11 +1661,14 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // One shift ends at both timeout sites (the poll and the START tap);
     // bank the record once and push the best to the world board. Pushing on
     // every end (not only an improvement) also syncs a best restored from a
-    // local save whose earlier push never reached Firestore.
+    // local save whose earlier push never reached Firestore. The shift-ended
+    // page opens from here, so the timeout is never silent (Unity chains the
+    // same page before the map).
     private void EndShift(TimeSpan idle)
     {
+        ShiftSummary summary = _shift.Summary();
         _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
-            $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+            $"{summary.Jobs} jobs / {summary.Earnings:0.00}");
         _lastShiftSecs = -1;
         // The closed state goes to disk before the record push: a shift that
         // timed out between sessions is already over and must never reopen.
@@ -1664,14 +1677,28 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         // process noticed: an expiry discovered at the next launch can be
         // days later, and the world board breaks earnings ties by this stamp.
         DateTime endedAt = _shift.LastJobEnd + TimeSpan.FromMinutes(TaxiShift.TimeoutMinutes);
-        _shifts.Record(_shift.Earned, endedAt.Ticks);
+        _shifts.Complete(summary.Jobs, summary.Earnings, endedAt.Ticks);
+        // Refresh before the page reads it, exactly like the receipt's XP
+        // block: LastResult then answers with the fresh rank or the restored
+        // snapshot, and the page follows the board's event if it is still
+        // loading.
+        if (_shiftBoard.Refresh(_shifts.BestEarnings, _shifts.BestFirstEarnedTicks)
+            is { } standings)
+        {
+            _shifts.RestoreStandings(standings.CurrentRank, standings.TotalCompetitors);
+        }
         if (_shifts.BestEarnings > 0.0)
         {
             _online.PushShiftEarnings(
                 _shifts.BestEarnings, _shifts.BestFirstEarnedTicks, PlayerName());
-            SaveDriver(_rivals.LastResult);
         }
+        // The lifetime counters ride the driver save, so bank even a shift
+        // that earned nothing.
+        SaveDriver(_rivals.LastResult);
         RefreshJob();
+        ShowJobScreen(new ShiftEndedScreenViewModel(
+            summary, _shifts, _shiftBoard, _beat,
+            new RelayCommand(() => SetScreen(CreateControlScreen()))));
     }
 
     // Unity's whole-km trip unit (Mathf.RoundToInt with a 1 km floor): the

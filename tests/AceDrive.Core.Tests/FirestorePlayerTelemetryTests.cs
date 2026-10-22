@@ -12,7 +12,7 @@ public sealed class FirestorePlayerTelemetryTests
         return new FirestorePlayerTelemetry(
             new FirestorePlayers(db, clock),
             new FirestoreCountries(db, clock),
-            () => uid, new NullLogger(), CancellationToken.None);
+            _ => Task.FromResult(uid), new NullLogger(), CancellationToken.None);
     }
 
     [Fact]
@@ -39,6 +39,32 @@ public sealed class FirestorePlayerTelemetryTests
         Assert.Equal(500.0, Assert.IsType<double>(fields["highestShiftEarnings"]));
         Assert.Equal("Ace", fields["displayName"]);
         Assert.IsType<string>(fields["highestShiftEarningsFirstEarnedAt"]);
+    }
+
+    [Fact]
+    public async Task ShiftPush_WaitsForTheAnonymousSignIn()
+    {
+        // Regression (LATESTDRIVEBS2): the boot poll ends a shift that timed
+        // out while the game was closed before auth has produced a uid. The
+        // push must wait for that sign-in, not vanish: a new player would
+        // otherwise stay off the shift board until a later shift ends.
+        var db = new FakeFirestoreDatabase();
+        var signIn = new TaskCompletionSource<string?>();
+        var clock = new FakeClock();
+        var telemetry = new FirestorePlayerTelemetry(
+            new FirestorePlayers(db, clock),
+            new FirestoreCountries(db, clock),
+            _ => signIn.Task, new NullLogger(), CancellationToken.None);
+
+        Task push = telemetry.PushShiftEarningsAsync(120.0, 1, "New Player");
+        Assert.Empty(db.Sets);
+
+        signIn.SetResult("new-uid");
+        await push;
+
+        var (path, fields) = Assert.Single(db.Sets);
+        Assert.Equal("acevo_players/new-uid", path);
+        Assert.Equal(120.0, Assert.IsType<double>(fields["highestShiftEarnings"]));
     }
 
     [Fact]

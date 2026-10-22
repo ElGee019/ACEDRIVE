@@ -54,6 +54,7 @@ public sealed class MainViewModelTests
             FakeCarRarity? rarity = null,
             FakePlayerTelemetry? telemetry = null,
             ShiftRecord? shifts = null,
+            IShiftStandings? shiftStandings = null,
             IPlayerNameRegistry? playerNames = null,
             TaxiShift? shift = null, IShiftStore? shiftStore = null)
     {
@@ -108,6 +109,7 @@ public sealed class MainViewModelTests
             rarity ?? new FakeCarRarity(),
             telemetry ?? new FakePlayerTelemetry(),
             shifts ?? new ShiftRecord(savedDriver),
+            shiftStandings ?? new FakeShiftStandings(),
             hunger ?? new Hunger(HungerRules.Default), hungerStore ?? new FakeHungerStore(),
             garageInstance, garageStore ?? new FakeGarageStore(),
             InsuranceRules.Default,
@@ -954,12 +956,15 @@ public sealed class MainViewModelTests
         // shift is already over and the first poll banks it as closed.
         var shifts = new FakeShiftStore();
         var online = new FakePlayerTelemetry();
+        var board = new FakeShiftStandings();
+        var driverStore = new FakeDriverStore();
         var restart = new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc);
         var shift = new TaxiShift(new TaxiShiftSnapshot(
             IsStarted: true, StartedAt: restart.AddMinutes(-55),
             LastJobEnd: restart.AddMinutes(-50), JobsDone: 1, Earned: 20.0));
         var (vm, _, _, _) = Create(
-            speedKmh: 0f, shift: shift, shiftStore: shifts, telemetry: online);
+            speedKmh: 0f, shift: shift, shiftStore: shifts, telemetry: online,
+            shiftStandings: board, driverStore: driverStore);
 
         vm.Poll();
 
@@ -969,6 +974,48 @@ public sealed class MainViewModelTests
         // The closed shift still feeds the best-shift record and the board.
         Assert.Single(online.ShiftPushes);
         Assert.Equal(20.0, online.ShiftPushes[0].Earnings);
+        // The notification page opens on that tick (Unity chains the
+        // shift-ended screen before the map), so the timeout is never silent.
+        var page = Assert.IsType<ShiftEndedScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("Jobs completed: 1", page.JobsLine);
+        Assert.Equal("Total earnings: €20.00", page.EarningsLine);
+        Assert.Equal("Shift duration: 5 min", page.DurationLine);
+        Assert.Equal("Longest shift: 1 jobs", page.LongestLine);
+        Assert.Equal("Total shifts completed: 1", page.TotalShiftsLine);
+        // The rank was refreshed against the board and banked with the
+        // lifetime counters (Unity SaveToPlayerData).
+        Assert.Equal((20.0, restart.AddMinutes(-20).Ticks), Assert.Single(board.Refreshes));
+        Assert.Equal(1, driverStore.Saved[^1].ShiftsCompleted);
+        Assert.Equal(1, driverStore.Saved[^1].LongestShiftJobs);
+    }
+
+    [Fact]
+    public void TaxiTap_OnATimedOutShift_ShowsShiftEnded_InsteadOfANewShift()
+    {
+        // Unity JobSelectionScreen: the tap that finds a stale shift ends it,
+        // shows the stats page and returns without starting a new shift.
+        var (vm, clock, _, _) = Create(speedKmh: 0f);
+        vm.FinishDialogue();
+        vm.TaxiShiftCommand.Execute(null);
+        var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
+        proposal.BackCommand.Execute(null);
+
+        clock.Advance(TimeSpan.FromMinutes(30).Add(TimeSpan.FromSeconds(1)));
+        vm.TaxiShiftCommand.Execute(null);
+
+        var page = Assert.IsType<ShiftEndedScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("Jobs completed: 0", page.JobsLine);
+        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+
+        // CONTINUE lands on the control page; the next tap then opens a
+        // fresh shift as usual.
+        page.ContinueCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+
+        vm.TaxiShiftCommand.Execute(null);
+        Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
+        Assert.Contains("left", vm.ShiftText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -2563,8 +2610,10 @@ public sealed class MainViewModelTests
     {
         var shifts = new ShiftRecord(null);
         var telemetry = new FakePlayerTelemetry();
+        var board = new FakeShiftStandings();
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, shifts: shifts, telemetry: telemetry,
+            shiftStandings: board,
             requests: new FakeCustomerRequestRoller
             {
                 Result = CustomerRequestTestData.PassiveRequest,
@@ -2579,5 +2628,11 @@ public sealed class MainViewModelTests
         Assert.Equal(shifts.BestEarnings, pushed.Earnings);
         Assert.Equal(shifts.BestFirstEarnedTicks, pushed.Ticks);
         Assert.True(pushed.Ticks > 0);
+        // The page reports the shift that just closed, and its board was
+        // refreshed for the record, not for the shift's own earnings.
+        var page = Assert.IsType<ShiftEndedScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("Jobs completed: 1", page.JobsLine);
+        Assert.Equal(1, shifts.ShiftsCompleted);
+        Assert.Equal((shifts.BestEarnings, shifts.BestFirstEarnedTicks), Assert.Single(board.Refreshes));
     }
 }

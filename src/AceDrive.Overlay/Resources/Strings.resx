@@ -279,6 +279,21 @@ Accept this job?</value></data>
   <data name="ReceiptStandingsLost" xml:space="preserve"><value>You lost {0} positions.</value></data>
   <data name="ReceiptStandingsNoChange" xml:space="preserve"><value>No change in standings.</value></data>
   <data name="ReceiptContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <!-- Shift-ended page (PORTPLAN 12, Unity ShiftEndedScreen): the shift that
+       just timed out, its lifetime records and the best-single-shift world
+       standings. {0} is the jobs / amount / minutes / ordinal, {1} the board
+       size. The delta sentences reuse the receipt's ReceiptStandings* keys.
+       Placeholders survive translation; translators may reorder, never
+       remove. -->
+  <data name="ShiftEndedTitle" xml:space="preserve"><value>SHIFT ENDED</value></data>
+  <data name="ShiftEndedJobs" xml:space="preserve"><value>Jobs completed: {0}</value></data>
+  <data name="ShiftEndedEarnings" xml:space="preserve"><value>Total earnings: €{0:0.00}</value></data>
+  <data name="ShiftEndedDuration" xml:space="preserve"><value>Shift duration: {0} min</value></data>
+  <data name="ShiftEndedLongest" xml:space="preserve"><value>Longest shift: {0} jobs</value></data>
+  <data name="ShiftEndedBest" xml:space="preserve"><value>Highest earnings: €{0:0.00}</value></data>
+  <data name="ShiftEndedTotal" xml:space="preserve"><value>Total shifts completed: {0}</value></data>
+  <data name="ShiftEndedStandings" xml:space="preserve"><value>Your shift world standings is {0} of {1}.</value></data>
+  <data name="ShiftEndedStandingsUnknown" xml:space="preserve"><value>Your shift world standings is —/—.</value></data>
   <!-- Savings bank (PORTPLAN 48, Unity BankScript copy): saldo/preview
        lines, the withdraw + back buttons and the temporary control-page entry.
        {0} is the 2-decimal CR amount; the CR prefix is Unity's own currency

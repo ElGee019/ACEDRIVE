@@ -181,6 +181,7 @@ public partial class App : Application, IDisposable
         IRivalsService rivals;
         ICarRaritySource rarity;
         IPlayerTelemetry telemetry;
+        IShiftStandings shiftStandings;
         IPlayerNameRegistry playerNames;
         FirebaseOptions? firebaseOptions = FirebaseOptions.TryLoad(_log);
         if (firebaseOptions is not null)
@@ -198,12 +199,21 @@ public partial class App : Application, IDisposable
                 new FirestoreCars(_firebase.Database, wall), _log, _firebase.StopToken);
             liveRarity.Start();
 
+            var liveShiftBoard = new FirestoreShiftStandings(
+                onlinePlayers, () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+            liveShiftBoard.RestoreSnapshot(savedDriver);
+            liveShiftBoard.Start();
+
             rivals = liveRivals;
             rarity = liveRarity;
+            shiftStandings = liveShiftBoard;
+            // WHY UidAsync: the boot poll can end a shift that timed out while
+            // the game was closed before anonymous auth has finished, and the
+            // shift push has no later retry of its own.
             telemetry = new FirestorePlayerTelemetry(
                 onlinePlayers,
                 new FirestoreCountries(_firebase.Database, wall),
-                () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+                _firebase.UidAsync, _log, _firebase.StopToken);
             playerNames = new FirestorePlayerNameRegistry(
                 _firebase.Database, _firebase.UidAsync, wall, _log);
         }
@@ -214,6 +224,9 @@ public partial class App : Application, IDisposable
             rivals = offline;
             rarity = new OfflineCarRarity();
             telemetry = new OfflinePlayerTelemetry();
+            var offlineShiftBoard = new OfflineShiftStandings();
+            offlineShiftBoard.RestoreSnapshot(savedDriver);
+            shiftStandings = offlineShiftBoard;
             playerNames = new OfflinePlayerNameRegistry();
         }
         // Familiarity (PORTPLAN 45): one persisted level per resident, so a
@@ -280,6 +293,7 @@ public partial class App : Application, IDisposable
             rarity,
             telemetry,
             shifts,
+            shiftStandings,
             hunger,
             hungerStore,
             garage,

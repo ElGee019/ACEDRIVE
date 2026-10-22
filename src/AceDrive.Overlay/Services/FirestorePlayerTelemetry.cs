@@ -5,24 +5,29 @@ namespace AceDrive.Overlay.Services;
 /// <summary>
 /// Firestore-backed player telemetry. Each call is one merge write on the
 /// player's own doc or one country increment; failures never gate gameplay.
-/// Calls made before anonymous auth has produced a uid are dropped — the
-/// next job/shift/zone event pushes again.
+/// The uid is resolved by awaiting anonymous auth instead of reading the
+/// cached session: the boot poll can end a shift that timed out while the
+/// game was closed before the first sign-in has finished, and a shift's
+/// record is only pushed at its end — dropping that push would keep a new
+/// player (a fresh uid with no doc yet) off the shift board until a later
+/// shift ends. XP, zone and country pushes self-heal on their next event;
+/// the shift push has no such retry, so it waits for the uid.
 /// </summary>
 public sealed class FirestorePlayerTelemetry : IPlayerTelemetry
 {
     private readonly FirestorePlayers _players;
     private readonly FirestoreCountries _countries;
-    private readonly Func<string?> _uid;
+    private readonly Func<CancellationToken, Task<string?>> _uidAsync;
     private readonly ILog _log;
     private readonly CancellationToken _stopToken;
 
     public FirestorePlayerTelemetry(
         FirestorePlayers players, FirestoreCountries countries,
-        Func<string?> uid, ILog log, CancellationToken stopToken)
+        Func<CancellationToken, Task<string?>> uidAsync, ILog log, CancellationToken stopToken)
     {
         _players = players;
         _countries = countries;
-        _uid = uid;
+        _uidAsync = uidAsync;
         _log = log;
         _stopToken = stopToken;
     }
@@ -40,20 +45,30 @@ public sealed class FirestorePlayerTelemetry : IPlayerTelemetry
             IncrementCountryKmAsync(country, km), _log, "country km push");
 
     /// <summary>Awaitable twins for the fire-and-forget interface methods.</summary>
-    public Task PushZoneKmAsync(double zoneKm, string displayName) =>
-        _uid() is { Length: > 0 } uid
-            ? _players.SetZoneKmAsync(uid, zoneKm, displayName, _stopToken)
-            : Task.CompletedTask;
+    public async Task PushZoneKmAsync(double zoneKm, string displayName)
+    {
+        if (await UidAsync() is not { Length: > 0 } uid) return;
+        await _players.SetZoneKmAsync(uid, zoneKm, displayName, _stopToken).ConfigureAwait(false);
+    }
 
-    public Task PushShiftEarningsAsync(
-        double earnings, long firstEarnedTicks, string displayName) =>
-        _uid() is { Length: > 0 } uid && earnings > 0.0
-            ? _players.SetShiftEarningsAsync(
-                uid, earnings, firstEarnedTicks, displayName, _stopToken)
-            : Task.CompletedTask;
+    public async Task PushShiftEarningsAsync(
+        double earnings, long firstEarnedTicks, string displayName)
+    {
+        if (earnings <= 0.0) return;
+        if (await UidAsync() is not { Length: > 0 } uid) return;
+        await _players.SetShiftEarningsAsync(
+            uid, earnings, firstEarnedTicks, displayName, _stopToken).ConfigureAwait(false);
+    }
 
-    public Task IncrementCountryKmAsync(string country, int km) =>
-        _uid() is { Length: > 0 } && km > 0
-            ? _countries.IncrementKmAsync(country, km, _stopToken)
-            : Task.CompletedTask;
+    public async Task IncrementCountryKmAsync(string country, int km)
+    {
+        if (km <= 0) return;
+        if (await UidAsync() is not { Length: > 0 }) return;
+        await _countries.IncrementKmAsync(country, km, _stopToken).ConfigureAwait(false);
+    }
+
+    // Offline or a rejected sign-in answers null, the same silent degrade the
+    // cached-uid path had; SafeTask turns a transport exception into a log.
+    private async Task<string?> UidAsync() =>
+        await _uidAsync(_stopToken).ConfigureAwait(false);
 }

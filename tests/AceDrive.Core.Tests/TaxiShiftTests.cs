@@ -49,6 +49,34 @@ public sealed class TaxiShiftTests
     }
 
     [Fact]
+    public void Summary_ReportsTheActiveSpanNotTheIdleWindow()
+    {
+        var shift = new TaxiShift();
+        shift.Start(Start);
+        shift.RecordCompleted(
+            new TaxiJobState { Phase = JobPhase.Complete, Fare = 10, Tip = 1 },
+            Start.AddMinutes(25));
+
+        ShiftSummary summary = shift.Summary();
+
+        Assert.Equal(1, summary.Jobs);
+        Assert.Equal(11.0, summary.Earnings);
+        Assert.Equal(25, summary.DurationMinutes);
+    }
+
+    [Fact]
+    public void Summary_ShiftWithoutAJob_ReadsZeroMinutes()
+    {
+        var shift = new TaxiShift();
+        shift.Start(Start);
+
+        ShiftSummary summary = shift.Summary();
+
+        Assert.Equal(0, summary.Jobs);
+        Assert.Equal(0, summary.DurationMinutes);
+    }
+
+    [Fact]
     public void Snapshot_RestoresAClosedShiftAsClosed()
     {
         var closed = new TaxiShiftSnapshot(

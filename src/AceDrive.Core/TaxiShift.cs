@@ -59,6 +59,15 @@ public sealed class TaxiShift
         if (IsStarted) LastJobEnd = now;
     }
 
+    /// <summary>How long the driver was on the shift: first start to the last
+    /// dropoff. The idle window that follows that dropoff is what ends the
+    /// shift, not part of the work done in it.</summary>
+    public TimeSpan Length => LastJobEnd > StartedAt ? LastJobEnd - StartedAt : TimeSpan.Zero;
+
+    /// <summary>The finished shift as one report for the shift-ended page.</summary>
+    public ShiftSummary Summary() => new(
+        JobsDone, Earned, (int)Math.Round(Length.TotalMinutes, MidpointRounding.AwayFromZero));
+
     /// <summary>True when open and idle since the last dropoff hit the timeout.</summary>
     public bool IsTimedOut(DateTime now) =>
         IsStarted && (now - LastJobEnd).TotalMinutes >= TimeoutMinutes;

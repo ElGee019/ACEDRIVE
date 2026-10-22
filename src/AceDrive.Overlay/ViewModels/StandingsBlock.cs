@@ -65,14 +65,7 @@ public sealed class StandingsBlock : ViewModelBase
     {
         Line = Strings.Format(
             "ReceiptStandings", Ordinals.Of(result.CurrentRank), result.TotalCompetitors);
-        DeltaLine = result.RankChange switch
-        {
-            1 => Strings.Get("ReceiptStandingsGainedOne"),
-            > 0 => Strings.Format("ReceiptStandingsGained", result.RankChange),
-            -1 => Strings.Get("ReceiptStandingsLostOne"),
-            < 0 => Strings.Format("ReceiptStandingsLost", -result.RankChange),
-            _ => Strings.Get("ReceiptStandingsNoChange"),
-        };
+        DeltaLine = StandingsCopy.Delta(result.RankChange);
         Changed = result.RankChange != 0;
         PulseSignal = Changed ? PulseSignal + 1 : 0;
     }

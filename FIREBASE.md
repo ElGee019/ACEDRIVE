@@ -80,7 +80,9 @@ Live wiring:
 - global car km → dynamic rarity rank used by the taxi XP formula;
 - player name reservation on the opening screen;
 - longest operating zone on expansion;
-- best single-shift earnings on shift end;
+- best single-shift earnings on shift end, and the shift-ended page shows the
+  resulting world standings (the push waits for anonymous auth: a shift that
+  ended before the first sign-in still creates a new player's doc);
 - per-country km on every paid trip.
 
 Backend-only today (no ACEDRIVE screen/caller yet, compiled and tested):

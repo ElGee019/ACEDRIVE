@@ -4,10 +4,13 @@ namespace AceDrive.Overlay.Services;
 
 /// <summary>
 /// Best-single-shift world standings (PORTPLAN item 12, Unity
-/// ShiftStandingsService). Backend parity only: no shift-ended screen
-/// consumes it yet, but the board math and push are ready.
+/// ShiftStandingsService): the board is read once from <c>acevo_players</c>
+/// and cached, and <see cref="Refresh"/> stays synchronous so the
+/// shift-ended page can render immediately while the network load and the
+/// player's own push run in the background. Own doc is excluded from the
+/// board, exactly like Unity's CollectOtherEntries.
 /// </summary>
-public sealed class FirestoreShiftStandings
+public sealed class FirestoreShiftStandings : IShiftStandings
 {
     private readonly FirestorePlayers _players;
     private readonly Func<string?> _uid;
@@ -33,6 +36,19 @@ public sealed class FirestoreShiftStandings
 
     public ShiftStandingsResult? LastResult => Volatile.Read(ref _last);
 
+    public event Action<ShiftStandingsResult>? ResultUpdated;
+
+    public void RestoreSnapshot(DriverState? saved)
+    {
+        if (saved is null || saved.ShiftRank <= 0 || saved.ShiftTotal <= 0)
+        {
+            return;
+        }
+        Volatile.Write(ref _last, new ShiftStandingsResult(
+            saved.ShiftRank, saved.ShiftTotal, 0, saved.ShiftRank, false));
+    }
+
+    /// <summary>Starts the boot-time board load without blocking startup.</summary>
     public void Start() => EnsureBoardLoad();
 
     public ShiftStandingsResult? Refresh(double earnings, long firstEarnedTicks)
@@ -54,15 +70,6 @@ public sealed class FirestoreShiftStandings
             boardLoaded: true, last: LastResult);
         Publish(result);
         return result;
-    }
-
-    public void Push(double earnings, long firstEarnedTicks, string displayName)
-    {
-        if (_uid() is not { Length: > 0 } uid || earnings <= 0.0) return;
-        SafeTask.Forget(
-            _players.SetShiftEarningsAsync(
-                uid, earnings, firstEarnedTicks, displayName, _stopToken),
-            _log, "shift earnings push");
     }
 
     private void EnsureBoardLoad()
@@ -108,5 +115,6 @@ public sealed class FirestoreShiftStandings
     {
         if (result is null) return;
         Volatile.Write(ref _last, result);
+        ResultUpdated?.Invoke(result);
     }
 }

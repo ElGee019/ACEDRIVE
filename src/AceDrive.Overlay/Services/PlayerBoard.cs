@@ -40,7 +40,11 @@ public static class PlayerBoard
         {
             if (IsOwn(doc, ownUid)) continue;
             if (doc.Number("highestShiftEarnings") is not { } earnings) continue;
-            long first = doc.Timestamp("highestShiftEarningsFirstEarnedAt")?.Ticks ?? 0L;
+            // WHY MaxValue: an absent stamp ranks BELOW every real stamp, so a
+            // tie never lifts that player above one who earned it first
+            // (Unity's fallback). Zero would win every tie instead.
+            long first = doc.Timestamp("highestShiftEarningsFirstEarnedAt")?.Ticks
+                ?? long.MaxValue;
             values.Add(new ShiftBoardEntry(earnings, first));
         }
         return values;

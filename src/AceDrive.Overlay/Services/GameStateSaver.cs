@@ -148,5 +148,7 @@ public sealed class GameStateSaver
             BestShiftFirstEarnedTicks = _shifts.BestFirstEarnedTicks,
             ShiftRank = _shifts.Rank,
             ShiftTotal = _shifts.Total,
+            ShiftsCompleted = _shifts.ShiftsCompleted,
+            LongestShiftJobs = _shifts.LongestJobs,
         });
 }

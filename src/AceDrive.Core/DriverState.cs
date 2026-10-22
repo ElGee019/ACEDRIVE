@@ -23,8 +23,10 @@ namespace AceDrive.Core;
 /// The trunk (PORTPLAN 26/51, Unity PlayerData.trunkItems) rides here so a
 /// restart reopens bought goods with the cash that paid for them.
 /// The best single shift (PORTPLAN 12, Unity highestShiftEarnings +
-/// highestShiftEarningsFirstEarnedAt) and its last world rank snapshot ride
-/// here too, so the online board resumes without re-pushing on every launch.</summary>
+/// highestShiftEarningsFirstEarnedAt) with its lifetime counters
+/// (totalShiftsCompleted + longestShiftJobCount) and its last world rank
+/// snapshot ride here too, so the online board resumes without re-pushing on
+/// every launch.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -45,7 +47,9 @@ public sealed record DriverState(
     double BestShiftEarnings = 0.0,
     long BestShiftFirstEarnedTicks = 0,
     int ShiftRank = 0,
-    int ShiftTotal = 0)
+    int ShiftTotal = 0,
+    int ShiftsCompleted = 0,
+    int LongestShiftJobs = 0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

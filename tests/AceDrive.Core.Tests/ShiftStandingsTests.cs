@@ -53,15 +53,26 @@ public sealed class ShiftStandingsTests
     public void ShiftRecord_OnlyImprovesOnStrictlyHigherEarnings()
     {
         var record = new ShiftRecord(null);
-        Assert.True(record.Record(500, 100));
+        Assert.True(record.Complete(jobs: 3, earnings: 500, firstEarnedTicks: 100));
         Assert.Equal(500, record.BestEarnings);
         Assert.Equal(100, record.BestFirstEarnedTicks);
 
-        Assert.False(record.Record(500, 200));
+        Assert.False(record.Complete(jobs: 3, earnings: 500, firstEarnedTicks: 200));
         Assert.Equal(100, record.BestFirstEarnedTicks);
 
-        Assert.True(record.Record(700, 300));
+        Assert.True(record.Complete(jobs: 5, earnings: 700, firstEarnedTicks: 300));
         Assert.Equal(300, record.BestFirstEarnedTicks);
+    }
+
+    [Fact]
+    public void ShiftRecord_CompleteBanksTheLifetimeCounters()
+    {
+        var record = new ShiftRecord(null);
+        record.Complete(jobs: 3, earnings: 500, firstEarnedTicks: 100);
+        record.Complete(jobs: 1, earnings: 80, firstEarnedTicks: 200);
+
+        Assert.Equal(2, record.ShiftsCompleted);
+        Assert.Equal(3, record.LongestJobs);
     }
 
     [Fact]
@@ -73,11 +84,15 @@ public sealed class ShiftStandingsTests
             BestShiftFirstEarnedTicks = 123,
             ShiftRank = 4,
             ShiftTotal = 20,
+            ShiftsCompleted = 7,
+            LongestShiftJobs = 6,
         };
         var record = new ShiftRecord(saved);
         Assert.Equal(800, record.BestEarnings);
         Assert.Equal(123, record.BestFirstEarnedTicks);
         Assert.Equal(4, record.Rank);
         Assert.Equal(20, record.Total);
+        Assert.Equal(7, record.ShiftsCompleted);
+        Assert.Equal(6, record.LongestJobs);
     }
 }

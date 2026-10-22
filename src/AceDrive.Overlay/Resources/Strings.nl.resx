@@ -225,6 +225,15 @@ Deze klus aannemen?</value></data>
   <data name="ReceiptStandingsLost" xml:space="preserve"><value>Je bent {0} plekken gezakt.</value></data>
   <data name="ReceiptStandingsNoChange" xml:space="preserve"><value>Geen verandering in de standaard.</value></data>
   <data name="ReceiptContinue" xml:space="preserve"><value>VERDER</value></data>
+  <data name="ShiftEndedTitle" xml:space="preserve"><value>DIENST VOORBIJ</value></data>
+  <data name="ShiftEndedJobs" xml:space="preserve"><value>Afgeronde ritten: {0}</value></data>
+  <data name="ShiftEndedEarnings" xml:space="preserve"><value>Totaal verdiend: €{0:0.00}</value></data>
+  <data name="ShiftEndedDuration" xml:space="preserve"><value>Duur van de dienst: {0} min</value></data>
+  <data name="ShiftEndedLongest" xml:space="preserve"><value>Langste dienst: {0} ritten</value></data>
+  <data name="ShiftEndedBest" xml:space="preserve"><value>Hoogste verdiensten: €{0:0.00}</value></data>
+  <data name="ShiftEndedTotal" xml:space="preserve"><value>Totaal afgeronde diensten: {0}</value></data>
+  <data name="ShiftEndedStandings" xml:space="preserve"><value>Je wereldstandaard voor diensten is {0} van {1}.</value></data>
+  <data name="ShiftEndedStandingsUnknown" xml:space="preserve"><value>Je wereldstandaard voor diensten is —/—.</value></data>
   <data name="BankTitle" xml:space="preserve"><value>BANK</value></data>
   <data name="BankSaldo" xml:space="preserve"><value>Huidige banksaldo: CR{0:0.00}</value></data>
   <data name="BankAfter" xml:space="preserve"><value>Saldo na opname: CR{0:0.00}</value></data>

@@ -47,6 +47,9 @@
         <DataTemplate DataType="{x:Type vm:TaxiReceiptScreenViewModel}">
             <views:TaxiReceiptScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ShiftEndedScreenViewModel}">
+            <views:ShiftEndedScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:CustomerRequestScreenViewModel}">
             <views:CustomerRequestScreenView/>
         </DataTemplate>
