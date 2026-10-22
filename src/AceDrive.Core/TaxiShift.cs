@@ -7,13 +7,25 @@ namespace AceDrive.Core;
 /// A shift opens on the first taxi job and idles out 30 minutes after the
 /// last dropoff (Unity TaxiShiftService rule): the button reads START while
 /// closed and CONTINUE while open, and the header counts down to the end.
-/// Time is always passed in (IClock at the call site) so tests stay
+/// The stamp is real wall-clock time, so restoring a snapshot reopens the
+/// same shift — or times it out — exactly as if the process had never
+/// stopped. Time is always passed in (IClock at the call site) so tests stay
 /// deterministic; the parameterless RecordCompleted keeps the legacy
 /// accumulate-without-stamping path.</summary>
 public sealed class TaxiShift
 {
     /// <summary>Idle minutes after the last dropoff before a shift ends.</summary>
     public const double TimeoutMinutes = 30.0;
+
+    public TaxiShift(TaxiShiftSnapshot? saved = null)
+    {
+        if (saved is null) return;
+        IsStarted = saved.IsStarted;
+        StartedAt = saved.StartedAt;
+        LastJobEnd = saved.LastJobEnd;
+        JobsDone = Math.Max(0, saved.JobsDone);
+        Earned = Math.Max(0.0, saved.Earned);
+    }
 
     public int JobsDone { get; private set; }
     public double Earned { get; private set; }
@@ -69,4 +81,8 @@ public sealed class TaxiShift
         IsStarted = false;
         return true;
     }
+
+    /// <summary>The state the next session resumes from, stamps included.</summary>
+    public TaxiShiftSnapshot Snapshot() =>
+        new(IsStarted, StartedAt, LastJobEnd, JobsDone, Earned);
 }

@@ -50,7 +50,12 @@ public sealed class MainViewModelTests
             TaxiRules? taxiRules = null,
             ICustomerRequestRoller? requests = null,
             CustomerRequestTable? requestTable = null,
-            PolicePatrolPlanner? police = null)
+            PolicePatrolPlanner? police = null,
+            FakeCarRarity? rarity = null,
+            FakePlayerTelemetry? telemetry = null,
+            ShiftRecord? shifts = null,
+            IPlayerNameRegistry? playerNames = null,
+            TaxiShift? shift = null, IShiftStore? shiftStore = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -81,11 +86,11 @@ public sealed class MainViewModelTests
                 storeNetwork, trunkInstance, walletInstance, garageInstance,
                 friendsInstance, beat),
         ]);
-        var vm = new MainViewModel(tel, clock, new GameClock(clock, gameStart ?? clock.UtcNow), new TaxiShift(), store,
+        var vm = new MainViewModel(tel, clock, new GameClock(clock, gameStart ?? clock.UtcNow), shift ?? new TaxiShift(), shiftStore ?? new FakeShiftStore(), store,
             log ?? new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(map: map, seed: 0),
             onboardingStore, new FakeContentSource(content ?? EmptyContent),
-            profiles, map, detectedName,
+            profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
             brands, TodoTable.Default, board, career,
             deliveryFares ?? DeliveryFareTable.Default,
@@ -95,9 +100,14 @@ public sealed class MainViewModelTests
             beat, walletInstance,
             driverStore ?? new FakeDriverStore(),
             new DailyStreak(clock, savedDriver),
-            new OperatingZone(savedDriver, seed: 0),
+            // Production seeds the interim zone length from the placeholder
+            // map (App.OnStartup), so the starter bonus decays the same way.
+            new OperatingZone(savedDriver, seed: 0, AddressBook.MapLengthKm(map)),
             friendsInstance, cars ?? TestRoadCars.Pool,
             brandMileage ?? new FakeBrandMileageStore(), rivals ?? new FakeRivals(),
+            rarity ?? new FakeCarRarity(),
+            telemetry ?? new FakePlayerTelemetry(),
+            shifts ?? new ShiftRecord(savedDriver),
             hunger ?? new Hunger(HungerRules.Default), hungerStore ?? new FakeHungerStore(),
             garageInstance, garageStore ?? new FakeGarageStore(),
             InsuranceRules.Default,
@@ -266,8 +276,8 @@ public sealed class MainViewModelTests
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         // 43.15 x 4 = 172.60 charge + 10 forfait = 182.60 base,
         // 36.52 tip + 9.13 brand sponsorship (first 8.2 km in
-        // the brand: 5%) = 228.25.
-        Assert.Equal("€228.25", vm.FareText);
+        // the brand: 5%) = 228.25, plus the 99% starter bonus = 454.22.
+        Assert.Equal("€454.22", vm.FareText);
         Assert.Equal(new ReceiptLine("Fare: 4 × €43.15", "€172.60"), receipt.FareLine);
         Assert.True(receipt.HasBrandBonus);
         Assert.Contains("Customers: 4.", receipt.CustomerLine, StringComparison.Ordinal);
@@ -296,9 +306,9 @@ public sealed class MainViewModelTests
     public void Accept_UnknownCar_RidesSolo()
     {
         // A live 8.2 km ride, tip eligible, no fine: 53.15 base + 10.63 tip +
-        // 2.66 brand sponsorship (first 8.2 km in the brand:
-        // 5%) = 66.44 on the receipt screen, banked to the wallet
-        // and the driver save.
+        // 2.66 brand sponsorship (first 8.2 km in the brand: 5%) = 66.44,
+        // plus the 99% starter bonus (1.929 km zone) = 132.22 on the receipt
+        // screen, banked to the wallet and the driver save.
         var wallet = new DriverWallet();
         var drivers = new FakeDriverStore();
         var (vm, clock, tel, _) = Create(
@@ -309,12 +319,12 @@ public sealed class MainViewModelTests
             });
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("€66.44", vm.FareText);
+        Assert.Equal("€132.22", vm.FareText);
         Assert.Contains("1 jobs", vm.ShiftText, StringComparison.Ordinal);
-        Assert.Equal(66.44, wallet.Cash);
+        Assert.Equal(132.22, wallet.Cash);
         Assert.Equal(0.082, wallet.Xp, precision: 9);
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(66.44, saved.Cash);
+        Assert.Equal(132.22, saved.Cash);
         Assert.Equal(wallet.Xp, saved.Xp);
         // The settle now carries the streak slice too (SaveDriver): a fresh
         // driver recounts to day 1, and with onboarding incomplete no bonus
@@ -323,10 +333,15 @@ public sealed class MainViewModelTests
         Assert.Equal(clock.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             saved.LastLoginDate);
         Assert.Null(saved.LastDailyBonusDate);
-        Assert.Equal(new ReceiptLine("Total earned", "€66.44"), receipt.TotalLine);
+        Assert.Equal(new ReceiptLine("Total earned", "€132.22"), receipt.TotalLine);
         Assert.False(receipt.HasFine);
         Assert.True(receipt.HasBrandBonus);
         Assert.Equal(new ReceiptLine("mazda Sponsorship", "€2.66"), receipt.SponsorshipLine);
+        // The seeded 1.929 km zone pays 99% of the settled total.
+        Assert.True(receipt.HasStarterBonus);
+        Assert.Equal(
+            new ReceiptLine("Business Starter Bonus 99.0%", "€65.78"),
+            receipt.StarterBonusLine);
         Assert.Contains("0.08", receipt.XpLine, StringComparison.Ordinal);
 
         // CONTINUE lands back on the control page.
@@ -353,7 +368,7 @@ public sealed class MainViewModelTests
         Assert.Equal([wallet.Xp], rivals.RefreshedAt);
         Assert.Equal((wallet.Xp, string.Empty), Assert.Single(rivals.Pushed));
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(66.44, saved.Cash);
+        Assert.Equal(132.22, saved.Cash);
         Assert.Equal(wallet.Xp, saved.Xp);
         Assert.Equal(4, saved.RivalsRank);
         Assert.Equal(30, saved.RivalsTotal);
@@ -362,6 +377,7 @@ public sealed class MainViewModelTests
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal("Your XP world standings is 4th of 30.", receipt.Standings.Line);
         Assert.Equal("You gained 2 positions.", receipt.Standings.DeltaLine);
+        Assert.Equal(1, receipt.Standings.PulseSignal);
     }
 
     [Fact]
@@ -395,7 +411,7 @@ public sealed class MainViewModelTests
             });
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(66.44, saved.Cash);
+        Assert.Equal(132.22, saved.Cash);
         Assert.Equal(wallet.Xp, saved.Xp);
         // Fresh driver, offline board: 0/0 keeps "never saved".
         Assert.Equal(0, saved.RivalsRank);
@@ -405,6 +421,7 @@ public sealed class MainViewModelTests
         Assert.Equal("Your XP world standings is —/—.", receipt.Standings.Line);
         Assert.Equal(string.Empty, receipt.Standings.DeltaLine);
         Assert.False(receipt.Standings.Changed);
+        Assert.Equal(0, receipt.Standings.PulseSignal);
     }
 
     [Fact]
@@ -471,15 +488,19 @@ public sealed class MainViewModelTests
 
         TaxiJobProposalViewModel proposal = TaxiFlow.Propose(vm);
         string customer = proposal.Phrase[..proposal.Phrase.IndexOf('\n')].TrimEnd('\r');
+        string suffix = NamePoolTable.Default.Suffixes
+            .First(s => customer.EndsWith($" {s}", StringComparison.Ordinal));
+        string baseName = customer[..^(suffix.Length + 1)];
         Assert.NotNull(hud.JobGuidance);
         Assert.Equal("HudJobPickupDrive", hud.JobGuidance!.DriveKey);
-        // The line names the passenger; the template adds the door itself.
+        // The line names the whole party; the template adds the door itself.
         Assert.Equal(customer, hud.JobGuidance.TargetName);
         Assert.False(vm.IsShown);
 
         vm.PickupCommand.Execute(null);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
-        Assert.Equal(customer, hud.JobGuidance.TargetName);
+        // The drop-off names the customer alone, without the companion suffix.
+        Assert.Equal(baseName, hud.JobGuidance.TargetName);
 
         TaxiFlow.Drive(vm, clock, tel);
         hud.RaiseJobEnter();
@@ -518,13 +539,16 @@ public sealed class MainViewModelTests
         vm.PickupCommand.Execute(null);
 
         var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
-        Assert.True(vm.IsShown);
-        // The pickup interstitial owns the panel before the drop-off guidance.
+        // The ask rides the companion, not the panel: the mini window owns it.
+        Assert.Same(screen, hud.Request);
+        Assert.False(vm.IsShown);
         Assert.Equal("HudJobPickupDrive", hud.JobGuidance!.DriveKey);
 
         screen.Options[0].Command.Execute(null);
         screen.BackCommand.Execute(null);
 
+        Assert.Null(hud.Request);
+        Assert.Equal(1, hud.ClearRequestCalls);
         Assert.False(vm.IsShown);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
         Assert.Equal(1, requests.Calls);
@@ -573,6 +597,35 @@ public sealed class MainViewModelTests
         vm.Poll();
 
         Assert.Equal(13, screen.RemainingSeconds);
+    }
+
+    [Fact]
+    public void Pickup_Request_AnswersByVoiceOnTheCompanion()
+    {
+        // The ask is answered on the mini window mid-drive: with the panel
+        // hidden, the voice router must reach the companion's request instead
+        // of treating the words as chatter for the wake word.
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.PassiveRequest,
+        };
+        var hud = new FakeTelemetryHud();
+        var voice = new FakeVoiceListener();
+        var (vm, _, _, _) = Create(
+            speedKmh: 0f, hud: hud, voice: voice, requests: requests);
+
+        TaxiFlow.Propose(vm);
+        vm.PickupCommand.Execute(null);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
+
+        voice.Fire("sure sure", isFinal: true);
+
+        Assert.True(screen.ShowBack);
+        Assert.False(screen.TimerVisible);
+
+        screen.BackCommand.Execute(null);
+        Assert.Null(hud.Request);
     }
 
     [Fact]
@@ -857,6 +910,65 @@ public sealed class MainViewModelTests
         vm.Poll();
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
         Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TaxiShiftStart_BanksTheShiftForTheNextSession()
+    {
+        var shifts = new FakeShiftStore();
+        var (vm, _, _, _) = Create(speedKmh: 0f, shiftStore: shifts);
+
+        vm.TaxiShiftCommand.Execute(null);
+
+        TaxiShiftSnapshot saved = Assert.Single(shifts.Saved);
+        Assert.True(saved.IsStarted);
+        Assert.Equal(0, saved.JobsDone);
+        Assert.NotEqual(default, saved.LastJobEnd);
+    }
+
+    [Fact]
+    public void RestoredShift_KeepsCountingUntilThirtyMinutesAfterTheLastJob()
+    {
+        // FakeClock opens at 12:00; the last dropoff was 10 minutes ago, so a
+        // restart resumes the same shift with 20 minutes left.
+        var restart = new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc);
+        var shift = new TaxiShift(new TaxiShiftSnapshot(
+            IsStarted: true, StartedAt: restart.AddMinutes(-15),
+            LastJobEnd: restart.AddMinutes(-10), JobsDone: 2, Earned: 42.0));
+        var (vm, clock, _, _) = Create(speedKmh: 0f, shift: shift);
+
+        vm.Poll();
+        Assert.Contains("left", vm.ShiftText, StringComparison.Ordinal);
+        Assert.Contains("2 jobs", vm.ShiftText, StringComparison.Ordinal);
+
+        clock.Advance(TimeSpan.FromMinutes(20).Add(TimeSpan.FromSeconds(1)));
+        vm.Poll();
+        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+        Assert.Contains("2 jobs", vm.ShiftText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void RestoredShift_ExpiredWhileClosed_EndsOnTheFirstPoll()
+    {
+        // The overlay was shut for 50 minutes after the last dropoff: the
+        // shift is already over and the first poll banks it as closed.
+        var shifts = new FakeShiftStore();
+        var online = new FakePlayerTelemetry();
+        var restart = new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc);
+        var shift = new TaxiShift(new TaxiShiftSnapshot(
+            IsStarted: true, StartedAt: restart.AddMinutes(-55),
+            LastJobEnd: restart.AddMinutes(-50), JobsDone: 1, Earned: 20.0));
+        var (vm, _, _, _) = Create(
+            speedKmh: 0f, shift: shift, shiftStore: shifts, telemetry: online);
+
+        vm.Poll();
+
+        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+        Assert.Contains("1 jobs", vm.ShiftText, StringComparison.Ordinal);
+        Assert.Contains(shifts.Saved, s => !s.IsStarted);
+        // The closed shift still feeds the best-shift record and the board.
+        Assert.Single(online.ShiftPushes);
+        Assert.Equal(20.0, online.ShiftPushes[0].Earnings);
     }
 
     [Fact]
@@ -1157,6 +1269,65 @@ public sealed class MainViewModelTests
         Assert.True(vm.IsShown);
         vm.ToggleShowCommand.Execute(null);
         Assert.False(vm.IsShown);
+    }
+
+    [Fact]
+    public void Show_DuringAcceptedJob_LeavesThePanelHidden()
+    {
+        // ACCEPT hands the drive (and the mic) to the HUD. A call must not
+        // pop the job centre over the ride: the player could start a second
+        // job from the control page.
+        var (vm, _, _, _) = Create(speedKmh: 0f);
+        TaxiFlow.Propose(vm);
+        Assert.False(vm.IsShown);
+
+        vm.Show();
+
+        Assert.False(vm.IsShown);
+        Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void Show_WhilePassengerAboard_LeavesThePanelHidden()
+    {
+        var (vm, _, _, _) = Create(speedKmh: 0f);
+        TaxiFlow.Propose(vm);
+        vm.PickupCommand.Execute(null);
+        Assert.False(vm.IsShown);
+
+        vm.Show();
+
+        Assert.False(vm.IsShown);
+    }
+
+    [Fact]
+    public void Show_BeforeAJobIsAccepted_StillOpensTheMenu()
+    {
+        // The gate covers the accepted job, not the shift: a running shift
+        // with no customer must still reach the job centre to pick one.
+        var (vm, _, _, _) = Create(speedKmh: 0f);
+        vm.TaxiShiftCommand.Execute(null);
+        vm.ToggleShowCommand.Execute(null);
+        Assert.False(vm.IsShown);
+
+        vm.Show();
+
+        Assert.True(vm.IsShown);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void Show_AfterTheJobSettles_OpensTheMenu()
+    {
+        var (vm, clock, tel, _) = Create(speedKmh: 0f);
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        vm.ToggleShowCommand.Execute(null); // back to driving with the job done
+        Assert.False(vm.IsShown);
+
+        vm.Show();
+
+        Assert.True(vm.IsShown);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -1891,6 +2062,52 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void Deliver_UnownedCar_EarnsTheMoneyButNoCareerProgress()
+    {
+        // Same run as above, but the live car matches no owned row: the
+        // goods money and fare still settle, while XP, standings, country km,
+        // zone jobs and the global car km stay untouched.
+        var catalog = new DeliveryCatalog(
+            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries")],
+            0.7, 100);
+        var hubs = new HubCatalog(
+            [new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
+            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        var wallet = new DriverWallet();
+        var rarity = new FakeCarRarity { CarCount = 3 };
+        var telemetry = new FakePlayerTelemetry();
+        var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
+        var drivers = new FakeDriverStore();
+        var (vm, _, _, _) = Create(
+            catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
+            carKsId: "ks_mazda_mx5_na", rarity: rarity,
+            telemetry: telemetry, rivals: rivals, driverStore: drivers);
+        vm.FinishDialogue();
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen).DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+        board.ToggleOrderCommand.Execute(board.Rows[0]);
+        board.MainButtonCommand.Execute(null);
+
+        var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(143.40, wallet.Cash);
+        Assert.Equal(0.0, wallet.Xp);
+        Assert.Contains("0.00", receipt.XpLine, StringComparison.Ordinal);
+        Assert.Empty(rarity.Recorded);
+        Assert.Empty(telemetry.CountryPushes);
+        Assert.Empty(rivals.RefreshedAt);
+        Assert.Empty(rivals.Pushed);
+        DriverState saved = drivers.Saved[^1];
+        Assert.Equal(143.40, saved.Cash);
+        Assert.Equal(0, saved.ExpansionJobs);
+    }
+
+    [Fact]
     public void CarHaulTap_SettlesStraightIntoTheReceipt()
     {
         // Like the taxi ACCEPT skip (PORTPLAN 20): with no driving slice
@@ -2006,7 +2223,8 @@ public sealed class MainViewModelTests
         Assert.Equal(0, after.ExpansionJobs);
         Assert.Equal(1, after.ExpansionCount);
         Assert.Equal(["home", "s1"], after.StreetIds);
-        Assert.Equal(0.0, after.ZoneKm); // interim: no street metadata
+        // Interim: the 1.929 km placeholder map + one mean street (0.9645 km).
+        Assert.Equal(2.8935, after.ZoneKm, precision: 4);
     }
 
     [Fact]
@@ -2219,5 +2437,147 @@ public sealed class MainViewModelTests
 
         wash.BackCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void TaxiXp_OwnedCar_UsesItsClassAndGlobalRarity()
+    {
+        // The real class/rarity feed: a class-15 car ranked 2nd of 3 earns
+        // 8.2 * 15 * 2 / 100 = 2.46 XP, contributes its rounded 8 km to the
+        // car board and 8 km to the country aggregate.
+        var pool = new List<CarSpec>
+        {
+            new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4, Class: 15),
+        };
+        var garage = new Garage(pool);
+        garage.Add(pool[0], week: 1);
+        var wallet = new DriverWallet();
+        var rarity = new FakeCarRarity { CarCount = 3 };
+        rarity.RarityByKey["ks_test_sedan"] = 2;
+        rarity.KmByKey["ks_test_sedan"] = 1234;
+        var telemetry = new FakePlayerTelemetry();
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, cars: pool, carKsId: "ks_test_sedan",
+            garage: garage, wallet: wallet, rarity: rarity, telemetry: telemetry,
+            profile: new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1),
+            roads: new RoadTestLedger(pool, seed: 0),
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+
+        Assert.Equal(2.46, wallet.Xp, precision: 9);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(
+            "XP: (8.2 km × class 15 × rarity 2) / 100 × street knowledge 100%",
+            receipt.XpCalcLine);
+        Assert.True(receipt.HasRarityLine);
+        Assert.Contains("2nd most commonly used", receipt.RarityLine, StringComparison.Ordinal);
+        Assert.Equal(("ks_test_sedan", 8), Assert.Single(rarity.Recorded));
+        Assert.Equal(("Germany", 8), Assert.Single(telemetry.CountryPushes));
+    }
+
+    [Fact]
+    public void TaxiXp_UnownedCar_EarnsTheFareButNoCareerProgress()
+    {
+        // A free-roam car that is not in the garage pays the fare, but
+        // contributes nothing to the career: no XP, no world standings, no
+        // country km, no zone job and no global car km. Class/rarity read 0
+        // so the receipt's own formula explains the zero XP.
+        var pool = new List<CarSpec>
+        {
+            new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4, Class: 15),
+        };
+        var wallet = new DriverWallet();
+        var rarity = new FakeCarRarity { CarCount = 3 };
+        var telemetry = new FakePlayerTelemetry();
+        var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
+        var drivers = new FakeDriverStore();
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, cars: pool, carKsId: "ks_test_sedan",
+            garage: new Garage(pool), wallet: wallet,
+            rarity: rarity, telemetry: telemetry, rivals: rivals,
+            driverStore: drivers,
+            profile: new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1),
+            roads: new RoadTestLedger(pool, seed: 0),
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+
+        Assert.Equal(0.0, wallet.Xp);
+        // The 4-seat fare still pays, and the starter bonus rides along even
+        // for an unowned car (it is a payout line, not career progress).
+        Assert.Equal(454.22, wallet.Cash);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(
+            "XP: (8.2 km × class 0 × rarity 0) / 100 × street knowledge 100%",
+            receipt.XpCalcLine);
+        Assert.Contains("0.00", receipt.XpLine, StringComparison.Ordinal);
+        Assert.False(receipt.HasRarityLine);
+        Assert.Empty(rarity.Recorded);
+        Assert.Empty(telemetry.CountryPushes);
+        Assert.Empty(rivals.RefreshedAt);
+        Assert.Empty(rivals.Pushed);
+        // The settle still banks the cash; the zone counter stays put.
+        DriverState saved = drivers.Saved[^1];
+        Assert.Equal(454.22, saved.Cash);
+        Assert.Equal(0.0, saved.Xp);
+        Assert.Equal(0, saved.ExpansionJobs);
+    }
+
+    [Fact]
+    public void TaxiXp_NoLiveIdentity_FallsBackToTheGarageCurrentCar()
+    {
+        var pool = new List<CarSpec>
+        {
+            new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4, Class: 15),
+        };
+        var garage = new Garage(pool);
+        garage.Add(pool[0], week: 1);
+        var wallet = new DriverWallet();
+        var rarity = new FakeCarRarity { CarCount = 3 };
+        rarity.RarityByKey["ks_test_sedan"] = 2;
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, cars: pool, garage: garage,
+            wallet: wallet, rarity: rarity,
+            profile: new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1),
+            roads: new RoadTestLedger(pool, seed: 0),
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+
+        Assert.Equal(2.46, wallet.Xp, precision: 9);
+        Assert.Equal(("ks_test_sedan", 8), Assert.Single(rarity.Recorded));
+    }
+
+    [Fact]
+    public void ShiftEnd_BanksAndPushesTheBestShift()
+    {
+        var shifts = new ShiftRecord(null);
+        var telemetry = new FakePlayerTelemetry();
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, shifts: shifts, telemetry: telemetry,
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        clock.Advance(TimeSpan.FromMinutes(31));
+        vm.Poll();
+
+        Assert.True(shifts.BestEarnings > 0.0);
+        var pushed = Assert.Single(telemetry.ShiftPushes);
+        Assert.Equal(shifts.BestEarnings, pushed.Earnings);
+        Assert.Equal(shifts.BestFirstEarnedTicks, pushed.Ticks);
+        Assert.True(pushed.Ticks > 0);
     }
 }

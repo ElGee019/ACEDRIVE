@@ -1,4 +1,6 @@
+using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
@@ -9,11 +11,14 @@ public sealed class OpeningScreenTests
     private static (OpeningScreenViewModel Vm, List<PlayerProfile> Confirmed) Create(
         PlayerProfile? saved = null,
         string? detected = "ElGee",
-        AddressMap? map = null)
+        AddressMap? map = null,
+        IPlayerNameRegistry? names = null)
     {
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var confirmed = new List<PlayerProfile>();
         var vm = new OpeningScreenViewModel(
-            map ?? AddressMap.Default, saved, detected, confirmed.Add);
+            map ?? AddressMap.Default, saved, detected,
+            names ?? new OfflinePlayerNameRegistry(), confirmed.Add);
         return (vm, confirmed);
     }
 
@@ -76,14 +81,14 @@ public sealed class OpeningScreenTests
     }
 
     [Fact]
-    public void Confirm_SavesTrimmedProfile()
+    public async Task Confirm_SavesTrimmedProfile()
     {
         var (vm, confirmed) = Create(detected: null);
         vm.DisplayName = "  ElGee  ";
         vm.SelectedStreet = vm.Streets[1];
         vm.SelectedHouseNumber = 17;
 
-        vm.ContinueCommand.Execute(null);
+        await vm.ConfirmAsync();
 
         PlayerProfile saved = Assert.Single(confirmed);
         Assert.Equal("ElGee", saved.DisplayName);
@@ -114,5 +119,72 @@ public sealed class OpeningScreenTests
         Assert.False(vm.CanContinue);
         vm.ContinueCommand.Execute(null);
         Assert.Empty(confirmed);
+    }
+
+    [Fact]
+    public void ShortName_ShowsInlineValidationAndDisablesContinue()
+    {
+        var (vm, _) = Create(detected: "ElGee");
+        vm.DisplayName = "A";
+
+        Assert.False(vm.CanContinue);
+        Assert.Equal("Name must be at least 2 characters.", vm.NameStatus);
+    }
+
+    [Fact]
+    public void LongName_ShowsInlineValidationAndDisablesContinue()
+    {
+        var (vm, _) = Create(detected: "ElGee");
+        vm.DisplayName = "12345678901234567";
+
+        Assert.False(vm.CanContinue);
+        Assert.Equal("Name must be at most 16 characters.", vm.NameStatus);
+    }
+
+    [Fact]
+    public async Task NameTaken_StaysOnThePageWithInlineError()
+    {
+        var names = new FakePlayerNames { Result = NameClaimResult.Taken };
+        var (vm, confirmed) = Create(names: names);
+
+        await vm.ConfirmAsync();
+
+        Assert.Empty(confirmed);
+        Assert.False(vm.IsClaiming);
+        Assert.Equal("That name is already taken.", vm.NameStatus);
+        Assert.True(vm.CanContinue);
+    }
+
+    [Fact]
+    public async Task ClaimUnavailable_StillSavesTheProfileLocally()
+    {
+        var names = new FakePlayerNames { Result = NameClaimResult.Unavailable };
+        var (vm, confirmed) = Create(names: names);
+
+        await vm.ConfirmAsync();
+
+        Assert.Equal("ElGee", Assert.Single(confirmed).DisplayName);
+        Assert.False(vm.IsClaiming);
+    }
+
+    [Fact]
+    public async Task ClaimInFlight_DisablesContinueAndShowsChecking()
+    {
+        var names = new FakePlayerNames
+        {
+            Gate = new TaskCompletionSource<bool>(),
+        };
+        var (vm, confirmed) = Create(names: names);
+
+        Task claim = vm.ConfirmAsync();
+        Assert.True(vm.IsClaiming);
+        Assert.Equal("Checking name…", vm.NameStatus);
+        Assert.False(vm.CanContinue);
+
+        names.Gate.SetResult(true);
+        await claim;
+
+        Assert.False(vm.IsClaiming);
+        Assert.Single(confirmed);
     }
 }

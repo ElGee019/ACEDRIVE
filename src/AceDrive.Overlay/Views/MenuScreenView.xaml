@@ -49,7 +49,10 @@
          trunk / employees / home, hunger / filth / settings. Every tile is a
          Button so a later feature can attach its action; Jobs opens the
          control page, Calendar its weekly page and Settings the first-run
-         preferences form, the rest are voice-detectable placeholders.
+         preferences form, the rest only acknowledge the tap until their
+         features land. Voice taps wear the shared teal glow for the voice
+         beat: the labels are baked into the bitmap, so the glow follows the
+         artwork's silhouette where a text button turns its foreground teal.
          Artwork goes through the PackImage converter so a machine whose WIC
          has no WebP codec drops the tiles instead of the overlay. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
@@ -67,42 +70,51 @@
                              DayWeekText="{Binding DayWeekText}"/>
         <Viewbox Grid.Row="1" Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
             <Canvas Width="1080" Height="1077">
-                <Button Canvas.Left="105" Canvas.Top="0" Style="{StaticResource MenuTile}">
+                <Button Canvas.Left="105" Canvas.Top="0" Style="{StaticResource MenuTile}"
+                        Effect="{Binding WalletFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonWallet.webp"/>
                 </Button>
                 <Button Canvas.Left="400" Canvas.Top="0" Style="{StaticResource MenuTile}"
-                        Command="{Binding JobsCommand}">
+                        Command="{Binding JobsCommand}"
+                        Effect="{Binding JobsFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonJobs.webp"/>
                 </Button>
                 <Button Canvas.Left="697" Canvas.Top="0" Style="{StaticResource MenuTile}"
-                        Command="{Binding CalendarCommand}">
+                        Command="{Binding CalendarCommand}"
+                        Effect="{Binding CalendarFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonCalendar.webp"/>
                 </Button>
-                <Button Canvas.Left="105" Canvas.Top="383" Style="{StaticResource MenuTile}">
+                <Button Canvas.Left="105" Canvas.Top="383" Style="{StaticResource MenuTile}"
+                        Effect="{Binding TrunkFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonTrunk.webp"/>
                 </Button>
-                <Button Canvas.Left="400" Canvas.Top="383" Style="{StaticResource MenuTile}">
+                <Button Canvas.Left="400" Canvas.Top="383" Style="{StaticResource MenuTile}"
+                        Effect="{Binding EmployeesFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonEmployees.webp"/>
                 </Button>
-                <Button Canvas.Left="697" Canvas.Top="383" Style="{StaticResource MenuTile}">
+                <Button Canvas.Left="697" Canvas.Top="383" Style="{StaticResource MenuTile}"
+                        Effect="{Binding HomeFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHome.webp"/>
                 </Button>
-                <Button Canvas.Left="105" Canvas.Top="767" Style="{StaticResource MenuTile}">
+                <Button Canvas.Left="105" Canvas.Top="767" Style="{StaticResource MenuTile}"
+                        Effect="{Binding HungerFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHunger.webp"/>
                 </Button>
-                <Button Canvas.Left="400" Canvas.Top="767" Style="{StaticResource MenuTile}">
+                <Button Canvas.Left="400" Canvas.Top="767" Style="{StaticResource MenuTile}"
+                        Effect="{Binding FilthFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonFilth.webp"/>
                 </Button>
                 <Button Canvas.Left="697" Canvas.Top="767" Style="{StaticResource MenuTile}"
-                        Command="{Binding SettingsCommand}">
+                        Command="{Binding SettingsCommand}"
+                        Effect="{Binding SettingsFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonSettings.webp"/>
                 </Button>

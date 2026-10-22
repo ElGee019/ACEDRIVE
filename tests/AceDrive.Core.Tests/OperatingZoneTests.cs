@@ -21,6 +21,19 @@ public sealed class OperatingZoneTests
     }
 
     [Fact]
+    public void InitialKm_SeedsAFreshZone_ButTheSavedLengthWins()
+    {
+        // The composition root seeds the placeholder-map length; a real
+        // saved zone length is never overwritten by that interim.
+        var fresh = new OperatingZone(null, seed: 0, initialKm: 1.929);
+        Assert.Equal(1.929, fresh.Km, precision: 9);
+
+        var saved = new DriverState(0.0, 0.0, ZoneKm: 3.5);
+        var resumed = new OperatingZone(saved, seed: 0, initialKm: 1.929);
+        Assert.Equal(3.5, resumed.Km, precision: 9);
+    }
+
+    [Fact]
     public void FirstExpansion_NeedsTwoJobs()
     {
         var zone = new OperatingZone(null, seed: 0);

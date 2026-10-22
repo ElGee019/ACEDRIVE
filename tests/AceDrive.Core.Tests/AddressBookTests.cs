@@ -17,6 +17,23 @@ public sealed class AddressBookTests
         ]);
 
     [Fact]
+    public void MapLengthKm_SumsTheStreetSpans()
+    {
+        // 1,929 m over two half-lap streets: the interim operating-zone seed.
+        Assert.Equal(1.929, AddressBook.MapLengthKm(Map), precision: 9);
+        Assert.Equal(20.0, AddressBook.MapLengthKm(LongMap), precision: 9);
+    }
+
+    [Fact]
+    public void AverageStreetLengthKm_DividesByTheStreetCount()
+    {
+        Assert.Equal(0.9645, AddressBook.AverageStreetLengthKm(Map), precision: 9);
+        Assert.Equal(10.0, AddressBook.AverageStreetLengthKm(LongMap), precision: 9);
+        Assert.Equal(0.0, AddressBook.AverageStreetLengthKm(
+            new AddressMap("Germany", "Test", 20_000.0, 1_000.0, [])));
+    }
+
+    [Fact]
     public void Home_ResolvesTheSavedStreetAndNumber()
     {
         var profile = new PlayerProfile(

@@ -99,6 +99,45 @@ public sealed class TaxiReceiptTests
     }
 
     [Fact]
+    public void WithoutZone_NoStarterBonus()
+    {
+        // The builder keeps the bonus out when no operating zone is supplied
+        // (a caller without the zone system), never a phantom 100%.
+        TaxiReceipt receipt = Placeholder();
+        Assert.Equal(0.0, receipt.StarterBonusRate);
+        Assert.Equal(0.0, receipt.StarterBonus);
+        Assert.False(receipt.HasStarterBonus);
+    }
+
+    [Fact]
+    public void StarterBonus_PaysTheZoneRateOnSettledTotal()
+    {
+        // 13.78 settled (53.15 base + 10.63 tip − 50 fine); the placeholder
+        // map is 1.929 km, so the zone pays 100 − floor(1.929) = 99%:
+        // 13.64 on top, total 27.42.
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0,
+            zoneKm: AddressBook.MapLengthKm(AddressMap.Default), ownedCars: 1);
+        Assert.Equal(99.0, receipt.StarterBonusRate, precision: 9);
+        Assert.Equal(13.64, receipt.StarterBonus);
+        Assert.True(receipt.HasStarterBonus);
+        Assert.Equal(27.42, receipt.Total);
+    }
+
+    [Fact]
+    public void StarterBonus_SplitsByOwnedCars()
+    {
+        // 5 km zone pays 95%; a two-car garage halves it to 47.5%:
+        // 13.78 × 0.475 = 6.55 on top, total 20.33.
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0,
+            zoneKm: 5.0, ownedCars: 2);
+        Assert.Equal(47.5, receipt.StarterBonusRate, precision: 9);
+        Assert.Equal(6.55, receipt.StarterBonus);
+        Assert.Equal(20.33, receipt.Total);
+    }
+
+    [Fact]
     public void BrandBonus_PaysRateOnBase_AndJoinsTotal()
     {
         // First 8.2 km ride in the brand: 5% of the 53.15 base = 2.66,

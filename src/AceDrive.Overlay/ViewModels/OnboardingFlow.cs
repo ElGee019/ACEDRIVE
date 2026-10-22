@@ -16,6 +16,7 @@ public sealed class OnboardingFlow : IScreenController
     private readonly IOnboardingStore _onboarding;
     private readonly IContentSource _content;
     private readonly IProfileStore _profiles;
+    private readonly IPlayerNameRegistry _playerNames;
     private readonly AddressMap _addressMap;
     private readonly string? _detectedPlayerName;
     private readonly PoiGenerator _pois;
@@ -77,7 +78,8 @@ public sealed class OnboardingFlow : IScreenController
 
     public OnboardingFlow(
         IOnboardingStore onboarding, IContentSource content,
-        IProfileStore profiles, AddressMap addressMap, string? detectedPlayerName,
+        IProfileStore profiles, IPlayerNameRegistry playerNames,
+        AddressMap addressMap, string? detectedPlayerName,
         PoiGenerator pois, PoiArrivalRouter? poiArrivals, Trunk trunk,
         IPreferencesStore preferencesStore, PlayerPreferences preferences,
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
@@ -87,6 +89,7 @@ public sealed class OnboardingFlow : IScreenController
         _onboarding = onboarding;
         _content = content;
         _profiles = profiles;
+        _playerNames = playerNames;
         _addressMap = addressMap;
         _detectedPlayerName = detectedPlayerName;
         _pois = pois;
@@ -213,7 +216,7 @@ public sealed class OnboardingFlow : IScreenController
         }
 
         return new OpeningScreenViewModel(
-            _addressMap, _profile, _detectedPlayerName, CompleteOpening);
+            _addressMap, _profile, _detectedPlayerName, _playerNames, CompleteOpening);
     }
 
     private object? BrandPage()

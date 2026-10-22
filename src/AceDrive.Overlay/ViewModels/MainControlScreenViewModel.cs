@@ -22,12 +22,31 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     // Spoken shortcuts that re-tap the taxi button. Players say one or two
     // words, not the full three-word label: logged 2026-10-14 sessions show
     // "start taxi" attempted on its own (and the model garbling the tail
-    // into "start taxes shift", where the slice never lines up). Bare
-    // "continue" stays: collision-free by routing, it lives on the dialogue
-    // page's own dictionary, never here.
+    // into "start taxes shift", where the slice never lines up). The
+    // 2026-10-18/22 sessions added the other half: the model hears "start"
+    // as "stuart" or "starts" ("stuart ducks a shift", "stuart's taxes
+    // shift", "starts taxes shift"), so each logged two-word run gets its
+    // own keyword. WHY never the bare "stuart"/"starts": background speech
+    // says those words far too often, and an accidental tap starts a shift.
+    // Normalize splits the possessive into "stuart s" ("stuart's taxi").
+    // Bare "continue" stays: collision-free by routing, it lives on the
+    // dialogue page's own dictionary, never here.
     // Accepted trade-off: small talk containing "continue" while the page
     // is open proposes a job, exactly like a stray click would.
-    private static readonly string[] TaxiKeywords = ["continue", "start taxi"];
+    private static readonly string[] TaxiKeywords =
+    [
+        "continue",
+        "start taxi",
+        "stuart taxi",
+        "stuart taxes",
+        "stuart ducks",
+        "stuart s taxi",
+        "stuart s taxes",
+        "stuart nazi",
+        "starts taxi",
+        "starts taxes",
+        "start decks",
+    ];
 
     // Spoken shortcuts that re-tap the car-hauling button. The label already
     // answers whole ("CAR HAULING JOB") and as its two-word leading slice, so

@@ -24,7 +24,8 @@ public static class DeliveryReceiptBuilder
         double currentXp,
         FriendshipResult? friendship = null,
         int credPEarned = 0,
-        double totalCredP = 0.0)
+        double totalCredP = 0.0,
+        bool awardsXp = true)
     {
         distanceKm = Math.Max(0.0, distanceKm);
         List<ReceiptTier> lines = FareTierLines.Of(distanceKm, table.Tiers);
@@ -37,7 +38,11 @@ public static class DeliveryReceiptBuilder
         }
         charge = Cents(charge);
         double totalEarned = Cents(Math.Max(0.0, receivedForGoods) - Math.Max(0.0, paidForGoods) + charge);
-        double xp = XpEarning.ComputeDelivery(distanceKm, streetKnowledgePct, currentXp);
+        // An unowned car pays the run but earns no player XP: the caller owns
+        // the ownership rule, this builder only knows whether to award.
+        double xp = awardsXp
+            ? XpEarning.ComputeDelivery(distanceKm, streetKnowledgePct, currentXp)
+            : 0.0;
         return new DeliveryReceipt(
             distanceKm,
             lines,

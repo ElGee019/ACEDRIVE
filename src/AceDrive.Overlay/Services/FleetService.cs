@@ -53,6 +53,35 @@ public sealed class FleetService
         _host.CarIdentity?.FindIn(_cars) is { } car ? Math.Max(1, car.Passengers) : 1;
 
     /// <summary>
+    /// The car that earns class/rarity XP and the global km increment: the
+    /// live car when it matches an owned garage row, the garage's current car
+    /// when the watcher has not announced one yet, and null when the player is
+    /// driving a car they do not own. Null means no car class/rarity and no
+    /// Firebase car write — a borrowed free-roam car must not distort the
+    /// ownership economy or the global rarity board.
+    /// </summary>
+    public CarSpec? XpCar()
+    {
+        if (_host.CarIdentity is { } live)
+        {
+            return FindOwned(live) is { } owned ? _garage.SpecOf(owned) : null;
+        }
+
+        return _garage.Current is { } current ? _garage.SpecOf(current) : null;
+    }
+
+    /// <summary>
+    /// True when the watcher has announced a live car that matches no owned
+    /// garage row. An unknown identity is not unowned (the watcher may not
+    /// have caught up yet), so the garage's current car stands in, the same
+    /// rule as the wrong-car flag. A job driven in an unowned car still pays
+    /// its fare, but contributes no career progress: no XP/standings, no
+    /// country km, no zone job and no global car km.
+    /// </summary>
+    public bool IsDrivingUnownedCar() =>
+        _host.CarIdentity is { } live && FindOwned(live) is null;
+
+    /// <summary>
     /// Display brand for the receipt's sponsorship lines: the watcher's spoken
     /// brand ("mazda") canonicalized to the onboarding spelling ("Mazda") so
     /// the receipt reads like the brand page. Unknown brands ride through
@@ -227,6 +256,20 @@ public sealed class FleetService
                 _log.LogInfo($"[Engine] {car.Key} passed its annual inspection at {car.Odometer:0} km");
             }
         }
+    }
+
+    // The garage row behind the announced live car; null when the player
+    // drives a car they do not own (or a variant no owned row matches).
+    private OwnedCar? FindOwned(CarIdentity live)
+    {
+        foreach (OwnedCar owned in _garage.Cars)
+        {
+            if (live.Matches(owned.Key))
+            {
+                return owned;
+            }
+        }
+        return null;
     }
 
     // The catalogue cc behind the driven car; an unknown key reads 0 and rides

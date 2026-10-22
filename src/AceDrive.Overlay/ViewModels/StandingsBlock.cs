@@ -41,17 +41,26 @@ public sealed class StandingsBlock : ViewModelBase
     public string DeltaLine { get => _deltaLine; private set => SetField(ref _deltaLine, value); }
     private string _deltaLine = string.Empty;
 
-    /// <summary>True when the rank moved: drives the teal delta colour
-    /// and the view's scale pulse (Unity PulseWorldStandingsChange).</summary>
+    /// <summary>True when the rank moved: drives the teal delta colour.</summary>
     public bool Changed { get => _changed; private set => SetField(ref _changed, value); }
     private bool _changed;
+
+    /// <summary>
+    /// Pulse trigger for the view: positive restarts the scale animation,
+    /// 0 stops and resets it. Unity stops any running coroutine and resets
+    /// the scales on every result, then starts a new pulse only when the
+    /// rank moved — so each fresh result gets a new positive value and a
+    /// no-change result cancels an in-flight pulse.
+    /// </summary>
+    public int PulseSignal { get => _pulseSignal; private set => SetField(ref _pulseSignal, value); }
+    private int _pulseSignal;
 
     /// <summary>Stops the live updates on the page leave (Unity Hide()).</summary>
     public void Unhook() => _rivals.ResultUpdated -= _handler;
 
     // Unity rivals block, sentence assembly split per AGENTS.md: the Core
     // gives numbers, the resx gives copy. Rank changes of any size flip
-    // Changed, the trigger behind the delta colour and pulse.
+    // Changed (delta colour) and advance PulseSignal (scale pulse).
     private void Apply(RivalsResult result)
     {
         Line = Strings.Format(
@@ -65,6 +74,7 @@ public sealed class StandingsBlock : ViewModelBase
             _ => Strings.Get("ReceiptStandingsNoChange"),
         };
         Changed = result.RankChange != 0;
+        PulseSignal = Changed ? PulseSignal + 1 : 0;
     }
 
     // Unity's placeholder branch: no board, no snapshot — —/— with an
@@ -74,5 +84,6 @@ public sealed class StandingsBlock : ViewModelBase
         Line = Strings.Get("ReceiptStandingsUnknown");
         DeltaLine = string.Empty;
         Changed = false;
+        PulseSignal = 0;
     }
 }

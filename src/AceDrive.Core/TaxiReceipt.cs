@@ -12,7 +12,8 @@ namespace AceDrive.Core;
 /// empty name means the passenger matched no known resident, so the
 /// receipt hides the box. The brand tail is the Unity sponsorship pair:
 /// empty brand (or zero km) means no sponsorship, so the receipt hides
-/// those lines like any other zero row.
+/// those lines like any other zero row. The starter tail is the Unity
+/// business starter bonus: rate 0 (a fully decayed zone) hides the row.
 /// </summary>
 public sealed record TaxiReceipt(
     double DistanceKm,
@@ -35,11 +36,17 @@ public sealed record TaxiReceipt(
     string BrandName = "",
     double BrandDistanceKm = 0.0,
     double BrandBonusRate = 0.0,
-    double BrandBonus = 0.0)
+    double BrandBonus = 0.0,
+    double StarterBonusRate = 0.0,
+    double StarterBonus = 0.0,
+    string CarKey = "")
 {
     /// <summary>False when the passenger matched no known resident.</summary>
     public bool HasFriendship => FriendshipName.Length > 0;
 
     /// <summary>False when the ride earned no brand sponsorship.</summary>
     public bool HasBrandBonus => BrandBonus > 0.0;
+
+    /// <summary>False when the zone/car decay left no starter bonus.</summary>
+    public bool HasStarterBonus => StarterBonus > 0.0;
 }

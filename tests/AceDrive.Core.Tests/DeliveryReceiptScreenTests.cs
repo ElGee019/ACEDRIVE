@@ -106,6 +106,7 @@ public sealed class DeliveryReceiptScreenTests
         Assert.Equal("Your XP world standings is 7th of 41.", vm.Standings.Line);
         Assert.Equal("You gained 3 positions.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
+        Assert.Equal(1, vm.Standings.PulseSignal);
 
         // Unity unhooks its rivals handler in Hide(): after CONTINUE the
         // page no longer follows the board, so the leave-time lines stay.

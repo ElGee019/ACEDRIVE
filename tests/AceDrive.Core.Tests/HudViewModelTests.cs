@@ -60,6 +60,34 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void Request_ReplacesTheTaskTextThenClears()
+    {
+        // The customer request rides the companion (PORTPLAN 11): the view
+        // hides the normal task text and paints this VM while it is set.
+        var vm = Create();
+        Assert.True(vm.HasNoRequest);
+        Assert.False(vm.HasRequest);
+        Assert.Null(vm.Request);
+
+        var request = new CustomerRequestScreenViewModel(
+            new CustomerRequest(CustomerRequestKind.Passive, "Could you avoid the potholes?"),
+            "Max Weber", 14, new FakeClock(), new VoiceBeat(new FakeClock()), _ => { });
+
+        vm.ShowRequest(request);
+
+        Assert.True(vm.HasRequest);
+        Assert.False(vm.HasNoRequest);
+        Assert.Same(request, vm.Request);
+        Assert.Same(request, ((ITelemetryHud)vm).RequestScreen);
+
+        vm.ClearRequest();
+
+        Assert.False(vm.HasRequest);
+        Assert.True(vm.HasNoRequest);
+        Assert.Null(vm.Request);
+    }
+
+    [Fact]
     public void NoGame_ShowsWaitingAndKeepsTheCarMileage()
     {
         var vm = Create();
@@ -531,7 +559,7 @@ public sealed class HudViewModelTests
         Assert.True(vm.AtDestination);
         Assert.True(vm.ShowEnterButton);
         Assert.Equal(
-            "You are at the pickup point. Press ENTER to let Max in.",
+            "You are at the pickup point. Press PICK UP to let Max in.",
             vm.DestinationText);
         Assert.Equal("PICK UP", vm.EnterText);
     }

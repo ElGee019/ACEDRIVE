@@ -47,6 +47,18 @@ public sealed class DeliveryReceiptTests
     }
 
     [Fact]
+    public void NoAwardedXp_KeepsTheRunMoneyButZerosXp()
+    {
+        // An unowned car still settles the goods and fare, but the caller
+        // withholds the player XP award.
+        DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 100, 0.0,
+            awardsXp: false);
+        Assert.Equal(143.40, receipt.TotalEarned);
+        Assert.Equal(0.0, receipt.XpEarned);
+    }
+
+    [Fact]
     public void NoOwnedHub_HidesFriendshipAndCredP()
     {
         // Growing category-less stores still settle; the receipt just runs

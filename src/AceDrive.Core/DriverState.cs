@@ -21,7 +21,10 @@ namespace AceDrive.Core;
 /// The nullable dates default to null for the migration-free loads of old
 /// saves: a fresh streak answers 1, exactly like Unity's zero counter.
 /// The trunk (PORTPLAN 26/51, Unity PlayerData.trunkItems) rides here so a
-/// restart reopens bought goods with the cash that paid for them.</summary>
+/// restart reopens bought goods with the cash that paid for them.
+/// The best single shift (PORTPLAN 12, Unity highestShiftEarnings +
+/// highestShiftEarningsFirstEarnedAt) and its last world rank snapshot ride
+/// here too, so the online board resumes without re-pushing on every launch.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -38,7 +41,11 @@ public sealed record DriverState(
     bool HasEnteredBank = false,
     string? LastInsuranceChargeDate = null,
     double PendingInsurance = 0.0,
-    IReadOnlyList<TrunkItem>? Trunk = null)
+    IReadOnlyList<TrunkItem>? Trunk = null,
+    double BestShiftEarnings = 0.0,
+    long BestShiftFirstEarnedTicks = 0,
+    int ShiftRank = 0,
+    int ShiftTotal = 0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

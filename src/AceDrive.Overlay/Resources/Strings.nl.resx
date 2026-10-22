@@ -37,10 +37,10 @@
   <data name="HudNoPosition" xml:space="preserve"><value>geen positie op de baan</value></data>
   <data name="HudNoCar" xml:space="preserve"><value>geen auto</value></data>
   <data name="HudJobPickupDrive" xml:space="preserve"><value>Haal {0} op bij {1} nr. {2} in {3}</value></data>
-  <data name="HudJobPickupArrived" xml:space="preserve"><value>Je bent bij de ophaalplek. Druk op ENTER om {0} in te laten stappen.</value></data>
+  <data name="HudJobPickupArrived" xml:space="preserve"><value>Je bent bij de ophaalplek. Druk op OPHALEN om {0} in te laten stappen.</value></data>
   <data name="HudJobPickupAction" xml:space="preserve"><value>OPHALEN</value></data>
   <data name="HudJobDropoffDrive" xml:space="preserve"><value>Zet {0} af bij {1} nr. {2} in {3}</value></data>
-  <data name="HudJobDropoffArrived" xml:space="preserve"><value>Je bent bij de bestemming. Druk op ENTER om de rit af te ronden.</value></data>
+  <data name="HudJobDropoffArrived" xml:space="preserve"><value>Je bent aangekomen. Druk op afzetten om de rit af te ronden.</value></data>
   <data name="HudJobDropoffAction" xml:space="preserve"><value>AFZETTEN</value></data>
   <data name="HudJobDistanceMeters" xml:space="preserve"><value>{0:0} m</value></data>
   <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
@@ -69,6 +69,11 @@
   <data name="OpeningStreet" xml:space="preserve"><value>STRAAT</value></data>
   <data name="OpeningHouseNumber" xml:space="preserve"><value>HUISNUMMER</value></data>
   <data name="OpeningContinue" xml:space="preserve"><value>DOORGAAN</value></data>
+  <data name="OpeningNameChecking" xml:space="preserve"><value>Naam wordt gecontroleerd…</value></data>
+  <data name="OpeningNameTaken" xml:space="preserve"><value>Die naam is al in gebruik.</value></data>
+  <data name="OpeningNameTooShort" xml:space="preserve"><value>De naam moet minstens 2 tekens hebben.</value></data>
+  <data name="OpeningNameTooLong" xml:space="preserve"><value>De naam mag hoogstens 16 tekens hebben.</value></data>
+  <data name="OpeningNameInvalid" xml:space="preserve"><value>De naam moet minstens één letter of cijfer bevatten.</value></data>
   <!-- Eerste scherm (afstandseenheid + taal). De keuzelijstlabels zelf zijn
        taalonafhankelijk ("km"/"mi", endoniemen), dus alleen deze teksten
        worden opnieuw gelezen bij een taalwissel. -->
@@ -197,6 +202,7 @@ Deze klus aannemen?</value></data>
   <data name="ReceiptFare" xml:space="preserve"><value>Ritprijs: {0} × €{1:0.00}</value></data>
   <data name="ReceiptSponsorship" xml:space="preserve"><value>{0}-sponsoring</value></data>
   <data name="ReceiptBrandBonus" xml:space="preserve"><value>{0}-sponsoring: {1:0.00}% voor {2:0.00} km in hun auto's.</value></data>
+  <data name="ReceiptStarterBonus" xml:space="preserve"><value>Startersbonus voor je bedrijf {0:0.0}%</value></data>
   <data name="ReceiptTip" xml:space="preserve"><value>Fooi</value></data>
   <data name="ReceiptFine" xml:space="preserve"><value>Snelheidsboete</value></data>
   <data name="ReceiptTotal" xml:space="preserve"><value>Totaal verdiend</value></data>
@@ -207,6 +213,10 @@ Deze klus aannemen?</value></data>
   <data name="ReceiptXp" xml:space="preserve"><value>XP verdiend: {0:0.00}</value></data>
   <data name="ReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × klasse {1} × zeldzaamheid {2}) / 100 × straatkennis {3}%</value></data>
   <data name="ReceiptTotalXp" xml:space="preserve"><value>Totaal XP: {0:0.00}</value></data>
+  <data name="ReceiptRarityMostCommon" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de meest gebruikte auto in het spel.</value></data>
+  <data name="ReceiptRarityCommon" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de {1} meest gebruikte auto in het spel.</value></data>
+  <data name="ReceiptRarityLeast" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de minst gereden auto in het spel.</value></data>
+  <data name="ReceiptRarityRare" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de {1} minst gereden auto in het spel.</value></data>
   <data name="ReceiptStandings" xml:space="preserve"><value>Je wereldstandaard voor XP is {0} van {1}.</value></data>
   <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Je wereldstandaard voor XP is —/—.</value></data>
   <data name="ReceiptStandingsGainedOne" xml:space="preserve"><value>Je bent 1 plek gestegen.</value></data>

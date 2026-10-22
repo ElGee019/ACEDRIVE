@@ -96,7 +96,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 - [x] 44 Attentive-Driver score — CONFIRMED
 - [x] 45 Friendship/relationship + street-knowledge XP — CONFIRMED
 - [x] 46 Grandma ToDo tutorial quests (7 subjects) — CONFIRMED
-- [x] 47 Daily streak + consecutive-day + starter bonus — CONFIRMED
+- [x] 47 Daily streak + consecutive-day + starter bonus — CONFIRMED (starter bonus on the taxi receipt; delivery pending)
 - [x] 48 Bank savings + interest — CONFIRMED
 - [x] 49 Competitive events (Mille/Cento Miglia, Road-Test, Valuation, Star of Show) — CONFIRMED (road-test pick is sticky: one car until its test is driven, kept across overlay sessions)
 

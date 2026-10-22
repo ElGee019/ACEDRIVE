@@ -41,14 +41,16 @@
   <data name="HudNoTrack" xml:space="preserve"><value>no track</value></data>
   <data name="HudNoPosition" xml:space="preserve"><value>no track position</value></data>
   <data name="HudNoCar" xml:space="preserve"><value>no car</value></data>
-  <!-- Taxi job guidance: the leg pinned while the job is active. The line
-       under the banner carries the remaining distance in the step from
+  <!-- Taxi job guidance: the leg pinned while the job is active. {0} is the
+       customer identity: the whole party (name + companion suffix) at the
+       pickup, the base name alone on the drop-off drive. The line under the
+       banner carries the remaining distance in the step from
        Data/taxi_rules.json; placeholders survive translation. -->
   <data name="HudJobPickupDrive" xml:space="preserve"><value>Pick up {0} at {1} No. {2} in {3}</value></data>
-  <data name="HudJobPickupArrived" xml:space="preserve"><value>You are at the pickup point. Press ENTER to let {0} in.</value></data>
+  <data name="HudJobPickupArrived" xml:space="preserve"><value>You are at the pickup point. Press PICK UP to let {0} in.</value></data>
   <data name="HudJobPickupAction" xml:space="preserve"><value>PICK UP</value></data>
   <data name="HudJobDropoffDrive" xml:space="preserve"><value>Drop off {0} at {1} No. {2} in {3}</value></data>
-  <data name="HudJobDropoffArrived" xml:space="preserve"><value>You are at the drop-off. Press ENTER to finish the ride.</value></data>
+  <data name="HudJobDropoffArrived" xml:space="preserve"><value>You arrived. Press drop-off to finish the ride.</value></data>
   <data name="HudJobDropoffAction" xml:space="preserve"><value>DROP OFF</value></data>
   <data name="HudJobDistanceMeters" xml:space="preserve"><value>{0:0} m</value></data>
   <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
@@ -79,6 +81,11 @@
   <data name="OpeningStreet" xml:space="preserve"><value>STREET</value></data>
   <data name="OpeningHouseNumber" xml:space="preserve"><value>HOUSE NUMBER</value></data>
   <data name="OpeningContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="OpeningNameChecking" xml:space="preserve"><value>Checking name…</value></data>
+  <data name="OpeningNameTaken" xml:space="preserve"><value>That name is already taken.</value></data>
+  <data name="OpeningNameTooShort" xml:space="preserve"><value>Name must be at least 2 characters.</value></data>
+  <data name="OpeningNameTooLong" xml:space="preserve"><value>Name must be at most 16 characters.</value></data>
+  <data name="OpeningNameInvalid" xml:space="preserve"><value>Name must contain at least one letter or digit.</value></data>
   <!-- First-run page (distance unit + UI language). The dropdown option
        labels themselves are language-independent ("km"/"mi", endonyms),
        so only this chrome re-reads when the language changes. -->
@@ -240,6 +247,9 @@ Accept this job?</value></data>
        Translators may reorder, never remove. -->
   <data name="ReceiptSponsorship" xml:space="preserve"><value>{0} Sponsorship</value></data>
   <data name="ReceiptBrandBonus" xml:space="preserve"><value>{0} sponsorship: {1:0.00}% for driving {2:0.00}km in their cars.</value></data>
+  <!-- Business starter bonus (PORTPLAN 47, Unity TaxiReceiptScreen's
+       starterBonusText): the decayed percentage rides the explanation. -->
+  <data name="ReceiptStarterBonus" xml:space="preserve"><value>Business Starter Bonus {0:0.0}%</value></data>
   <data name="ReceiptTip" xml:space="preserve"><value>Customer tip</value></data>
   <data name="ReceiptFine" xml:space="preserve"><value>Speed fine</value></data>
   <data name="ReceiptTotal" xml:space="preserve"><value>Total earned</value></data>
@@ -252,6 +262,12 @@ Accept this job?</value></data>
   <data name="ReceiptXp" xml:space="preserve"><value>XP earned: {0:0.00}</value></data>
   <data name="ReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × class {1} × rarity {2}) / 100 × street knowledge {3}%</value></data>
   <data name="ReceiptTotalXp" xml:space="preserve"><value>Total XP: {0:0.00}</value></data>
+  <!-- Global car-km / rarity sentence (Unity TaxiReceiptScreen
+       BuildGlobalKmText): {0} is the all-players km, {1} the ordinal. -->
+  <data name="ReceiptRarityMostCommon" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the most commonly used car in the game.</value></data>
+  <data name="ReceiptRarityCommon" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the {1} most commonly used car in the game.</value></data>
+  <data name="ReceiptRarityLeast" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the least driven car in the game.</value></data>
+  <data name="ReceiptRarityRare" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the {1} least driven car in the game.</value></data>
   <!-- XP world standings (PORTPLAN 60, Unity TaxiReceiptScreen rivals
        block): {0} is the English ordinal rank, {1} the board size.
        Translators may reorder, never remove. -->

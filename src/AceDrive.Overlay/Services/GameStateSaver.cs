@@ -18,6 +18,7 @@ public sealed class GameStateSaver
     private readonly ICityStore _cityStore;
     private readonly IHungerStateStore _hungerStore;
     private readonly IRoadTestStore _roadTestStore;
+    private readonly IShiftStore _shiftStore;
     private readonly GameClock _game;
     private readonly DriverWallet _wallet;
     private readonly DailyStreak _streak;
@@ -27,14 +28,18 @@ public sealed class GameStateSaver
     private readonly CityEconomy _city;
     private readonly Hunger _hunger;
     private readonly RoadTestLedger _roads;
+    private readonly TaxiShift _shift;
+    private readonly ShiftRecord _shifts;
 
     public GameStateSaver(
         IClock clock, GameClock game,
         IGameClockStore clockStore, IDriverStore driverStore,
         IGarageStore garageStore, ICityStore cityStore,
         IHungerStateStore hungerStore, IRoadTestStore roadTestStore,
+        IShiftStore shiftStore,
         DriverWallet wallet, DailyStreak streak, OperatingZone zone, Trunk trunk,
-        Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests)
+        Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
+        TaxiShift shift, ShiftRecord shifts)
     {
         _clock = clock;
         _game = game;
@@ -44,6 +49,7 @@ public sealed class GameStateSaver
         _cityStore = cityStore;
         _hungerStore = hungerStore;
         _roadTestStore = roadTestStore;
+        _shiftStore = shiftStore;
         _wallet = wallet;
         _streak = streak;
         _zone = zone;
@@ -52,6 +58,8 @@ public sealed class GameStateSaver
         _city = city;
         _hunger = hunger;
         _roads = roadTests;
+        _shift = shift;
+        _shifts = shifts;
         // WHY not DateTime.MinValue: the first throttled write must land a full
         // interval into the session, so a startup read that failed for a
         // transient reason (locked file) can never be immediately clobbered.
@@ -109,6 +117,14 @@ public sealed class GameStateSaver
     public void SaveRoadTest() => _roadTestStore.Save(_roads.Snapshot());
 
     /// <summary>
+    /// Banks the taxi shift with its wall-clock stamps. Three moments change
+    /// it — START, a completed dropoff and the idle timeout — so the 30-minute
+    /// rule keeps running across a closed overlay instead of restarting at
+    /// the next launch.
+    /// </summary>
+    public void SaveShift() => _shiftStore.Save(_shift.Snapshot());
+
+    /// <summary>
     /// The driver file (PORTPLAN 51 interim): every scalar owner contributes,
     /// plus the standings the caller just refreshed. A null snapshot keeps the
     /// last known board (OfflineRivals seeds it from the driver save at boot).
@@ -128,5 +144,9 @@ public sealed class GameStateSaver
             Bank = _wallet.BankBalance,
             HasEnteredBank = _wallet.HasEnteredBank,
             Trunk = _trunk.Snapshot(),
+            BestShiftEarnings = _shifts.BestEarnings,
+            BestShiftFirstEarnedTicks = _shifts.BestFirstEarnedTicks,
+            ShiftRank = _shifts.Rank,
+            ShiftTotal = _shifts.Total,
         });
 }

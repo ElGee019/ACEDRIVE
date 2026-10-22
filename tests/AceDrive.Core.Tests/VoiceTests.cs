@@ -48,11 +48,12 @@ public sealed class VoiceTests
         var clock = new FakeClock();
         var mic = new FakeVoiceListener(voice);
         var car = new FakeCarBrandSource();
-        var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
+        var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
             new FakeStore(), log ?? new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(),
             new FakeOnboardingStore(), new FakeContentSource(Content),
-            new FakeProfileStore(), AddressMap.Default, "ElGee",
+            new FakeProfileStore(), new OfflinePlayerNameRegistry(),
+            AddressMap.Default, "ElGee",
             mic, car, TodoTable.Default,
             DeliveryCatalog.Default, HubCareerShell(),
             DeliveryFareTable.Default,
@@ -62,6 +63,7 @@ public sealed class VoiceTests
             new FakeDriverStore(), new DailyStreak(clock, null), new OperatingZone(null, seed: 0),
             new FakeFriendshipStore(), [],
             new FakeBrandMileageStore(), new FakeRivals(),
+            new OfflineCarRarity(), new OfflinePlayerTelemetry(), new ShiftRecord(null),
             new Hunger(HungerRules.Default), new FakeHungerStore(),
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
@@ -372,6 +374,29 @@ public sealed class VoiceTests
         Assert.True(control.TaxiFlash);
     }
 
+    // The 2026-10-18/22 sessions: "start" reached the model as "stuart" or
+    // "starts", so the clean "start taxi" keyword (and the label slice) never
+    // lined up. Each literal transcript has to tap the shift.
+    [Theory]
+    [InlineData("stuart ducks shift")]                 // 2026-10-22 15:22:59
+    [InlineData("stuart taxes shift")]                 // 15:23:03
+    [InlineData("stuart's taxes shift")]               // 15:48:12
+    [InlineData("stuart nazi shift starts to shift")]  // 15:48:16
+    [InlineData("stuart taxi shift")]                  // 15:48:19
+    [InlineData("stuart ducks a shift")]               // 19:34:32
+    [InlineData("starts taxes shift")]                 // 2026-10-18 22:09:39
+    [InlineData("start decks shift")]                  // 2026-10-18 20:01:06
+    public void Voice_LoggedStartTaxiGarbles_TapTheShift(string transcript)
+    {
+        var (vm, _, mic, _) = Create();
+        mic.Fire("hey mazda");
+        var control = ToControlPage(vm);
+
+        mic.Fire(transcript);
+
+        Assert.True(control.TaxiFlash);
+    }
+
     [Fact]
     public void ConfusionTable_AcceptsFromLoggedGarble()
     {
@@ -579,11 +604,12 @@ public sealed class VoiceTests
         // early-return, so auto-hide works outside a live EVO session.
         var clock = new FakeClock();
         var tel = new FakeTelemetry { PhysicsPresent = false };
-        var vm = new MainViewModel(tel, clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
+        var vm = new MainViewModel(tel, clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
             new FakeStore(), new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(),
             new FakeOnboardingStore(), new FakeContentSource(Content),
-            new FakeProfileStore(), AddressMap.Default, "ElGee",
+            new FakeProfileStore(), new OfflinePlayerNameRegistry(),
+            AddressMap.Default, "ElGee",
             new FakeVoiceListener(),
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             DeliveryFareTable.Default,
@@ -591,6 +617,7 @@ public sealed class VoiceTests
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
             new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
             new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
+            new OfflineCarRarity(), new OfflinePlayerTelemetry(), new ShiftRecord(null),
             new Hunger(HungerRules.Default), new FakeHungerStore(), new Garage([]), new FakeGarageStore(),
             InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
@@ -716,17 +743,21 @@ public sealed class VoiceTests
     [Fact]
     public void VoiceJobs_OnMenu_OpensControlPage()
     {
-        // The menu's Jobs tile answers the mic like a click: "jobs" opens the
-        // control page with every job door.
-        var (vm, _, mic, _) = Create();
+        // The menu's Jobs tile answers the mic like a click, after the shared
+        // teal acknowledgment: the tile glows for the beat, then the control
+        // page with every job door opens.
+        var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
         var control = ToControlPage(vm);
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back: the menu page
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         mic.Fire("jobs");
 
+        Assert.True(menu.JobsFlash);
+        Assert.Same(menu, vm.CurrentScreen);
+        DrainBeat(vm, clock);
         Assert.Same(control, vm.CurrentScreen);
     }
 
@@ -736,7 +767,7 @@ public sealed class VoiceTests
         // Settings reuses the first-run preferences page, but its action is
         // BACK and both the button and the mic return to the menu instead of
         // advancing the walk.
-        var (vm, _, mic, _) = Create();
+        var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
         ToControlPage(vm);
         vm.ToggleShowCommand.Execute(null); // hide
@@ -744,6 +775,7 @@ public sealed class VoiceTests
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         mic.Fire("settings");
+        DrainBeat(vm, clock);
 
         var settings = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
         Assert.Equal("BACK", settings.ContinueLabel);

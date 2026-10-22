@@ -14,6 +14,9 @@
              but for pack URIs, so a WebP-less WIC drops the art instead of the
              app. The startup assigns its Source once. -->
         <views:PackImageConverter x:Key="PackImage"/>
+        <!-- Menu-tile voice acknowledgment: the shared teal glow around the
+             artwork while its flash flag is up. -->
+        <views:BoolToVoiceGlowConverter x:Key="VoiceGlow"/>
         <!-- One earnings row shape for both receipt pages (taxi + delivery):
              explanation and amount sit in their own column, both
              left-aligned. The SharedSizeGroup (scoped on the hosting body

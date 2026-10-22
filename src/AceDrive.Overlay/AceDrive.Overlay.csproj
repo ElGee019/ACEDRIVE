@@ -26,6 +26,7 @@
     <!-- UI art ships inside the exe (pack URI), unlike Data/ which is loose.
          Not auto-globbed as Resource by the SDK: .webp is unknown to it. -->
     <Resource Include="Assets\backdrop.webp" />
+    <Resource Include="Assets\bluebg.webp" />
     <Resource Include="Assets\Buttons\*.webp" />
     <!-- Tourney Thin (SIL OFL): the menu clock's outline face, as in
          ontwerpdesign.psd. Ship the licence beside the exe. -->

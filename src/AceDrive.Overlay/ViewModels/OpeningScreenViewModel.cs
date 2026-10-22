@@ -1,5 +1,7 @@
 using System.Windows.Input;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
+using AceDrive.Overlay.Services;
 
 namespace AceDrive.Overlay.ViewModels;
 
@@ -8,14 +10,19 @@ namespace AceDrive.Overlay.ViewModels;
 /// name AC EVO/Steam supplies plus a home address on the placeholder map.
 /// Country and city are fixed data, the street and house-number dropdowns
 /// cascade, and CONTINUE stays disabled until the address is complete.
-/// Mouse-only like the brand and grandma-car pages: typing a name is not a
-/// voice action.
+/// The name is reserved in Firestore before the profile is saved, so two
+/// players cannot own the same world identity; an unavailable online layer
+/// still lets single-player proceed. Mouse-only like the brand and
+/// grandma-car pages: typing a name is not a voice action.
 /// </summary>
 public sealed class OpeningScreenViewModel : ViewModelBase
 {
     private readonly AddressMap _map;
+    private readonly IPlayerNameRegistry _names;
     private readonly Action<PlayerProfile> _confirmed;
     private string _displayName;
+    private string _nameStatus = string.Empty;
+    private bool _isClaiming;
     private AddressStreet? _selectedStreet;
     private int _selectedHouseNumber;
     private IReadOnlyList<int> _houseNumbers = [];
@@ -24,9 +31,11 @@ public sealed class OpeningScreenViewModel : ViewModelBase
         AddressMap map,
         PlayerProfile? saved,
         string? detectedName,
+        IPlayerNameRegistry names,
         Action<PlayerProfile> confirmed)
     {
         _map = map;
+        _names = names;
         _confirmed = confirmed;
         Country = map.Country;
         City = map.City;
@@ -35,7 +44,8 @@ public sealed class OpeningScreenViewModel : ViewModelBase
         _selectedStreet = FindStreet(saved?.StreetId) ?? FirstStreet();
         _houseNumbers = HouseNumbersFor(_selectedStreet);
         _selectedHouseNumber = PickHouseNumber(saved?.HouseNumber);
-        ContinueCommand = new RelayCommand(Confirm, () => CanContinue);
+        ContinueCommand = new RelayCommand(() => _ = ConfirmAsync(), () => CanContinue);
+        ValidateName();
     }
 
     public string DisplayName
@@ -44,13 +54,36 @@ public sealed class OpeningScreenViewModel : ViewModelBase
         set
         {
             // Keep the raw text while typing; Confirm trims the saved value.
-            if (SetField(ref _displayName, value)) RefreshContinue();
+            if (!SetField(ref _displayName, value)) return;
+            ValidateName();
+            RefreshContinue();
         }
     }
 
     public string Country { get; }
     public string City { get; }
     public IReadOnlyList<AddressStreet> Streets { get; }
+
+    /// <summary>Inline validation/claim message; empty when the form is fine.</summary>
+    public string NameStatus
+    {
+        get => _nameStatus;
+        private set => SetField(ref _nameStatus, value);
+    }
+
+    /// <summary>True while the Firestore name claim is in flight.</summary>
+    public bool IsClaiming
+    {
+        get => _isClaiming;
+        private set
+        {
+            if (!SetField(ref _isClaiming, value)) return;
+            NameStatus = value ? Strings.Get("OpeningNameChecking") : NameError;
+            RefreshContinue();
+        }
+    }
+
+    private string NameError { get; set; } = string.Empty;
 
     public AddressStreet? SelectedStreet
     {
@@ -81,7 +114,8 @@ public sealed class OpeningScreenViewModel : ViewModelBase
     }
 
     public bool CanContinue =>
-        !string.IsNullOrWhiteSpace(DisplayName)
+        !IsClaiming
+        && PlayerNameKey.IsValid(DisplayName)
         && !string.IsNullOrWhiteSpace(Country)
         && !string.IsNullOrWhiteSpace(City)
         && SelectedStreet is not null
@@ -89,12 +123,58 @@ public sealed class OpeningScreenViewModel : ViewModelBase
 
     public ICommand ContinueCommand { get; }
 
-    private void Confirm()
+    /// <summary>
+    /// Validates, claims the global name, then hands the profile to the walk.
+    /// Public so tests can await the async claim instead of racing the
+    /// command's fire-and-forget execution. Never throws: the registry
+    /// reports Taken/Invalid/Unavailable, and only Taken/Invalid stop here.
+    /// </summary>
+    public async Task ConfirmAsync()
     {
         if (!CanContinue || SelectedStreet is null) return;
+
+        IsClaiming = true;
+        try
+        {
+            NameClaimResult result = await _names.ClaimAsync(DisplayName.Trim())
+                .ConfigureAwait(true);
+            if (result == NameClaimResult.Taken)
+            {
+                NameError = Strings.Get("OpeningNameTaken");
+                return;
+            }
+            if (result == NameClaimResult.Invalid)
+            {
+                NameError = Strings.Get("OpeningNameInvalid");
+                return;
+            }
+        }
+        finally
+        {
+            IsClaiming = false;
+        }
+
         _confirmed(new PlayerProfile(
             DisplayName.Trim(), Country, City,
             SelectedStreet.Id, SelectedHouseNumber));
+    }
+
+    private void ValidateName()
+    {
+        string trimmed = DisplayName.Trim();
+        NameError = trimmed.Length switch
+        {
+            0 => string.Empty,
+            < PlayerNameKey.MinLength => Strings.Get("OpeningNameTooShort"),
+            > PlayerNameKey.MaxLength => Strings.Get("OpeningNameTooLong"),
+            _ when PlayerNameKey.Normalize(trimmed).Length == 0 =>
+                Strings.Get("OpeningNameInvalid"),
+            _ => string.Empty,
+        };
+        if (!IsClaiming)
+        {
+            NameStatus = NameError;
+        }
     }
 
     private void RefreshContinue()

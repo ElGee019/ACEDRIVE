@@ -23,6 +23,11 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     public bool Revealed { get; private set; }
     public int EnterRequests { get; private set; }
     public int JobEnterRequests { get; private set; }
+    public CustomerRequestScreenViewModel? Request { get; private set; }
+    public int ShowRequestCalls { get; private set; }
+    public int ClearRequestCalls { get; private set; }
+
+    public IVoiceScreen? RequestScreen => Request;
 
     public event EventHandler? EnterRequested;
     public event EventHandler? JobEnterRequested;
@@ -68,5 +73,17 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     {
         Notice = text;
         NoticeDuration = duration;
+    }
+
+    public void ShowRequest(CustomerRequestScreenViewModel request)
+    {
+        ShowRequestCalls++;
+        Request = request;
+    }
+
+    public void ClearRequest()
+    {
+        ClearRequestCalls++;
+        Request = null;
     }
 }

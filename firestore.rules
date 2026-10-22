@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- LATESTDRIVEBS (Unity) collections -----------------------------
+    // Kept so deploying this file from ACEDRIVE cannot break the sibling
+    // Unity game that shares the Firebase project.
+
+    // Per-car global km aggregate (existing, used by CarRarityService + FirestoreService).
+    match /cars/{carId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Per-player longest operating zone (async world standings board).
+    // Each player writes their own doc (keyed by anonymous-auth uid); the
+    // board reads all docs to rank real players against each other.
+    // Also carries per-player XP ("xp") for the XP world standings board.
+    match /players/{userId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Per-country total km aggregate across all players. One write per
+    // completed trip (FieldValue.Increment on totalKmDriven).
+    match /countries/{countryId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Weekly vehicle-valuation showcase entries. One doc per entrant
+    // (keyed by anonymous-auth uid) holding {playerName, carId}, plus the
+    // permanent house entry ("house-entry": John and Jane Doe). The list is
+    // wiped every week on the Monday-to-Tuesday midnight transition and
+    // re-seeded with the house entry on a fresh random car.
+    match /enteredForValuation/{entryId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Globally unique player names. Doc ID = normalized name; create-only
+    // ownership means a name can never be overwritten or stolen once claimed.
+    match /playerNames/{nameKey} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                     && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+                     && resource.data.ownerUid == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Road-test acceleration standings. One doc per player per car
+    // (keyed "{uid}|{carId}") holding the best 0-100 time. Reads span all
+    // docs (per-car top-10 + global best-per-car boards); writes are
+    // per-player docs via a guarded best-only transaction.
+    match /roadTestStandings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Road-test braking standings. Same shape as roadTestStandings but for
+    // the best braking distance per player per car.
+    match /roadTestBrakeStandings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // ---- ACEDRIVE / EVO collections ------------------------------------
+    // Same project as the Unity game, separate boards: the two rosters use
+    // different car ids, so mixing them would distort the rarity ranks.
+
+    // Per-car all-players km aggregate. Every authenticated driver may
+    // increment any car's counter; the rarity board reads the collection.
+    match /acevo_cars/{carId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Each player writes only their own document; the boards read all docs.
+    match /acevo_players/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Country total km (all players combined).
+    match /acevo_countries/{countryId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Per-car road-test boards, one doc per (uid, car).
+    match /acevo_roadTestStandings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /acevo_roadTestBrakeStandings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Weekly valuation entries + the permanent house-entry doc.
+    match /acevo_enteredForValuation/{entryId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Globally unique display names: create-only ownership, no deletes.
+    match /acevo_playerNames/{nameKey} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                     && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+                     && resource.data.ownerUid == request.auth.uid;
+      allow delete: if false;
+    }
+  }
+}

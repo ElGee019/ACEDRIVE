@@ -11,7 +11,7 @@ namespace AceDrive.Core.Tests;
 public sealed class TaxiReceiptScreenTests
 {
     private static (TaxiReceiptScreenViewModel Vm, bool[] Continued, FakeRivals Rivals) Create(
-        FakeRivals? rivals = null)
+        FakeRivals? rivals = null, FakeCarRarity? rarity = null, string carKey = "")
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var clock = new FakeClock();
@@ -20,7 +20,7 @@ public sealed class TaxiReceiptScreenTests
         TaxiReceipt receipt = TaxiReceiptBuilder.Build(
             8.2, capacity: 1, carClass: 1, carRarity: 1,
             streetKnowledgePct: 100, tipEligible: true, fines: 1,
-            FareTable.Default, currentXp: 0.0);
+            FareTable.Default, currentXp: 0.0, carKey: carKey);
         var wallet = new DriverWallet();
         wallet.AddReceipt(receipt);
         var shift = new TaxiShift();
@@ -30,7 +30,8 @@ public sealed class TaxiReceiptScreenTests
         var fake = rivals ?? new FakeRivals();
         var vm = new TaxiReceiptScreenViewModel(
             receipt, "Solo Sohn", wallet, shift, beat,
-            new RelayCommand(() => continued[0] = true), fake);
+            new RelayCommand(() => continued[0] = true), fake,
+            rarity ?? new FakeCarRarity());
         return (vm, continued, fake);
     }
 
@@ -73,10 +74,29 @@ public sealed class TaxiReceiptScreenTests
             FareTable.Default, currentXp: 0.0);
         var vm = new TaxiReceiptScreenViewModel(
             receipt, "Solo Sohn", new DriverWallet(), new TaxiShift(), beat,
-            new RelayCommand(() => { }), new FakeRivals());
+            new RelayCommand(() => { }), new FakeRivals(), new FakeCarRarity());
         Assert.False(vm.HasFine);
         Assert.Equal(new ReceiptLine(string.Empty, string.Empty), vm.FineLine);
         Assert.Equal(new ReceiptLine("Total earned", "€63.78"), vm.TotalLine);
+    }
+
+    [Fact]
+    public void WithoutTip_LineStaysEmpty()
+    {
+        // No customer tip means no tip row: the view collapses it and the
+        // line itself carries no zero amount (Unity hides the text too).
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, capacity: 1, carClass: 1, carRarity: 1,
+            streetKnowledgePct: 100, tipEligible: false, fines: 0,
+            FareTable.Default, currentXp: 0.0);
+        var vm = new TaxiReceiptScreenViewModel(
+            receipt, "Solo Sohn", new DriverWallet(), new TaxiShift(), beat,
+            new RelayCommand(() => { }), new FakeRivals(), new FakeCarRarity());
+        Assert.False(vm.HasTip);
+        Assert.Equal(new ReceiptLine(string.Empty, string.Empty), vm.TipLine);
     }
 
     [Fact]
@@ -128,13 +148,42 @@ public sealed class TaxiReceiptScreenTests
             brand: "Mazda", brandDistanceKm: 8.2);
         var vm = new TaxiReceiptScreenViewModel(
             receipt, "Solo Sohn", new DriverWallet(), new TaxiShift(), beat,
-            new RelayCommand(() => { }), new FakeRivals());
+            new RelayCommand(() => { }), new FakeRivals(), new FakeCarRarity());
         Assert.True(vm.HasBrandBonus);
         Assert.Equal(new ReceiptLine("Mazda Sponsorship", "€2.66"), vm.SponsorshipLine);
         Assert.Equal(
             "Mazda sponsorship: 5.00% for driving 8.20km in their cars.",
             vm.BrandBonusLine);
         Assert.Equal(new ReceiptLine("Total earned", "€16.44"), vm.TotalLine);
+    }
+
+    [Fact]
+    public void WithStarterBonus_ShowsTheDecayedRow()
+    {
+        // 1.5 km zone = 99%, halved by the second car = 49.5% of 13.78 =
+        // 6.82 on top, total 20.60.
+        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, capacity: 1, carClass: 1, carRarity: 1,
+            streetKnowledgePct: 100, tipEligible: true, fines: 1,
+            FareTable.Default, currentXp: 0.0, zoneKm: 1.5, ownedCars: 2);
+        var vm = new TaxiReceiptScreenViewModel(
+            receipt, "Solo Sohn", new DriverWallet(), new TaxiShift(), beat,
+            new RelayCommand(() => { }), new FakeRivals(), new FakeCarRarity());
+        Assert.True(vm.HasStarterBonus);
+        Assert.Equal(
+            new ReceiptLine("Business Starter Bonus 49.5%", "€6.82"),
+            vm.StarterBonusLine);
+        Assert.Equal(new ReceiptLine("Total earned", "€20.60"), vm.TotalLine);
+    }
+
+    [Fact]
+    public void WithoutStarterBonus_RowHidden()
+    {
+        var (vm, _, _) = Create();
+        Assert.False(vm.HasStarterBonus);
     }
 
     [Fact]
@@ -150,7 +199,7 @@ public sealed class TaxiReceiptScreenTests
             new FriendshipResult("Finn Marsh", 5, true));
         var vm = new TaxiReceiptScreenViewModel(
             receipt, "Finn Marsh", new DriverWallet(), new TaxiShift(), beat,
-            new RelayCommand(() => { }), new FakeRivals());
+            new RelayCommand(() => { }), new FakeRivals(), new FakeCarRarity());
         Assert.True(vm.HasFriendship);
         Assert.Equal("New familiarity with Finn: 5. Finn is a friend.", vm.FriendshipLine);
         Assert.True(vm.FriendshipHighlight);
@@ -190,6 +239,40 @@ public sealed class TaxiReceiptScreenTests
         Assert.Equal("Your XP world standings is 11th of 57.", vm.Standings.Line);
         Assert.Equal("No change in standings.", vm.Standings.DeltaLine);
         Assert.False(vm.Standings.Changed);
+        Assert.Equal(0, vm.Standings.PulseSignal);
+    }
+
+    [Fact]
+    public void Standings_EveryRankMoveRestartsThePulse()
+    {
+        // Unity stops any running pulse and starts a new one for every
+        // result that moved the rank, so a live board update under the open
+        // receipt must advance the signal again.
+        var rivals = new FakeRivals
+        {
+            Result = new RivalsResult(5, 20, 1, 6, false),
+        };
+        var (vm, _, _) = Create(rivals);
+        Assert.Equal(1, vm.Standings.PulseSignal);
+
+        rivals.Emit(new RivalsResult(3, 20, 2, 5, false));
+        Assert.Equal(2, vm.Standings.PulseSignal);
+        Assert.True(vm.Standings.Changed);
+    }
+
+    [Fact]
+    public void Standings_NoChangeCancelsAnInFlightPulse()
+    {
+        var rivals = new FakeRivals
+        {
+            Result = new RivalsResult(5, 20, 1, 6, false),
+        };
+        var (vm, _, _) = Create(rivals);
+        Assert.Equal(1, vm.Standings.PulseSignal);
+
+        rivals.Emit(new RivalsResult(5, 20, 0, 5, false));
+        Assert.Equal(0, vm.Standings.PulseSignal);
+        Assert.False(vm.Standings.Changed);
     }
 
     [Fact]
@@ -200,10 +283,12 @@ public sealed class TaxiReceiptScreenTests
         Assert.Equal("Your XP world standings is —/—.", vm.Standings.Line);
         Assert.Equal(string.Empty, vm.Standings.DeltaLine);
         Assert.False(vm.Standings.Changed);
+        Assert.Equal(0, vm.Standings.PulseSignal);
         rivals.Emit(new RivalsResult(1, 12, 11, 12, true));
         Assert.Equal("Your XP world standings is 1st of 12.", vm.Standings.Line);
         Assert.Equal("You gained 11 positions.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
+        Assert.Equal(1, vm.Standings.PulseSignal);
     }
 
     [Fact]
@@ -216,5 +301,65 @@ public sealed class TaxiReceiptScreenTests
         // not keep a dead receipt alive on the service event.
         rivals.Emit(new RivalsResult(2, 9, 3, 5, false));
         Assert.Equal("Your XP world standings is —/—.", vm.Standings.Line);
+    }
+
+    [Fact]
+    public void Rarity_NoBoard_HidesTheGlobalKmLine()
+    {
+        var (vm, _, _) = Create(carKey: "ks_test");
+        Assert.False(vm.HasRarityLine);
+        Assert.Equal(string.Empty, vm.RarityLine);
+    }
+
+    [Fact]
+    public void Rarity_CommonHalf_ReadsMostCommonlyUsed()
+    {
+        var rarity = new FakeCarRarity { CarCount = 10 };
+        rarity.KmByKey["ks_test"] = 1234;
+        rarity.RarityByKey["ks_test"] = 2;
+        var (vm, _, _) = Create(rarity: rarity, carKey: "ks_test");
+        Assert.True(vm.HasRarityLine);
+        Assert.Equal(
+            "Your car has been driven 1234 km by all players combined and is the 2nd most commonly used car in the game.",
+            vm.RarityLine);
+    }
+
+    [Fact]
+    public void Rarity_RareHalf_CountsFromTheBottom()
+    {
+        var rarity = new FakeCarRarity { CarCount = 10 };
+        rarity.KmByKey["ks_test"] = 7;
+        rarity.RarityByKey["ks_test"] = 9;
+        var (vm, _, _) = Create(rarity: rarity, carKey: "ks_test");
+        Assert.True(vm.HasRarityLine);
+        Assert.Equal(
+            "Your car has been driven 7 km by all players combined and is the 2nd least driven car in the game.",
+            vm.RarityLine);
+    }
+
+    [Fact]
+    public void Rarity_MostCommonCar_UsesTheUnnumberedSentence()
+    {
+        var rarity = new FakeCarRarity { CarCount = 10 };
+        rarity.KmByKey["ks_test"] = 9000;
+        rarity.RarityByKey["ks_test"] = 1;
+        var (vm, _, _) = Create(rarity: rarity, carKey: "ks_test");
+        Assert.Equal(
+            "Your car has been driven 9000 km by all players combined and is the most commonly used car in the game.",
+            vm.RarityLine);
+    }
+
+    [Fact]
+    public void Rarity_CarMissingFromTheBoard_ReadsLeastDriven()
+    {
+        // Unity's unknown-car rank is carCount + 1; the bottom-half math
+        // would say "0th least driven" without the clamp.
+        var rarity = new FakeCarRarity { CarCount = 10 };
+        rarity.KmByKey["ks_test"] = 0;
+        rarity.RarityByKey["ks_test"] = 11;
+        var (vm, _, _) = Create(rarity: rarity, carKey: "ks_test");
+        Assert.Equal(
+            "Your car has been driven 0 km by all players combined and is the least driven car in the game.",
+            vm.RarityLine);
     }
 }

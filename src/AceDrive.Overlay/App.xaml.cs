@@ -17,6 +17,7 @@ namespace AceDrive.Overlay;
 public partial class App : Application, IDisposable
 {
     private FileLogger? _log;
+    private FirebaseConnection? _firebase;
     private bool _disposed;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -150,6 +151,16 @@ public partial class App : Application, IDisposable
         var driverStore = new JsonDriverStore(_log);
         DriverState? savedDriver = driverStore.Load();
         var driver = new DriverWallet(savedDriver);
+        // The open taxi shift resumes with its wall-clock stamps (PORTPLAN 12):
+        // the 30-minute idle rule keeps running while the app and EVO are
+        // closed, so a restart inside the window continues the same shift and
+        // a later one opens on a closed shift.
+        var shiftStore = new JsonShiftStore(_log);
+        var shift = new TaxiShift(shiftStore.Load());
+        // The best single shift (PORTPLAN 12) and its last world rank resume
+        // beside the wallet; the online layer pushes the record on shift end.
+        var shifts = new ShiftRecord(savedDriver);
+        shifts.RestoreStandings(savedDriver?.ShiftRank ?? 0, savedDriver?.ShiftTotal ?? 0);
         // The trunk rides the driver state (Unity PlayerData.trunkItems), so
         // bought goods and the spent cash survive a restart together.
         var trunk = new Trunk(savedDriver?.Trunk);
@@ -159,13 +170,52 @@ public partial class App : Application, IDisposable
         // The operating zone (PORTPLAN 58): the street-growth counters resume
         // from the last session; the threshold curve re-draws its seeded
         // lottery per launch, Unity GetNextExpansionThreshold parity.
-        var zone = new OperatingZone(savedDriver, Environment.TickCount);
-        // XP world standings (PORTPLAN 60): the offline null-object until
-        // the online backend lands. The saved rank snapshot is restored at
-        // boot (Unity's LoadFromPlayerData), so receipts can show the last
-        // known standing while the board itself is still out of reach.
-        var rivals = new OfflineRivals();
-        rivals.RestoreSnapshot(savedDriver);
+        // The placeholder map supplies the interim zone length: a 0 km zone
+        // would pin the business starter bonus at 100% (PORTPLAN 47/58).
+        var zone = new OperatingZone(
+            savedDriver, Environment.TickCount, AddressBook.MapLengthKm(addressMap));
+        // XP world standings (PORTPLAN 60): the live Firestore board when a
+        // config exists, otherwise the offline null-object. The saved rank
+        // snapshot restores either way (Unity's LoadFromPlayerData), so the
+        // first receipt already knows the last seen standing.
+        IRivalsService rivals;
+        ICarRaritySource rarity;
+        IPlayerTelemetry telemetry;
+        IPlayerNameRegistry playerNames;
+        FirebaseOptions? firebaseOptions = FirebaseOptions.TryLoad(_log);
+        if (firebaseOptions is not null)
+        {
+            _firebase = new FirebaseConnection(firebaseOptions, _log);
+            _firebase.Start();
+            var onlinePlayers = new FirestorePlayers(_firebase.Database, wall);
+            var liveRivals = new FirestoreRivals(
+                onlinePlayers, () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+            liveRivals.RestoreSnapshot(savedDriver);
+            liveRivals.Start();
+            liveRivals.Refresh(driver.Xp);
+
+            var liveRarity = new FirestoreCarRarity(
+                new FirestoreCars(_firebase.Database, wall), _log, _firebase.StopToken);
+            liveRarity.Start();
+
+            rivals = liveRivals;
+            rarity = liveRarity;
+            telemetry = new FirestorePlayerTelemetry(
+                onlinePlayers,
+                new FirestoreCountries(_firebase.Database, wall),
+                () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+            playerNames = new FirestorePlayerNameRegistry(
+                _firebase.Database, _firebase.UidAsync, wall, _log);
+        }
+        else
+        {
+            var offline = new OfflineRivals();
+            offline.RestoreSnapshot(savedDriver);
+            rivals = offline;
+            rarity = new OfflineCarRarity();
+            telemetry = new OfflinePlayerTelemetry();
+            playerNames = new OfflinePlayerNameRegistry();
+        }
         // Familiarity (PORTPLAN 45): one persisted level per resident, so a
         // restart reopens the same friendships instead of resetting them.
         var friendships = new JsonFriendshipStore(_log);
@@ -194,7 +244,8 @@ public partial class App : Application, IDisposable
             new ShmReader(_log),
             wall,
             new GameClock(wall, saved?.GameNow ?? new DateTime(2026, 10, 10, 8, 0, 0, DateTimeKind.Utc)),
-            new TaxiShift(),
+            shift,
+            shiftStore,
             new JsonSettingsStore(),
             _log,
             fares,
@@ -202,6 +253,7 @@ public partial class App : Application, IDisposable
             onboardingStore,
             content,
             profileStore,
+            playerNames,
             addressMap,
             playerName,
             CreateVoice(_log),
@@ -225,6 +277,9 @@ public partial class App : Application, IDisposable
             cars,
             brands,
             rivals,
+            rarity,
+            telemetry,
+            shifts,
             hunger,
             hungerStore,
             garage,
@@ -243,7 +298,7 @@ public partial class App : Application, IDisposable
         // separate top-level window. Its VM keeps it hidden through the
         // introduction and reveals it when the birthday dialogue ends.
         var hudWindow = new HudWindow(
-            hud, HudSettings(), MainWindow.Left, MainWindow.Top, MainWindow.Width);
+            hud, HudSettings(), _log, MainWindow.Left, MainWindow.Top, MainWindow.Width);
         MainWindow.SizeChanged += (_, _) => hudWindow.MatchWidth(MainWindow.ActualWidth);
         // The companion sits in the same corner as the panel; hide it while
         // the panel is on screen so it cannot cover page rows or eat clicks.
@@ -344,6 +399,8 @@ public partial class App : Application, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _firebase?.Dispose();
+        _firebase = null;
         _log?.Dispose();
         _log = null;
         GC.SuppressFinalize(this);

@@ -36,9 +36,12 @@ public sealed class TaxiJobState
     /// <summary>Brand sponsorship on the settled receipt (Unity's
     /// brandLoyaltyBonus, 0 until the mileage store knows the brand).</summary>
     public double BrandBonus { get; set; }
+    /// <summary>Business starter bonus on the settled receipt (Unity's
+    /// starterBonus, 0 once the zone/car decay has eaten it).</summary>
+    public double StarterBonus { get; set; }
     /// <summary>Speed-fine deduction on the settled receipt (0 until dropoff).</summary>
     public double Fine { get; set; }
-    public double Total => Fare + BrandBonus + Tip - Fine;
+    public double Total => Fare + BrandBonus + Tip + StarterBonus - Fine;
 
     /// <summary>The special request drawn at the pickup, null when this ride
     /// asks nothing. Kept with the job so the receipt and a later save can

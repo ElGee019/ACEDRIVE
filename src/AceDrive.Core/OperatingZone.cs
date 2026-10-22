@@ -30,12 +30,19 @@ public sealed class OperatingZone
     private int _expansions;
     private double _km;
 
-    public OperatingZone(DriverState? saved, int seed)
+    public OperatingZone(DriverState? saved, int seed, double initialKm = 0.0)
     {
         _rng = new Random(seed);
         int jobs = Math.Max(0, saved?.ExpansionJobs ?? 0);
         int expansions = Math.Max(0, saved?.ExpansionCount ?? 0);
+        // A saved length always wins. A fresh (or pre-street-metadata) save
+        // seeds from the placeholder map instead of 0 km, so the starter
+        // bonus and the zone board start from the interim free-roam area.
         _km = Math.Max(0.0, saved?.ZoneKm ?? 0.0);
+        if (_km <= 0.0)
+        {
+            _km = Math.Max(0.0, initialKm);
+        }
         IReadOnlyList<string> savedStreets = saved?.StreetIds ?? [];
         if (savedStreets.Count == 0)
         {
@@ -65,7 +72,8 @@ public sealed class OperatingZone
     public IReadOnlyList<string> StreetIds => _streets;
 
     /// <summary>Total discovered street length in km (Unity
-    /// currentOperatingZone); 0.0 until real street metadata lands.</summary>
+    /// currentOperatingZone); seeded from the placeholder map until real
+    /// street metadata lands.</summary>
     public double Km => _km;
 
     /// <summary>Jobs still missing before the next expansion (Unity HUD

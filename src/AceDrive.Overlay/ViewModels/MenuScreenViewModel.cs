@@ -9,52 +9,81 @@ namespace AceDrive.Overlay.ViewModels;
 /// tile leads into the career — the main control page with every job door —
 /// and the Calendar tile opens the weekly strip, by click or by voice. Every
 /// tile carries a voice entry; Jobs opens the control page, Calendar the
-/// calendar page and Settings the first-run preferences form, the other six
-/// answer with a no-op until their features land. Marked as a jobs-side screen
-/// so the onboarding gate treats it like every other post-introduction page.
-/// The header repeats the design's clock (ontwerpdesign.psd): the game time
-/// over the abbreviated weekday and the display week.
+/// calendar page and Settings the first-run preferences form, and the other
+/// six acknowledge the tap and stay put until their features land. Voice taps
+/// glow the tile teal for the shared <see cref="VoiceBeat"/>; the navigating
+/// ones wait out that beat before the flip, so the acknowledgment is visible,
+/// while mouse clicks act at once like every other page. Marked as a jobs-side
+/// screen so the onboarding gate treats it like every other post-introduction
+/// page. The header repeats the design's clock (ontwerpdesign.psd): the game
+/// time over the abbreviated weekday and the display week.
 /// </summary>
 public sealed class MenuScreenViewModel : ViewModelBase, IJobsScreen, IVoiceScreen
 {
     // The words are baked into the tile artwork, so the spoken keys are the
     // drawn English labels, not resx copy: a translated page would need new
     // artwork and its own keywords. Listed in the view's row order.
+    // The drawn English labels double as the flash targets, so the tile names
+    // live once: the array feeds the voice table and each check below.
+    private const string WalletTile = "WALLET";
+    private const string JobsTile = "JOBS";
+    private const string CalendarTile = "CALENDAR";
+    private const string TrunkTile = "TRUNK";
+    private const string EmployeesTile = "EMPLOYEES";
+    private const string HomeTile = "HOME";
+    private const string HungerTile = "HUNGER";
+    private const string FilthTile = "FILTH";
+    private const string SettingsTile = "SETTINGS";
+
     private static readonly string[] TileLabels =
     [
-        "WALLET", "JOBS", "CALENDAR",
-        "TRUNK", "EMPLOYEES", "HOME",
-        "HUNGER", "FILTH", "SETTINGS",
+        WalletTile, JobsTile, CalendarTile,
+        TrunkTile, EmployeesTile, HomeTile,
+        HungerTile, FilthTile, SettingsTile,
     ];
 
     // "job" covers the mic's singular reading; MatchLabel still answers any
     // phrase containing the whole label.
     private static readonly string[] JobsKeywords = ["JOBS", "JOB"];
 
+    private readonly VoiceBeat _beat;
     private readonly GameClock _game;
     private int _week;
     private int _lastMinute = -1;
     private int _lastWeek = -1;
 
+    // Voice acknowledgment state: the tile currently glowing and the beat's
+    // deadline on the injected clock, never a tick count.
+    private string? _flashTile;
+    private DateTime _flashUntil;
+
     public MenuScreenViewModel(
-        ICommand jobs, ICommand calendar, ICommand settings, GameClock game, int displayWeek)
+        ICommand jobs, ICommand calendar, ICommand settings,
+        VoiceBeat beat, GameClock game, int displayWeek)
     {
-        JobsCommand = jobs;
-        CalendarCommand = calendar;
-        SettingsCommand = settings;
+        _beat = beat;
         _game = game;
         _week = displayWeek;
+        // The tile commands wrap the injected ones so a click is newer input
+        // than a pending voice tap: it drops the deferred navigation instead
+        // of letting one utterance flip the page after the player moved on.
+        JobsCommand = new RelayCommand(() => Tap(jobs));
+        CalendarCommand = new RelayCommand(() => Tap(calendar));
+        SettingsCommand = new RelayCommand(() => Tap(settings));
         var actions = new Dictionary<string, Action>();
         foreach (string label in TileLabels)
         {
-            actions[label] = NoAction;
+            // Every tile answers its drawn label. The three navigating ones
+            // are rebound below; the six features still to land acknowledge
+            // the voice tap with the teal glow and stay on the page.
+            actions[label] = () => Flash(label);
         }
         foreach (string keyword in JobsKeywords)
         {
             actions[keyword] = OpenJobs;
         }
-        actions["CALENDAR"] = OpenCalendar;
-        actions["SETTINGS"] = OpenSettings;
+        actions[CalendarTile] = OpenCalendar;
+        actions[SettingsTile] = OpenSettings;
         VoiceActions = actions;
         Refresh();
     }
@@ -70,6 +99,42 @@ public sealed class MenuScreenViewModel : ViewModelBase, IJobsScreen, IVoiceScre
     public ICommand SettingsCommand { get; }
 
     public IReadOnlyDictionary<string, Action> VoiceActions { get; }
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool WalletFlash { get => _walletFlash; private set => SetField(ref _walletFlash, value); }
+    private bool _walletFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool JobsFlash { get => _jobsFlash; private set => SetField(ref _jobsFlash, value); }
+    private bool _jobsFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool CalendarFlash { get => _calendarFlash; private set => SetField(ref _calendarFlash, value); }
+    private bool _calendarFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool TrunkFlash { get => _trunkFlash; private set => SetField(ref _trunkFlash, value); }
+    private bool _trunkFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool EmployeesFlash { get => _employeesFlash; private set => SetField(ref _employeesFlash, value); }
+    private bool _employeesFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool HomeFlash { get => _homeFlash; private set => SetField(ref _homeFlash, value); }
+    private bool _homeFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool HungerFlash { get => _hungerFlash; private set => SetField(ref _hungerFlash, value); }
+    private bool _hungerFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool FilthFlash { get => _filthFlash; private set => SetField(ref _filthFlash, value); }
+    private bool _filthFlash;
+
+    /// <summary>Teal-glow acknowledgment for voice taps, one per tile.</summary>
+    public bool SettingsFlash { get => _settingsFlash; private set => SetField(ref _settingsFlash, value); }
+    private bool _settingsFlash;
 
     /// <summary>Design clock line, 24-hour and culture-invariant (Tourney's
     /// digits are the design's face; the locale never reshapes "21:45").</summary>
@@ -106,15 +171,77 @@ public sealed class MenuScreenViewModel : ViewModelBase, IJobsScreen, IVoiceScre
         DayWeekText = GameClockText.DayWeek(_game.Today, _week);
     }
 
-    private void OpenJobs() => JobsCommand.Execute(null);
+    // Voice taps glow first and wait out the shared beat, so the
+    // acknowledgment is visible before the page flips.
+    private void OpenJobs() => FireVoice(JobsTile, JobsCommand);
 
-    private void OpenCalendar() => CalendarCommand.Execute(null);
+    private void OpenCalendar() => FireVoice(CalendarTile, CalendarCommand);
 
-    private void OpenSettings() => SettingsCommand.Execute(null);
+    private void OpenSettings() => FireVoice(SettingsTile, SettingsCommand);
 
-    // The six tiles whose pages arrive later still register their words so
-    // the mic routes them now instead of treating the page as closed.
-    private static void NoAction()
+    // A click bypasses the beat (companion parity): it acts at once, and it
+    // supersedes a voice tap still waiting, so one utterance cannot flip the
+    // page after the player already moved on.
+    private void Tap(ICommand command)
     {
+        _beat.Cancel();
+        ClearFlash();
+        command.Execute(null);
+    }
+
+    private void FireVoice(string tile, ICommand command)
+    {
+        Flash(tile);
+        _beat.Defer(() =>
+        {
+            // Clear on the way out so the cached menu never shows a stale
+            // glow when the player comes back (bank-page precedent).
+            ClearFlash();
+            command.Execute(null);
+        });
+    }
+
+    private void Flash(string tile)
+    {
+        WalletFlash = tile == WalletTile;
+        JobsFlash = tile == JobsTile;
+        CalendarFlash = tile == CalendarTile;
+        TrunkFlash = tile == TrunkTile;
+        EmployeesFlash = tile == EmployeesTile;
+        HomeFlash = tile == HomeTile;
+        HungerFlash = tile == HungerTile;
+        FilthFlash = tile == FilthTile;
+        SettingsFlash = tile == SettingsTile;
+        _flashTile = tile;
+        _flashUntil = _beat.Deadline();
+    }
+
+    /// <summary>
+    /// Clears the expired voice-flash. Called from the 10 Hz poll (the refresh
+    /// guard would swallow a same-minute expiry): one DateTime compare per
+    /// tick, allocations only on the glow transition.
+    /// </summary>
+    public void UpdateFlash()
+    {
+        if (_flashTile is not null && _beat.IsDue(_flashUntil))
+        {
+            ClearFlash();
+        }
+    }
+
+    // Glow off on every tile at once: the deferred navigation clears here on
+    // the way out, the poll clears here when the beat expires.
+    private void ClearFlash()
+    {
+        _flashTile = null;
+        WalletFlash = false;
+        JobsFlash = false;
+        CalendarFlash = false;
+        TrunkFlash = false;
+        EmployeesFlash = false;
+        HomeFlash = false;
+        HungerFlash = false;
+        FilthFlash = false;
+        SettingsFlash = false;
     }
 }

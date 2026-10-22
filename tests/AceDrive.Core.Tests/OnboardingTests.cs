@@ -31,11 +31,12 @@ public sealed class OnboardingTests
         var store = onboarding ?? new FakeOnboardingStore();
         if (start is not null) store.Save(start);
         clock ??= new FakeClock();
-        return new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
+        return new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
             new FakeStore(), new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(),
             store, new FakeContentSource(Content),
-            profiles ?? new FakeProfileStore(), AddressMap.Default, "ElGee",
+            profiles ?? new FakeProfileStore(), new OfflinePlayerNameRegistry(),
+            AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             DeliveryFareTable.Default,
@@ -43,6 +44,7 @@ public sealed class OnboardingTests
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
             new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
             new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
+            new OfflineCarRarity(), new OfflinePlayerTelemetry(), new ShiftRecord(null),
             new Hunger(HungerRules.Default), new FakeHungerStore(),
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
@@ -224,11 +226,11 @@ public sealed class OnboardingTests
         var store = new FakeOnboardingStore();
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var clock = new FakeClock();
-        var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(),
+        var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
             new FakeStore(), new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(),
             store, new FakeContentSource(Content),
-            new FakeProfileStore(), AddressMap.Default, "ElGee",
+            new FakeProfileStore(), new OfflinePlayerNameRegistry(), AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
             new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             DeliveryFareTable.Default,
@@ -236,6 +238,7 @@ public sealed class OnboardingTests
             new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
             new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
             new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
+            new OfflineCarRarity(), new OfflinePlayerTelemetry(), new ShiftRecord(null),
             new Hunger(HungerRules.Default), new FakeHungerStore(),
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),

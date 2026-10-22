@@ -47,6 +47,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private bool _atDestination;
     private bool _wrongCar;
     private bool _isRevealed;
+    // The customer request currently presented on the companion, if any. The
+    // host creates it (it owns the countdown and the outcome); the HUD only
+    // paints it in place of the task text and lets its buttons run.
+    private CustomerRequestScreenViewModel? _request;
 
     // The line under the banner: the remaining job distance, or a transient
     // host notice (the notice wins). Both are empty outside a job.
@@ -258,6 +262,43 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     /// <summary>Reveals the companion after the introduction has finished.</summary>
     public void Reveal() => IsRevealed = true;
+
+    /// <summary>
+    /// The customer request the companion is presenting, or null. The view
+    /// swaps its whole content for this while it is set.
+    /// </summary>
+    public CustomerRequestScreenViewModel? Request => _request;
+
+    /// <summary>True while the customer request overlay owns the companion.</summary>
+    public bool HasRequest => _request is not null;
+
+    /// <summary>The normal task text is hidden while the request is up.</summary>
+    public bool HasNoRequest => _request is null;
+
+    /// <summary>
+    /// Shows the customer request in place of the task text. The request's own
+    /// options and BACK run their commands; the host clears it once the
+    /// outcome is reported.
+    /// </summary>
+    public void ShowRequest(CustomerRequestScreenViewModel request)
+    {
+        _request = request;
+        RaiseRequestChanged();
+    }
+
+    /// <summary>Clears the request overlay, restoring the task text.</summary>
+    public void ClearRequest()
+    {
+        if (_request is null)
+        {
+            return;
+        }
+
+        _request = null;
+        RaiseRequestChanged();
+    }
+
+    IVoiceScreen? ITelemetryHud.RequestScreen => _request;
 
     public void Update(
         TelemetrySample? sample, double? odometerKm, bool gameRunning,
@@ -610,6 +651,15 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         OnPropertyChanged(nameof(HasNotice));
         OnPropertyChanged(nameof(HudLineText));
         OnPropertyChanged(nameof(HasHudLine));
+    }
+
+    // The view listens for both the content swap and the frame change, so one
+    // notify per edge keeps them in step.
+    private void RaiseRequestChanged()
+    {
+        OnPropertyChanged(nameof(Request));
+        OnPropertyChanged(nameof(HasRequest));
+        OnPropertyChanged(nameof(HasNoRequest));
     }
 
     private void UpdateMileage(double? odometerKm, bool force)

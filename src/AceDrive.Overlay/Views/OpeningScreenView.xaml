@@ -24,6 +24,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Style="{StaticResource FormLabel}"
@@ -62,6 +63,12 @@
                 <ComboBox Grid.Row="4" Grid.Column="1" Style="{StaticResource FormCombo}"
                           ItemsSource="{Binding HouseNumbers}"
                           SelectedItem="{Binding SelectedHouseNumber}"/>
+
+                <!-- Inline name validation / global-claim status. Empty when
+                     the form is valid, so the row collapses silently. -->
+                <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding NameStatus}"
+                           Foreground="#FFFF7A7A" FontSize="12" TextWrapping="Wrap"
+                           Margin="0,4,0,0"/>
             </Grid>
         </StackPanel>
         <Button Grid.Row="2" Content="{loc:Loc Key=OpeningContinue}"

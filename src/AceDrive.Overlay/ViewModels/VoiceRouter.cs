@@ -55,6 +55,15 @@ public sealed class VoiceRouter
         // the keyword tables from data instead of guesses.
         if (isFinal) _log.LogInfo($"voice heard: {text}");
 
+        // The companion's customer request owns the mic while it is up: it is
+        // answered on the HUD mid-drive, panel hidden, so it is checked before
+        // the panel's shown/hidden split (unlike a page, it is not the panel).
+        if (_hud?.RequestScreen is { } request)
+        {
+            Tap(request, text, isFinal);
+            return;
+        }
+
         // Finals only: one utterance must not enter twice.
         if (isFinal && TryEnterPoi(text))
         {
@@ -76,7 +85,17 @@ public sealed class VoiceRouter
             return;
         }
 
-        if (_host.CurrentScreen is not IVoiceScreen screen) return;
+        if (_host.CurrentScreen is IVoiceScreen screen)
+        {
+            Tap(screen, text, isFinal);
+        }
+    }
+
+    // Matches the spoken words against one screen's labels and fires the tap.
+    // Shared by the panel's current screen and the companion's request overlay
+    // so both obey the same mute rule.
+    private void Tap(IVoiceScreen screen, string text, bool isFinal)
+    {
         string? label = VoiceMatch.MatchLabel(text, screen.VoiceActions.Keys, _host.Content.Confusions);
         if (label is null)
         {

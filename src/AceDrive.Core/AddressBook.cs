@@ -31,6 +31,36 @@ public static class AddressBook
         return null;
     }
 
+    /// <summary>
+    /// Total drivable length of the placeholder map's streets in km. The
+    /// interim operating-zone seed until real Eifel street lengths arrive
+    /// (PORTPLAN 58): a 0 km zone would pin the starter bonus at 100%.
+    /// </summary>
+    public static double MapLengthKm(AddressMap map)
+    {
+        double trackKm = double.IsFinite(map.TrackLengthMeters)
+            ? Math.Max(0.0, map.TrackLengthMeters) / 1000.0
+            : 0.0;
+        double spans = 0.0;
+        foreach (AddressStreet street in map.Streets)
+        {
+            double span = street.ToFraction - street.FromFraction;
+            if (double.IsFinite(span) && span > 0.0)
+            {
+                spans += Math.Min(span, 1.0);
+            }
+        }
+        return spans * trackKm;
+    }
+
+    /// <summary>
+    /// Mean street length in km: the interim length one zone expansion adds
+    /// while street metadata is pending, so the zone (and the starter bonus)
+    /// still decays with every expansion. Zero for an empty map.
+    /// </summary>
+    public static double AverageStreetLengthKm(AddressMap map) =>
+        map.Streets is { Count: > 0 } ? MapLengthKm(map) / map.Streets.Count : 0.0;
+
     /// <summary>The street whose display name matches, ignoring case.</summary>
     public static AddressStreet? StreetByName(AddressMap map, string? name)
     {

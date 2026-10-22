@@ -1,10 +1,14 @@
 using System.ComponentModel;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using AceDrive.Core;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
@@ -20,17 +24,33 @@ public partial class HudWindow : Window
     private const double DefaultWidth = 413.6;
     private const double HudHeight = 200.0;
     private const double DefaultMargin = 24.0;
+    private const string BlueBackdropUri = "pack://application:,,,/Assets/bluebg.webp";
+
+    // The blue plate inside the backdrop art's transparent export margin (see
+    // TryLoadBackdrop), in the brush's relative units. A re-export at another
+    // canvas size only trims a sliver of art instead of exposing the margin.
+    private static readonly Rect BackdropPlate = new(
+        30.0 / 1080.0, 30.0 / 2280.0, 1020.0 / 1080.0, 2220.0 / 2280.0);
+
+    // The XAML fallback fill, kept so the request toggle can restore it when
+    // the WebP backdrop is unavailable.
+    private static readonly Brush DarkBackdrop =
+        new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x16, 0x1A));
 
     private readonly ISettingsStore _store;
+    private readonly ILog _log;
+    private readonly Brush? _blueBackdrop;
     private bool _panelOpen;
 
     public HudWindow(
-        HudViewModel viewModel, ISettingsStore store,
+        HudViewModel viewModel, ISettingsStore store, ILog log,
         double mainLeft, double mainTop, double mainWidth)
     {
         _store = store;
+        _log = log;
         DataContext = viewModel;
         InitializeComponent();
+        _blueBackdrop = TryLoadBackdrop();
 
         Width = double.IsFinite(mainWidth) && mainWidth > 0.0 ? mainWidth : DefaultWidth;
         Height = HudHeight;
@@ -72,6 +92,7 @@ public partial class HudWindow : Window
         Closed += OnClosed;
         viewModel.PropertyChanged += OnViewModelChanged;
         ApplyShown();
+        ApplyRequest();
     }
 
     /// <summary>Keeps the HUD the same width as the main overlay.</summary>
@@ -102,6 +123,10 @@ public partial class HudWindow : Window
         {
             ApplyShown();
         }
+        else if (e.PropertyName == nameof(HudViewModel.HasRequest))
+        {
+            ApplyRequest();
+        }
     }
 
     // The VM owns the hand-over: hidden through the introduction, shown once
@@ -126,10 +151,58 @@ public partial class HudWindow : Window
         }
     }
 
+    // The customer request takes the companion over: the frame turns blue while
+    // the ask is up and reverts when the host clears it. The frame keeps the
+    // driving strip's size — the page scrolls inside it instead of growing over
+    // the game. A machine without the WebP codec keeps the dark fill and still
+    // shows the ask.
+    private void ApplyRequest()
+    {
+        bool request = DataContext is HudViewModel { HasRequest: true };
+        Backdrop.Background = request ? _blueBackdrop ?? DarkBackdrop : DarkBackdrop;
+    }
+
+    // WHY: WPF has no WebP codec of its own — the decode rides on the OS WIC
+    // one. OnLoad forces the decode to throw synchronously inside this try, so
+    // a codec-less machine keeps the dark XAML fill instead of crashing on the
+    // render thread later (AGENTS.md: degrade gracefully).
+    private ImageBrush? TryLoadBackdrop()
+    {
+        try
+        {
+            var art = new BitmapImage();
+            art.BeginInit();
+            art.UriSource = new Uri(BlueBackdropUri, UriKind.Absolute);
+            art.CacheOption = BitmapCacheOption.OnLoad;
+            art.EndInit();
+            art.Freeze();
+            return new ImageBrush(art)
+            {
+                Stretch = Stretch.UniformToFill,
+                // WHY the Viewbox: the art is exported on a 1080 x 2280 canvas
+                // whose blue plate is the 1020 x 2220 content inside a 30 px
+                // transparent margin. Mapping the whole canvas leaves that
+                // margin transparent around the frame edge — at the companion's
+                // width the white ring then shows right at the window border.
+                // Mapping just the plate lets UniformToFill reach the edge.
+                Viewbox = BackdropPlate,
+            };
+        }
+        catch (Exception ex) when (ex is NotSupportedException or IOException)
+        {
+            // NotSupportedException = WIC has no WebP codec on this machine;
+            // IOException = resource missing from the build. Either way the
+            // request keeps its dark fill instead of blocking window start.
+            _log.LogWarning($"blue request backdrop not shown ({ex.GetType().Name}: {ex.Message}); using dark fill");
+            return null;
+        }
+    }
+
     private void OnDrag(object sender, MouseButtonEventArgs e)
     {
-        // The ENTER button owns its click; only the surrounding chrome drags.
-        if (EnterButton.IsMouseOver)
+        // Buttons own their clicks (ENTER, the request options and BACK); only
+        // the surrounding chrome drags.
+        if (IsOverButton(e.OriginalSource as DependencyObject))
         {
             return;
         }
@@ -138,6 +211,30 @@ public partial class HudWindow : Window
         {
             DragMove();
         }
+    }
+
+    // WHY the walk: a button's label is inline content (a Run), which is a
+    // ContentElement, not a Visual — VisualTreeHelper.GetParent on it throws.
+    // Such an origin stops the walk and counts as "not a button" (2D-only
+    // overlay, so checking Visual, not Visual3D, is enough).
+    private static bool IsOverButton(DependencyObject? source)
+    {
+        while (source is not null)
+        {
+            if (source is ButtonBase)
+            {
+                return true;
+            }
+
+            if (source is not Visual)
+            {
+                return false;
+            }
+
+            source = VisualTreeHelper.GetParent(source);
+        }
+
+        return false;
     }
 
     // WHY deferred: the ENTER command may open the panel or swap screens

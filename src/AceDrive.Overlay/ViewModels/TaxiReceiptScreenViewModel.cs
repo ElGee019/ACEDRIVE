@@ -26,7 +26,8 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     private readonly StandingsBlock _standings;
     public TaxiReceiptScreenViewModel(
         TaxiReceipt receipt, string customerName, DriverWallet wallet, TaxiShift shift,
-        VoiceBeat beat, ICommand continueCommand, IRivalsService rivals)
+        VoiceBeat beat, ICommand continueCommand, IRivalsService rivals,
+        ICarRaritySource rarity)
     {
         _receipt = receipt;
         _wallet = wallet;
@@ -34,6 +35,7 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         _beat = beat;
         _continueCommand = continueCommand;
         _standings = new StandingsBlock(rivals);
+        (RarityLine, HasRarityLine) = BuildRarityLine(receipt, rarity);
 
         ContinueCommand = new RelayCommand(Continue);
         CustomerLine = Strings.Format("ReceiptCustomer", receipt.Capacity, customerName);
@@ -76,8 +78,21 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         "ReceiptBrandBonus", _receipt.BrandName,
         _receipt.BrandBonusRate * 100.0, _receipt.BrandDistanceKm);
 
+    /// <summary>False once the zone/car decay has left no starter bonus.</summary>
+    public bool HasStarterBonus => _receipt.HasStarterBonus;
+
+    /// <summary>Unity's starter row: the decayed percentage + the amount.</summary>
+    public ReceiptLine StarterBonusLine => new(
+        Strings.Format("ReceiptStarterBonus", _receipt.StarterBonusRate),
+        ReceiptText.Amount(_receipt.StarterBonus));
+
     public bool HasTip => _receipt.Tip > 0.0;
-    public ReceiptLine TipLine => new(Strings.Get("ReceiptTip"), ReceiptText.Amount(_receipt.Tip));
+
+    /// <summary>No tip means no mention: the view collapses the row and the
+    /// line itself stays empty, never a zero tip.</summary>
+    public ReceiptLine TipLine => HasTip
+        ? new(Strings.Get("ReceiptTip"), ReceiptText.Amount(_receipt.Tip))
+        : new(string.Empty, string.Empty);
 
     public bool HasFine => _receipt.FineDeduction > 0.0;
 
@@ -100,6 +115,12 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         _receipt.CarRarity, _receipt.StreetKnowledgePct);
 
     public string TotalXpLine => Strings.Format("ReceiptTotalXp", _wallet.Xp);
+
+    /// <summary>Unity's global-km sentence; empty while the board is offline.</summary>
+    public string RarityLine { get; }
+
+    /// <summary>True when the car is known and the global board has data.</summary>
+    public bool HasRarityLine { get; }
 
     /// <summary>The page's XP world standings block: rank line, delta line
     /// and pulse flag, live on the board's event (StandingsBlock owns it).</summary>
@@ -142,5 +163,36 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         {
             [Strings.Get("ReceiptContinue")] = FlashThenContinue,
         };
+    }
+
+    // Unity TaxiReceiptScreen.BuildGlobalKmText: the upper half of the board
+    // reads "most commonly used", the lower half counts from the bottom as
+    // "least driven". Rank 1 and the bottom rank get their own sentences.
+    private static (string Line, bool HasLine) BuildRarityLine(
+        TaxiReceipt receipt, ICarRaritySource rarity)
+    {
+        if (receipt.CarKey.Length == 0 || rarity.CarCount == 0)
+        {
+            return (string.Empty, false);
+        }
+
+        int km = rarity.GetKm(receipt.CarKey);
+        int rank = rarity.GetRarity(receipt.CarKey);
+        int count = rarity.CarCount;
+        if (rank * 2 <= count + 1)
+        {
+            string line = rank == 1
+                ? Strings.Format("ReceiptRarityMostCommon", km)
+                : Strings.Format("ReceiptRarityCommon", km, Ordinals.Of(rank));
+            return (line, true);
+        }
+
+        // A car missing from the board ranks carCount + 1 ("never driven"),
+        // which would compute 0 from the bottom; it is the least-driven car.
+        int least = rank > count ? 1 : count - rank + 1;
+        string rareLine = least == 1
+            ? Strings.Format("ReceiptRarityLeast", km)
+            : Strings.Format("ReceiptRarityRare", km, Ordinals.Of(least));
+        return (rareLine, true);
     }
 }

@@ -36,6 +36,14 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // XP world standings backend (PORTPLAN 60, Unity RivalsService): the
     // receipt's rivals block reads through it on every settle.
     private readonly IRivalsService _rivals;
+    // The dynamic car-rarity board behind the XP multiplier (PORTPLAN 35,
+    // Unity CarRarityService): reads are cached, the km write is fire-and-forget.
+    private readonly ICarRaritySource _rarity;
+    // Zone, best-shift and country pushes (Unity FirestoreService + CountryKm).
+    private readonly IPlayerTelemetry _online;
+    // The persisted best single shift (PORTPLAN 12): the settle path banks it
+    // and the online board receives it at the shift end.
+    private readonly ShiftRecord _shifts;
     // Lifetime km per driven brand behind the receipt's sponsorship rate
     // (PORTPLAN 35, Unity PlayerData.brandDistanceDriven).
     private readonly IBrandMileageStore _brands;
@@ -163,6 +171,10 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     private bool _disposed;
 
     private TaxiJobState _job = new();
+    // A job is live from ACCEPT (the drive to the pickup) until the drop-off
+    // settles. The idle-shift rule and the overlay call both read this one
+    // definition, so a new leg cannot mean two different things.
+    private bool JobInProgress => _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute;
     // The passenger-leg distance. Lives outside the job so a refused pickup or
     // a breakdown can discard the ride without leaving a half-run meter.
     private readonly TaxiDriveMeter _meter;
@@ -190,21 +202,22 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
 
     // Dropoff placeholders until the driving slice feeds real inputs: the
     // agreed 8.2 km ride with every extra on except the speeding fine (the
-    // receipt keeps its empty fine line, but no fine is charged). Car class
-    // has no live source yet either (the log watcher only
-    // publishes the brand, never the ks id), so it stays 1 with rarity and
-    // street knowledge until active-car tracking lands.
+    // receipt keeps its empty fine line, but no fine is charged). The car's
+    // class/rarity come from the owned car driven now; these fallbacks cover
+    // an unknown catalogue row and the unknown-identity case. An unowned car
+    // deliberately reads 0 × 0 so it earns no XP.
     private const double PlaceholderDistanceKm = 8.2;
-    private const int PlaceholderCarClass = 1;
-    private const int PlaceholderCarRarity = 1;
+    private const int FallbackCarClass = 1;
+    private const int FallbackCarRarity = 1;
     private const int PlaceholderStreetKnowledgePct = 100;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, GameClock game,
-        TaxiShift shift, ISettingsStore store,
+        TaxiShift shift, IShiftStore shiftStore, ISettingsStore store,
         ILog log, FareTable fares, TaxiJobProposer proposals,
         IOnboardingStore onboarding, IContentSource content,
-        IProfileStore profiles, AddressMap addressMap, string? detectedPlayerName,
+        IProfileStore profiles, IPlayerNameRegistry playerNames,
+        AddressMap addressMap, string? detectedPlayerName,
         IVoiceListener voice, ICarBrandSource carBrands,
         TodoTable todos, DeliveryCatalog deliveryCatalog, DeliveryCareer career,
         DeliveryFareTable deliveryFares,
@@ -214,6 +227,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         VoiceBeat beat, DriverWallet wallet, IDriverStore driverStore,
         DailyStreak streak, OperatingZone zone, IFriendshipStore friendships, IReadOnlyList<CarSpec> cars,
         IBrandMileageStore brands, IRivalsService rivals,
+        ICarRaritySource rarity, IPlayerTelemetry playerTelemetry, ShiftRecord shifts,
         Hunger hunger, IHungerStateStore hungerStore,
         Garage garage, IGarageStore garageStore, InsuranceRules insuranceRules,
         BreakdownStrategy breakdowns,
@@ -269,20 +283,23 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _friends = friendships;
         _brands = brands;
         _rivals = rivals;
+        _rarity = rarity;
+        _online = playerTelemetry;
+        _shifts = shifts;
         _cars = cars;
         // The persistence collaborator is built from the injected services, so
         // the early banks below (garage seed, streak bonus) already route
         // through it instead of assembling snapshots here.
         _saver = new GameStateSaver(
             clock, game, clockStore, driverStore, garageStore, cityStore,
-            hungerStore, roadTestStore, wallet, streak, zone, trunk,
-            garage, city, hunger, roadTests);
+            hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
+            garage, city, hunger, roadTests, shift, shifts);
         _fleet = new FleetService(
             garage, cars, game, wallet, insuranceRules, log, this, PlaceholderDriverRating);
         // The story collaborator owns the persisted walk + profile + errand POI;
         // it is built before the garage seed below reads its progress.
         _story = new OnboardingFlow(
-            onboarding, content, profiles, addressMap, detectedPlayerName,
+            onboarding, content, profiles, playerNames, addressMap, detectedPlayerName,
             pois, poiArrivals, trunk, preferencesStore, preferences,
             culture, beat, hud, garage, () => _displayWeek, SaveGarage,
             () => _carBrand, log, this);
@@ -575,7 +592,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         string carName = car is not null
             ? $"{car.Brand} {car.Model}".ToUpperInvariant()
             : Strings.Get("HaulReceiptCarUnknown");
-        int carClass = car is { Class: > 0 } ? car.Class : PlaceholderCarClass;
+        int carClass = car is { Class: > 0 } ? car.Class : FallbackCarClass;
         if (car is { Class: > 0 })
         {
             _log.LogInfo($"haul car: {carName} class {carClass}");
@@ -683,6 +700,14 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     /// </summary>
     public void SaveHunger() => _saver.SaveHunger();
 
+    /// <summary>
+    /// Banks the taxi shift (PORTPLAN 12) with its wall-clock stamps, so the
+    /// 30-minute idle rule keeps running while the overlay is closed. Banked
+    /// on every shift-changing event, not just exit. Never throws (the store
+    /// swallows IO).
+    /// </summary>
+    public void SaveShift() => _saver.SaveShift();
+
     // ---- core loop (public so tests drive it directly) --------------------
 
     public void Poll()
@@ -724,13 +749,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         // button flips back to START even when the player never taps it.
         // WHY the job guard: an accepted job is work in progress, and a long
         // drive to a far door must not idle the shift out mid-ride.
-        bool jobActive = _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute;
-        if (!jobActive && _shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
+        if (!JobInProgress && _shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
         {
-            _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
-                $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
-            _lastShiftSecs = -1;
-            RefreshJob();
+            EndShift(idle);
         }
         // Voice acknowledgment: the beat drains first so a due tap acts at
         // its end, then flash expiry runs on the clock, not the minute
@@ -741,6 +762,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _control?.Refresh();
         _calendar?.UpdateFlash();
         _calendar?.Refresh();
+        _menu?.UpdateFlash();
         _menu?.Refresh();
 
         // Game-day flip: the calendar highlight moved. One int compare per
@@ -979,6 +1001,16 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
 
     public void Show()
     {
+        // WHY: from ACCEPT to the receipt the HUD owns the screen and the
+        // mic (guidance + customer request). A call mid-job would let the
+        // player open the job centre over the ride and start a second job,
+        // so the call is ignored until the job settles or is abandoned.
+        if (JobInProgress)
+        {
+            _log.LogInfo("overlay call ignored: job in progress");
+            return;
+        }
+
         RecordActivity();
         if (IsShown) return;
         IsShown = true;
@@ -1006,6 +1038,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             new RelayCommand(() => SetScreen(CreateControlScreen())),
             new RelayCommand(OpenCalendar),
             new RelayCommand(OpenSettings),
+            _beat,
             _game,
             _displayWeek);
 
@@ -1075,8 +1108,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         DateTime now = _clock.UtcNow;
         if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
         {
-            _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
-                $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+            EndShift(idle);
         }
         if (!_shift.IsStarted)
         {
@@ -1085,8 +1117,10 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             _log.LogInfo("taxi shift started");
             // Checkpoint bank: a shift start is the moment a player reads as
             // progress, so the calendar never rewinds past it when the process
-            // dies before the next throttled write.
+            // dies before the next throttled write. The shift itself is banked
+            // too: an empty shift must still idle out across a restart.
             SaveClock();
+            SaveShift();
         }
 
         // Built once and reused like the delivery board: the committed radius
@@ -1161,8 +1195,10 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _job.Fare = TaxiFare.ComputeBase(0.0, _fares);
         _log.LogInfo($"job pickup: {_job.PickupName}");
         // Unity rolls the special request at the pickup, while the customer
-        // is still parked at the door. The page opens before the meter starts
-        // moving; the drop-off guidance resumes once BACK reports the outcome.
+        // is still parked at the door. The ask rides the companion, not a
+        // panel page: the player is mid-drive, and the mini window replaces
+        // its task text for the 14 s countdown. The drop-off guidance resumes
+        // once BACK reports the outcome.
         CustomerRequest? request = _requests?.Roll(
             _job.Customer, CurrentCarSpec(), _game.GameNow.Year,
             _garage.Current?.AskedCategories ?? []);
@@ -1172,7 +1208,8 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             _requestScreen = new CustomerRequestScreenViewModel(
                 request, _job.Customer.Full, _requestTable.TimerSeconds,
                 _clock, _beat, OnRequestFinished);
-            ShowJobScreen(_requestScreen);
+            SetScreen(_requestScreen);
+            _hud?.ShowRequest(_requestScreen);
             _log.LogInfo($"customer request: {request.Kind} for {_job.Customer.Full}");
             RefreshJob();
             return;
@@ -1228,6 +1265,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _job.FinedPatrolIds.Clear();
         _job.WarnedPatrolIds.Clear();
         _requestScreen = null;
+        _hud?.ClearRequest();
         _hud?.SetJobGuidance(null);
         RefreshJob();
     }
@@ -1244,13 +1282,14 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         }
     }
 
-    // BACK on the request page lands here exactly once: copy the outcome onto
-    // the job, bank the quiz history for this car, resume the drop-off
-    // guidance and close the panel. The police patrols arm from the speed flag
+    // BACK on the request lands here exactly once: copy the outcome onto the
+    // job, bank the quiz history for this car, clear the companion overlay and
+    // resume the drop-off guidance. The police patrols arm from the speed flag
     // in the police slice; this host stays the single owner of job state.
     private void OnRequestFinished(CustomerRequestOutcome outcome)
     {
         _requestScreen = null;
+        _hud?.ClearRequest();
         _job.TipEligible = outcome.TipEligible;
         _job.QuizAnsweredCorrectly = outcome.QuizAnsweredCorrectly;
         _job.SpeedChallengeAgreed = outcome.SpeedChallengeAgreed;
@@ -1354,7 +1393,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // The HUD line names the customer, not the leg: the templates carry the
     // door's street, number and town from the structured address, so passing
     // an address descriptor here would print it twice (Unity names the
-    // passenger on the PICK UP / DROP OFF prompt too).
+    // passenger on the PICK UP / DROP OFF prompt too). The pickup names the
+    // whole party (companion suffix included); the drop-off names the
+    // customer alone, like Unity's base-name identity.
     private void ShowPickupGuidance() =>
         _hud?.SetJobGuidance(Guidance(
             _job.Customer.Full, _job.PickupAddress,
@@ -1362,7 +1403,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
 
     private void ShowDropoffGuidance() =>
         _hud?.SetJobGuidance(Guidance(
-            _job.Customer.Full, _job.DropoffAddress,
+            _job.Customer.BaseName, _job.DropoffAddress,
             "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction"));
 
     // A proposal generated on a map that cannot supply two doors has no
@@ -1395,6 +1436,34 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     {
         _job.Phase = JobPhase.Complete;
         int capacity = _fleet.PassengerCapacity();
+        // The car that actually ran the ride. An owned car supplies its real
+        // class + global rarity and contributes its km. An unowned free-roam
+        // car reads 0 × 0 (no XP) and suppresses every career write below;
+        // only its fare still pays.
+        CarSpec? xpCar = _fleet.XpCar();
+        bool earnsProgress = !_fleet.IsDrivingUnownedCar();
+        int carClass = FallbackCarClass;
+        int carRarity = FallbackCarRarity;
+        if (earnsProgress)
+        {
+            if (xpCar is { Class: > 0 } knownClass)
+            {
+                carClass = knownClass.Class;
+            }
+            if (xpCar is not null)
+            {
+                carRarity = _rarity.GetRarity(xpCar.Key);
+            }
+        }
+        else
+        {
+            // An unowned car has no class/rarity in the career ledger, so the
+            // receipt's own XP formula reads 0 × 0.
+            carClass = 0;
+            carRarity = 0;
+        }
+        string carKey = xpCar?.Key ?? string.Empty;
+        int tripKm = TripKm(_job.DistanceKm);
         // Unity keys familiarity off the base name (no companion suffix):
         // every completed ride is +1 for that resident, strangers included
         // (0 -> 1 on the first ride). The outcome rides the receipt so the
@@ -1406,30 +1475,60 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         string brandName = _fleet.SponsorBrand();
         double brandKm = _brands.RegisterRide(brandName, _job.DistanceKm);
         TaxiReceipt receipt = TaxiReceiptBuilder.Build(
-            _job.DistanceKm, capacity, PlaceholderCarClass,
-            PlaceholderCarRarity, PlaceholderStreetKnowledgePct,
+            _job.DistanceKm, capacity, carClass,
+            carRarity, PlaceholderStreetKnowledgePct,
             tipEligible: _job.TipEligible || _job.QuizAnsweredCorrectly,
             fines: _job.SpeedChallengeFines, _fares, _wallet.Xp,
             new FriendshipResult(friendship.OwnerName, friendship.Level, friendship.TierIncreased),
-            brandName, brandKm);
+            brandName, brandKm, carKey,
+            // The starter bonus decays with the operating zone and the car
+            // count (PORTPLAN 47, Unity ProvincialStarterBonus).
+            zoneKm: _zone.Km, ownedCars: _garage.Cars.Count);
         if (friendship.TierIncreased)
         {
             _log.LogInfo($"friendship tier up: {friendship.OwnerName} -> {friendship.Level}");
         }
         _job.Fare = receipt.BaseTotal;
         _job.BrandBonus = receipt.BrandBonus;
+        _job.StarterBonus = receipt.StarterBonus;
         _job.Tip = receipt.Tip;
         _job.Fine = receipt.FineDeduction;
         _wallet.AddReceipt(receipt);
-        // Zone tick (PORTPLAN 58, Unity expansionJobsCompleted++): every
-        // settled taxi ride counts; the interest lands in the bank before
-        // the expansion street joins (Unity orders it the same way —
-        // counter, interest, street registration at the receipt CONTINUE).
-        _zone.RegisterJob();
+        // An unowned car banks the fare but no career progress: no global car
+        // km, country km, zone job or XP standings. The interest still
+        // compounds — it belongs to the bank, not to the car.
+        if (earnsProgress)
+        {
+            if (xpCar is not null && tripKm > 0)
+            {
+                _rarity.RecordKm(xpCar.Key, tripKm);
+            }
+            if (tripKm > 0)
+            {
+                _online.IncrementCountryKm(HomeCountry, tripKm);
+            }
+            // Zone tick (PORTPLAN 58, Unity expansionJobsCompleted++): every
+            // settled taxi ride counts; the interest lands in the bank before
+            // the expansion street joins (Unity orders it the same way —
+            // counter, interest, street registration at the receipt CONTINUE).
+            _zone.RegisterJob();
+        }
         ApplyBankInterest();
-        TryExpandZone();
-        RivalsResult? standings = RefreshStandings();
+        if (earnsProgress)
+        {
+            TryExpandZone();
+            RefreshStandings();
+        }
+        else
+        {
+            // The settle still banks cash and the shift; only the XP push is
+            // skipped. The last known board rides along unchanged.
+            SaveDriver(_rivals.LastResult);
+        }
         _shift.RecordCompleted(_job, _clock.UtcNow);
+        // The dropoff restamps the idle clock; bank it so a process death
+        // right after the receipt keeps the shift's 30 minutes honest.
+        SaveShift();
         // Dirt tick (PORTPLAN 33, Unity TaxiJobLifecycleHandler's dropoff
         // block): every completed ride is +1 on the car driven now.
         _fleet.AddDirt();
@@ -1439,12 +1538,14 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         SaveClock();
         SaveGarage();
         _log.LogInfo($"job dropoff: {_job.PickupName} -> {_job.DropoffName} " +
-                  $"dist={receipt.DistanceKm:0.00}km total={receipt.Total:0.00} xp={receipt.XpEarned:0.00} " +
+                  $"dist={receipt.DistanceKm:0.00}km car={(carKey.Length > 0 ? carKey : "unowned")} " +
+                  $"class={carClass} rarity={carRarity} xp={receipt.XpEarned:0.00} " +
                   $"brand={receipt.BrandName} bonus={receipt.BrandBonus:0.00} " +
+                  $"starter={receipt.StarterBonus:0.00} " +
                   $"wallet={_wallet.Cash:0.00} shift={_shift.JobsDone} jobs / {_shift.Earned:0.00}");
         ShowJobScreen(new TaxiReceiptScreenViewModel(
             receipt, _job.Customer.Full, _wallet, _shift, _beat,
-            new RelayCommand(() => SetScreen(CreateControlScreen())), _rivals));
+            new RelayCommand(() => SetScreen(CreateControlScreen())), _rivals, _rarity));
         RefreshJob();
     }
 
@@ -1465,7 +1566,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         RivalsResult? standings = _rivals.Refresh(_wallet.Xp);
         // The opening screen supplies the display name; before it is
         // confirmed the push stays nameless like the old placeholder.
-        _rivals.PushXp(_wallet.Xp, _story.Profile?.DisplayName ?? string.Empty);
+        _rivals.PushXp(_wallet.Xp, PlayerName());
         SaveDriver(standings);
         LogStandingsMove(standings);
         return standings;
@@ -1536,13 +1637,53 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     {
         if (!OnboardingDone || !_zone.ExpansionDue) return;
         string streetId = $"s{_zone.ExpansionCount + 1}";
-        // Interim length 0.0: no street metadata exists yet to grow the km.
-        if (_zone.TryExpand(streetId, 0.0))
+        // Interim length: the placeholder map's mean street, so the zone km
+        // (and the starter bonus) keeps decaying until real street metadata
+        // arrives (PORTPLAN 58).
+        if (_zone.TryExpand(streetId, AddressBook.AverageStreetLengthKm(_addressMap)))
         {
             _log.LogInfo($"[Zone] expanded: {streetId} joins " +
                 $"(zone {_zone.StreetIds.Count} streets, {_zone.Km:0.0} km)");
+            _online.PushZoneKm(_zone.Km, PlayerName());
         }
     }
+
+    // One shift ends at both timeout sites (the poll and the START tap);
+    // bank the record once and push the best to the world board. Pushing on
+    // every end (not only an improvement) also syncs a best restored from a
+    // local save whose earlier push never reached Firestore.
+    private void EndShift(TimeSpan idle)
+    {
+        _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
+            $"{_shift.JobsDone} jobs / {_shift.Earned:0.00}");
+        _lastShiftSecs = -1;
+        // The closed state goes to disk before the record push: a shift that
+        // timed out between sessions is already over and must never reopen.
+        SaveShift();
+        // The record is stamped when the idle window closed, not when the
+        // process noticed: an expiry discovered at the next launch can be
+        // days later, and the world board breaks earnings ties by this stamp.
+        DateTime endedAt = _shift.LastJobEnd + TimeSpan.FromMinutes(TaxiShift.TimeoutMinutes);
+        _shifts.Record(_shift.Earned, endedAt.Ticks);
+        if (_shifts.BestEarnings > 0.0)
+        {
+            _online.PushShiftEarnings(
+                _shifts.BestEarnings, _shifts.BestFirstEarnedTicks, PlayerName());
+            SaveDriver(_rivals.LastResult);
+        }
+        RefreshJob();
+    }
+
+    // Unity's whole-km trip unit (Mathf.RoundToInt with a 1 km floor): the
+    // country/car aggregates never receive a sub-kilometre or negative sample.
+    private static int TripKm(double distanceKm) =>
+        distanceKm > 0.0 && double.IsFinite(distanceKm)
+            ? Math.Max(1, (int)Math.Round(distanceKm))
+            : 0;
+
+    private string PlayerName() => _story.Profile?.DisplayName ?? string.Empty;
+
+    private string HomeCountry => _story.Profile?.Country ?? _addressMap.Country;
 
     // Bank interest at the two settle sites (PORTPLAN 48, Unity
     // BankInterestHelper.ApplyForCompletion): credited INTO the bank after
@@ -1806,17 +1947,44 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         }
         // Testing hook: the settled run wears the car by its own distance.
         _fleet.BankJobDistance(PlaceholderDistanceKm);
+        // An unowned free-roam car pays the run's money but earns no career
+        // progress, exactly like the taxi settle: no XP, country km, zone job
+        // or XP standings.
+        bool earnsProgress = !_fleet.IsDrivingUnownedCar();
         DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
             PlaceholderDistanceKm, run.PaidForGoods, run.ReceivedForGoods,
             _deliveryFares, PlaceholderStreetKnowledgePct, _wallet.Xp,
-            friendship, credPEarned, _career.CredP);
+            friendship, credPEarned, _career.CredP, awardsXp: earnsProgress);
         _wallet.AddDelivery(receipt);
-        // Zone tick, delivery twin (Unity DeliveryJobHandler's settle): the
-        // counters, interest and expansion flow exactly like the taxi hook.
-        _zone.RegisterJob();
+        // Delivery's km feed: the owned car contributes to the global rarity
+        // board and the country aggregate, exactly like the taxi settle. The
+        // delivery XP itself stays class/rarity-free (Unity parity).
+        CarSpec? deliveryCar = _fleet.XpCar();
+        int deliveryKm = TripKm(PlaceholderDistanceKm);
+        if (earnsProgress)
+        {
+            if (deliveryCar is not null && deliveryKm > 0)
+            {
+                _rarity.RecordKm(deliveryCar.Key, deliveryKm);
+            }
+            if (deliveryKm > 0)
+            {
+                _online.IncrementCountryKm(HomeCountry, deliveryKm);
+            }
+            // Zone tick, delivery twin (Unity DeliveryJobHandler's settle): the
+            // counters, interest and expansion flow exactly like the taxi hook.
+            _zone.RegisterJob();
+        }
         ApplyBankInterest();
-        TryExpandZone();
-        RefreshStandings();
+        if (earnsProgress)
+        {
+            TryExpandZone();
+            RefreshStandings();
+        }
+        else
+        {
+            SaveDriver(_rivals.LastResult);
+        }
         // Dirt tick, delivery twin (PORTPLAN 33, Unity DeliveryJobHandler's
         // store arrival): a completed run is +1 on the car driven now.
         _fleet.AddDirt();

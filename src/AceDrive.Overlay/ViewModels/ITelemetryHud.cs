@@ -56,6 +56,24 @@ public interface ITelemetryHud
     void ShowNotice(string text, TimeSpan duration);
 
     /// <summary>
+    /// Presents the customer request on the companion instead of a main-window
+    /// page: the ask, its options and the countdown replace the task text, and
+    /// the frame turns blue. The host still owns the timer and the outcome; the
+    /// HUD only paints what it is handed and raises the taps back through the
+    /// screen's own commands.
+    /// </summary>
+    void ShowRequest(CustomerRequestScreenViewModel request);
+
+    /// <summary>Clears the customer request overlay once the outcome is in.</summary>
+    void ClearRequest();
+
+    /// <summary>
+    /// The screen the companion is presenting (the customer request), or null.
+    /// The voice router taps its labels while the overlay is up, panel hidden.
+    /// </summary>
+    IVoiceScreen? RequestScreen { get; }
+
+    /// <summary>
     /// True while the car is parked on the destination house; the ENTER button is
     /// up and voice may fire it.
     /// </summary>
