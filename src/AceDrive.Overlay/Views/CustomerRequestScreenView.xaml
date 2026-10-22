@@ -14,7 +14,8 @@
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=RequestTitle}"/>
         <StackPanel Grid.Row="1" VerticalAlignment="Center">
             <TextBlock Text="{Binding RequestText}" Foreground="#FFF" FontSize="14"
-                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,10"/>
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,10"
+                       Visibility="{Binding RequestTextVisible, Converter={StaticResource BoolToVis}}"/>
             <TextBlock Text="{Binding TimeLine}" Foreground="#FFBFC4C9" FontSize="12"
                        TextAlignment="Center" Margin="0,0,0,10"
                        Visibility="{Binding TimerVisible, Converter={StaticResource BoolToVis}}"/>

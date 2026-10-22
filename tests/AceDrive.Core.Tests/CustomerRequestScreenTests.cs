@@ -114,6 +114,7 @@ public sealed class CustomerRequestScreenTests
 
         Assert.Equal("That is impressive, thank you. I will tip you well.", h.Vm.Feedback);
         Assert.True(h.Vm.FeedbackPositive);
+        Assert.False(h.Vm.RequestTextVisible);
         Assert.True(h.Vm.ShowBack);
         Assert.Empty(h.Vm.Options);
         h.Vm.BackCommand.Execute(null);
@@ -133,6 +134,7 @@ public sealed class CustomerRequestScreenTests
 
         Assert.Equal("That can't be right. No tip for you!", h.Vm.Feedback);
         Assert.False(h.Vm.FeedbackPositive);
+        Assert.False(h.Vm.RequestTextVisible);
         h.Vm.BackCommand.Execute(null);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
@@ -170,6 +172,7 @@ public sealed class CustomerRequestScreenTests
 
         Assert.Equal("Thank you. I'll tip you when we arrive.", h.Vm.Feedback);
         Assert.True(h.Vm.FeedbackPositive);
+        Assert.True(h.Vm.RequestTextVisible);
         h.Vm.BackCommand.Execute(null);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);

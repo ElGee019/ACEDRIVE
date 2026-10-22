@@ -49,6 +49,16 @@ public sealed class CustomerRequestScreenViewModel :
 
     public string RequestText => _request.Text;
 
+    /// <summary>The ask hides once a quiz ends: the feedback line replaces
+    /// the question instead of sitting underneath it. Passive/speed asks stay
+    /// visible, since the feedback answers the ask rather than replacing it.</summary>
+    public bool RequestTextVisible
+    {
+        get => _requestTextVisible;
+        private set => SetField(ref _requestTextVisible, value);
+    }
+    private bool _requestTextVisible = true;
+
     public int RemainingSeconds
     {
         get => _remainingSeconds;
@@ -214,6 +224,10 @@ public sealed class CustomerRequestScreenViewModel :
         Feedback = Strings.Get(feedbackKey);
         FeedbackPositive = positive;
         TimerVisible = false;
+        if (_request.Kind == CustomerRequestKind.CarQuiz)
+        {
+            RequestTextVisible = false;
+        }
         Options = [];
         ShowBack = true;
         RebuildVoice();
