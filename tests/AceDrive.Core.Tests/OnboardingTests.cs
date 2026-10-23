@@ -122,14 +122,47 @@ public sealed class OnboardingTests
     [Fact]
     public void DoneBoot_StartsOnTheMenuPage()
     {
-        // A finished introduction is not replayed: the next launch opens the
-        // menu with its three tiles, and Jobs leads to the career page.
-        var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
+        // A finished introduction is not replayed: once the whole tour is
+        // banked, the next launch opens the menu with its three tiles, and
+        // Jobs leads to the career page.
+        var vm = Create(OnboardingState.Fresh with
+        {
+            BirthdayDone = true,
+            MaxErrandDone = true,
+            JustinPickedUp = true,
+            AnnabellaPickedUp = true,
+            PancakesDone = true,
+            CommunityCentreDone = true,
+        });
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.False(vm.IsOnboarding);
+        Assert.False(vm.IntroTourInProgress);
+        Assert.True(vm.IsShown);
 
         menu.JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void BootBeforeTheBirthday_StartsHiddenAndResumesTheWalk()
+    {
+        // The walk pages are the introduction the player must see, so a new
+        // career still opens the panel at once (with a mic the app root calls
+        // Show() for this same page).
+        var vm = Create();
+
+        Assert.True(vm.IsShown);
+        Assert.False(vm.IntroTourInProgress);
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void BootDuringTheTour_StartsHiddenUntilTheTourEnds()
+    {
+        var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
+
+        Assert.True(vm.IntroTourInProgress);
+        Assert.False(vm.IsShown);
     }
 
     [Theory]

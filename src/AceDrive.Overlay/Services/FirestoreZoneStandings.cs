@@ -5,15 +5,18 @@ namespace AceDrive.Overlay.Services;
 /// <summary>
 /// Operating-zone world standings (PORTPLAN item 58, Unity
 /// ZoneStandingsService). Backend parity: the board is loaded and ranked
-/// here; no ACEDRIVE screen consumes the result yet.
+/// here; no ACEDRIVE screen consumes the result yet. Only the CURRENT
+/// username row is excluded, so an earlier username of the same player stays
+/// a rival.
 /// </summary>
 public sealed class FirestoreZoneStandings
 {
     private readonly FirestorePlayers _players;
     private readonly Func<string?> _uid;
+    private readonly Func<string?> _ownName;
     private readonly ILog _log;
     private readonly CancellationToken _stopToken;
-    private double[] _otherKm = [];
+    private IReadOnlyList<FirestoreDocument>? _documents;
     private ZoneStandingsResult? _last;
     private double _lastZoneKm;
     private int _boardLoaded;
@@ -21,11 +24,12 @@ public sealed class FirestoreZoneStandings
     private int _loading;
 
     public FirestoreZoneStandings(
-        FirestorePlayers players, Func<string?> uid,
+        FirestorePlayers players, Func<string?> uid, Func<string?> ownName,
         ILog log, CancellationToken stopToken)
     {
         _players = players;
         _uid = uid;
+        _ownName = ownName;
         _log = log;
         _stopToken = stopToken;
     }
@@ -46,8 +50,14 @@ public sealed class FirestoreZoneStandings
                 zoneKm, otherKm: null, boardLoaded: false, last: LastResult);
         }
 
+        IReadOnlyList<FirestoreDocument>? documents = Volatile.Read(ref _documents);
+        if (documents is null)
+        {
+            return LastResult;
+        }
+
         ZoneStandingsResult? result = ZoneStandings.Refresh(
-            zoneKm, Volatile.Read(ref _otherKm), boardLoaded: true, last: LastResult);
+            zoneKm, OtherKm(documents), boardLoaded: true, last: LastResult);
         Publish(result);
         return result;
     }
@@ -72,16 +82,16 @@ public sealed class FirestoreZoneStandings
         try
         {
             IReadOnlyList<FirestoreDocument>? documents =
-                await _players.LoadAsync(_stopToken).ConfigureAwait(false);
+                await _players.LoadAsync(_uid, _stopToken).ConfigureAwait(false);
             if (documents is null)
             {
                 _log.LogWarning("firebase: zone board unavailable");
                 return;
             }
 
-            double[] others = [.. PlayerBoard.OtherZoneKm(documents, _uid())];
-            Volatile.Write(ref _otherKm, others);
+            Volatile.Write(ref _documents, documents);
             Volatile.Write(ref _boardLoaded, 1);
+            double[] others = OtherKm(documents);
             _log.LogInfo($"firebase: zone board ready ({others.Length} other players)");
 
             if (Volatile.Read(ref _hasValue) == 1)
@@ -96,6 +106,11 @@ public sealed class FirestoreZoneStandings
             Interlocked.Exchange(ref _loading, 0);
         }
     }
+
+    // Recomputed per refresh so the name the opening screen confirms later
+    // stops being counted as a rival in the same session.
+    private double[] OtherKm(IReadOnlyList<FirestoreDocument> documents) =>
+        [.. PlayerBoard.OtherZoneKm(documents, _uid(), _ownName())];
 
     private void Publish(ZoneStandingsResult? result)
     {

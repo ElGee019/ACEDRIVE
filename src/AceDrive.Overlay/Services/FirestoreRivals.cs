@@ -6,16 +6,17 @@ namespace AceDrive.Overlay.Services;
 /// Live XP world standings (PORTPLAN item 60, Unity RivalsService). The
 /// board is read once from <c>acevo_players</c> and cached; <see cref="Refresh"/>
 /// stays synchronous so the receipt can render immediately, while the network
-/// load and the XP push run in the background. Own doc is excluded from the
-/// board, exactly like Unity's CollectOtherXp.
+/// load and the XP push run in the background. Only the CURRENT username row
+/// is excluded, so an earlier username of the same player stays a rival.
 /// </summary>
 public sealed class FirestoreRivals : IRivalsService
 {
     private readonly FirestorePlayers _players;
     private readonly Func<string?> _uid;
+    private readonly Func<string?> _ownName;
     private readonly ILog _log;
     private readonly CancellationToken _stopToken;
-    private double[] _otherXp = [];
+    private IReadOnlyList<FirestoreDocument>? _documents;
     private RivalsResult? _last;
     private double _lastPlayerXp;
     private int _boardLoaded;
@@ -24,11 +25,12 @@ public sealed class FirestoreRivals : IRivalsService
     private Task? _loadTask;
 
     public FirestoreRivals(
-        FirestorePlayers players, Func<string?> uid,
+        FirestorePlayers players, Func<string?> uid, Func<string?> ownName,
         ILog log, CancellationToken stopToken)
     {
         _players = players;
         _uid = uid;
+        _ownName = ownName;
         _log = log;
         _stopToken = stopToken;
     }
@@ -73,8 +75,14 @@ public sealed class FirestoreRivals : IRivalsService
                 playerXp, otherXp: null, boardLoaded: false, last: last);
         }
 
+        IReadOnlyList<FirestoreDocument>? documents = Volatile.Read(ref _documents);
+        if (documents is null)
+        {
+            return last;
+        }
+
         RivalsResult? result = RivalsStandings.Refresh(
-            playerXp, Volatile.Read(ref _otherXp), boardLoaded: true, last: last);
+            playerXp, OtherXp(documents), boardLoaded: true, last: last);
         Publish(result);
         return result;
     }
@@ -101,16 +109,16 @@ public sealed class FirestoreRivals : IRivalsService
         try
         {
             IReadOnlyList<FirestoreDocument>? documents =
-                await _players.LoadAsync(_stopToken).ConfigureAwait(false);
+                await _players.LoadAsync(_uid, _stopToken).ConfigureAwait(false);
             if (documents is null)
             {
                 _log.LogWarning("firebase: XP board unavailable");
                 return;
             }
 
-            double[] others = [.. PlayerBoard.OtherXp(documents, _uid())];
-            Volatile.Write(ref _otherXp, others);
+            Volatile.Write(ref _documents, documents);
             Volatile.Write(ref _boardLoaded, 1);
+            double[] others = OtherXp(documents);
             _log.LogInfo($"firebase: XP board ready ({others.Length} other players)");
 
             if (Volatile.Read(ref _hasPlayerXp) == 1)
@@ -125,6 +133,12 @@ public sealed class FirestoreRivals : IRivalsService
             Interlocked.Exchange(ref _loading, 0);
         }
     }
+
+    // Recomputed per refresh, not baked at load: the opening screen confirms
+    // the display name after boot, and the current row must stop counting as
+    // a rival from that moment on.
+    private double[] OtherXp(IReadOnlyList<FirestoreDocument> documents) =>
+        [.. PlayerBoard.OtherXp(documents, _uid(), _ownName())];
 
     private void Publish(RivalsResult? result)
     {

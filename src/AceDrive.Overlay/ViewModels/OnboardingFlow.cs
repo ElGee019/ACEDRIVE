@@ -138,6 +138,13 @@ public sealed class OnboardingFlow : IScreenController
     public bool Done => _progress.IsComplete;
 
     /// <summary>
+    /// True from the birthday hand-over until the guided tour's last stop
+    /// (the community centre) is banked. The tour is still the introduction:
+    /// the shell keeps the main panel closed and the HUD guides the drive.
+    /// </summary>
+    public bool IntroTourInProgress => _progress.IsComplete && !_progress.CommunityCentreDone;
+
+    /// <summary>
     /// The walk page first paint opens on: the one the player closed the
     /// overlay on, or the preferences page for a fresh install. Past the
     /// birthday the caller opens the menu instead, so this only ever returns
@@ -346,12 +353,14 @@ public sealed class OnboardingFlow : IScreenController
         // carries the story item skips straight to the next phase.
         HandOverErrand();
         _log.LogInfo("birthday dialogue done: main page unlocked");
-        // The intro hands over on the menu and leaves the panel up, so the
-        // player sees the page they will call back from now on; idle-hide and
-        // the hotkey own it from here. The HUD is revealed behind the panel
-        // and steps forward once the panel closes.
+        // The tour is still the introduction: the player drives Max's errand,
+        // the two friends, pancakes and the community centre on the HUD. Only
+        // the tour's own dialogues and interiors may open the panel before it
+        // ends, so the birthday hand-over closes it instead of leaving the
+        // menu up over the drive.
         _host.ShowScreen(_host.MenuScreen());
         _hud?.Reveal();
+        _host.Hide();
     }
 
     // Unity's PANCAKES! arrival at grandma's house: the first tour stop that
@@ -436,7 +445,8 @@ public sealed class OnboardingFlow : IScreenController
         _hud?.SetDestination(null);
         // First exit from the centre teaches how to call the panel back from
         // the driver's seat: the wake word, plus the hotkey for a muted mic.
-        // CONTINUE closes the panel exactly as this leg did before.
+        // CONTINUE then opens the main menu, the first time the panel appears
+        // on its own since the introduction started.
         _host.ShowScreen(new VoiceInfoScreenViewModel(
             Strings.Format("VoiceInfoWake", _carBrand().ToUpperInvariant()),
             Strings.Get("VoiceInfoHotkey"),
@@ -448,8 +458,10 @@ public sealed class OnboardingFlow : IScreenController
 
     private void CloseCommunityCentrePage()
     {
-        _host.ShowScreen(_host.ControlScreen());
-        _host.Hide();
+        // The tour is over: this is the first time the main panel opens on the
+        // menu of its own accord. Leave it up so the player lands on the page
+        // every later call returns to.
+        _host.ShowMenu();
     }
 
     // The errand line names the business and a random house; ordinary pages

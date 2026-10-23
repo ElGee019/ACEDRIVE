@@ -20,6 +20,11 @@ internal static class HudVoiceKeywords
     private static readonly string[] DropOff = ["enter", "drop off", "dropoff"];
     // Delivery's two actions: loading the freight and unloading it at a store.
     private static readonly string[] Deliver = ["enter", "deliver", "deliver items"];
+    // Grandma's arrival button prints PANCAKES!; the plural, the singular and
+    // the model's split two-word reading all answer because the trailing
+    // punctuation is dropped before matching.
+    private static readonly string[] Pancakes =
+        ["enter", "pancakes", "pancake", "pan cakes", "pan cake"];
 
     /// <summary>Keywords for one action resource key; unknown keys answer "enter".</summary>
     public static IReadOnlyList<string> For(string actionKey) => actionKey switch
@@ -27,6 +32,7 @@ internal static class HudVoiceKeywords
         "HudPickUp" or "HudJobPickupAction" or "HudDeliveryHubAction" => PickUp,
         "HudJobDropoffAction" => DropOff,
         "HudDeliveryStoreAction" => Deliver,
+        "HudPancakes" => Pancakes,
         _ => Enter,
     };
 }

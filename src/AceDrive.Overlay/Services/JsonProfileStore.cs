@@ -18,6 +18,9 @@ public sealed class JsonProfileStore : IProfileStore
 
     private readonly string _file;
     private readonly ILog _log;
+    private readonly object _gate = new();
+    private PlayerProfile? _current;
+    private bool _loaded;
 
     public JsonProfileStore(ILog log)
         : this(Path.Combine(
@@ -31,29 +34,17 @@ public sealed class JsonProfileStore : IProfileStore
         _log = log;
     }
 
+    // The online boards ask for the current display name on every refresh.
+    // Cache the loaded profile (Save refreshes it) so that lookup never turns
+    // into a file read per settled job.
     public PlayerProfile? Load()
     {
-        try
+        lock (_gate)
         {
-            if (!File.Exists(_file)) return null;
-            PlayerProfile? profile = JsonSerializer.Deserialize<PlayerProfile>(
-                File.ReadAllText(_file), JsonOptions);
-            if (profile is null || !profile.IsComplete)
-            {
-                _log.LogWarning($"profile.json incomplete at {_file}; opening screen starts from Steam");
-                return null;
-            }
-
-            _log.LogInfo($"profile loaded: {profile.DisplayName}, " +
-                $"{profile.Country} {profile.City} {profile.StreetId} {profile.HouseNumber}");
-            return profile;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked save must
-            // degrade to a blank opening screen, never take the overlay down.
-            _log.LogWarning($"profile.json unreadable at {_file} ({ex.GetType().Name}); opening screen starts from Steam");
-            return null;
+            if (_loaded) return _current;
+            _loaded = true;
+            _current = Read();
+            return _current;
         }
     }
 
@@ -79,6 +70,38 @@ public sealed class JsonProfileStore : IProfileStore
             // A failed write must never break gameplay or shutdown; the
             // opening screen already holds the values in memory.
             _log.LogWarning($"profile.json unwritable at {_file} ({ex.GetType().Name}); profile kept in memory");
+        }
+
+        lock (_gate)
+        {
+            _current = profile;
+            _loaded = true;
+        }
+    }
+
+    private PlayerProfile? Read()
+    {
+        try
+        {
+            if (!File.Exists(_file)) return null;
+            PlayerProfile? profile = JsonSerializer.Deserialize<PlayerProfile>(
+                File.ReadAllText(_file), JsonOptions);
+            if (profile is null || !profile.IsComplete)
+            {
+                _log.LogWarning($"profile.json incomplete at {_file}; opening screen starts from Steam");
+                return null;
+            }
+
+            _log.LogInfo($"profile loaded: {profile.DisplayName}, " +
+                $"{profile.Country} {profile.City} {profile.StreetId} {profile.HouseNumber}");
+            return profile;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // Read/deserialize boundary only: a corrupt or locked save must
+            // degrade to a blank opening screen, never take the overlay down.
+            _log.LogWarning($"profile.json unreadable at {_file} ({ex.GetType().Name}); opening screen starts from Steam");
+            return null;
         }
     }
 }

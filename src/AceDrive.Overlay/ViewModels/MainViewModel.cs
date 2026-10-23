@@ -450,9 +450,12 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         SetScreen(OnboardingDone ? CreateMenuScreen() : _story.StartPage());
 
         // The VM's default: hidden until called when a mic is present, visible
-        // otherwise so the shell stays usable (and testable). The app root
-        // calls Show() at launch, so a real start opens on the intro either way.
-        IsShown = !voice.IsAvailable;
+        // otherwise so the shell stays usable (and testable). A save that is
+        // still in the post-birthday tour starts hidden even without a mic:
+        // the tour is driven on the HUD, and the panel only opens once it is
+        // finished. The app root calls Show() at launch for the other starts,
+        // so a real start opens on the intro either way.
+        IsShown = !voice.IsAvailable && !IntroTourInProgress;
         // A visible start has already shown the intro; a hidden start keeps
         // the intro on the first wake (see Show).
         _introShown = IsShown;
@@ -531,6 +534,13 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     public bool OnboardingDone => _story.Done;
 
     /// <summary>
+    /// True while the post-birthday guided tour is still running. The shell
+    /// starts hidden and does not pop the panel open until the tour ends;
+    /// the companion HUD carries the driving instructions instead.
+    /// </summary>
+    public bool IntroTourInProgress => _story.IntroTourInProgress;
+
+    /// <summary>
     /// True once RESET GAME wiped the save files: the window's close path must
     /// not bank the live session back onto disk while the replacement process
     /// starts (or if starting it failed and the player closes this one).
@@ -554,6 +564,11 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     void IStoryHost.Hide() => Hide();
     object IStoryHost.ControlScreen() => CreateControlScreen();
     object IStoryHost.MenuScreen() => CreateMenuScreen();
+    void IStoryHost.ShowMenu()
+    {
+        SetScreen(CreateMenuScreen());
+        Show();
+    }
     void IStoryHost.SaveDriver() => SaveDriver(_rivals.LastResult);
 
     // Reveal the panel on the requested POI screen. Show() deliberately
@@ -2111,11 +2126,17 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // cash, XP and bank figures always open on the live wallet and the
     // leaderboard on the latest board result. Read-only — opening never
     // writes; BACK returns to the menu it was opened from.
-    private void OpenWallet() =>
+    private void OpenWallet()
+    {
+        // Re-rank locally against the current display name: the boot board may
+        // have landed before the opening screen confirmed it, and the wallet
+        // must not keep showing the old 1-of-1 fallback.
+        _rivals.Refresh(_wallet.Xp);
         SetScreen(new WalletScreenViewModel(
             _wallet, _rivals,
             new RelayCommand(() => SetScreen(CreateMenuScreen())),
             _beat));
+    }
 
     // The POI router's business families: the root supplies the store handler,
     // the host appends one registration per interior it builds. A new business

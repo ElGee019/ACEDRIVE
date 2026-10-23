@@ -10,7 +10,7 @@ public sealed class FirestorePlayerTelemetryTests
     {
         var clock = new FakeClock();
         return new FirestorePlayerTelemetry(
-            new FirestorePlayers(db, clock),
+            new FirestorePlayers(db, clock, new NullLogger()),
             new FirestoreCountries(db, clock),
             _ => Task.FromResult(uid), new NullLogger(), CancellationToken.None);
     }
@@ -22,9 +22,10 @@ public sealed class FirestorePlayerTelemetryTests
         await Create(db).PushZoneKmAsync(12.5, "Ace");
 
         var (path, fields) = Assert.Single(db.Sets);
-        Assert.Equal("acevo_players/me", path);
+        Assert.Equal("acevo_players/ace", path);
         Assert.Equal(12.5, fields["longestZoneKm"]);
         Assert.Equal("Ace", fields["displayName"]);
+        Assert.Equal("me", fields["ownerUid"]);
     }
 
     [Fact]
@@ -35,9 +36,10 @@ public sealed class FirestorePlayerTelemetryTests
         await Create(db).PushShiftEarningsAsync(500, ticks, "Ace");
 
         var (path, fields) = Assert.Single(db.Sets);
-        Assert.Equal("acevo_players/me", path);
+        Assert.Equal("acevo_players/ace", path);
         Assert.Equal(500.0, Assert.IsType<double>(fields["highestShiftEarnings"]));
         Assert.Equal("Ace", fields["displayName"]);
+        Assert.Equal("me", fields["ownerUid"]);
         Assert.IsType<string>(fields["highestShiftEarningsFirstEarnedAt"]);
     }
 
@@ -52,7 +54,7 @@ public sealed class FirestorePlayerTelemetryTests
         var signIn = new TaskCompletionSource<string?>();
         var clock = new FakeClock();
         var telemetry = new FirestorePlayerTelemetry(
-            new FirestorePlayers(db, clock),
+            new FirestorePlayers(db, clock, new NullLogger()),
             new FirestoreCountries(db, clock),
             _ => signIn.Task, new NullLogger(), CancellationToken.None);
 
@@ -63,8 +65,9 @@ public sealed class FirestorePlayerTelemetryTests
         await push;
 
         var (path, fields) = Assert.Single(db.Sets);
-        Assert.Equal("acevo_players/new-uid", path);
+        Assert.Equal("acevo_players/new-player", path);
         Assert.Equal(120.0, Assert.IsType<double>(fields["highestShiftEarnings"]));
+        Assert.Equal("new-uid", fields["ownerUid"]);
     }
 
     [Fact]

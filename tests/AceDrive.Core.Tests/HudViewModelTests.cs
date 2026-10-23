@@ -292,6 +292,11 @@ public sealed class HudViewModelTests
             "She's probably waiting on that maple syrup by now.",
             vm.BannerText);
         Assert.Equal("PANCAKES!", vm.EnterText);
+        Assert.Contains("pancakes", vm.EnterKeywords);
+        Assert.Contains("pancake", vm.EnterKeywords);
+        Assert.Contains("pan cakes", vm.EnterKeywords);
+        Assert.Contains("enter", vm.EnterKeywords);
+        Assert.DoesNotContain("pick up", vm.EnterKeywords);
 
         // 0.25 resolves to Street 1 No. 17, the home door.
         vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
@@ -299,6 +304,7 @@ public sealed class HudViewModelTests
         Assert.True(vm.AtDestination);
         Assert.Equal("You have arrived at grandma's house.", vm.DestinationText);
         Assert.Equal("PANCAKES!", vm.EnterText);
+        Assert.Contains("pancakes", vm.EnterKeywords);
     }
 
     [Fact]

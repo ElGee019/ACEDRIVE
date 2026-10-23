@@ -63,7 +63,7 @@ is the source of truth.
 
 | Collection | Doc id | Fields |
 |---|---|---|
-| `acevo_players` | anonymous uid | `xp`, `displayName`, `longestZoneKm`, `highestShiftEarnings`, `highestShiftEarningsFirstEarnedAt`, `lastUpdatedAt` |
+| `acevo_players` | normalized display name | `ownerUid`, `xp`, `displayName`, `longestZoneKm`, `highestShiftEarnings`, `highestShiftEarningsFirstEarnedAt`, `lastUpdatedAt` |
 | `acevo_cars` | `carId` or `carId#preset` | `totalKmDriven`, `lastUpdatedAt` |
 | `acevo_countries` | normalized country | `totalKmDriven`, `displayName`, `lastUpdatedAt` |
 | `acevo_playerNames` | normalized name | `ownerUid`, `displayName`, `claimedAt` |
@@ -77,6 +77,11 @@ Live wiring:
 
 - anonymous auth and session resume;
 - XP world standings (`acevo_players.xp`) on every settled taxi/delivery;
+- username is the board identity: the doc id is the normalized display name
+  and `ownerUid` guards writes, so a reset with a new username leaves the old
+  row on the board as a rival instead of overwriting it. Pre-name-key uid rows
+  are moved to their recorded username on the first load (the row is readable
+  meanwhile and hidden from its own owner's board);
 - global car km → dynamic rarity rank used by the taxi XP formula;
 - player name reservation on the opening screen;
 - longest operating zone on expansion;

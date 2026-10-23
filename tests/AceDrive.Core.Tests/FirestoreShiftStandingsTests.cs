@@ -22,8 +22,8 @@ public sealed class FirestoreShiftStandingsTests
     }
 
     private static FirestoreShiftStandings Create(FakeFirestoreDatabase db) =>
-        new(new FirestorePlayers(db, new FakeClock()),
-            () => "me", new NullLogger(), CancellationToken.None);
+        new(new FirestorePlayers(db, new FakeClock(), new NullLogger()),
+            () => "uid-1", () => "Me", new NullLogger(), CancellationToken.None);
 
     [Fact]
     public void Board_ExcludesOwnDocAndRanksTheRest()

@@ -262,7 +262,10 @@ public sealed class VoiceTests
         dialogue.ContinueCommand.Execute(null); // page 2
         dialogue.ContinueCommand.Execute(null); // finishes
         Assert.True(dialogue.IsComplete);
-        // The intro leaves the menu up; Jobs opens the career page.
+        // The birthday hand-over closes the panel: the tour is driven on the
+        // HUD. Calling the app back opens the menu; Jobs is the career page.
+        Assert.False(vm.IsShown);
+        vm.Show();
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
 
@@ -721,8 +724,9 @@ public sealed class VoiceTests
     public void WakeAgain_OpensMenuPage()
     {
         // Calling the app with the wake word opens the intro the first time;
-        // once the intro is done the panel stays on the menu until idle-hide
-        // parks it, and the next wake returns on the same menu page.
+        // the birthday hand-over closes the panel for the guided tour, and
+        // the next wake opens the menu page, where it stays until idle-hide
+        // parks it and the wake after that returns on the same menu page.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
         Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
@@ -732,7 +736,11 @@ public sealed class VoiceTests
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
-        dialogue.ContinueCommand.Execute(null); // finishes: the menu stays up
+        dialogue.ContinueCommand.Execute(null); // finishes: the panel closes
+        Assert.False(vm.IsShown);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        clock.Advance(TimeSpan.FromSeconds(4)); // wake cooldown over
+        mic.Fire("hey mazda");
         Assert.True(vm.IsShown);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         clock.Advance(TimeSpan.FromSeconds(16));
@@ -885,8 +893,12 @@ public sealed class VoiceTests
 
         mic.Fire("continue"); // partial: finishes the dialogue
         clock.Advance(TimeSpan.FromSeconds(0.51));
-        vm.Poll(); // beat drains: the menu is built and stays up
+        vm.Poll(); // beat drains: the menu is built, the hand-over closes the panel
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
+        // The tail must be inert on the menu. Calling the app back puts the
+        // menu (not the control page) under it for the assertion below.
+        vm.Show();
         Assert.True(vm.IsShown);
 
         mic.Fire("continue", isFinal: true); // same utterance's tail
@@ -923,6 +935,9 @@ public sealed class VoiceTests
         clock.Advance(TimeSpan.FromSeconds(0.51));
         vm.Poll();
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
+        // Call the menu back so the re-scored tail has a page to land on.
+        vm.Show();
         Assert.True(vm.IsShown);
 
         mic.Fire("the continue", isFinal: true); // same utterance, re-scored

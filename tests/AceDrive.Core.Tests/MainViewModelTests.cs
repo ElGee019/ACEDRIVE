@@ -1722,16 +1722,17 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void FinishDialogue_ShowsTheMenuAndKeepsThePanelUp()
+    public void FinishDialogue_ClosesThePanelForTheTour()
     {
         var (vm, _, _, _) = Create();
         vm.FinishDialogue();
 
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.False(vm.IsOnboarding);
-        // The intro hands over in place: the player lands on the menu and the
-        // panel stays up until idle-hide or a call toggles it.
-        Assert.True(vm.IsShown);
+        // The guided tour still has to be driven (Max, the friends, pancakes,
+        // the community centre): the hand-over hides the panel and lets the
+        // HUD guide instead of leaving the menu over the road.
+        Assert.False(vm.IsShown);
     }
 
     [Fact]
@@ -2211,12 +2212,14 @@ public sealed class MainViewModelTests
 
         voiceInfo.ContinueCommand.Execute(null);
 
-        Assert.False(vm.IsShown);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        // The tour is over: the panel opens on the menu by itself for the
+        // first time since the introduction started.
+        Assert.True(vm.IsShown);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
-    public void BootAfterBirthday_OpensTheMenuAndRevealsTheTourLeg()
+    public void BootDuringTheTour_StaysHiddenAndRevealsTheLeg()
     {
         var justin = new AddressLocation("Street 2", 12, HouseSide.Left);
         var progress = new OnboardingState(
@@ -2226,7 +2229,10 @@ public sealed class MainViewModelTests
             progress: progress, hud: hud,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5));
 
+        // The menu is the page waiting behind the panel, but the intro tour is
+        // not finished: the launch keeps the panel closed and the HUD guides.
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
         Assert.True(hud.Revealed);
         Assert.Equal(StoryFriends.Justin.Id, hud.Destination?.Id);
         Assert.Equal(justin, hud.Destination?.Address);

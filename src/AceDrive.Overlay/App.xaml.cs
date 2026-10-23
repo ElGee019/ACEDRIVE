@@ -233,9 +233,11 @@ public partial class App : Application, IDisposable
         {
             _firebase = new FirebaseConnection(firebaseOptions, _log);
             _firebase.Start();
-            var onlinePlayers = new FirestorePlayers(_firebase.Database, wall);
+            var onlinePlayers = new FirestorePlayers(_firebase.Database, wall, _log);
             var liveRivals = new FirestoreRivals(
-                onlinePlayers, () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+                onlinePlayers, () => _firebase?.Session.Uid,
+                () => profileStore.Load()?.DisplayName,
+                _log, _firebase.StopToken);
             liveRivals.RestoreSnapshot(savedDriver);
             liveRivals.Start();
             liveRivals.Refresh(driver.Xp);
@@ -245,7 +247,9 @@ public partial class App : Application, IDisposable
             liveRarity.Start();
 
             var liveShiftBoard = new FirestoreShiftStandings(
-                onlinePlayers, () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+                onlinePlayers, () => _firebase?.Session.Uid,
+                () => profileStore.Load()?.DisplayName,
+                _log, _firebase.StopToken);
             liveShiftBoard.RestoreSnapshot(savedDriver);
             liveShiftBoard.Start();
 
@@ -394,8 +398,17 @@ public partial class App : Application, IDisposable
         // idle-hide, the hotkey and the wake word keep working; the companion
         // HUD stays hidden through the walk until the birthday hand-over
         // reveals it (a save past the birthday reveals it at startup).
-        vm.Show();
-        MainWindow.Show();
+        // A save that resumes mid-tour stays hidden: the tour is still the
+        // introduction and is driven on the HUD, so opening the menu here
+        // would put the panel up before the intro is finished.
+        if (!vm.IntroTourInProgress)
+        {
+            vm.Show();
+        }
+        if (vm.IsShown)
+        {
+            MainWindow.Show();
+        }
     }
 
     // A saved door whose id is exactly a spawnable definition's id came from

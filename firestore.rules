@@ -69,10 +69,18 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
 
-    // Each player writes only their own document; the boards read all docs.
-    match /acevo_players/{uid} {
+    // One doc per world identity: the doc id is the normalized display name
+    // (same key as acevo_playerNames) and ownerUid is the anonymous-auth uid
+    // that claimed it. The boards read all docs; a player only ever writes the
+    // row carrying their own ownerUid. Legacy uid-keyed rows stay readable;
+    // the one-time migration may delete the row whose id is the owner's uid.
+    match /acevo_players/{nameKey} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null
+                     && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if request.auth != null
+                     && resource.data.ownerUid == request.auth.uid;
+      allow delete: if request.auth != null && nameKey == request.auth.uid;
     }
 
     // Country total km (all players combined).

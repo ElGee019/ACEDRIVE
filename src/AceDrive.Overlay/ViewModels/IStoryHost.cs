@@ -2,8 +2,9 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The slice of the shell the introduction walk needs: swap the page, reveal
-/// the panel on a POI interior, open the menu the birthday hands over to, and
-/// bank the shared driver save when a purchase moves cash + trunk together.
+/// the panel on a POI interior or a story dialogue, open the menu the tour
+/// hands over to, and bank the shared driver save when a purchase moves cash +
+/// trunk together.
 /// </summary>
 public interface IStoryHost
 {
@@ -27,6 +28,9 @@ public interface IStoryHost
 
     /// <summary>The menu page the finished introduction lands on.</summary>
     object MenuScreen();
+
+    /// <summary>Reveals the panel on the menu (the tour's final hand-over).</summary>
+    void ShowMenu();
 
     /// <summary>Banks the shared driver file (wallet + trunk live in it).</summary>
     void SaveDriver();
