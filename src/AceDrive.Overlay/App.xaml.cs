@@ -119,10 +119,11 @@ public partial class App : Application, IDisposable
         var storeCatalog = new JsonStoreItemStore(_log).Load();
         var stores = new StoreNetwork(storeCatalog, poiTable);
         var playerName = new SteamPersonaNameSource(_log).TryReadName();
-        // The delivery board: its printed rows plus every grocery/coffee
-        // store an earlier session placed. The POI directory is the persisted
-        // identity, so the board row and the shop interior rebuild the same
-        // store from the same catalogue; the town then restores its shelf cell.
+        // The delivery board: the balance table plus every real shop door in
+        // the persisted directory (Max's story grocery and the stores each
+        // owned hub backfilled). The POI directory is the persisted identity,
+        // so the board row and the shop interior rebuild the same store from
+        // the same catalogue; the town then restores its shelf cell.
         var deliveryCatalog = new JsonDeliveryCatalog(_log).Load()
             .WithStores(PlacedStore.Rows(poiDirectory.All, storeCatalog));
         // The delivery distance-charge table rides beside the taxi fares:
@@ -351,6 +352,9 @@ public partial class App : Application, IDisposable
             // The trip-start breakdown roll (PORTPLAN 39): a seeded instance,
             // never the shared global (AGENTS.md).
             new BreakdownStrategy(maintenanceRules, Environment.TickCount),
+            // The streak's random skill gains (PORTPLAN 06/47): its own seeded
+            // stream, offset from the taxi seed like the other draws.
+            new Random(taxiSeed + 5),
             poiGenerator,
             poiDirectory, poiStore,
             poiSpawner, jobs,

@@ -44,6 +44,12 @@
   <data name="HudJobDropoffAction" xml:space="preserve"><value>AFZETTEN</value></data>
   <data name="HudJobDistanceMeters" xml:space="preserve"><value>{0:0} m</value></data>
   <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
+  <data name="HudDeliveryHubDrive" xml:space="preserve"><value>Rijd naar {0} voor de ophaal bij {1} nr. {2} in {3}</value></data>
+  <data name="HudDeliveryHubArrived" xml:space="preserve"><value>Je bent bij {0}. Druk op LAAD DE GOEDEREN om de vracht te laden.</value></data>
+  <data name="HudDeliveryHubAction" xml:space="preserve"><value>LAAD DE GOEDEREN</value></data>
+  <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Bezorg bij {0} op {1} nr. {2} in {3}</value></data>
+  <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}. Druk op BEZORG DE GOEDEREN om te lossen.</value></data>
+  <data name="HudDeliveryStoreAction" xml:space="preserve"><value>BEZORG DE GOEDEREN</value></data>
   <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
   <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Snelheidsuitdaging: {0}</value></data>

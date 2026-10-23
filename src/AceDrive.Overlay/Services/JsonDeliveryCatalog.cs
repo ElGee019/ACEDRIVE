@@ -5,8 +5,10 @@ using AceDrive.Core;
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// Loads delivery board content from Data/delivery_catalog.json next to
-/// the exe. Missing or invalid files degrade to
+/// Loads the delivery balance (rates, starting CredP) from
+/// Data/delivery_catalog.json next to the exe. The optional Stores array is
+/// only hand-authored content; real board rows come from the shop POIs
+/// (<see cref="PlacedStore"/>). Missing or invalid files degrade to
 /// <see cref="DeliveryCatalog.Default"/> (an empty board) with a warning —
 /// the overlay must never fail to start over a data file, and the page
 /// shows its empty state instead.
@@ -80,6 +82,9 @@ public sealed class JsonDeliveryCatalog
                 || store.UnitCapacity <= 0
                 || store.StockedUnits < 0 || store.StockedUnits > store.UnitCapacity
                 || store.PricePerUnit < 0
+                || (store.Address is { } address
+                    && (string.IsNullOrWhiteSpace(address.StreetName)
+                        || address.HouseNumber < 1))
                 || !keys.Add(store.Key))
             {
                 return false;

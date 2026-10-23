@@ -16,12 +16,11 @@ namespace AceDrive.Overlay.ViewModels;
 /// HasHubForCategory eligibility), so the board starts empty and the hub
 /// page fills it. Per-item quantities arrive with the order screen (item
 /// 17); the run crosses to the map, so both actions come in as
-/// injected commands (composition, no IScreenController growth). The
-/// delivery lands on the tap for now: with no Eifel address table yet
-/// (PORTPLAN Step 1) there is no leg to drive, so DELIVER fills the
-/// ordered shelves and hands the run (goods + money) to the host, which
-/// settles it straight into a delivery receipt — the same skip the taxi
-/// job's ACCEPT does until the driving slice feeds real legs.
+/// injected commands (composition, no IScreenController growth). DELIVER
+/// freezes the cart's money on the live shelves and hands the run to the
+/// host, which drives the hub pickups and store drop-offs on the companion
+/// and settles the receipt after the last stop (the taxi ACCEPT hand-over's
+/// delivery twin); the shelves are filled at each stop, never on this tap.
 /// Voice parity with the control page: every button answers to its text.
 /// </summary>
 public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
@@ -95,7 +94,7 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
 
     /// <summary>Total wholesale money committed by the cart (for logs/tests;
     /// the escrow wallet itself lands with the save, PORTPLAN 51).</summary>
-    public double CartTotal => _cart.TotalCost(_catalog);
+    public double CartTotal => _cart.TotalCost(_catalog, _city);
 
     /// <summary>Unity re-shows this screen after the hub page closes, so it
     /// re-pulls career state (spent CredP, newly connected stores). This
@@ -141,31 +140,32 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
             _hubCommand.Execute(null);
             return;
         }
-        // The drive is skipped (no Eifel address table yet): the drop-off
-        // completes here and the run hands straight over to the host, which
-        // settles the receipt — the taxi ACCEPT skip's delivery twin.
-        DeliverOrders();
+        // The run leaves this page: the host takes over the drive, pins the
+        // first hub/store leg on the companion and settles the receipt after
+        // the last stop (the taxi ACCEPT hand-over's delivery twin).
+        StartRun();
     }
 
     // The ordered stores are the delivered ones: a full store takes no order,
-    // so the cart never holds a shelf that does not need the drop-off. Filling
-    // the shelves is CityEconomy's rule (this page never edits town state by
-    // hand), and the staged money leaves as the run the host settles — the
-    // escrow ledger that pre-books the debit at confirm lands with the save
-    // (PORTPLAN 51).
-    private void DeliverOrders()
+    // so the cart never holds a shelf that does not need the drop-off. The
+    // money is frozen here on the live pre-run shelves and handed to the host;
+    // filling the shelves is CityEconomy's rule at each confirmed stop, never
+    // this page's job. Clearing the cart reflects that it became a live run —
+    // the escrow ledger that pre-books the debit at confirm lands with the
+    // save (PORTPLAN 51).
+    private void StartRun()
     {
-        IReadOnlyList<string> keys = _cart.ConfirmedKeys;
         DeliveryRun? run = _cart.Run(_catalog, _city);
-        _log.LogInfo($"orders delivered: €{run?.PaidForGoods:0.00} -> " +
-            $"{string.Join(", ", keys.Select(NameOf))} at full stock");
-        _city.Restock(keys);
+        if (run is null)
+        {
+            return;
+        }
+
+        _log.LogInfo($"delivery run started: €{run.PaidForGoods:0.00} -> " +
+            $"{string.Join(", ", _cart.ConfirmedKeys.Select(NameOf))}");
         _cart.Clear();
         RebuildRows();
-        if (run is not null)
-        {
-            _runCommand.Execute(run);
-        }
+        _runCommand.Execute(run);
     }
 
     // A cart key always has a catalog row (a row tap is the only way in);
@@ -181,7 +181,7 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
             // Unity: leaving with a pending cart is CANCEL ORDER, which
             // refunds the escrow first. No wallet yet: clearing the cart is
             // the whole refund until the save lands (PORTPLAN 51).
-            _log.LogInfo($"orders cancelled: €{_cart.TotalCost(_catalog):0.00} refunded");
+            _log.LogInfo($"orders cancelled: €{_cart.TotalCost(_catalog, _city):0.00} refunded");
             _cart.Clear();
             RebuildRows();
         }

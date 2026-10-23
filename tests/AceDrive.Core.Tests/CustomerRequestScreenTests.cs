@@ -5,7 +5,8 @@ using AceDrive.Overlay.ViewModels;
 namespace AceDrive.Core.Tests;
 
 /// <summary>The request page (PORTPLAN item 11): countdown, quiz grading,
-/// passive/speed answers, feedback colours and the single BACK report.</summary>
+/// passive answers, the forced challenge's self-dismissing read-in, feedback
+/// colours and the single exit report.</summary>
 public sealed class CustomerRequestScreenTests
 {
     private sealed record Harness(
@@ -16,15 +17,16 @@ public sealed class CustomerRequestScreenTests
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
     private static Harness Build(
-        CustomerRequest request, int timerSeconds = 14,
-        TimeSpan? speedAllowance = null)
+        CustomerRequest request, int timerSeconds = 19,
+        TimeSpan? speedAllowance = null, TimeSpan? speedReadIn = null)
     {
         var clock = new FakeClock();
         var outcomes = new List<CustomerRequestOutcome>();
         var vm = new CustomerRequestScreenViewModel(
             request, "Max Weber", timerSeconds, clock, new VoiceBeat(clock),
             outcomes.Add,
-            speedAllowance is { } allowance ? clock.UtcNow + allowance : null);
+            speedAllowance is { } allowance ? clock.UtcNow + allowance : null,
+            speedReadIn);
         return new Harness(vm, clock, outcomes);
     }
 
@@ -47,8 +49,9 @@ public sealed class CustomerRequestScreenTests
     {
         Harness h = Build(Passive());
 
-        Assert.Equal("TIME REMAINING: 14s", h.Vm.TimeLine);
+        Assert.Equal("TIME REMAINING: 19s", h.Vm.TimeLine);
         Assert.True(h.Vm.TimerVisible);
+        Assert.False(h.Vm.DeliveryVisible);
         Assert.False(h.Vm.ShowBack);
         Assert.False(h.Vm.HasFeedback);
         Assert.Equal(2, h.Vm.Options.Count);
@@ -67,13 +70,13 @@ public sealed class CustomerRequestScreenTests
 
         h.Clock.Advance(TimeSpan.FromSeconds(0.1));
         h.Vm.Tick(h.Clock.UtcNow);
-        Assert.Equal("TIME REMAINING: 14s", h.Vm.TimeLine);
+        Assert.Equal("TIME REMAINING: 19s", h.Vm.TimeLine);
 
         h.Clock.Advance(TimeSpan.FromSeconds(0.9));
         h.Vm.Tick(h.Clock.UtcNow);
-        Assert.Equal("TIME REMAINING: 13s", h.Vm.TimeLine);
+        Assert.Equal("TIME REMAINING: 18s", h.Vm.TimeLine);
 
-        h.Clock.Advance(TimeSpan.FromSeconds(12.5));
+        h.Clock.Advance(TimeSpan.FromSeconds(17.5));
         h.Vm.Tick(h.Clock.UtcNow);
         Assert.Equal("TIME REMAINING: 1s", h.Vm.TimeLine);
 
@@ -83,11 +86,32 @@ public sealed class CustomerRequestScreenTests
     }
 
     [Fact]
+    public void PassiveTimeout_FinishesAsAnUnansweredAsk()
+    {
+        // Every request kind runs the countdown; a passive ask that nobody
+        // answers still closes itself and reports the timed-out outcome.
+        Harness h = Build(Passive());
+
+        h.Clock.Advance(TimeSpan.FromSeconds(19));
+        h.Vm.Tick(h.Clock.UtcNow);
+
+        Assert.Equal("No tip then.", h.Vm.Feedback);
+        Assert.False(h.Vm.TimerVisible);
+        Assert.True(h.Vm.ShowBack);
+
+        h.Vm.BackCommand.Execute(null);
+
+        CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
+        Assert.False(outcome.TipEligible);
+        Assert.False(outcome.Answered);
+    }
+
+    [Fact]
     public void Timeout_FinishesOnce_ThenBackReportsOnce()
     {
         Harness h = Build(Quiz());
 
-        h.Clock.Advance(TimeSpan.FromSeconds(14));
+        h.Clock.Advance(TimeSpan.FromSeconds(19));
         h.Vm.Tick(h.Clock.UtcNow);
         h.Vm.Tick(h.Clock.UtcNow);
 
@@ -204,50 +228,65 @@ public sealed class CustomerRequestScreenTests
     }
 
     [Fact]
-    public void SpeedChallenge_IsForcedAndShowsTheDeliveryClock()
+    public void SpeedChallenge_IsAReadInWithoutAnswerOrButton()
     {
-        Harness h = Build(Speed(), speedAllowance: TimeSpan.FromSeconds(90));
+        Harness h = Build(
+            Speed(), speedAllowance: TimeSpan.FromSeconds(90),
+            speedReadIn: TimeSpan.FromSeconds(30));
 
         Assert.True(h.Vm.IsSpeedChallenge);
-        Assert.True(h.Vm.ShowBack);
-        Assert.True(h.Vm.TimerVisible);
+        Assert.False(h.Vm.ShowBack);
+        Assert.False(h.Vm.TimerVisible);
+        Assert.True(h.Vm.DeliveryVisible);
         Assert.True(h.Vm.RequestTextVisible);
         Assert.Empty(h.Vm.Options);
-        Assert.Equal("DELIVER WITHIN 1:30", h.Vm.TimeLine);
-        Assert.Contains("BACK", h.Vm.VoiceActions.Keys);
+        // No button and no answer row: nothing to tap, nothing to speak.
+        Assert.Empty(h.Vm.VoiceActions);
+        Assert.Equal("DELIVER WITHIN 1:30", h.Vm.DeliveryLine);
 
-        h.Clock.Advance(TimeSpan.FromSeconds(30.2));
+        h.Clock.Advance(TimeSpan.FromSeconds(5.2));
         h.Vm.Tick(h.Clock.UtcNow);
-        Assert.Equal("DELIVER WITHIN 1:00", h.Vm.TimeLine);
+        Assert.Equal("DELIVER WITHIN 1:25", h.Vm.DeliveryLine);
+        Assert.Empty(h.Outcomes);
+    }
 
-        h.Vm.BackCommand.Execute(null);
+    [Fact]
+    public void SpeedChallenge_LateDeadlinePaintsTheWarningLine()
+    {
+        // The page is a read-in; a deadline that passes while it is up paints
+        // the warning line without ending the page early.
+        Harness h = Build(
+            Speed(), speedAllowance: TimeSpan.FromSeconds(10),
+            speedReadIn: TimeSpan.FromSeconds(60));
+
+        h.Clock.Advance(TimeSpan.FromSeconds(11));
+        h.Vm.Tick(h.Clock.UtcNow);
+
+        Assert.True(h.Vm.SpeedChallengeLate);
+        Assert.Equal("TOO LATE", h.Vm.DeliveryLine);
+        Assert.False(h.Vm.ShowBack);
+        Assert.Empty(h.Outcomes);
+    }
+
+    [Fact]
+    public void SpeedChallenge_ReadInDismissesItAndReportsOnce()
+    {
+        // The forced page has nothing to answer and no button: its read-in
+        // running out reports the agreed outcome, so the host restores the
+        // task text while the delivery clock keeps running.
+        Harness h = Build(
+            Speed(), speedAllowance: TimeSpan.FromSeconds(300),
+            speedReadIn: TimeSpan.FromSeconds(3));
+
+        h.Clock.Advance(TimeSpan.FromSeconds(3));
+        h.Vm.Tick(h.Clock.UtcNow);
+        h.Vm.Tick(h.Clock.UtcNow);
         h.Vm.BackCommand.Execute(null);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
         Assert.True(outcome.SpeedChallengeAgreed);
         Assert.True(outcome.TipEligible);
         Assert.True(outcome.Answered);
-    }
-
-    [Fact]
-    public void SpeedChallenge_ExpiredClockSaysLateWithoutTimingThePageOut()
-    {
-        Harness h = Build(Speed(), speedAllowance: TimeSpan.FromSeconds(20));
-
-        h.Clock.Advance(TimeSpan.FromSeconds(21));
-        h.Vm.Tick(h.Clock.UtcNow);
-        h.Vm.Tick(h.Clock.UtcNow);
-
-        Assert.True(h.Vm.SpeedChallengeLate);
-        Assert.Equal("TOO LATE", h.Vm.TimeLine);
-        Assert.True(h.Vm.ShowBack);
-        Assert.Empty(h.Vm.Options);
-        Assert.Empty(h.Outcomes);
-
-        h.Vm.BackCommand.Execute(null);
-
-        CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
-        Assert.True(outcome.TipEligible);
     }
 
     [Fact]

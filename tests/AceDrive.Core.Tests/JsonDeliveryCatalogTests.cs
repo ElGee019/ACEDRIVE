@@ -13,7 +13,7 @@ public sealed class JsonDeliveryCatalogTests
           "WholesaleRate": 0.7,
           "StartCredP": 100,
           "Stores": [
-            { "Key": "a", "Name": "Store A", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.5, "Category": "groceries" },
+            { "Key": "a", "Name": "Store A", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.5, "Category": "groceries", "Address": { "StreetName": "Street 1", "HouseNumber": 7, "Side": 1 } },
             { "Key": "b", "Name": "Store B", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.2 }
           ]
         }
@@ -31,6 +31,10 @@ public sealed class JsonDeliveryCatalogTests
         // data, not a broken file — open content predates careers.
         Assert.Equal("groceries", catalog.Stores[0].Category);
         Assert.Equal("", catalog.Stores[1].Category);
+        Assert.Equal(
+            new AddressLocation("Street 1", 7, HouseSide.Right),
+            catalog.Stores[0].Address);
+        Assert.Null(catalog.Stores[1].Address);
         Assert.Empty(log.Warnings);
     }
 
@@ -59,6 +63,8 @@ public sealed class JsonDeliveryCatalogTests
     [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":41,"UnitCapacity":40,"PricePerUnit":2}]}""")]
     [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":0,"PricePerUnit":2}]}""")]
     [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":-1},{"Key":"a","Name":"Dup","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"Address":{"StreetName":"","HouseNumber":1}}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"Address":{"StreetName":"Street 1","HouseNumber":0}}]}""")]
     public void InvalidBalanceOrStore_FallsBackToDefault(string json)
     {
         var catalog = LoadFrom(json, out TestLog log);

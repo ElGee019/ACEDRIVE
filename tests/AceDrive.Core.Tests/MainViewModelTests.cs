@@ -35,6 +35,7 @@ public sealed class MainViewModelTests
             IHungerStateStore? hungerStore = null,
             Garage? garage = null, IGarageStore? garageStore = null,
             BreakdownStrategy? breakdowns = null,
+            Random? rng = null,
             OnboardingContent? content = null,
             PlayerProfile? profile = null, IProfileStore? profileStore = null,
             AddressMap? addressMap = null, string? detectedName = "ElGee",
@@ -62,7 +63,8 @@ public sealed class MainViewModelTests
             IPlayerNameRegistry? playerNames = null,
             TaxiShift? shift = null, IShiftStore? shiftStore = null,
             FakeSaveDataResetter? saveResets = null,
-            FakeAppRestarter? restarter = null)
+            FakeAppRestarter? restarter = null,
+            StoreCatalog? storeCatalog = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -86,7 +88,7 @@ public sealed class MainViewModelTests
         var garageInstance = garage ?? new Garage(cars ?? TestRoadCars.Pool);
         var friendsInstance = friendships ?? new FakeFriendshipStore();
         var trunkInstance = trunk ?? new Trunk(savedDriver?.Trunk);
-        var storeNetwork = new StoreNetwork(StoreCatalog.Default, PoiCatalog.Default);
+        var storeNetwork = new StoreNetwork(storeCatalog ?? StoreCatalog.Default, PoiCatalog.Default);
         IReadOnlyList<IPoiArrivalHandler> handlers = poiHandlers ??
         [
             new StorePoiHandler(
@@ -131,6 +133,7 @@ public sealed class MainViewModelTests
             InsuranceRules.Default,
             // Seeded so a test can force a breakdown or keep every trip clean.
             breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            rng ?? new Random(0),
             pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
             directory, directoryStore,
             poiSpawner ?? new PoiSpawner(
@@ -141,7 +144,8 @@ public sealed class MainViewModelTests
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
             trunkInstance, taxiRules ?? TaxiRules.Default, hud, handlers,
-            requests, requestTable, police, saveResets, restarter);
+            requests, requestTable, police, saveResets, restarter,
+            storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)
         {
             // The watcher thread lands via the dispatcher, which runs inline
@@ -796,7 +800,7 @@ public sealed class MainViewModelTests
         clock.Advance(TimeSpan.FromSeconds(1));
         vm.Poll();
 
-        Assert.Equal(13, screen.RemainingSeconds);
+        Assert.Equal(18, screen.RemainingSeconds);
     }
 
     [Fact]
@@ -843,9 +847,10 @@ public sealed class MainViewModelTests
             Result = new CustomerRequest(
                 CustomerRequestKind.CarQuiz, question.Text, question),
         };
+        var wallet = new DriverWallet();
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, cars: pool, garage: garage, garageStore: garageStore,
-            requests: requests,
+            requests: requests, wallet: wallet,
             requestTable: CustomerRequestTestData.Table(
                 categories: CustomerRequestTestData.SixCategories));
 
@@ -854,6 +859,9 @@ public sealed class MainViewModelTests
             TaxiFlow.Pickup(vm, clock));
         screen.Options[1].Command.Execute(null);
         screen.BackCommand.Execute(null);
+
+        // Unity HandleAnswer: a correct answer lifts off-the-line by 1.
+        Assert.Equal(21.0, wallet.Rating.OffTheLine);
 
         Assert.Equal(pool[0], requests.LastCar);
         Assert.Contains("weight", car.AskedCategories);
@@ -877,8 +885,9 @@ public sealed class MainViewModelTests
             Result = new CustomerRequest(
                 CustomerRequestKind.CarQuiz, question.Text, question),
         };
+        var wallet = new DriverWallet();
         var (vm, clock, tel, _) = Create(
-            speedKmh: 0f, requests: requests,
+            speedKmh: 0f, requests: requests, wallet: wallet,
             requestTable: CustomerRequestTestData.Table(
                 categories: CustomerRequestTestData.SixCategories));
 
@@ -887,6 +896,9 @@ public sealed class MainViewModelTests
             TaxiFlow.Pickup(vm, clock));
         screen.Options[0].Command.Execute(null);
         screen.BackCommand.Execute(null);
+
+        // A wrong answer drops off-the-line by 1 (Unity HandleAnswer).
+        Assert.Equal(19.0, wallet.Rating.OffTheLine);
 
         TaxiFlow.Drive(vm, clock, tel);
         vm.DropoffCommand.Execute(null);
@@ -908,8 +920,10 @@ public sealed class MainViewModelTests
             Result = new CustomerRequest(
                 CustomerRequestKind.CarQuiz, question.Text, question),
         };
+        var wallet = new DriverWallet();
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, cars: pool, garage: garage, requests: requests,
+            wallet: wallet,
             requestTable: CustomerRequestTestData.Table(
                 categories: CustomerRequestTestData.SixCategories));
 
@@ -917,12 +931,16 @@ public sealed class MainViewModelTests
         var screen = Assert.IsType<CustomerRequestScreenViewModel>(
             TaxiFlow.Pickup(vm, clock));
 
-        clock.Advance(TimeSpan.FromSeconds(14));
+        clock.Advance(TimeSpan.FromSeconds(19));
         vm.Poll();
 
         Assert.True(screen.ShowBack);
         Assert.Equal("No tip then.", screen.Feedback);
         screen.BackCommand.Execute(null);
+
+        // A timeout costs the same point a wrong answer does (Unity's
+        // HandleAnswer runs the null branch for an expiry).
+        Assert.Equal(19.0, wallet.Rating.OffTheLine);
 
         Assert.Contains("weight", car.AskedCategories);
         TaxiFlow.Drive(vm, clock, tel);
@@ -963,6 +981,7 @@ public sealed class MainViewModelTests
     public void Pickup_SpeedChallenge_FinesOnceAndDropsTheTip()
     {
         var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet();
         var requests = new FakeCustomerRequestRoller
         {
             Result = CustomerRequestTestData.SpeedRequest,
@@ -980,13 +999,12 @@ public sealed class MainViewModelTests
         };
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, hud: hud, requests: requests, police: police,
-            taxiRules: rules);
+            taxiRules: rules, wallet: wallet);
 
         TaxiFlow.Propose(vm);
         TaxiFlow.Pickup(vm, clock);
         TaxiFlow.AnswerRequest(vm);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
-
         // Three laps through the same patrol: the second and third pass must
         // not charge again.
         DriveLaps(vm, clock, tel, laps: 3, speedKmh: 80f);
@@ -997,12 +1015,16 @@ public sealed class MainViewModelTests
         Assert.False(receipt.HasTip);
         Assert.Contains("50.00", receipt.FineLine.Amount, StringComparison.Ordinal);
         Assert.Contains("Speeding fine", hud.Notice ?? string.Empty, StringComparison.Ordinal);
+        // The deadline was beaten, so the gamble still pays its cornering
+        // point even though the patrol fined the tip away (PORTPLAN 06).
+        Assert.Equal(21.0, wallet.Rating.Cornering);
     }
 
     [Fact]
     public void Pickup_SpeedChallenge_BelowTheLimitKeepsTheTip()
     {
         var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet();
         var requests = new FakeCustomerRequestRoller
         {
             Result = CustomerRequestTestData.SpeedRequest,
@@ -1021,7 +1043,7 @@ public sealed class MainViewModelTests
         };
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, hud: hud, requests: requests, police: police,
-            taxiRules: rules);
+            taxiRules: rules, wallet: wallet);
 
         TaxiFlow.Propose(vm);
         TaxiFlow.Pickup(vm, clock);
@@ -1033,12 +1055,16 @@ public sealed class MainViewModelTests
         Assert.False(receipt.HasFine);
         Assert.True(receipt.HasTip);
         Assert.Contains("Police patrol ahead", hud.Notice ?? string.Empty, StringComparison.Ordinal);
+        // Beating the deadline is the challenge's success (PORTPLAN 06): the
+        // gamble pays one cornering point.
+        Assert.Equal(21.0, wallet.Rating.Cornering);
     }
 
     [Fact]
     public void Pickup_SpeedChallenge_Late_RemovesTheTip()
     {
         var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet();
         var requests = new FakeCustomerRequestRoller
         {
             Result = CustomerRequestTestData.SpeedRequest,
@@ -1052,7 +1078,8 @@ public sealed class MainViewModelTests
                 BufferSeconds: 0),
         };
         var (vm, clock, tel, _) = Create(
-            speedKmh: 0f, hud: hud, requests: requests, taxiRules: rules);
+            speedKmh: 0f, hud: hud, requests: requests, taxiRules: rules,
+            wallet: wallet);
 
         TaxiFlow.Propose(vm);
         TaxiFlow.Pickup(vm, clock);
@@ -1063,10 +1090,13 @@ public sealed class MainViewModelTests
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.False(receipt.HasTip);
         Assert.Equal(Strings.Get("HudSpeedChallengeLate"), hud.Notice);
+        // A beaten deadline pays nothing: the challenge failed, so cornering
+        // stays where it started.
+        Assert.Equal(20.0, wallet.Rating.Cornering);
     }
 
     [Fact]
-    public void Pickup_SpeedChallenge_IsForced_NoDecline()
+    public void Pickup_SpeedChallenge_ReadInThenBackToTheTaskText()
     {
         var hud = new FakeTelemetryHud();
         var requests = new FakeCustomerRequestRoller
@@ -1083,10 +1113,17 @@ public sealed class MainViewModelTests
             TaxiFlow.Pickup(vm, clock));
         Assert.True(screen.IsSpeedChallenge);
         Assert.Empty(screen.Options);
-        Assert.True(screen.ShowBack);
+        Assert.False(screen.ShowBack);
+        Assert.False(screen.TimerVisible);
+        Assert.Same(screen, hud.Request);
 
-        screen.BackCommand.Execute(null);
+        // No answer and no button: the read-in closes itself and the drop-off
+        // task text comes back with the delivery clock still running.
+        clock.Advance(TimeSpan.FromSeconds(TaxiRules.Default.NoticeSeconds));
+        vm.Poll();
 
+        Assert.Null(hud.Request);
+        Assert.Equal(1, hud.ClearRequestCalls);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
         Assert.NotNull(hud.JobGuidance.SpeedChallengeDeadline);
     }
@@ -2522,15 +2559,211 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void Deliver_JumpsStraightToTheDeliveryReceipt()
+    public void GroceryHub_Purchase_ShowsMaxsAndTheFirstBackfilledStore()
     {
-        // Like the taxi ACCEPT skip (PORTPLAN 16): with no driving slice the
-        // DELIVER tap settles the whole run at once — goods money in and
-        // out, the hub ramp earns its CredP, the hub owner gains
-        // familiarity — and the receipt shows; CONTINUE returns to the
-        // delivery board the run came from.
+        // The grocery board is made of real shop doors: Max's story grocery,
+        // which the introduction already banked, plus the one store Unity's
+        // backfill opens at the purchase.
+        var address = new AddressLocation("Street 1", 9, HouseSide.Left);
+        var max = new PointOfInterest(
+            PoiCatalog.MaxGroceryId, "Max's Grocery Store", address,
+            PoiTypes.Grocery, "Max Silvestri", "groceries", ["MAPLE SYRUP"]);
+        var directory = new PoiDirectory([max]);
+        var hubs = new HubCatalog([
+            new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES",
+                    [new HubLevel("Grocers and Sons", 100)])])]);
+        var (vm, _, _, _) = Create(
+            catalog: new DeliveryCatalog([], 0.7, 100), hubs: hubs,
+            poiDirectory: directory);
+        var control = FinishIntro(vm);
+
+        control.DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        Assert.False(board.HasStores); // Max's stays behind the career gate
+
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+
+        PointOfInterest backfilled = Assert.Single(
+            directory.All, poi => poi.Type == PoiTypes.GroceryStore);
+        Assert.Equal(
+            [PoiCatalog.MaxGroceryId, backfilled.Id],
+            board.Rows.Select(row => row.Store.Key).ToArray());
+
+        DeliveryRow maxRow = board.Rows[0];
+        Assert.Equal("Max's Grocery Store", maxRow.Store.Name);
+        Assert.Equal("Max Silvestri", maxRow.Store.Owner);
+        Assert.Equal("groceries", maxRow.Store.Category);
+        Assert.Equal(address, maxRow.Store.Address);
+    }
+
+    [Fact]
+    public void CoffeeHub_Purchase_ShowsOneRealCoffeeShop()
+    {
+        // The coffee career has no story anchor, so its first board row is the
+        // single coffee shop the backfill opens at the purchase.
+        var directory = new PoiDirectory();
+        var hubs = new HubCatalog([
+            new HubTier(1, true, [
+                new HubCareer("coffee_beans", "COFFEE BEANS",
+                    [new HubLevel("CoffeeUs", 100)])])]);
+        var (vm, _, _, _) = Create(
+            catalog: new DeliveryCatalog([], 0.7, 100), hubs: hubs,
+            poiDirectory: directory,
+            // The coffee shelf layout derives from the catalogue's items; the
+            // test-shell default only carries groceries.
+            storeCatalog: new StoreCatalog(
+                [new StoreItem("BEANS", 10.0, 0.1, 0, "coffee_beans")],
+                DefaultStock: 20));
+        var control = FinishIntro(vm);
+
+        control.DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+
+        PointOfInterest shop = Assert.Single(
+            directory.All, poi => poi.Type == PoiTypes.CoffeeShop);
+        DeliveryRow row = Assert.Single(board.Rows);
+        Assert.Equal(shop.Id, row.Store.Key);
+        Assert.Equal("coffee_beans", row.Store.Category);
+        Assert.DoesNotContain(board.Rows, r => r.Store.Key == PoiCatalog.MaxGroceryId);
+    }
+
+    [Fact]
+    public void BuyingAHub_PlacesItsPickupDoorAndBanksTheDirectory()
+    {
+        // Unity PlaceHubOnExistingStreet: the owned hub gets a map door, so
+        // the delivery run can pin the pickup leg without a second table.
+        var hubs = new HubCatalog(
+            [
+                new HubTier(1, true, [
+                    new HubCareer("groceries", "GROCERIES",
+                        [new HubLevel("Grocers and Sons", 100)])]),
+            ],
+            OwnerNames: ["Elena Marchetti"]);
+        var directory = new PoiDirectory();
+        var poiStore = new FakePoiDirectoryStore();
+        var (vm, _, _, _) = Create(
+            catalog: new DeliveryCatalog([], 0.7, 100), hubs: hubs,
+            poiDirectory: directory, poiStore: poiStore);
+        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+
+        PointOfInterest door = Assert.Single(
+            directory.All, poi => poi.Type == PoiTypes.Hub);
+        Assert.Equal("groceries_grocers_and_sons", door.Id);
+        Assert.Equal("groceries", door.Category);
+        Assert.Equal("Grocers and Sons", door.Name);
+        Assert.NotEmpty(door.OwnerName);
+        Assert.Contains(door, poiStore.Saved);
+    }
+
+    [Fact]
+    public void DeliveryRun_ServesEveryStoreInCartOrder()
+    {
+        var first = new DeliveryStore(
+            "first", "First Store", "Hahn", 10, 40, 2.50, "groceries",
+            new AddressLocation("Street 1", 5, HouseSide.Right));
+        var second = new DeliveryStore(
+            "second", "Second Store", "Fuchs", 10, 40, 2.20, "groceries",
+            new AddressLocation("Street 2", 5, HouseSide.Left));
+        var catalog = new DeliveryCatalog([first, second], 0.7, 100);
+        var city = new CityEconomy(catalog.Stores, CityRules.Default);
+        var hubs = new HubCatalog([
+            new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES",
+                    [new HubLevel("Grocers and Sons", 100)])])]);
+        var hud = new FakeTelemetryHud();
+        var (vm, clock, tel, _) = Create(
+            catalog: catalog, hubs: hubs, city: city, hud: hud);
+        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+
+        board.ToggleOrderCommand.Execute(board.Rows.Single(r => r.Store.Key == "first"));
+        board.ToggleOrderCommand.Execute(board.Rows.Single(r => r.Store.Key == "second"));
+        board.MainButtonCommand.Execute(null);
+
+        Assert.Equal("HudDeliveryHubDrive", hud.JobGuidance!.DriveKey);
+        hud.RaiseJobEnter(); // load the freight once for the category
+        Assert.Equal("HudDeliveryStoreDrive", hud.JobGuidance!.DriveKey);
+        Assert.Equal("First Store", hud.JobGuidance.TargetName);
+
+        TaxiFlow.Drive(vm, clock, tel, 1.0);
+        hud.RaiseJobEnter(); // first store
+        Assert.Equal("Second Store", hud.JobGuidance!.TargetName);
+
+        TaxiFlow.Drive(vm, clock, tel, 1.0);
+        hud.RaiseJobEnter(); // last store
+
+        Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(40, city.Live(first).StockedUnits);
+        Assert.Equal(40, city.Live(second).StockedUnits);
+    }
+
+    [Fact]
+    public void DeliveryRun_StoreWithoutDoor_SkipsTheLegAndStillSettles()
+    {
+        // A hand-edited catalogue row without an address must not strand the
+        // run: the leg is skipped, its shelves still fill, and the receipt
+        // opens. Every shipped row has a door, so this is the degrade path.
+        var store = new DeliveryStore(
+            "no-door", "No Door", "Hahn", 10, 40, 2.50, "groceries");
+        var catalog = new DeliveryCatalog([store], 0.7, 100);
+        var city = new CityEconomy(catalog.Stores, CityRules.Default);
+        var hubs = new HubCatalog([
+            new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES",
+                    [new HubLevel("Grocers and Sons", 100)])])]);
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(
+            catalog: catalog, hubs: hubs, city: city, hud: hud);
+        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+        board.ToggleOrderCommand.Execute(board.Rows[0]);
+        board.MainButtonCommand.Execute(null);
+
+        Assert.Equal("HudDeliveryHubDrive", hud.JobGuidance!.DriveKey);
+        hud.RaiseJobEnter(); // pickup; the store leg has no door and skips
+
+        Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(40, city.Live(store).StockedUnits);
+    }
+
+    [Fact]
+    public void Deliver_PinsTheHubPickupThenTheStoreAndSettlesTheReceipt()
+    {
+        // PORTPLAN 19: DELIVER hands the run to the host, which pins the hub
+        // pickup first, then the store leg. The store leg's measured 8.2 km
+        // settle the goods money, the hub ramp's CredP and the owner's
+        // familiarity; CONTINUE returns to the delivery board the run came
+        // from.
         var catalog = new DeliveryCatalog(
-            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries")],
+            [new DeliveryStore(
+                "adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries",
+                new AddressLocation("Street 2", 5, HouseSide.Left))],
             0.7, 100);
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
@@ -2538,9 +2771,10 @@ public sealed class MainViewModelTests
             CredPRamp.UnityDefault, ["Elena Marchetti"]);
         var wallet = EmptyWallet();
         var friends = new FakeFriendshipStore();
-        var (vm, _, _, _) = Create(
+        var hud = new FakeTelemetryHud();
+        var (vm, clock, tel, _) = Create(
             catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
-            friendships: friends);
+            friendships: friends, hud: hud);
         var control = FinishIntro(vm);
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
@@ -2555,6 +2789,15 @@ public sealed class MainViewModelTests
         Assert.True(board.HasStores);
         board.ToggleOrderCommand.Execute(board.Rows[0]);
         board.MainButtonCommand.Execute(null);
+
+        // DELIVER pins the hub pickup first, then the store leg after the
+        // freight is loaded; the store leg's 8.2 km prices the receipt.
+        Assert.False(vm.IsShown);
+        Assert.Equal("HudDeliveryHubDrive", hud.JobGuidance!.DriveKey);
+        hud.RaiseJobEnter();
+        Assert.Equal("HudDeliveryStoreDrive", hud.JobGuidance!.DriveKey);
+        TaxiFlow.Drive(vm, clock, tel, TaxiFlow.DefaultDistanceKm);
+        hud.RaiseJobEnter();
 
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
         // 63.00 payout + 129.40 fare - 49.00 wholesale = the profit delta.
@@ -2582,7 +2825,9 @@ public sealed class MainViewModelTests
         // goods money and fare still settle, while XP, standings, country km,
         // zone jobs and the global car km stay untouched.
         var catalog = new DeliveryCatalog(
-            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries")],
+            [new DeliveryStore(
+                "adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries",
+                new AddressLocation("Street 2", 5, HouseSide.Left))],
             0.7, 100);
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
@@ -2593,10 +2838,11 @@ public sealed class MainViewModelTests
         var telemetry = new FakePlayerTelemetry();
         var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
         var drivers = new FakeDriverStore();
-        var (vm, _, _, _) = Create(
+        var hud = new FakeTelemetryHud();
+        var (vm, clock, tel, _) = Create(
             catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
             carKsId: "ks_mazda_mx5_na", rarity: rarity,
-            telemetry: telemetry, rivals: rivals, driverStore: drivers);
+            telemetry: telemetry, rivals: rivals, driverStore: drivers, hud: hud);
         FinishIntro(vm).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
@@ -2606,6 +2852,10 @@ public sealed class MainViewModelTests
         hub.BackCommand.Execute(null);
         board.ToggleOrderCommand.Execute(board.Rows[0]);
         board.MainButtonCommand.Execute(null);
+
+        hud.RaiseJobEnter(); // load the freight at the hub
+        TaxiFlow.Drive(vm, clock, tel, TaxiFlow.DefaultDistanceKm);
+        hud.RaiseJobEnter(); // deliver the store
 
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(143.40, wallet.Cash);
@@ -2693,6 +2943,13 @@ public sealed class MainViewModelTests
             System.Globalization.CultureInfo.InvariantCulture), granted.LastLoginDate);
         Assert.Equal("2026-10-12", granted.LastDailyBonusDate);
         Assert.True(vm.OnboardingDone);
+        // Unity's streak tail: day 3 hands three random skill points out
+        // (PORTPLAN 06), banked with the same grant.
+        Assert.Equal(63.0,
+            wallet.Rating.Cornering + wallet.Rating.Concentration + wallet.Rating.OffTheLine,
+            precision: 9);
+        Assert.Equal(wallet.Rating.Overall, (granted.Cornering + granted.Concentration + granted.OffTheLine) / 3.0,
+            precision: 9);
     }
 
     [Fact]
@@ -2898,12 +3155,14 @@ public sealed class MainViewModelTests
     public void TaxiPickup_FilthyCar_RefusesTheRideAndLosesFriendship()
     {
         // Unity's pickup refusal at filth 25: no ride, no receipt, familiarity
-        // with the drawn customer drops 1 and the page shows the reason. The
-        // concentration -1 stays parked for item 06.
+        // with the drawn customer drops 1, concentration drops 1 and the page
+        // shows the reason.
         var garage = new Garage(TestRoadCars.Pool);
         garage.Add(TestRoadCars.Pool[0], week: 1).Filth.Add(25);
         var friends = new FakeFriendshipStore();
-        var (vm, _, _, _) = Create(speedKmh: 0f, garage: garage, friendships: friends);
+        var wallet = new DriverWallet();
+        var (vm, _, _, _) = Create(
+            speedKmh: 0f, garage: garage, friendships: friends, wallet: wallet);
 
         vm.TaxiShiftCommand.Execute(null);
         var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
@@ -2919,6 +3178,9 @@ public sealed class MainViewModelTests
         Assert.Contains(owner.Split(' ')[0], proposal.RefusalText, StringComparison.Ordinal);
         Assert.Equal(0, friends.GetLevel(owner)); // clamped, never negative
         Assert.Equal(25, garage.Current!.Filth.Value); // the refusal adds no dirt
+        // Unity HandleTooDirtyArrival: one concentration point per cancelled
+        // pickup.
+        Assert.Equal(19.0, wallet.Rating.Concentration);
 
         // A second ACCEPT on the same proposal and pickup repeats the message,
         // never the penalty (Unity's _tooDirtyArrived guard).
@@ -2926,6 +3188,7 @@ public sealed class MainViewModelTests
         vm.PickupCommand.Execute(null);
         Assert.Same(proposal, vm.CurrentScreen);
         Assert.Single(friends.Deltas);
+        Assert.Equal(19.0, wallet.Rating.Concentration);
     }
 
     [Fact]
@@ -2934,7 +3197,9 @@ public sealed class MainViewModelTests
         // Unity DeliveryJobHandler's store arrival, the delivery twin: a
         // completed run is +1 on the car driven now, banked with the settle.
         var catalog = new DeliveryCatalog(
-            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries")],
+            [new DeliveryStore(
+                "adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries",
+                new AddressLocation("Street 2", 5, HouseSide.Left))],
             0.7, 100);
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
@@ -2943,9 +3208,10 @@ public sealed class MainViewModelTests
         var garage = new Garage(TestRoadCars.Pool);
         garage.Add(TestRoadCars.Pool[0], week: 1);
         var store = new FakeGarageStore();
-        var (vm, _, _, _) = Create(
+        var hud = new FakeTelemetryHud();
+        var (vm, clock, tel, _) = Create(
             catalog: catalog, hubs: hubs, speedKmh: 0f,
-            garage: garage, garageStore: store);
+            garage: garage, garageStore: store, hud: hud);
         FinishIntro(vm).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
@@ -2955,6 +3221,10 @@ public sealed class MainViewModelTests
         hub.BackCommand.Execute(null);
         board.ToggleOrderCommand.Execute(board.Rows[0]);
         board.MainButtonCommand.Execute(null);
+
+        hud.RaiseJobEnter(); // load the freight at the hub
+        TaxiFlow.Drive(vm, clock, tel, 1.0);
+        hud.RaiseJobEnter(); // deliver the store
 
         Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(1, garage.Current!.Filth.Value);

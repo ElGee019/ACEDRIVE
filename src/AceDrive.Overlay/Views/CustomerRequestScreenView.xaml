@@ -3,10 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Customer request page (PORTPLAN 11, Unity CustomerRequestScreen):
-         the ask, the 14 s countdown, three quiz values or ACCEPT/DECLINE,
-         then feedback and BACK. The host ticks the countdown. The forced
-         speed challenge reuses the page without options; its delivery clock
-         is the Tourney face from the design. -->
+         the ask, the answer countdown (19 s), three quiz values or
+         ACCEPT/DECLINE, then feedback and BACK. A forced speed challenge
+         reuses the page as a short read-in: its delivery clock instead of
+         the answer countdown, no buttons, then it dismisses itself. The host
+         ticks the clocks. -->
     <UserControl.Resources>
         <FontFamily x:Key="TourneyThin">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Tourney Thin</FontFamily>
     </UserControl.Resources>
@@ -23,17 +24,17 @@
                        Visibility="{Binding RequestTextVisible, Converter={StaticResource BoolToVis}}"/>
             <TextBlock Text="{Binding TimeLine}"
                        TextAlignment="Center" Margin="0,0,0,10"
-                       Visibility="{Binding TimerVisible, Converter={StaticResource BoolToVis}}">
+                       Foreground="#FFBFC4C9" FontSize="12"
+                       Visibility="{Binding TimerVisible, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding DeliveryLine}"
+                       TextAlignment="Center" Margin="0,0,0,10"
+                       Visibility="{Binding DeliveryVisible, Converter={StaticResource BoolToVis}}">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
-                        <Setter Property="Foreground" Value="#FFBFC4C9"/>
-                        <Setter Property="FontSize" Value="12"/>
+                        <Setter Property="FontFamily" Value="{StaticResource TourneyThin}"/>
+                        <Setter Property="FontSize" Value="30"/>
+                        <Setter Property="Foreground" Value="#FFFFFFFF"/>
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsSpeedChallenge}" Value="True">
-                                <Setter Property="FontFamily" Value="{StaticResource TourneyThin}"/>
-                                <Setter Property="FontSize" Value="30"/>
-                                <Setter Property="Foreground" Value="#FFFFFFFF"/>
-                            </DataTrigger>
                             <DataTrigger Binding="{Binding SpeedChallengeLate}" Value="True">
                                 <Setter Property="Foreground" Value="#FFFF9E64"/>
                             </DataTrigger>

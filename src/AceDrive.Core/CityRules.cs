@@ -1,7 +1,7 @@
 // Balance table for the town's economy (PORTPLAN item 25, port of Unity's
 // StoreEconomyConfig asset): every edge the citizen tick compares against,
 // the cadence and the demand ladder live here, never in code. Stocked-unit
-// capacity stays per store in delivery_catalog.json (Unity's single
+// capacity is derived per store from the shop catalogue layout (Unity's single
 // defaultMaxStock became a per-store number in this port).
 namespace AceDrive.Core;
 

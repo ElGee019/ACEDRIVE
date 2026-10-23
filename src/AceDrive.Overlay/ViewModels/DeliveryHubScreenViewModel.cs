@@ -11,10 +11,12 @@ namespace AceDrive.Overlay.ViewModels;
 /// picks the list's next buyable hub (the narrow overlay stacks the lists
 /// vertically instead of Unity's side-by-side columns). Buying a hub
 /// connects that category's stores to the delivery board — Unity's map
-/// backfill, ported as the career's eligibility rule. There is no
-/// confirmation dialog: the enabled/disabled state of OPEN CAREER is the
-/// whole confirm (Unity HasSelectedCareer). Built fresh on every visit,
-/// like Unity's re-show: tier 1 active, nothing selected.
+/// backfill, ported as the career's eligibility rule — and hands the new
+/// owned record to the host, which places the hub's pickup door before the
+/// stores draw theirs. There is no confirmation dialog: the enabled/disabled
+/// state of OPEN CAREER is the whole confirm (Unity HasSelectedCareer). Built
+/// fresh on every visit, like Unity's re-show: tier 1 active, nothing
+/// selected.
 /// Voice parity with the board: every button answers to its text.
 /// </summary>
 public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
@@ -30,6 +32,9 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     private readonly ILog _log;
     private readonly VoiceBeat _beat;
     private readonly Action _goBack;
+    // The host's map side of a purchase: the hub's pickup door is placed
+    // here, before the backfill stores draw their own free addresses.
+    private readonly Action<OwnedHub>? _hubOpened;
     private readonly RelayCommand _openCareer;
     private int _tierIndex;
     private int _selectedCareer = -1;
@@ -38,13 +43,15 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     public DeliveryHubScreenViewModel(
         DeliveryCareer career, DeliveryCatalog board, CityEconomy city, ILog log,
         ICommand backCommand,
-        VoiceBeat beat)
+        VoiceBeat beat,
+        Action<OwnedHub>? hubOpened = null)
     {
         _career = career;
         _board = board;
         _city = city;
         _log = log;
         _beat = beat;
+        _hubOpened = hubOpened;
         _goBack = () => backCommand.Execute(null);
 
         ChooseTierCommand = new ParameterizedCommand<HubTierCell>(ChooseTier);
@@ -138,6 +145,9 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         if (!_career.TryOpenCareer(tier.Id, _selectedCareer, _selectedLevel)) return;
 
         _log.LogInfo($"career opened: {name} ({chosen.Id}) CredP left {_career.CredP:0}");
+        // The newly owned record is the one just appended: the host pins its
+        // pickup door before any backfilled store draws an address.
+        _hubOpened?.Invoke(_career.Owned[^1]);
         ClearSelection();
         Rebuild();
     }

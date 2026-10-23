@@ -49,9 +49,10 @@ public interface ITelemetryHud
     PointOfInterest? CurrentDestination { get; }
 
     /// <summary>
-    /// Pins one taxi leg on the HUD or clears it with null when the job ends.
-    /// Job guidance wins over a story destination; the wrong-car warning still
-    /// wins over both. Called on phase changes, never per poll.
+    /// Pins one job leg (taxi or delivery) on the HUD or clears it with null
+    /// when the job ends. Job guidance wins over a story destination; the
+    /// wrong-car warning still wins over both. Called on phase changes, never
+    /// per poll.
     /// </summary>
     void SetJobGuidance(HudJobGuidance? guidance);
 
@@ -117,8 +118,9 @@ public interface ITelemetryHud
 
     /// <summary>
     /// Raised when the player taps ENTER while parked at the pinned job door.
-    /// The host decides whether that confirms a pickup or a drop-off; the HUD
-    /// only knows which leg it painted.
+    /// The host decides what that confirms — the taxi pickup/drop-off or a
+    /// delivery hub pickup/store drop-off; the HUD only knows which leg it
+    /// painted.
     /// </summary>
     event EventHandler? JobEnterRequested;
 }

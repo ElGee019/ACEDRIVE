@@ -63,6 +63,15 @@ public sealed class PoiDirectory
         !string.IsNullOrWhiteSpace(id) && _byId.ContainsKey(id);
 
     /// <summary>
+    /// The door with this stable id, or null when it is not known yet. The
+    /// delivery pickup leg uses it to turn an owned hub into a destination.
+    /// </summary>
+    public PointOfInterest? Find(string? id) =>
+        !string.IsNullOrWhiteSpace(id) && _byId.TryGetValue(id, out PointOfInterest? poi)
+            ? poi
+            : null;
+
+    /// <summary>
     /// The page's view: every known door sorted by display name, then id, so
     /// two businesses with the same name still have a stable order.
     /// </summary>

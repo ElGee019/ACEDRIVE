@@ -195,6 +195,21 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
+    public void RatingSkillEvents_RideTheSnapshot()
+    {
+        var wallet = new DriverWallet(new DriverState(0, 0));
+
+        wallet.AddCornering(1.0);
+        wallet.AddConcentration(-1.0);
+        wallet.AddOffTheLine(2.0);
+
+        DriverState snapshot = wallet.Snapshot();
+        Assert.Equal(21.0, snapshot.Cornering);
+        Assert.Equal(19.0, snapshot.Concentration);
+        Assert.Equal(22.0, snapshot.OffTheLine);
+    }
+
+    [Fact]
     public void Snapshot_RoundTrips()
     {
         var wallet = new DriverWallet(new DriverState(100.0, 5.0));

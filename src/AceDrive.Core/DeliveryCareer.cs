@@ -91,9 +91,12 @@ public sealed class DeliveryCareer
         if (IsOwned(level!.Name) || CredP < level.Cost) return false;
 
         // Unity numbers the owned level from 1 (its CredP ramp indexes by it).
+        // Key mirrors Unity's category_slug id so the hub's map door and the
+        // owned record share one identity.
         _owned.Add(new OwnedHub(
             level.Name, career!.Id, level.Cost, tierId, levelIndex + 1,
-            HubOwnerNames.Pick(level.Name, Hubs.OwnersInForce)));
+            HubOwnerNames.Pick(level.Name, Hubs.OwnersInForce),
+            HubKey(career.Id, level.Name)));
         CredP -= level.Cost;
         return true;
     }
@@ -110,7 +113,7 @@ public sealed class DeliveryCareer
     /// </summary>
     public DeliveryEarning RegisterDelivery(string category)
     {
-        if (NewestOwned(category) is not { } hub)
+        if (OwnedFor(category) is not { } hub)
         {
             return new DeliveryEarning("", 0);
         }
@@ -122,10 +125,13 @@ public sealed class DeliveryCareer
         return new DeliveryEarning(hub.OwnerName, earned);
     }
 
-    // The purchase that supplies the category is the newest one: buying a
-    // further level of a career is the player's upgrade, so the goods source
-    // moves with it (Unity leaves the old contract behind on the map).
-    private OwnedHub? NewestOwned(string category)
+    /// <summary>
+    /// The newest hub that supplies the category, or null when none is owned.
+    /// Buying a further level of a career is the player's upgrade, so the
+    /// goods source moves with it (Unity leaves the old contract behind on
+    /// the map). The delivery planner pins this hub's door for the pickup leg.
+    /// </summary>
+    public OwnedHub? OwnedFor(string category)
     {
         for (int i = _owned.Count - 1; i >= 0; i--)
         {
@@ -139,7 +145,13 @@ public sealed class DeliveryCareer
     /// credits. Empty when no owned hub supplies the category. Read-only so a
     /// failed trip (a breakdown) can charge familiarity without crediting the
     /// ramp.</summary>
-    public string OwnerFor(string category) => NewestOwned(category)?.OwnerName ?? "";
+    public string OwnerFor(string category) => OwnedFor(category)?.OwnerName ?? "";
+
+    // Unity's hub id: "<category>_<name with spaces as underscores>". The
+    // same string becomes the POI id, so the pickup leg resolves the door by
+    // the owned hub alone.
+    private static string HubKey(string category, string name) =>
+        $"{category}_{name.ToLowerInvariant().Replace(' ', '_')}";
 
     private bool TryResolve(
         int tierId, int careerIndex, int levelIndex,

@@ -49,6 +49,7 @@ public sealed class OnboardingTests
             new Hunger(HungerRules.Default), new FakeHungerStore(),
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             new PoiDirectory(), new FakePoiDirectoryStore(),
             new PoiSpawner(
@@ -249,6 +250,7 @@ public sealed class OnboardingTests
             new Hunger(HungerRules.Default), new FakeHungerStore(),
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             new PoiDirectory(), new FakePoiDirectoryStore(),
             new PoiSpawner(

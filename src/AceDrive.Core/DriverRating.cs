@@ -60,4 +60,48 @@ public readonly record struct DriverRating(
         }
         return Math.Clamp(value, MinValid, MaxStat);
     }
+
+    /// <summary>
+    /// Unity DriverRatingService.ApplyCorneringDelta: moves one skill by the
+    /// delta and clamps back into the legal band. A non-finite delta is
+    /// ignored rather than resetting the stat to the floor (ClampStat's
+    /// fallback is meant for broken SAVES, never for a live event).
+    /// </summary>
+    public DriverRating AddCornering(double delta) =>
+        double.IsFinite(delta)
+            ? this with { Cornering = ClampStat(Cornering + delta) }
+            : this;
+
+    /// <summary>Unity DriverRatingService.ApplyConcentrationDelta.</summary>
+    public DriverRating AddConcentration(double delta) =>
+        double.IsFinite(delta)
+            ? this with { Concentration = ClampStat(Concentration + delta) }
+            : this;
+
+    /// <summary>Unity DriverRatingService.ApplyOffTheLineDelta.</summary>
+    public DriverRating AddOffTheLine(double delta) =>
+        double.IsFinite(delta)
+            ? this with { OffTheLine = ClampStat(OffTheLine + delta) }
+            : this;
+
+    /// <summary>
+    /// Unity ApplyRandomSkillDelta: hands the delta to one randomly chosen
+    /// skill (the daily-streak tail). System.Random stands in for
+    /// UnityEngine.Random; the caller owns the seeded instance, so the roll is
+    /// reproducible in tests.
+    /// </summary>
+    public DriverRating AddRandomSkill(Random rng, double delta)
+    {
+        if (!double.IsFinite(delta))
+        {
+            return this;
+        }
+
+        return rng.Next(3) switch
+        {
+            0 => AddCornering(delta),
+            1 => AddConcentration(delta),
+            _ => AddOffTheLine(delta),
+        };
+    }
 }

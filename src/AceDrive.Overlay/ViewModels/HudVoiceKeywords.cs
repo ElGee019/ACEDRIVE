@@ -18,12 +18,15 @@ internal static class HudVoiceKeywords
     // which one the microphone will land.
     private static readonly string[] PickUp = ["enter", "pick up", "pickup"];
     private static readonly string[] DropOff = ["enter", "drop off", "dropoff"];
+    // Delivery's two actions: loading the freight and unloading it at a store.
+    private static readonly string[] Deliver = ["enter", "deliver", "deliver items"];
 
     /// <summary>Keywords for one action resource key; unknown keys answer "enter".</summary>
     public static IReadOnlyList<string> For(string actionKey) => actionKey switch
     {
-        "HudPickUp" or "HudJobPickupAction" => PickUp,
+        "HudPickUp" or "HudJobPickupAction" or "HudDeliveryHubAction" => PickUp,
         "HudJobDropoffAction" => DropOff,
+        "HudDeliveryStoreAction" => Deliver,
         _ => Enter,
     };
 }

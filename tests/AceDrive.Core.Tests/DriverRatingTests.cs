@@ -47,4 +47,43 @@ public sealed class DriverRatingTests
         Assert.Equal(44.0, rating.Concentration);
         Assert.Equal(100.0, rating.OffTheLine);
     }
+
+    [Fact]
+    public void SkillDeltas_MoveOneStatAndStayLegal()
+    {
+        DriverRating rating = new(50.0, 50.0, 50.0);
+
+        Assert.Equal(51.0, rating.AddCornering(1.0).Cornering);
+        Assert.Equal(51.0, rating.AddConcentration(1.0).Concentration);
+        Assert.Equal(51.0, rating.AddOffTheLine(1.0).OffTheLine);
+        // Only the moved stat changes.
+        Assert.Equal(50.0, rating.AddCornering(1.0).Concentration);
+
+        Assert.Equal(100.0, rating.AddCornering(80.0).Cornering);
+        Assert.Equal(11.01, rating.AddCornering(-80.0).Cornering);
+    }
+
+    [Fact]
+    public void SkillDeltas_IgnoreANonFiniteDelta()
+    {
+        // A broken event must never reset a skill to the ClampStat fallback.
+        DriverRating rating = new(50.0, 50.0, 50.0);
+
+        Assert.Equal(rating, rating.AddCornering(double.NaN));
+        Assert.Equal(rating, rating.AddRandomSkill(new Random(0), double.PositiveInfinity));
+    }
+
+    [Fact]
+    public void AddRandomSkill_LandsOnExactlyOneSkill()
+    {
+        DriverRating rating = DriverRating.NewGame;
+        var rng = new Random(7);
+
+        DriverRating moved = rating.AddRandomSkill(rng, 1.0);
+
+        double sum = moved.Cornering + moved.Concentration + moved.OffTheLine;
+        Assert.Equal(61.0, sum, precision: 9);
+        Assert.Equal(1, new[] { moved.Cornering, moved.Concentration, moved.OffTheLine }
+            .Count(stat => stat == 21.0));
+    }
 }

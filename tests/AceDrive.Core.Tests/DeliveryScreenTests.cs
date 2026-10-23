@@ -166,16 +166,14 @@ public sealed class DeliveryScreenTests
     }
 
     [Fact]
-    public void Deliver_FillsTheOrderedShelvesAndEmptiesTheCart()
+    public void Deliver_HandsTheRunOffAndEmptiesTheCart()
     {
         var (vm, log, fired, _, runs) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
         vm.MainButtonCommand.Execute(null);
 
-        // The drive is skipped (no Eifel address table yet): the drop-off
-        // completes on the tap, so the ordered store prints full while its
-        // neighbour keeps draining, and the run hands the job straight to
-        // the receipt settle (the taxi ACCEPT skip's delivery twin).
+        // The tap only starts the run: the host owns the drive and fills each
+        // shelf at the stop, so the board must not change yet.
         Assert.True(fired[1]);
         // The run carries the job's money exactly as the cart staged it:
         // wholesale out (49.00), retail payout of the live pre-restock
@@ -185,33 +183,33 @@ public sealed class DeliveryScreenTests
         Assert.Equal(49.00, run.PaidForGoods);
         Assert.Equal(63.00, run.ReceivedForGoods);
         DeliveryRow post = Row(vm, "adenau-post");
-        Assert.Equal("40 / 40 units", post.UnitsLine);
-        Assert.Equal("100%", post.PercentLine);
-        Assert.Equal("▲ +2 citizen / hr", post.GrowthLine);
+        Assert.Equal("12 / 40 units", post.UnitsLine);
+        Assert.Equal("30%", post.PercentLine);
+        Assert.Equal("▼ -1 citizen / hr", post.GrowthLine);
         Assert.Equal("6 / 40 units", Row(vm, "nurburg-kiosk").UnitsLine);
 
-        // A delivered order is a fulfilled order: the page flips back to its
-        // intro copy instead of holding a cart nothing will pick up.
+        // The cart became a live run, so the page flips back to its intro copy
+        // instead of holding an order nothing will pick up.
         Assert.Equal(0.0, vm.CartTotal);
         Assert.Equal("OPEN NEW CAREER", vm.MainButtonLabel);
         Assert.Equal("BACK", vm.BackButtonLabel);
-        Assert.Contains("orders delivered: €49.00 -> Adenau Post at full stock",
+        Assert.Contains("delivery run started: €49.00 -> Adenau Post",
             string.Join("|", log.Infos), StringComparison.Ordinal);
     }
 
     [Fact]
-    public void Deliver_HeaderFollowsTheRestockedBand()
+    public void Deliver_LeavesTheTownAloneUntilTheStopsAreServed()
     {
-        // The town's growth is read off the shelves, so the header answers to
-        // the delivery without a second call: the kiosk flips the total from
-        // -1/hr (-1, -2, +2) to +3/hr (-1, +2, +2).
+        // The town's growth is read off the shelves, so starting the run
+        // changes nothing: the kiosk is still empty and the header still
+        // reads -1/hr until the host serves that stop.
         var (vm, _, _, _, _) = Create();
         Assert.Equal("City growth: ▼ -1 / hr", vm.CityGrowthLine);
 
         vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
         vm.MainButtonCommand.Execute(null);
 
-        Assert.Equal("City growth: ▲ +3 / hr", vm.CityGrowthLine);
+        Assert.Equal("City growth: ▼ -1 / hr", vm.CityGrowthLine);
         Assert.Equal("Current citizens: 300", vm.CitizensLine);
     }
 

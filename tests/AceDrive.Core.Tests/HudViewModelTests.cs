@@ -634,6 +634,36 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void DeliveryGuidance_HubAndStoreEachAnswerTheirOwnWords()
+    {
+        // PORTPLAN 19: the delivery companion reuses the job guidance but its
+        // two action keys carry their own copy and English voice words.
+        var vm = Create();
+        var door = new AddressLocation("Street 1", 5, HouseSide.Right);
+
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Grocers and Sons", door,
+            "HudDeliveryHubDrive", "HudDeliveryHubArrived",
+            "HudDeliveryHubAction", 25.0));
+
+        Assert.StartsWith("Drive to Grocers and Sons", vm.DestinationText, StringComparison.Ordinal);
+        Assert.Equal("PICK UP THE GOODS", vm.EnterText);
+        Assert.Contains("pick up", vm.EnterKeywords);
+        Assert.DoesNotContain("deliver", vm.EnterKeywords);
+
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Adenau Post", door,
+            "HudDeliveryStoreDrive", "HudDeliveryStoreArrived",
+            "HudDeliveryStoreAction", 25.0));
+
+        Assert.StartsWith("Deliver to Adenau Post", vm.DestinationText, StringComparison.Ordinal);
+        Assert.Equal("DELIVER ITEMS", vm.EnterText);
+        Assert.Contains("deliver", vm.EnterKeywords);
+        Assert.Contains("deliver items", vm.EnterKeywords);
+        Assert.DoesNotContain("pick up", vm.EnterKeywords);
+    }
+
+    [Fact]
     public void PersonDestination_AnswersToPickUp()
     {
         var vm = Create();

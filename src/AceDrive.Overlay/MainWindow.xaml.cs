@@ -213,8 +213,13 @@ public partial class MainWindow : Window
     // the mouse, so a row's press tunnels through this window's preview
     // handler. DragMove() there steals the click and the row only commits on
     // Enter; letting the row keep it is what selects on a normal click.
+    // TextBoxBase matters the same way: the opening name, bank amount and job
+    // radius fields need the click to place the caret. DragMove() swallowed
+    // that press and started a window drag instead, so the field never got
+    // keyboard focus and typing went to the game (the new-game name stayed
+    // unchanged and its availability check never ran).
     private static bool OwnsClick(DependencyObject source) =>
-        source is ButtonBase or ComboBoxItem;
+        source is ButtonBase or TextBoxBase or ComboBoxItem;
 
     private void OnDragMove(object sender, MouseButtonEventArgs e)
     {

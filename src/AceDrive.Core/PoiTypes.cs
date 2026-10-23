@@ -50,4 +50,8 @@ public static class PoiTypes
 
     /// <summary>The insurance broker (PORTPLAN 34).</summary>
     public const string Insurance = "insurance";
+
+    /// <summary>A wholesale hub's pickup door (Unity's "hub" family): the
+    /// delivery run loads the cart's freight here (PORTPLAN 19).</summary>
+    public const string Hub = "hub";
 }

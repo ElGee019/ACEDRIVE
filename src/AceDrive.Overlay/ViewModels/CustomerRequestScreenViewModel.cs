@@ -6,14 +6,14 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The customer request interstitial (PORTPLAN item 11, port of Unity
-/// CustomerRequestScreen): a suffix-triggered passive ask, a forced speed
-/// challenge or a three-option car-stat quiz. Passive and quiz asks run on
-/// the 14 s answer countdown; the speed challenge has no answer, so its page
-/// shows the host's delivery deadline instead and never times out. The page
-/// only reports the outcome; the host copies it onto the job, banks the quiz
-/// history and opens the drop-off guidance when BACK closes the page. The
-/// timer is ticked from <c>MainViewModel.Poll</c>, never a private dispatcher
-/// timer (AGENTS.md: one loop).
+/// CustomerRequestScreen): a suffix-triggered passive ask or a three-option
+/// car-stat quiz, both on the table's answer countdown (19 s in shipped
+/// data). A forced speed challenge is already agreed, so its page is a short
+/// read-in that shows the delivery clock and closes itself: no answer
+/// countdown and no button. The page only reports the outcome; the host
+/// copies it onto the job, banks the quiz history and restores the drop-off
+/// guidance. The timer is ticked from <c>MainViewModel.Poll</c>, never a
+/// private dispatcher timer (AGENTS.md: one loop).
 /// </summary>
 public sealed class CustomerRequestScreenViewModel :
     ViewModelBase, IVoiceScreen, IJobsScreen, IKeepPanelOpen
@@ -25,6 +25,7 @@ public sealed class CustomerRequestScreenViewModel :
     private readonly DateTime _deadline;
     private readonly bool _speedChallenge;
     private readonly DateTime? _speedDeadline;
+    private readonly DateTime? _speedDismissAt;
     private IReadOnlyList<CustomerRequestOption> _options = [];
     private CustomerRequestOutcome _outcome = CustomerRequestOutcome.None;
     private bool _finished;
@@ -33,7 +34,7 @@ public sealed class CustomerRequestScreenViewModel :
     public CustomerRequestScreenViewModel(
         CustomerRequest request, string customerName, int timerSeconds,
         IClock clock, VoiceBeat beat, Action<CustomerRequestOutcome> onFinished,
-        DateTime? speedDeadline = null)
+        DateTime? speedDeadline = null, TimeSpan? speedReadIn = null)
     {
         _request = request;
         _beat = beat;
@@ -43,16 +44,16 @@ public sealed class CustomerRequestScreenViewModel :
         _speedDeadline = speedDeadline;
         CustomerName = customerName;
         _deadline = clock.UtcNow.AddSeconds(_timerSeconds);
+        RemainingSeconds = _timerSeconds;
         if (_speedChallenge)
         {
-            TimerVisible = _speedDeadline is not null;
-            RemainingSeconds = RemainingAt(clock.UtcNow);
-            SpeedChallengeLate = _speedDeadline is { } deadline
-                && deadline < clock.UtcNow;
-        }
-        else
-        {
-            RemainingSeconds = _timerSeconds;
+            // A forced challenge asks nothing: no answer clock and no button,
+            // just the delivery deadline and a read-in that closes the page.
+            TimerVisible = false;
+            _speedDismissAt = speedReadIn is { } readIn
+                ? clock.UtcNow + readIn
+                : null;
+            RefreshDeliveryClock(clock.UtcNow);
         }
 
         BackCommand = new RelayCommand(Back);
@@ -60,12 +61,13 @@ public sealed class CustomerRequestScreenViewModel :
         RebuildVoice();
     }
 
-    /// <summary>True for the forced speed challenge: no ACCEPT/DECLINE, and
-    /// the page's clock is the delivery deadline instead of the answer timer.</summary>
+    /// <summary>True for the forced speed challenge: no answer countdown, no
+    /// options and no BACK; the page dismisses itself after its read-in while
+    /// the delivery clock keeps running.</summary>
     public bool IsSpeedChallenge => _speedChallenge;
 
     /// <summary>True once the delivery deadline has passed, so the page can
-    /// paint the countdown line in its warning colour.</summary>
+    /// paint the deadline line in its warning colour.</summary>
     public bool SpeedChallengeLate
     {
         get => _speedChallengeLate;
@@ -73,11 +75,15 @@ public sealed class CustomerRequestScreenViewModel :
         {
             if (SetField(ref _speedChallengeLate, value))
             {
-                OnPropertyChanged(nameof(TimeLine));
+                OnPropertyChanged(nameof(DeliveryLine));
             }
         }
     }
     private bool _speedChallengeLate;
+
+    /// <summary>True when the forced challenge's delivery deadline is drawn
+    /// on its read-in page (never for a passive ask or a quiz).</summary>
+    public bool DeliveryVisible => _speedChallenge && _speedDeadline is not null;
 
     /// <summary>The drawn passenger's full identity (the host's copy is the
     /// same one the proposal and receipt use).</summary>
@@ -88,8 +94,8 @@ public sealed class CustomerRequestScreenViewModel :
     /// <summary>The ask hides once the request ends: the feedback line
     /// replaces the question instead of sitting underneath it. That covers the
     /// suffix-triggered passive ask as well, whose "I'll tip you when we
-    /// arrive" answer would otherwise leave the request line above it. Only
-    /// the forced speed challenge keeps its line, and it never ends here.</summary>
+    /// arrive" answer would otherwise leave the request line above it. The
+    /// forced speed challenge keeps its line; its page never enters feedback.</summary>
     public bool RequestTextVisible
     {
         get => _requestTextVisible;
@@ -110,29 +116,23 @@ public sealed class CustomerRequestScreenViewModel :
     }
     private int _remainingSeconds;
 
-    /// <summary>Unity's "TIME REMAINING: {0}s" line for an answer, or the
-    /// speed challenge's delivery clock once that request is up.</summary>
-    public string TimeLine
-    {
-        get
-        {
-            if (!_speedChallenge)
-            {
-                return Strings.Format("RequestTime", RemainingSeconds);
-            }
+    /// <summary>The passive ask's and quiz's answer countdown ("TIME
+    /// REMAINING: {0}s"), Unity's quiz line; hidden on the forced challenge.</summary>
+    public string TimeLine => Strings.Format("RequestTime", RemainingSeconds);
 
-            if (_speedDeadline is null)
-            {
-                return string.Empty;
-            }
-
-            return SpeedChallengeLate
+    /// <summary>The forced challenge's delivery clock (mm:ss or TOO LATE);
+    /// empty for the passive ask and the quiz.</summary>
+    public string DeliveryLine =>
+        !DeliveryVisible
+            ? string.Empty
+            : SpeedChallengeLate
                 ? Strings.Get("SpeedChallengeLate")
-                : Strings.Format("SpeedChallengeTime", ClockText(RemainingSeconds));
-        }
-    }
+                : Strings.Format("SpeedChallengeTime", ClockText(_deliverySeconds));
 
-    /// <summary>Shown until the request is answered or times out.</summary>
+    private int _deliverySeconds;
+
+    /// <summary>Shown until the passive ask is answered/timed out; the forced
+    /// challenge draws its delivery clock instead.</summary>
     public bool TimerVisible { get => _timerVisible; private set => SetField(ref _timerVisible, value); }
     private bool _timerVisible = true;
 
@@ -173,7 +173,8 @@ public sealed class CustomerRequestScreenViewModel :
     }
     private bool _feedbackPositive;
 
-    /// <summary>BACK appears only after answering or the timeout fires.</summary>
+    /// <summary>BACK appears only after answering or the timeout fires (never
+    /// on the forced challenge, which has no button).</summary>
     public bool ShowBack { get => _showBack; private set => SetField(ref _showBack, value); }
     private bool _showBack;
 
@@ -187,28 +188,27 @@ public sealed class CustomerRequestScreenViewModel :
         new Dictionary<string, Action>();
 
     /// <summary>
-    /// Advances the countdown on integer seconds. Called at 10 Hz by the
-    /// host; a due timeout finishes an answer request exactly once and waits
-    /// for BACK to report it, so the host never loses a timed-out quiz. The
-    /// speed challenge only repaints its delivery clock.
+    /// Advances the clocks on integer seconds. Called at 10 Hz by the host: a
+    /// passive ask or quiz that runs out finishes exactly once and waits for
+    /// BACK to report it (so the host never loses a timed-out ask). The forced
+    /// challenge has nothing to answer: it repaints its delivery clock and
+    /// reports the agreed outcome when its read-in ends, which restores the
+    /// task text with the same clock still running.
     /// </summary>
     public void Tick(DateTime now)
     {
-        if (_speedChallenge)
+        if (_finished)
         {
-            // The speed challenge is already accepted; its clock is the
-            // delivery deadline, not the answer countdown, so it never times
-            // the page out or changes the outcome.
-            if (_speedDeadline is not null)
-            {
-                RemainingSeconds = RemainingAt(now);
-                SpeedChallengeLate = _speedDeadline < now;
-            }
             return;
         }
 
-        if (_finished)
+        if (_speedChallenge)
         {
+            RefreshDeliveryClock(now);
+            if (_speedDismissAt is { } dismissAt && now >= dismissAt)
+            {
+                FinishSpeedChallenge();
+            }
             return;
         }
 
@@ -221,6 +221,35 @@ public sealed class CustomerRequestScreenViewModel :
         {
             Timeout();
         }
+    }
+
+    // The speed challenge's delivery deadline: its own clock, repainted on
+    // whole seconds, never part of the answer window.
+    private void RefreshDeliveryClock(DateTime now)
+    {
+        if (_speedDeadline is null)
+        {
+            return;
+        }
+
+        _deliverySeconds = RemainingAt(now);
+        SpeedChallengeLate = _speedDeadline < now;
+        OnPropertyChanged(nameof(DeliveryLine));
+    }
+
+    // The forced challenge's read-in is over: report the agreed outcome once.
+    // The host restores the drop-off guidance, carrying the same deadline the
+    // page was showing, so the countdown continues without a second page.
+    private void FinishSpeedChallenge()
+    {
+        if (_reported)
+        {
+            return;
+        }
+
+        _finished = true;
+        _reported = true;
+        _onFinished(CustomerRequestGrader.Accept(_request));
     }
 
     private int RemainingAt(DateTime now)
@@ -241,9 +270,10 @@ public sealed class CustomerRequestScreenViewModel :
     {
         if (_speedChallenge)
         {
-            // Forced challenge: the customer does not ask, so there is nothing
-            // to accept or decline. BACK only returns to the driving guidance.
-            ShowBack = true;
+            // Forced challenge: the customer does not ask, so there is
+            // nothing to accept or decline and no button to close a page
+            // that dismisses itself after its read-in.
+            ShowBack = false;
             Options = [];
             return;
         }
@@ -324,27 +354,14 @@ public sealed class CustomerRequestScreenViewModel :
         RebuildVoice();
     }
 
-    // The one path back: a click and the voice tap's deferred end both land
-    // here, so the glow clears on the way out and the host hears the outcome
-    // exactly once.
+    // The one path back for an answered ask: a click and the voice tap's
+    // deferred end both land here, so the glow clears on the way out and the
+    // host hears the outcome exactly once. The forced challenge has no BACK:
+    // its own read-in reports the outcome.
     private void Back()
     {
         BackFlash = false;
-        if (_reported)
-        {
-            return;
-        }
-
-        if (_speedChallenge)
-        {
-            // The forced challenge was accepted at the pickup; BACK only
-            // dismisses its page. Report the same outcome the old ACCEPT did.
-            _reported = true;
-            _onFinished(CustomerRequestGrader.Accept(_request));
-            return;
-        }
-
-        if (!_finished)
+        if (_reported || !_finished)
         {
             return;
         }

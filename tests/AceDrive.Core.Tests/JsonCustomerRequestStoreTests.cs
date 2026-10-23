@@ -133,7 +133,7 @@ public sealed class JsonCustomerRequestStoreTests
             new JsonNamePoolStore(Path.Combine(data, "name_pools.json"), log).Load();
 
         Assert.Empty(log.Warnings);
-        Assert.Equal(14, table.TimerSeconds);
+        Assert.Equal(19, table.TimerSeconds);
         Assert.Equal(49, table.SuffixRequests.Count);
         Assert.Equal(6, table.QuestionCategories.Count);
         Assert.Equal(6, table.QuestionCategories.Select(c => c.Stat).Distinct().Count());

@@ -25,6 +25,8 @@ public sealed class PlacedStoreTests
         Assert.Equal("Marco's Grocery", row.Name);
         Assert.Equal("Marco Bianchi", row.Owner);
         Assert.Equal("groceries", row.Category);
+        // The POI's door is the delivery destination: no second address table.
+        Assert.Equal(new AddressLocation("Street 1", 4, HouseSide.Left), row.Address);
         // Default layout: 8 groceries + 2 coffee beans, 20 units per slot.
         Assert.Equal(200, row.UnitCapacity);
         Assert.Equal(200, row.StockedUnits);
@@ -55,10 +57,14 @@ public sealed class PlacedStoreTests
     }
 
     [Fact]
-    public void MaxsStoryShop_AndBusinessDoors_AreNotPlacedRows()
+    public void MaxsStoryShop_IsTheRealGroceryRow_BusinessDoorsAreNot()
     {
-        Assert.Null(PlacedStore.Row(
-            Store("max-grocery", PoiTypes.Grocery, "groceries"), StoreCatalog.Default));
+        DeliveryStore? max = PlacedStore.Row(
+            Store("max-grocery", PoiTypes.Grocery, "groceries", "Max's Grocery Store"),
+            StoreCatalog.Default);
+        Assert.NotNull(max);
+        Assert.Equal("max-grocery", max.Key);
+        Assert.Equal("groceries", max.Category);
         Assert.Null(PlacedStore.Row(
             Store("bank_0", PoiTypes.Bank, ""), StoreCatalog.Default));
     }
@@ -78,19 +84,26 @@ public sealed class PlacedStoreTests
     }
 
     [Fact]
-    public void Rows_KeepsOnlyGeneratedStores_InDirectoryOrder()
+    public void Rows_KeepsEveryRealShopDoor_InDirectoryOrder()
     {
+        var catalog = new StoreCatalog(
+            [
+                new StoreItem("BANANA", 2.0, 0.3, 4, "groceries"),
+                new StoreItem("BEANS", 10.0, 0.1, 0, "coffee_beans"),
+            ],
+            DefaultStock: 20);
         var pois = new List<PointOfInterest>
         {
-            Store("max-grocery", PoiTypes.Grocery, "groceries"),
+            Store("max-grocery", PoiTypes.Grocery, "groceries", "Max's Grocery Store"),
             Store("bank_0", PoiTypes.Bank, ""),
             Store("grocery_store_0", PoiTypes.GroceryStore, "groceries"),
             Store("coffee_shop_0", PoiTypes.CoffeeShop, "coffee_beans"),
         };
 
-        IReadOnlyList<DeliveryStore> rows = PlacedStore.Rows(pois, StoreCatalog.Default);
+        IReadOnlyList<DeliveryStore> rows = PlacedStore.Rows(pois, catalog);
 
-        Assert.Equal(["grocery_store_0"], rows.Select(row => row.Key));
+        Assert.Equal(["max-grocery", "grocery_store_0", "coffee_shop_0"],
+            rows.Select(row => row.Key));
     }
 
     [Fact]

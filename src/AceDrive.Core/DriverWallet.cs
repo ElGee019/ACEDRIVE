@@ -47,9 +47,25 @@ public sealed class DriverWallet
     public double Xp { get; private set; }
 
     /// <summary>The persisted driver-rating skills (Unity PlayerData's three
-    /// driver* fields). The wallet screen shows them and the haul/insurance
-    /// math reads the overall; no skill event mutates them yet.</summary>
-    public DriverRating Rating { get; }
+    /// driver* fields). Skill events move them through the Add* helpers below;
+    /// the wallet screen shows them and the haul/insurance math reads the
+    /// overall.</summary>
+    public DriverRating Rating { get; private set; }
+
+    /// <summary>Unity DriverRatingService.ApplyCorneringDelta: a skill event
+    /// moves one stat (clamped) and the next SaveDriver banks it.</summary>
+    public void AddCornering(double delta) => Rating = Rating.AddCornering(delta);
+
+    /// <summary>Unity DriverRatingService.ApplyConcentrationDelta.</summary>
+    public void AddConcentration(double delta) => Rating = Rating.AddConcentration(delta);
+
+    /// <summary>Unity DriverRatingService.ApplyOffTheLineDelta.</summary>
+    public void AddOffTheLine(double delta) => Rating = Rating.AddOffTheLine(delta);
+
+    /// <summary>Unity ApplyRandomSkillDelta: the streak tail's one random
+    /// skill point, rolled on the caller's seeded RNG.</summary>
+    public void AddRandomSkill(Random rng, double delta) =>
+        Rating = Rating.AddRandomSkill(rng, delta);
 
     /// <summary>The savings-bank balance (Unity PlayerData.bankAmount).
     /// Interest accrues here and compounds; job payouts land in Cash.</summary>

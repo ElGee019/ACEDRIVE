@@ -41,8 +41,8 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // keys the story hands over, never sentences, so it repaints with the rest.
     private PointOfInterest? _destination;
     private HudDestinationCopy? _copy;
-    // The active taxi leg, when any: it replaces the story destination in the
-    // banner until the job settles.
+    // The active job leg, when any (taxi or delivery): it replaces the story
+    // destination in the banner until the job settles.
     private HudJobGuidance? _jobGuidance;
     private bool _hasDestination;
     private bool _atDestination;
@@ -182,9 +182,9 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public IReadOnlyList<string> EnterKeywords => _enterKeywords;
 
     /// <summary>
-    /// Remaining distance to the pinned leg ("120 m"/"1.4 km") — a taxi job or
-    /// an intro drive — empty when no leg is up or the live sample has no
-    /// track position.
+    /// Remaining distance to the pinned leg ("120 m"/"1.4 km") — a taxi or
+    /// delivery leg, or an intro drive — empty when no leg is up or the live
+    /// sample has no track position.
     /// </summary>
     public string LegDistanceText => _legDistanceText;
 
@@ -662,8 +662,8 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // The distance line only repaints when the shown step moves: metres below
     // a kilometre (rules step), then tenths of a kilometre. The lookup and the
     // arithmetic are cheap enough for the 10 Hz poll; the format is not. It
-    // serves both leg kinds — a taxi job and an intro drive — so the driver
-    // always reads how far the pinned door is.
+    // serves every leg kind — a taxi or delivery job and an intro drive — so
+    // the driver always reads how far the pinned door is.
     private void UpdateLegDistance(TelemetrySample? sample, bool force)
     {
         if (PinnedTarget is not { } target

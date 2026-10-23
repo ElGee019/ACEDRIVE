@@ -124,7 +124,7 @@ annual every 364-371; failed annual roll = `engineBroken`; repair =
 
 Dirt: an int 0-25 per car, `+1` per completed taxi/delivery leg (never time/km),
 flat **CR50** wash clears it, filth 25 refuses a taxi pickup (−1 friendship,
-−1 concentration — the concentration half is parked for item 06).
+−1 concentration — both wired, the concentration half at the pickup refusal).
 
 Insurance: per car, `max(1, price × 0.0005 × 1.15 × (1 − driverRating/100))`
 charged nightly at 01:00 game time for every insured car (needs a saved
@@ -153,9 +153,9 @@ Port to ACEDRIVE:
       while driving past onboarding, and banks garage.json on a 60 s throttle
       beside the clock save.
 - [x] `CarFilth` (Core) + the `+1` hooks at the two settle sites + the wash
-      screen; the taxi refusal sits on ACCEPT until the driving slice gives
-      the pickup its own moment (concentration −1 and the wash owner's
-      friendship bump stay parked).
+      screen; the taxi refusal fires at the pickup door and now takes the
+      concentration −1 (item 06); the wash owner's friendship bump stays
+      parked.
 - [x] `InsuranceRules` + `InsurancePricing` (Core) + the per-car flag + the
       nightly charge (once per game date in the 01:00 hour, `ChargeUnavoidable`
       so a premium is a commitment and the ledger never goes negative) + the

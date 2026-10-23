@@ -53,6 +53,11 @@ public sealed class HubCareerTests
         // Unity numbers the owned level from 1: the CredP ramp indexes by it.
         Assert.Equal(1, hub.Tier);
         Assert.Equal(2, hub.Level);
+        // The map identity is Unity's category_slug id; the pickup leg resolves
+        // the hub's POI by exactly this key.
+        Assert.Equal("groceries_the_food_hub", hub.Key);
+        Assert.Same(hub, career.OwnedFor("groceries"));
+        Assert.Null(career.OwnedFor("coffee_beans"));
     }
 
     [Fact]
@@ -165,6 +170,17 @@ public sealed class HubCareerTests
         var none = new DeliveryCareer(HubCatalog.Default, 100);
         Assert.Equal(0, none.RegisterDelivery("groceries").CredPEarned);
         Assert.Equal("", none.RegisterDelivery("groceries").OwnerName);
+    }
+
+    [Fact]
+    public void OwnedFor_AnswersTheNewestHubOfTheCategory()
+    {
+        var career = Fresh(300);
+        Assert.True(career.TryOpenCareer(1, 0, 0));
+        Assert.True(career.TryOpenCareer(1, 0, 1));
+
+        Assert.Equal("The Food Hub", career.OwnedFor("groceries")!.Name);
+        Assert.Equal("groceries_the_food_hub", career.OwnedFor("groceries")!.Key);
     }
 
     [Fact]

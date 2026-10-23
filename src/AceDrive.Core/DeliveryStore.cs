@@ -11,7 +11,9 @@ namespace AceDrive.Core;
 /// is the fill the town starts with — the live shelf count is CityEconomy's.
 /// Category is the wholesale career that supplies the store (item 18):
 /// its stores stay off the board until a hub of that category is bought.
-/// No category means open content that never needed a career.
+/// No category means open content that never needed a career. Address is the
+/// door the delivery HUD pins: every real board row derives it from its shop
+/// POI, so there is no second address table.
 /// </summary>
 public sealed record DeliveryStore(
     string Key,
@@ -20,7 +22,8 @@ public sealed record DeliveryStore(
     int StockedUnits,
     int UnitCapacity,
     double PricePerUnit,
-    string Category = "")
+    string Category = "",
+    AddressLocation? Address = null)
 {
     /// <summary>Unity StoreListView: rows under 25 % flag as URGENT.</summary>
     public const double UrgentPercent = 25.0;

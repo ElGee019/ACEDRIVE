@@ -81,6 +81,30 @@ public sealed class PoiSpawner
         return added;
     }
 
+    /// <summary>
+    /// Places a door the career owns rather than a paced family: a wholesale
+    /// hub bought on the career page (Unity PlaceHubOnExistingStreet). The
+    /// address is drawn from the same free-house pool as every other business,
+    /// so it can never land on a known door. Answers null when the id already
+    /// exists or the map has no free house; the caller decides the fallback.
+    /// </summary>
+    public PointOfInterest? Place(
+        string id, string name, string type, string ownerName,
+        string category, PoiDirectory known)
+    {
+        if (known is null
+            || string.IsNullOrWhiteSpace(id)
+            || string.IsNullOrWhiteSpace(name)
+            || known.Contains(id))
+        {
+            return null;
+        }
+
+        return DrawFreeAddress(known, []) is { } door
+            ? new PointOfInterest(id, name, door, type, ownerName, category)
+            : null;
+    }
+
     private PointOfInterest? SpawnOne(
         PoiDefinition definition, int index,
         PoiDirectory known, List<PointOfInterest> added)

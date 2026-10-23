@@ -39,6 +39,26 @@ public sealed class InsuranceFlowTests
     }
 
     [Fact]
+    public void Poll_InsurancePremiumReadsTheLiveRating()
+    {
+        // A skill gained during the session must lower tonight's premium: the
+        // fleet reads the wallet, never a rating captured at boot (PORTPLAN
+        // 06 + 34). Raising all three skills to 40 turns 6.90 into 4.14.
+        var garage = GarageWith(insured: true);
+        var wallet = new DriverWallet(new DriverState(100.0, 0.0));
+        wallet.AddCornering(20.0);
+        wallet.AddConcentration(20.0);
+        wallet.AddOffTheLine(20.0);
+        var (vm, clock, _, _) = MainViewModelTests.Create(
+            speedKmh: 0f, garage: garage, wallet: wallet, cars: Pool);
+
+        clock.Advance(TimeSpan.FromSeconds(13.5 * 60 * 2.2));
+        vm.Poll();
+
+        Assert.Equal(100.0 - 4.14, wallet.Cash, 6);
+    }
+
+    [Fact]
     public void Poll_SkipsUninsuredCars()
     {
         var garage = GarageWith(insured: false);

@@ -33,6 +33,19 @@ public sealed class PoiDirectoryTests
     }
 
     [Fact]
+    public void Find_AnswersTheBankedDoorOrNull()
+    {
+        var directory = new PoiDirectory();
+        directory.Add(Poi("hub", "Grocers and Sons", house: 6));
+
+        PointOfInterest door = Assert.IsType<PointOfInterest>(directory.Find("hub"));
+        Assert.Equal(6, door.Address.HouseNumber);
+        Assert.Null(directory.Find("missing"));
+        Assert.Null(directory.Find(null));
+        Assert.Null(directory.Find(" "));
+    }
+
+    [Fact]
     public void Add_RejectsUnusableRows()
     {
         var directory = new PoiDirectory();

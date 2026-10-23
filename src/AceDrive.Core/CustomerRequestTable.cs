@@ -7,7 +7,9 @@ namespace AceDrive.Core;
 /// categories, the speed-challenge line and the tier chances/timer. Shipped
 /// values live in Data/customer_requests.json; this default is the test-shell
 /// fallback and deliberately asks nothing, so a missing file never invents a
-/// request.
+/// request. WHY 19 s instead of Unity's 14: the port added five seconds of
+/// reading time to the answer window, and every request kind (passive, speed
+/// challenge, quiz) runs on it.
 /// </summary>
 public sealed record CustomerRequestTable(
     IReadOnlyDictionary<string, string> SuffixRequests,
@@ -23,5 +25,5 @@ public sealed record CustomerRequestTable(
         SpeedChallengeText: string.Empty,
         Tier2Chance: 0.0,
         Tier3Chance: 0.0,
-        TimerSeconds: 14);
+        TimerSeconds: 19);
 }

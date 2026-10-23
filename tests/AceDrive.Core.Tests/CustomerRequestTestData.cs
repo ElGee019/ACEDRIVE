@@ -59,5 +59,5 @@ internal static class CustomerRequestTestData
             SpeedChallengeText: "Quickly!",
             Tier2Chance: tier2,
             Tier3Chance: tier3,
-            TimerSeconds: 14);
+            TimerSeconds: 19);
 }

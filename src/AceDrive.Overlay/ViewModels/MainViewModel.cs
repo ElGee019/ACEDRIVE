@@ -132,6 +132,10 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // The trip-start breakdown roll (PORTPLAN 39): a seeded instance built in
     // the composition root, never the shared global (AGENTS.md).
     private readonly BreakdownStrategy _breakdowns;
+    // The seeded roll behind the streak's random skill gains (PORTPLAN 06/47,
+    // Unity ApplyRandomSkillDelta): the root owns the seed, so a test can pin
+    // the skills a resumed streak lands on.
+    private readonly Random _rng;
     // The 200 px companion: the poll pushes it one snapshot so
     // the HUD never opens its own timer or shared-memory handle.
     private readonly ITelemetryHud? _hud;
@@ -204,10 +208,21 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     private bool _disposed;
 
     private TaxiJobState _job = new();
+    // The live delivery run (PORTPLAN 19): ordered hub pickups + store
+    // drop-offs. Null outside a run; the taxi job and this cannot overlap
+    // because a call/board is refused while either is in progress.
+    private DeliveryJob? _deliveryJob;
+    // True once the run reached its first store leg: the meter is reset at
+    // that edge so the hub pickup distance is not charged as delivery km
+    // (Unity stamps jobStartOdometer when the store route starts).
+    private bool _deliveryStoreLegStarted;
     // A job is live from ACCEPT (the drive to the pickup) until the drop-off
-    // settles. The idle-shift rule and the overlay call both read this one
-    // definition, so a new leg cannot mean two different things.
-    private bool JobInProgress => _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute;
+    // settles, or from DELIVER until the last store is served. The idle-shift
+    // rule and the overlay call both read this one definition, so a new leg
+    // cannot mean two different things.
+    private bool JobInProgress =>
+        _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute || DeliveryInProgress;
+    private bool DeliveryInProgress => _deliveryJob is { IsComplete: false };
     // The passenger-leg distance. Lives outside the job so a refused pickup or
     // a breakdown can discard the ride without leaving a half-run meter.
     private readonly TaxiDriveMeter _meter;
@@ -233,13 +248,10 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // one lookup on its first tick instead of one per tick.
     private string? _lastWaitingKey;
 
-    // Dropoff placeholders until the driving slice feeds real inputs: the
-    // agreed 8.2 km ride with every extra on except the speeding fine (the
-    // receipt keeps its empty fine line, but no fine is charged). The car's
-    // class/rarity come from the owned car driven now; these fallbacks cover
-    // an unknown catalogue row and the unknown-identity case. An unowned car
-    // deliberately reads 0 × 0 so it earns no XP.
-    private const double PlaceholderDistanceKm = 8.2;
+    // Receipt fallbacks for an unknown catalogue row: the car's class/rarity
+    // come from the owned car driven now, while an unowned car deliberately
+    // reads 0 × 0 so it earns no XP. Street knowledge has no system here yet,
+    // so every job settles at Unity's fully-known 100 %.
     private const int FallbackCarClass = 1;
     private const int FallbackCarRarity = 1;
     private const int PlaceholderStreetKnowledgePct = 100;
@@ -265,6 +277,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         Hunger hunger, IHungerStateStore hungerStore,
         Garage garage, IGarageStore garageStore, InsuranceRules insuranceRules,
         BreakdownStrategy breakdowns,
+        Random rng,
         PoiGenerator pois,
         PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
         PoiSpawner poiGrowth, JobLedger jobs,
@@ -315,6 +328,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _garage = garage;
         _insuranceRules = insuranceRules;
         _breakdowns = breakdowns;
+        _rng = rng;
         _hud = hud;
         if (_hud is not null)
         {
@@ -343,7 +357,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
             garage, city, hunger, roadTests, shift, shifts, jobs);
         _fleet = new FleetService(
-            garage, cars, game, wallet, insuranceRules, log, this, DriverRatingPercent);
+            garage, cars, game, wallet, insuranceRules, log, this);
         // The POI entry router: the store handler rides in from the root, the
         // business interiors are built here because they bank through this host
         // and change the page themselves (dealer -> bought-car choice).
@@ -385,8 +399,15 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             int bonus = ConsecutiveDayBonus.ComputeBonus(days);
             _streak.StampBonus();
             _wallet.AddBonus(bonus);
+            // Unity's streak tail (Source MapScreen.GrantDailyBonusIfDue): day
+            // N hands N random skill points out, silently, before the save.
+            for (int i = 0; i < days; i++)
+            {
+                _wallet.AddRandomSkill(_rng, 1.0);
+            }
             SaveDriver(_rivals.LastResult);
-            _log.LogInfo($"[Streak] consecutive-day bonus granted: {bonus} CR (day {days})");
+            _log.LogInfo($"[Streak] consecutive-day bonus granted: {bonus} CR (day {days}, " +
+                $"{days} random skill point(s))");
         }
         // The day-flip detector starts on the session's opening day, so the
         // first poll does not report a transition.
@@ -601,10 +622,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
 
     // Built once and reused: the pickup cart survives leaving the page, like
     // Unity's player.pickupCart. Back lands on the control page. The run
-    // button carries the whole cart run to the host: DELIVER settles it
-    // straight into a delivery receipt (the drive is skipped while there is
-    // no Eifel address table, exactly like the taxi job's ACCEPT skip). The
-    // hub button opens the real OPEN NEW CAREER page (item 18).
+    // button carries the whole cart run to the host, which drives the hub
+    // pickups and store drop-offs on the companion before it settles the
+    // receipt. The hub button opens the real OPEN NEW CAREER page (item 18).
     private void OpenDelivery()
     {
         // A hub bought on the previous visit may have opened store doors; the
@@ -613,7 +633,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _deliveryScreen ??= new DeliveryJobScreenViewModel(
             _deliveryCatalog, _career, _city, _log,
             new RelayCommand(() => SetScreen(CreateControlScreen())),
-            new ParameterizedCommand<DeliveryRun>(OnDeliveryRun),
+            new ParameterizedCommand<DeliveryRun>(StartDeliveryRun),
             new RelayCommand(OpenHub),
             _beat);
         _deliveryScreen.Refresh(_deliveryCatalog);
@@ -681,7 +701,8 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         SetScreen(new DeliveryHubScreenViewModel(
             _career, _deliveryCatalog, _city, _log,
             new RelayCommand(CloseHub),
-            _beat));
+            _beat,
+            PlaceHubDoor));
 
     private void CloseHub()
     {
@@ -960,21 +981,24 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             SaveGarage();
         }
 
-        // Meter runs while the passenger is aboard: the accumulator applies
-        // the stalled-frame guard and the speed clamp, so a torn read cannot
-        // inflate the fare.
-        if (_job.Phase == JobPhase.EnRoute)
+        // Meter runs while a paid leg is live: the taxi passenger leg and the
+        // delivery store legs share the one accumulator (the two jobs cannot
+        // overlap). The stalled-frame guard and the speed clamp keep a torn
+        // read from inflating a fare or a delivery charge. The delivery run
+        // resets it when the first store leg starts, so hub pickups are not
+        // charged as delivery distance.
+        if (_job.Phase == JobPhase.EnRoute || DeliveryInProgress)
         {
             double before = _meter.DistanceKm;
             _meter.Add(s.SpeedKmh, dt);
-            if (_meter.DistanceKm != before)
+            if (_job.Phase == JobPhase.EnRoute && _meter.DistanceKm != before)
             {
                 _job.DistanceKm = _meter.DistanceKm;
                 _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
                 RefreshJob();
             }
 
-            if (_job.SpeedChallengeAgreed)
+            if (_job.Phase == JobPhase.EnRoute && _job.SpeedChallengeAgreed)
             {
                 CheckPolice(s);
             }
@@ -1361,7 +1385,9 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // The customer asks once the drop-off task text has had its read-in time.
     // The job only carries the request from this moment, and the forced speed
     // challenge starts its clock here: the player is not timed while reading
-    // where to drive.
+    // where to drive. A forced challenge is not an ask: its page is a short
+    // read-in with no answer countdown or button, so it closes itself and the
+    // task text takes back over with the same clock still running.
     private void ShowCustomerRequest(CustomerRequest request)
     {
         _job.Request = request;
@@ -1373,7 +1399,10 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _requestScreen = new CustomerRequestScreenViewModel(
             request, _job.Customer.Full, _requestTable.TimerSeconds,
             _clock, _beat, OnRequestFinished,
-            request.IsSpeedChallenge ? _job.SpeedChallengeDeadline : null);
+            request.IsSpeedChallenge ? _job.SpeedChallengeDeadline : null,
+            request.IsSpeedChallenge
+                ? TimeSpan.FromSeconds(_taxiRules.NoticeSeconds)
+                : null);
         SetScreen(_requestScreen);
         _hud?.ShowRequest(_requestScreen);
         _log.LogInfo($"customer request: {request.Kind} for {_job.Customer.Full}");
@@ -1398,8 +1427,12 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         {
             _dirtyRefusedJob = job;
             _friends.AddFamiliarity(customer, -1);
+            // Unity HandleTooDirtyArrival: a ride cancelled for a filthy car
+            // costs one concentration point, once per cancelled pickup.
+            _wallet.AddConcentration(-1.0);
+            SaveDriver(_rivals.LastResult);
             _log.LogWarning($"[Filth] pickup refused at {car.Filth.Value}/{car.Filth.Max}: " +
-                $"{customer} friendship -1");
+                $"{customer} friendship -1, concentration {_wallet.Rating.Concentration:0.00}");
         }
         _proposal?.ShowRefusal(Strings.Format("TaxiTooDirty", customer));
         return true;
@@ -1438,7 +1471,11 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
 
     private void OnJobEntered()
     {
-        if (PickupCommand.CanExecute(null))
+        if (DeliveryInProgress)
+        {
+            DeliverStop();
+        }
+        else if (PickupCommand.CanExecute(null))
         {
             PickupCommand.Execute(null);
         }
@@ -1448,10 +1485,12 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         }
     }
 
-    // BACK on the request lands here exactly once: copy the outcome onto the
-    // job, bank the quiz history for this car, clear the companion overlay and
-    // resume the drop-off guidance. The police patrols arm from the speed flag
-    // in the police slice; this host stays the single owner of job state.
+    // The request's one exit lands here exactly once: BACK on an answered ask,
+    // its timeout, or the forced challenge's read-in closing itself. Copy the
+    // outcome onto the job, bank the quiz history for this car, clear the
+    // companion overlay and resume the drop-off guidance. The police patrols
+    // arm from the speed flag in the police slice; this host stays the single
+    // owner of job state.
     private void OnRequestFinished(CustomerRequestOutcome outcome)
     {
         _requestScreen = null;
@@ -1459,12 +1498,12 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _job.TipEligible = outcome.TipEligible;
         _job.QuizAnsweredCorrectly = outcome.QuizAnsweredCorrectly;
         _job.SpeedChallengeAgreed = outcome.SpeedChallengeAgreed;
+        ApplyQuizRating(outcome);
 
         if (outcome.SpeedChallengeAgreed)
         {
-            // The forced challenge already armed at the pickup; this keeps
-            // the old accepted-on-the-page path working without drawing a
-            // second plan when BACK closes the forced page.
+            // The forced challenge already armed when its page opened; this
+            // keeps the single exit idempotent without drawing a second plan.
             ArmSpeedChallenge();
         }
 
@@ -1488,6 +1527,24 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     // catalogue row behind the current key, never a copy taken at purchase.
     private CarSpec? CurrentCarSpec() =>
         _garage.Current is { } car ? _garage.SpecOf(car) : null;
+
+    // Unity CustomerRequestScreen.HandleAnswer: a correct quiz answer lifts
+    // off-the-line by 1, a wrong answer or a timeout drops it by 1 (both reach
+    // here with QuizAnsweredCorrectly false). The skill belongs to the driver,
+    // not the car, so an unowned free-roam car pays the same.
+    private void ApplyQuizRating(CustomerRequestOutcome outcome)
+    {
+        if (_job.Request?.Quiz is null)
+        {
+            return;
+        }
+
+        bool correct = outcome.Answered && outcome.QuizAnsweredCorrectly;
+        _wallet.AddOffTheLine(correct ? 1.0 : -1.0);
+        SaveDriver(_rivals.LastResult);
+        _log.LogInfo($"[Rating] quiz {(correct ? "correct" : "missed")}: " +
+            $"off-the-line {_wallet.Rating.OffTheLine:0.00}");
+    }
 
     private double TrackLengthMeters() =>
         _trackLengthMeters ?? _addressMap.TrackLengthMeters;
@@ -1545,18 +1602,20 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
 
     // The deadline only removes the ordinary tip; the fare and XP settle as
     // usual. The buffer in the estimate already covers the stop at the door,
-    // so the HUD's TOO LATE line and this check agree.
-    private void ApplySpeedChallengeDeadline()
+    // so the HUD's TOO LATE line and this check agree. Returns true when the
+    // challenge was agreed AND beaten, which is the cornering award's gate
+    // (PORTPLAN 06): an untimed challenge has nothing to succeed at.
+    private bool ResolveSpeedChallenge()
     {
         if (!_job.SpeedChallengeAgreed
             || _job.SpeedChallengeDeadline is not { } deadline)
         {
-            return;
+            return false;
         }
 
         if (_clock.UtcNow <= deadline)
         {
-            return;
+            return true;
         }
 
         _job.TipEligible = false;
@@ -1566,6 +1625,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _log.LogInfo(
             $"speed challenge late: {(_clock.UtcNow - deadline).TotalSeconds:0}s " +
             $"past the deadline; tip dropped");
+        return false;
     }
 
     // Speed-challenge police check, once per live poll while the passenger is
@@ -1673,7 +1733,15 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     private void SettleReceipt()
     {
         _job.Phase = JobPhase.Complete;
-        ApplySpeedChallengeDeadline();
+        // The speed challenge's verdict (PORTPLAN 06): winning it lifts
+        // cornering by 1, the way Unity's accepted challenge did before the
+        // port made the gamble a success condition. The settle's own driver
+        // save below banks it.
+        if (ResolveSpeedChallenge())
+        {
+            _wallet.AddCornering(1.0);
+            _log.LogInfo($"[Rating] speed challenge won: cornering {_wallet.Rating.Cornering:0.00}");
+        }
         int capacity = _fleet.PassengerCapacity();
         // The car that actually ran the ride. An owned car supplies its real
         // class + global rarity and contributes its km. An unowned free-roam
@@ -1906,13 +1974,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         IReadOnlyList<PointOfInterest> grown = _poiGrowth.Spawn(
             _zone.StreetIds.Count, _jobs.Completed, _poiDirectory,
             _career.OwnsCategory);
-        if (grown.Count == 0)
-        {
-            return;
-        }
-
         bool banked = false;
-        bool boardChanged = false;
         foreach (PointOfInterest poi in grown)
         {
             if (!_poiDirectory.Add(poi))
@@ -1923,15 +1985,6 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             banked = true;
             _log.LogInfo($"[Poi] opened {poi.Name} at " +
                 AddressFormatter.Format(poi.Address));
-            // A placed grocery/coffee store is also a delivery target: the
-            // shop interior and the board row share the same POI identity,
-            // so the town and the board gain the store together.
-            if (PlacedStore.Row(poi, _storeCatalog) is { } store
-                && _city.AddStore(store))
-            {
-                _deliveryCatalog = _deliveryCatalog.WithStore(store);
-                boardChanged = true;
-            }
         }
 
         if (banked)
@@ -1939,10 +1992,46 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             _poiStore.Save(_poiDirectory.All);
         }
 
-        if (boardChanged)
+        // A placed grocery/coffee store is also a delivery target: the shop
+        // interior and the board row share the same POI identity, so the town
+        // and the board gain the store together. Max's story grocery is the
+        // career's first real grocery; adopting every known shop door also
+        // covers the session where onboarding drew it after the catalog was
+        // built at boot.
+        if (AdoptShopDoors() || banked)
         {
             _deliveryScreen?.Refresh(_deliveryCatalog);
         }
+    }
+
+    // Adds every known shop POI to the delivery board and the town, once.
+    // This is what makes the board list real stores instead of printed
+    // placeholder rows: Max's grocery plus the stores each owned hub has
+    // backfilled so far.
+    private bool AdoptShopDoors()
+    {
+        bool changed = false;
+        foreach (PointOfInterest poi in _poiDirectory.All)
+        {
+            if (PlacedStore.Row(poi, _storeCatalog) is not { } store)
+            {
+                continue;
+            }
+
+            bool newCell = _city.AddStore(store);
+            if (_deliveryCatalog.Find(store.Key) is not null)
+            {
+                changed |= newCell;
+                continue;
+            }
+
+            _deliveryCatalog = _deliveryCatalog.WithStore(store);
+            _log.LogInfo($"delivery board connected: {store.Name} " +
+                $"({store.Category}) at {AddressFormatter.Format(poi.Address)}");
+            changed = true;
+        }
+
+        return changed;
     }
 
     // One shift ends at both timeout sites (the poll and the START tap);
@@ -2215,16 +2304,16 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         }
     }
 
-    // Accepting settles the run straight into its receipt — the taxi ACCEPT
-    // skip's delivery twin. With no driving slice the pickup/drop-off flow
-    // has no inputs, so the placeholder run (8.2 km) settles here: the run
-    // carries the goods money exactly as the cart moved it, every delivered
-    // store earns its hub's ramp, the producing hub's owner gains
-    // familiarity, and the receipt shows at once. The settle here is shared
-    // by today's board DELIVER and the driving slice's drop-off later.
-    private void OnDeliveryRun(DeliveryRun? run)
+    // DELIVER hands the frozen cart run to the host: the breakdown roll and
+    // the route happen here, then the companion drives every hub pickup and
+    // store drop-off (Unity DeliveryJobHandler's pickup/delivery phases). The
+    // cart order is the route, so the destination-setting wizard has no step.
+    private void StartDeliveryRun(DeliveryRun? run)
     {
-        if (run is null) return;
+        if (run is null || run.StoreKeys.Count == 0 || DeliveryInProgress)
+        {
+            return;
+        }
         // Breakdown roll at the delivery trip start (PORTPLAN 39, Unity
         // DeliveryJobHandler's BeginTripSession): the cargo is lost (no settle,
         // no credit) and every producing hub's owner loses 1 familiarity. The
@@ -2239,6 +2328,150 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             ShowBreakdown(breakdown);
             return;
         }
+
+        IReadOnlyList<DeliveryStop> stops =
+            DeliveryJobPlanner.Plan(_deliveryCatalog, _career, run.StoreKeys);
+        _deliveryJob = new DeliveryJob(stops, run);
+        _deliveryStoreLegStarted = false;
+        _meter.Reset();
+        _log.LogInfo($"delivery started: {stops.Count} stops, " +
+            $"{run.StoreKeys.Count} stores, goods €{run.PaidForGoods:0.00}");
+        Hide();
+        ShowDeliveryStop();
+    }
+
+    // Pins the current leg on the companion, or skips a leg whose content
+    // lost its address (a hand-edited catalogue) so the run can never stall
+    // on an unreachable stop. The first store leg resets the meter: the
+    // pickup drive is not part of the delivery distance charge.
+    private void ShowDeliveryStop()
+    {
+        while (_deliveryJob?.Current is { } stop)
+        {
+            if (!_deliveryStoreLegStarted && stop.Kind == DeliveryStopKind.Store)
+            {
+                _meter.Reset();
+                _deliveryStoreLegStarted = true;
+            }
+
+            if (DeliveryGuidance(stop) is { } guidance)
+            {
+                _hud?.SetJobGuidance(guidance);
+                return;
+            }
+
+            _log.LogWarning(
+                $"delivery stop skipped, no address: {stop.Name} ({stop.Key})");
+            _deliveryJob.Advance();
+        }
+
+        SettleDelivery();
+    }
+
+    // The one ENTER action: at a hub it loads the freight, at a store it fills
+    // the shelves for that stop and advances. The receipt waits for the last
+    // stop, unlike Unity's per-stop page, so the run settles as one job.
+    private void DeliverStop()
+    {
+        if (_deliveryJob is not { } job || job.Current is not { } stop)
+        {
+            return;
+        }
+
+        if (stop.Kind == DeliveryStopKind.Store)
+        {
+            bool moved = _city.Restock([stop.Key]);
+            _log.LogInfo($"delivery stop served: {stop.Name}" +
+                (moved ? "" : " (already full)"));
+        }
+        else
+        {
+            _log.LogInfo($"delivery pickup: {stop.Name}");
+        }
+
+        job.Advance();
+        ShowDeliveryStop();
+    }
+
+    private HudJobGuidance? DeliveryGuidance(DeliveryStop stop)
+    {
+        AddressLocation? door = stop.Kind == DeliveryStopKind.Hub
+            ? OwnedHubDoor(stop.Key)?.Address
+            : _deliveryCatalog.Find(stop.Key)?.Address;
+        if (door is not { } target)
+        {
+            return null;
+        }
+
+        return stop.Kind == DeliveryStopKind.Hub
+            ? new HudJobGuidance(
+                stop.Name, target,
+                "HudDeliveryHubDrive", "HudDeliveryHubArrived", "HudDeliveryHubAction",
+                _taxiRules.ArrivalRadiusMeters)
+            : new HudJobGuidance(
+                stop.Name, target,
+                "HudDeliveryStoreDrive", "HudDeliveryStoreArrived", "HudDeliveryStoreAction",
+                _taxiRules.ArrivalRadiusMeters);
+    }
+
+    // The host's map side of a hub purchase: place its pickup door in the
+    // free-house pool before the backfilled stores draw their addresses, then
+    // bank the directory. A failed placement logs and leaves the pickup leg
+    // skipped; the rest of the run still works.
+    private void PlaceHubDoor(OwnedHub hub) => _ = EnsureHubDoor(hub);
+
+    private PointOfInterest? OwnedHubDoor(string key)
+    {
+        foreach (OwnedHub hub in _career.Owned)
+        {
+            if (hub.Key == key)
+            {
+                return EnsureHubDoor(hub);
+            }
+        }
+        return null;
+    }
+
+    private PointOfInterest? EnsureHubDoor(OwnedHub hub)
+    {
+        if (_poiDirectory.Find(hub.Key) is { } known)
+        {
+            return known;
+        }
+
+        PointOfInterest? door = _poiGrowth.Place(
+            hub.Key, hub.Name, PoiTypes.Hub, hub.OwnerName, hub.Category, _poiDirectory);
+        if (door is null || !_poiDirectory.Add(door))
+        {
+            _log.LogWarning($"hub door not placed: {hub.Name} ({hub.Key})");
+            return null;
+        }
+
+        _poiStore.Save(_poiDirectory.All);
+        _log.LogInfo($"[Poi] opened hub {hub.Name} at " +
+            AddressFormatter.Format(door.Address));
+        return door;
+    }
+
+    // The last store is served: the measured store-leg distance prices the
+    // receipt, the sum of every stop pays out exactly like Unity's per-store
+    // ApplyStoreDeliveryEffects, and the run banks once. Every ordered shelf
+    // is filled even if a stop was skipped for a missing address.
+    private void SettleDelivery()
+    {
+        if (_deliveryJob is not { } job)
+        {
+            return;
+        }
+
+        _deliveryJob = null;
+        _deliveryStoreLegStarted = false;
+        _hud?.SetJobGuidance(null);
+        DeliveryRun run = job.Run;
+        double distanceKm = _meter.DistanceKm;
+        _meter.Reset();
+        _ = _city.Restock(run.StoreKeys);
+
         // Unity ApplyStoreDeliveryEffects runs per stop; the sum receipt
         // totals it: each store credits its producing hub's ramp, distinct
         // owners collect. A store the catalog no longer lists (content
@@ -2280,14 +2513,12 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
                 _ = _friends.RegisterRide(owner);
             }
         }
-        // Testing hook: the settled run wears the car by its own distance.
-        _fleet.BankJobDistance(PlaceholderDistanceKm);
         // An unowned free-roam car pays the run's money but earns no career
         // progress, exactly like the taxi settle: no XP, country km, zone job
         // or XP standings.
         bool earnsProgress = !_fleet.IsDrivingUnownedCar();
         DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
-            PlaceholderDistanceKm, run.PaidForGoods, run.ReceivedForGoods,
+            distanceKm, run.PaidForGoods, run.ReceivedForGoods,
             _deliveryFares, PlaceholderStreetKnowledgePct, _wallet.Xp,
             friendship, credPEarned, _career.CredP, awardsXp: earnsProgress);
         _wallet.AddDelivery(receipt);
@@ -2295,7 +2526,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         // board and the country aggregate, exactly like the taxi settle. The
         // delivery XP itself stays class/rarity-free (Unity parity).
         CarSpec? deliveryCar = _fleet.XpCar();
-        int deliveryKm = TripKm(PlaceholderDistanceKm);
+        int deliveryKm = TripKm(distanceKm);
         if (earnsProgress)
         {
             if (deliveryCar is not null && deliveryKm > 0)
@@ -2325,16 +2556,20 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         // Dirt tick, delivery twin (PORTPLAN 33, Unity DeliveryJobHandler's
         // store arrival): a completed run is +1 on the car driven now.
         _fleet.AddDirt();
+        // The cached board must show the filled shelves and any store the
+        // expansion just placed before CONTINUE hands back to it.
+        _deliveryScreen?.Refresh(_deliveryCatalog);
         // Checkpoint bank, same rule as the taxi dropoff: the paid run is
         // progress the player can see, so it goes to disk now.
         SaveClock();
         SaveGarage();
         _log.LogInfo($"delivery settled: {run.StoreKeys.Count} stores " +
+            $"dist={receipt.DistanceKm:0.00}km " +
             $"paid={receipt.PaidForGoods:0.00} received={receipt.ReceivedForGoods:0.00} " +
             $"fare={receipt.DistanceCharge:0.00} earned={receipt.TotalEarned:0.00} " +
             $"xp={receipt.XpEarned:0.00} credP=+{receipt.CredPEarned}/{_career.CredP:0} " +
             $"wallet={_wallet.Cash:0.00}");
-        SetScreen(new DeliveryReceiptScreenViewModel(
+        ShowJobScreen(new DeliveryReceiptScreenViewModel(
             receipt, _wallet, _beat,
             new RelayCommand(() =>
                 SetScreen(_deliveryScreen ?? (object)CreateControlScreen())), _rivals));

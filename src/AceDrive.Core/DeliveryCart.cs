@@ -33,14 +33,16 @@ public sealed class DeliveryCart
     public void Clear() => _storeKeys.Clear();
 
     /// <summary>Total wholesale CR committed by the cart (escrow model,
-    /// released on the save/economy page; PORTPLAN 19 + 51).</summary>
-    public double TotalCost(DeliveryCatalog catalog)
+    /// released on the save/economy page; PORTPLAN 19 + 51). Read on the
+    /// town's live shelves: the order's price follows the need the goods
+    /// actually fill, the same number the row shows.</summary>
+    public double TotalCost(DeliveryCatalog catalog, CityEconomy city)
     {
         double total = 0.0;
         foreach (string key in _storeKeys)
         {
             DeliveryStore? store = catalog.Find(key);
-            if (store is not null) total += catalog.OrderCost(store);
+            if (store is not null) total += catalog.OrderCost(city.Live(store));
         }
         return Math.Round(total, 2);
     }
@@ -70,7 +72,7 @@ public sealed class DeliveryCart
         if (_storeKeys.Count == 0) return null;
         return new DeliveryRun(
             [.. _storeKeys],
-            TotalCost(catalog),
+            TotalCost(catalog, city),
             TotalPayout(catalog, city));
     }
 }

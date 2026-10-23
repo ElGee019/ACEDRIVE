@@ -54,6 +54,15 @@
   <data name="HudJobDropoffAction" xml:space="preserve"><value>DROP OFF</value></data>
   <data name="HudJobDistanceMeters" xml:space="preserve"><value>{0:0} m</value></data>
   <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
+  <!-- Delivery run (PORTPLAN 19, Unity DeliveryJobHandler's pickup/delivery
+       phases): the hub leg loads a category's freight, the store leg fills
+       that store's shelves. Same placeholders as the taxi lines. -->
+  <data name="HudDeliveryHubDrive" xml:space="preserve"><value>Drive to {0} for the pickup at {1} No. {2} in {3}</value></data>
+  <data name="HudDeliveryHubArrived" xml:space="preserve"><value>You are at {0}. Press PICK UP THE GOODS to load the freight.</value></data>
+  <data name="HudDeliveryHubAction" xml:space="preserve"><value>PICK UP THE GOODS</value></data>
+  <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Deliver to {0} at {1} No. {2} in {3}</value></data>
+  <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>You have arrived at {0}. Press DELIVER ITEMS to unload.</value></data>
+  <data name="HudDeliveryStoreAction" xml:space="preserve"><value>DELIVER ITEMS</value></data>
   <!-- Speed-challenge police (PORTPLAN 11, Phase C): a warning on approach and
        the fine notice when a patrol catches the car over its limit. -->
   <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>

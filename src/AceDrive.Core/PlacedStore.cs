@@ -1,22 +1,23 @@
-// The delivery-board side of a placed store (PORTPLAN items 18/24/25, port
+// The delivery-board side of a real store door (PORTPLAN items 18/24/25, port
 // of Unity StorePlacementHelper's grocery/coffee stores). Unity keeps one
 // StoreState per store POI; the port collapses its item slots to one unit
-// count, so a placed door becomes a DeliveryStore row derived from the shop
+// count, so a shop door becomes a DeliveryStore row derived from the shop
 // category and the item catalogue.
 namespace AceDrive.Core;
 
 /// <summary>
-/// Turns a generated <c>grocery_store</c> / <c>coffee_shop</c> POI into the
-/// delivery board's row. The POI is the persisted identity; the row's numeric
-/// columns are derived from the same <see cref="StoreCatalog"/> the shop
-/// interior uses, so a restart rebuilds the identical row.
+/// Turns a real shop POI — Max's story grocery or a generated
+/// <c>grocery_store</c> / <c>coffee_shop</c> — into the delivery board's row.
+/// The POI is the persisted identity; the row's numeric columns are derived
+/// from the same <see cref="StoreCatalog"/> the shop interior uses, so a
+/// restart rebuilds the identical row.
 /// </summary>
 public static class PlacedStore
 {
     /// <summary>
-    /// The board row for this door, or null when the POI is not a generated
-    /// store or its category/layout is missing. Never throws: content edits
-    /// must degrade to "shop only", not take the board down.
+    /// The board row for this door, or null when the POI is not a shop or its
+    /// category/layout is missing. Never throws: content edits must degrade to
+    /// "shop only", not take the board down.
     /// </summary>
     public static DeliveryStore? Row(PointOfInterest? poi, StoreCatalog? catalog)
     {
@@ -41,10 +42,13 @@ public static class PlacedStore
             StockedUnits: capacity,
             UnitCapacity: capacity,
             PricePerUnit: Math.Round(price, 2),
-            Category: poi.Category);
+            Category: poi.Category,
+            // The POI is the persisted identity; its door is the destination
+            // the delivery run drives to (placed stores need no second table).
+            Address: poi.Address);
     }
 
-    /// <summary>The rows for every generated store door in the directory.</summary>
+    /// <summary>The rows for every real shop door in the directory.</summary>
     public static IReadOnlyList<DeliveryStore> Rows(
         IEnumerable<PointOfInterest> pois, StoreCatalog catalog)
     {
@@ -59,10 +63,13 @@ public static class PlacedStore
         return rows;
     }
 
-    /// <summary>True for the store families the placement system generates.
-    /// Max's story shop keeps its own opening flow and is not a placed row.</summary>
+    /// <summary>True for the shop families the board can restock. Max's story
+    /// grocery is the real anchor of the grocery career; the generated grocery
+    /// and coffee doors join it as each hub's backfill grows.</summary>
     public static bool IsStoreType(string type) =>
-        string.Equals(type, PoiTypes.GroceryStore, StringComparison.OrdinalIgnoreCase)
+        string.Equals(type, PoiTypes.Grocery, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(type, PoiTypes.MaxsGrocery, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(type, PoiTypes.GroceryStore, StringComparison.OrdinalIgnoreCase)
         || string.Equals(type, PoiTypes.CoffeeShop, StringComparison.OrdinalIgnoreCase);
 
     // Unity's placed shop has one 20-unit slot per generated item; the

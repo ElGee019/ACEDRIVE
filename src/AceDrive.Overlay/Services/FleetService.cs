@@ -23,14 +23,11 @@ public sealed class FleetService
     private readonly InsuranceRules _insurance;
     private readonly ILog _log;
     private readonly IFleetHost _host;
-    // The driver's overall rating behind the insurance discount (PORTPLAN
-    // item 06); the composition root hands in the wallet's live average.
-    private readonly int _driverRating;
 
     public FleetService(
         Garage garage, IReadOnlyList<CarSpec> cars, GameClock game,
         DriverWallet wallet, InsuranceRules insurance, ILog log,
-        IFleetHost host, int driverRating)
+        IFleetHost host)
     {
         _garage = garage;
         _cars = cars;
@@ -39,7 +36,6 @@ public sealed class FleetService
         _insurance = insurance;
         _log = log;
         _host = host;
-        _driverRating = driverRating;
     }
 
     /// <summary>
@@ -147,26 +143,6 @@ public sealed class FleetService
     }
 
     /// <summary>
-    /// TESTING HOOK (PORTPLAN items 31/32, remove when the driving slice lands):
-    /// a settled job's placeholder km is banked into the current car's odometer
-    /// so a completed taxi/delivery leg wears the mechanic without the player
-    /// having to drive the route. Live telemetry already banks the odometer per
-    /// tick, so once the real pickup/drop-off feeds distances this would
-    /// double-count and must go. Nothing banks on an empty garage or a zero
-    /// distance; the caller banks the garage.
-    /// </summary>
-    public void BankJobDistance(double distanceKm)
-    {
-        if (_garage.Current is not { } car || distanceKm <= 0.0 || !double.IsFinite(distanceKm))
-        {
-            return;
-        }
-        car.Drive(distanceKm);
-        _log.LogInfo($"[Odometer] job distance {distanceKm:0.00} km banked into " +
-            $"{car.Key} (odometer {car.Odometer:0.00} km)");
-    }
-
-    /// <summary>
     /// One completed job's dirt (PORTPLAN 33, Unity IncrementFilth): +1 on the
     /// car driven now, clamped at the rules' cap. A settled job on an already
     /// filthy car is no transition, so nothing logs. The caller banks the garage.
@@ -192,7 +168,8 @@ public sealed class FleetService
     /// the cash covers (a premium is a commitment, not a purchase), and the
     /// stamp rides the driver save so a restart inside the same hour never
     /// double-charges. True when a charge was banked, so the caller can run the
-    /// shared driver save.
+    /// shared driver save. The discount reads the wallet's LIVE overall rating
+    /// (PORTPLAN 06): a skill gained earlier today lowers tonight's premium.
     /// </summary>
     public bool ChargeDailyInsurance()
     {
@@ -209,13 +186,14 @@ public sealed class FleetService
         _wallet.MarkInsuranceCharged(date);
         double total = 0.0;
         int insured = 0;
+        double driverRating = _wallet.Rating.Overall;
         foreach (OwnedCar car in _garage.Cars)
         {
             if (!car.HasInsurance || _garage.SpecOf(car) is not { Price: > 0.0 } spec)
             {
                 continue;
             }
-            double premium = InsurancePricing.DiscountedDailyCost(spec.Price, _driverRating, _insurance);
+            double premium = InsurancePricing.DiscountedDailyCost(spec.Price, driverRating, _insurance);
             total += _wallet.ChargeUnavoidable(premium);
             insured++;
         }

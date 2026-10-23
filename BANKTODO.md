@@ -54,8 +54,9 @@ Port to ACEDRIVE:
       MainViewModel ctor grants through the shared `SaveDriver` helper;
       stat log line only, resx string still due when the bonus becomes
       visible UI (no popup screen ported yet).
-- [ ] Driver-rating tail (day N grants N random skill +1s) — BLOCKED by
-      item 06 (rating not ported); listed so it isn't forgotten.
+- [x] Driver-rating tail (day N grants N random skill +1s) — landed with
+      item 06: the boot grant rolls N random +1s on the seeded RNG before
+      the same save. Tests: grant-once sum + the saved skills.
 - [x] Tests: recount idempotency, broken streak, bonus curve, grant-once,
       wallet cash delta, grant gate (pre-onboarding), settle-save carries
       the streak slice (660 tests green, format clean).

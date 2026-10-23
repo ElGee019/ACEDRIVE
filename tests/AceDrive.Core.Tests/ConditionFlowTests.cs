@@ -164,11 +164,14 @@ public sealed class ConditionFlowTests
     }
 
     [Fact]
-    public void DeliverySettle_BanksTheJobDistanceIntoTheCurrentCar()
+    public void DeliveryRun_BanksTheDrivenDistanceIntoTheCurrentCar()
     {
-        // The delivery twin: a settled run banks the same placeholder distance.
+        // The delivery twin: the live odometer integration already banks the
+        // store leg, so the settle must not add a second placeholder distance.
         var catalog = new DeliveryCatalog(
-            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries")],
+            [new DeliveryStore(
+                "adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries",
+                new AddressLocation("Street 2", 5, HouseSide.Left))],
             0.7, 100);
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
@@ -176,9 +179,10 @@ public sealed class ConditionFlowTests
             CredPRamp.UnityDefault, ["Elena Marchetti"]);
         var garage = new Garage(TestRoadCars.Pool);
         OwnedCar car = garage.Add(TestRoadCars.Pool[0], week: 1);
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        var hud = new FakeTelemetryHud();
+        var (vm, clock, tel, _) = MainViewModelTests.Create(
             catalog: catalog, hubs: hubs, speedKmh: 0f, garage: garage,
-            garageStore: new FakeGarageStore());
+            garageStore: new FakeGarageStore(), hud: hud);
         vm.FinishDialogue();
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen).DeliveryCommand.Execute(null);
@@ -190,6 +194,10 @@ public sealed class ConditionFlowTests
         hub.BackCommand.Execute(null);
         board.ToggleOrderCommand.Execute(board.Rows[0]);
         board.MainButtonCommand.Execute(null);
+
+        hud.RaiseJobEnter(); // load the freight at the hub
+        TaxiFlow.Drive(vm, clock, tel, TaxiFlow.DefaultDistanceKm);
+        hud.RaiseJobEnter(); // deliver the store
 
         Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(8.2, car.Odometer, 6);

@@ -10,6 +10,28 @@ public sealed class PoiSpawnerTests
         new ProceduralNameGenerator(NamePoolTable.Default, seed), seed);
 
     [Fact]
+    public void Place_DrawsAUniqueFreeDoorForACareerHub()
+    {
+        var directory = new PoiDirectory();
+        PointOfInterest hub = Assert.IsType<PointOfInterest>(Spawner().Place(
+            "groceries_grocers_and_sons", "Grocers and Sons",
+            PoiTypes.Hub, "Elena Marchetti", "groceries", directory));
+
+        Assert.Equal(PoiTypes.Hub, hub.Type);
+        Assert.Equal("groceries", hub.Category);
+        Assert.Equal("Elena Marchetti", hub.OwnerName);
+        Assert.True(hub.Address.StreetName is "Street 1" or "Street 2");
+        Assert.InRange(hub.Address.HouseNumber, 1, 33);
+
+        Assert.True(directory.Add(hub));
+        Assert.Null(Spawner().Place(
+            "groceries_grocers_and_sons", "Grocers and Sons",
+            PoiTypes.Hub, "Elena Marchetti", "groceries", directory));
+        Assert.Null(Spawner().Place(
+            "", "No id", PoiTypes.Hub, "Elena Marchetti", "groceries", directory));
+    }
+
+    [Fact]
     public void NewCareer_HasNoBusinessDoor()
     {
         Assert.Empty(Spawner().Spawn(0, 0, new PoiDirectory()));

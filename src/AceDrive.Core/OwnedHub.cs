@@ -9,6 +9,9 @@ namespace AceDrive.Core;
 /// save (PORTPLAN 51); the tier/level numbers ride along now because the
 /// per-delivery CredP ramp (item 18) reads exactly those, and the owner
 /// name is assigned at purchase like Unity does (Unity WholesaleHub.ownerName),
-/// because the delivery friendship keys on it.</summary>
+/// because the delivery friendship keys on it. Key is the hub's map identity
+/// (Unity's category_slug id): the host pins its POI with the same id so the
+/// pickup leg can find the door.</summary>
 public sealed record OwnedHub(
-    string Name, string Category, double Cost, int Tier, int Level, string OwnerName = "");
+    string Name, string Category, double Cost, int Tier, int Level,
+    string OwnerName = "", string Key = "");

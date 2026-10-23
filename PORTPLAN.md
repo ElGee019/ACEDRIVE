@@ -45,7 +45,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 - [-] 03 Bend/turn + destination braking — DECLINED
 - [-] 04 Street-resolved driving — DECLINED
 - [-] 05 Speed-limit policy per street — DECLINED
-- [x] 06 Driver-rating skill model — CONFIRMED
+- [x] 06 Driver-rating skill model — CONFIRMED (landed: the three skills persisted + shown on the wallet page; events wired — speed-challenge win +1 cornering, quiz correct +1 / wrong-or-timeout −1 off-the-line, filthy-car pickup refusal −1 concentration, streak day N grants N random +1s; insurance reads the live average; accident penalty + the Cento Miglia win await their ported source)
 - [x] 07 ETA estimators (single + multi-leg) — CONFIRMED (rework: distance + ETA for Kunos map)
 - [-] 08 Borrowed-car drive leg — DECLINED
 - [-] 09 Background catch-up + offline arrival — DECLINED

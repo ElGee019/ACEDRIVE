@@ -39,12 +39,15 @@ internal static class TaxiFlow
         return vm.CurrentScreen as CustomerRequestScreenViewModel;
     }
 
-    /// <summary>Accepts the first request option (passive/speed ACCEPT; a
-    /// quiz's first value, which a quiz test must drive itself) and closes
-    /// the page. No-request rides pass straight through.</summary>
+    /// <summary>Accepts the first request option (passive ACCEPT; a quiz's
+    /// first value, which a quiz test must drive itself) and closes the page.
+    /// A forced speed challenge has no answer and no button: its read-in
+    /// dismisses itself on a later poll. No-request rides pass straight
+    /// through.</summary>
     public static void AnswerRequest(MainViewModel vm)
     {
-        if (vm.CurrentScreen is not CustomerRequestScreenViewModel request)
+        if (vm.CurrentScreen is not CustomerRequestScreenViewModel request
+            || request.IsSpeedChallenge)
         {
             return;
         }
