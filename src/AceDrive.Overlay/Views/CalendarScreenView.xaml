@@ -18,7 +18,9 @@
     <!-- Calendar page skeleton: viewport-pinned MinHeight like the menu page.
          The top band repeats the menu's 942* row and shared clock view, so the
          calendar's clock renders at exactly the same height; the lower 1338*
-         band carries the CALENDAR title, the Monday-first strip and BACK. Only
+         band carries the Monday-first strip and BACK. The page has no title:
+         the strip's first row (Monday) takes the line the CALENDAR title used
+         to occupy, so the week starts right under the clock. Only
          days with an event render the event as a Button (global white-edge
          style). Day names wear the menu tiles' own face and size (TileFace
          above); the event labels stay body copy in the platform UI face at the
@@ -43,13 +45,13 @@
                              DayWeekText="{Binding DayWeekText}"/>
         <Grid Grid.Row="1">
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-            <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=ControlCalendar}"/>
-            <StackPanel Grid.Row="1" VerticalAlignment="Center">
-                <!-- Calendar strip: the page's one body block, centered. -->
+            <!-- The strip is the band's first line, flush with the top edge:
+                 no title above it, so the clock is the page's only heading. -->
+            <StackPanel Grid.Row="0" VerticalAlignment="Top">
+                <!-- Calendar strip: the page's one body block. -->
                 <StackPanel>
                     <ItemsControl ItemsSource="{Binding Days}" Grid.IsSharedSizeScope="True">
                         <ItemsControl.ItemTemplate>
@@ -59,22 +61,30 @@
                                      plain-text rows would otherwise sit tighter. The
                                      day label centers itself on the shared height, which
                                      lines its baseline up with the button content.
+                                     MinHeight reserves the gate warning's two 13 px
+                                     lines (2 x 17.3) plus the button's 4 px vertical
+                                     padding, 1 px border and 1 px top/bottom margin,
+                                     so swapping an event label for the longer COME
+                                     BACK copy never resizes the strip.
                                      Teal is the shared highlight (hub activated
                                      cells): the selectable day wears it on the
                                      button border and the day name alike. -->
                                 <Grid Margin="0,1">
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" SharedSizeGroup="DayRow"/>
+                                        <RowDefinition Height="Auto" MinHeight="47" SharedSizeGroup="DayRow"/>
                                     </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
-                                        <!-- Wide enough for "Wednesday"/"Donderdag" at
-                                             the tile face's 18 px; the old 90 only
-                                             fitted the 13 px body size. -->
-                                        <ColumnDefinition Width="110"/>
+                                        <!-- The day column sizes to the widest
+                                             three-letter name (shared across rows)
+                                             instead of a fixed width, so the event
+                                             button starts right beside its day
+                                             label at the same x on every row. -->
+                                        <ColumnDefinition Width="Auto" SharedSizeGroup="DayName"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{Binding DayLabel}"
+                                    <TextBlock Grid.Column="0" Text="{Binding ShortLabel}"
                                                FontFamily="{StaticResource TileFace}" FontSize="18"
+                                               Margin="0,0,8,0"
                                                VerticalAlignment="Center">
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
@@ -136,7 +146,7 @@
             <!-- Bottom band: the one way out, flush with the panel edge like every
                  page's back button. Teal is the shared voice-ack highlight: the
                  BACK the mic tapped glows for one beat before the page waits it out. -->
-            <Button Grid.Row="2" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+            <Button Grid.Row="1" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                         <Style.Triggers>

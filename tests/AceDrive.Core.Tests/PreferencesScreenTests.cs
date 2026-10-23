@@ -181,4 +181,100 @@ public sealed class PreferencesScreenTests
             CultureInfo.CurrentUICulture = original;
         }
     }
+
+    [Fact]
+    public void FirstRun_HasNoResetAction()
+    {
+        var vm = Create([], () => { });
+
+        Assert.False(vm.CanReset);
+        Assert.Equal(string.Empty, vm.ResetStatus);
+    }
+
+    [Fact]
+    public void SettingsReset_FirstTapWarns_SecondTapWipes()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            int calls = 0;
+            var vm = ResetPage(() => { calls++; return true; });
+
+            Assert.True(vm.CanReset);
+            Assert.Equal("RESET GAME", vm.ResetLabel);
+
+            vm.ResetCommand.Execute(null);
+
+            Assert.True(vm.IsConfirmingReset);
+            Assert.Equal("DELETE ALL PROGRESS", vm.ResetLabel);
+            Assert.Equal(0, calls);
+
+            vm.ResetCommand.Execute(null);
+
+            Assert.Equal(1, calls);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void SettingsReset_Failure_ShowsTheErrorAndAsksAgain()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            var vm = ResetPage(() => false);
+
+            vm.ResetCommand.Execute(null);
+            vm.ResetCommand.Execute(null);
+
+            Assert.False(vm.IsConfirmingReset);
+            Assert.Equal("RESET GAME", vm.ResetLabel);
+            Assert.Equal(
+                "Could not reset the game. Close AceDrive and try again.",
+                vm.ResetStatus);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void SettingsReset_CopyFollowsLanguageChange()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            var vm = new PreferencesScreenViewModel(
+                PlayerPreferences.Default,
+                preferences => CultureInfo.CurrentUICulture =
+                    new CultureInfo(preferences.Language == UiLanguage.Dutch ? "nl-NL" : "en-US"),
+                () => { },
+                "PreferencesBack", "BACK",
+                () => true);
+
+            vm.SelectedLanguage = vm.LanguageOptions[1];
+
+            Assert.Equal("SPEL RESETTEN", vm.ResetLabel);
+            Assert.Contains("profiel", vm.ResetWarning);
+
+            vm.ResetCommand.Execute(null);
+
+            Assert.Equal("ALLE VOORTGANG WISSEN", vm.ResetLabel);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    private static PreferencesScreenViewModel ResetPage(Func<bool> reset) =>
+        new(PlayerPreferences.Default, _ => { }, () => { },
+            "PreferencesBack", "BACK", reset);
 }

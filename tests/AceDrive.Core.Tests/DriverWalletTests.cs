@@ -8,10 +8,13 @@ public sealed class DriverWalletTests
         new(8.2, 1, [], 43.15, 10.0, 53.15, 10.63, 1, 50.0, total, xp, 1, 1, 100, "", 0, false);
 
     [Fact]
-    public void Fresh_StartsEmpty()
+    public void Fresh_StartsWithTheStartingCash()
     {
+        // A brand-new game must afford the first jobs' overhead, so the
+        // wallet opens on the seed rather than on nothing.
         var wallet = new DriverWallet();
-        Assert.Equal(0.0, wallet.Cash);
+        Assert.Equal(100.0, wallet.Cash);
+        Assert.Equal(DriverWallet.StartingCash, wallet.Cash);
         Assert.Equal(0.0, wallet.Xp);
     }
 
@@ -26,7 +29,9 @@ public sealed class DriverWalletTests
     [Fact]
     public void AddReceipt_AccumulatesCashAndXp()
     {
-        var wallet = new DriverWallet();
+        // The empty fixture keeps the expectation to the receipt delta alone
+        // (the fresh-start seed is covered above).
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
         wallet.AddReceipt(Receipt());
         wallet.AddReceipt(Receipt());
         Assert.Equal(27.56, wallet.Cash);
@@ -66,7 +71,7 @@ public sealed class DriverWalletTests
     [Fact]
     public void AddDelivery_BanksTheRunProfit()
     {
-        var wallet = new DriverWallet();
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
         wallet.AddDelivery(Delivery());
         Assert.Equal(143.40, wallet.Cash);
         Assert.Equal(0.082, wallet.Xp, precision: 9);
@@ -162,6 +167,31 @@ public sealed class DriverWalletTests
         wallet.ApplyInterest(0.3);
         Assert.Equal(1000.4, wallet.BankBalance);
         Assert.Equal(0.0, wallet.Cash); // the payout stays out of cash
+    }
+
+    [Fact]
+    public void Rating_DefaultsToNewGame_ResumesAndRidesTheSnapshot()
+    {
+        // A pre-rating save carries the new-game profile through the record
+        // defaults; a resumed save keeps its own three shares.
+        Assert.Equal(DriverRating.NewGame, new DriverWallet().Rating);
+
+        var resumed = new DriverWallet(new DriverState(
+            0, 0, Cornering: 30.0, Concentration: 40.0, OffTheLine: 50.0));
+        Assert.Equal(new DriverRating(30.0, 40.0, 50.0), resumed.Rating);
+        Assert.Equal(40.0, resumed.Rating.Overall, precision: 9);
+
+        DriverState snapshot = resumed.Snapshot();
+        Assert.Equal(30.0, snapshot.Cornering);
+        Assert.Equal(40.0, snapshot.Concentration);
+        Assert.Equal(50.0, snapshot.OffTheLine);
+    }
+
+    [Fact]
+    public void Rating_ClampsAHandEditedZero()
+    {
+        var wallet = new DriverWallet(new DriverState(0, 0, Cornering: 0.0));
+        Assert.Equal(11.01, wallet.Rating.Cornering);
     }
 
     [Fact]

@@ -72,4 +72,20 @@ public sealed class ProceduralNameTests
         // No suffix (a solo passenger) never leaves a dangling space.
         Assert.Equal("Klaus Berger", new ProceduralName("Klaus", "Berger").Full);
     }
+
+    [Fact]
+    public void ForCapacity_DropsTheGroupOnASingleSeat()
+    {
+        var withGroup = new ProceduralName("Klaus", "Berger", "and some friends");
+
+        // One seat, one customer: no companions with nowhere to sit.
+        ProceduralName solo = withGroup.ForCapacity(1);
+        Assert.Empty(solo.Suffix);
+        Assert.Equal("Klaus Berger", solo.Full);
+        // The source identity is untouched, so a later group ride still names it.
+        Assert.Equal("and some friends", withGroup.Suffix);
+
+        Assert.Equal(withGroup, withGroup.ForCapacity(2));
+        Assert.Equal(withGroup, withGroup.ForCapacity(4));
+    }
 }

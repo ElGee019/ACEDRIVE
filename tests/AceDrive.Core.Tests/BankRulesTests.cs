@@ -36,12 +36,4 @@ public sealed class BankRulesTests
         Assert.Equal(0.0, BankRules.MaxWithdraw(1000.0));
         Assert.Equal(0.0, BankRules.MaxWithdraw(900.0)); // never negative
     }
-
-    [Fact]
-    public void PlacementGate_FifteenThenFiftyOne()
-    {
-        Assert.Equal(15, BankRules.RequiredStreetCountFor(0));
-        Assert.Equal(66, BankRules.RequiredStreetCountFor(1));
-        Assert.Equal(117, BankRules.RequiredStreetCountFor(2));
-    }
 }

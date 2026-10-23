@@ -10,10 +10,4 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed record ControlActions(
     ICommand Taxi,
     ICommand Delivery,
-    ICommand Haul,
-    ICommand Bank,
-    ICommand Garage,
-    ICommand Dealer,
-    ICommand CarWash,
-    ICommand Mechanic,
-    ICommand Insurance);
+    ICommand Haul);

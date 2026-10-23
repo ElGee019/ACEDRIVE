@@ -12,11 +12,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class VoiceRouter
 {
-    // The companion HUD sits outside the main screen stack, so its ENTER
-    // button answers even while the overlay is hidden for driving.
-    // The HUD ENTER button answers to the one word the English mic model hears
-    // reliably, whatever the UI language shows on the button.
-    private static readonly string[] EnterKeywords = ["enter"];
+    // The companion HUD sits outside the main screen stack, so its action
+    // button answers even while the overlay is hidden for driving. The HUD
+    // owns the words per state ("enter" always, "pick up"/"drop off" when its
+    // label says so), keeping this router free of button copy.
     private const double WakeCooldownSec = 3.0;
 
     private readonly IVoiceHost _host;
@@ -99,13 +98,19 @@ public sealed class VoiceRouter
         string? label = VoiceMatch.MatchLabel(text, screen.VoiceActions.Keys, _host.Content.Confusions);
         if (label is null)
         {
-            // A failed attempt is still the user being present. The logged
-            // 2026-10-13 session hid mid-retry ("open your career" x3, then
-            // the 15 s window expired and the next phrase woke to home
-            // instead of pressing the button). Unmatched FINAL transcripts
-            // restart the idle window; partials do not, so a background
-            // voice that never finalizes keeps the old hide timing.
-            if (isFinal) _host.RecordActivity();
+            if (isFinal)
+            {
+                // A failed attempt is still the user being present: the
+                // logged 2026-10-13 session hid mid-retry ("open your
+                // career" x3), so an unmatched FINAL restarts the idle
+                // window (partials do not, keeping background chatter from
+                // holding the panel up). It also closes the utterance: the
+                // menu landing after the intro leaves the panel up, so
+                // without clearing here a tail that maps to nothing would
+                // keep the mute armed and swallow the next real tap.
+                ResetMute();
+                _host.RecordActivity();
+            }
             return;
         }
         // Voice control counts as user input: same idle-reset as a click.
@@ -148,23 +153,24 @@ public sealed class VoiceRouter
         action.Invoke();
     }
 
-    // HUD arrival voice tap: only while the button is up, and only a finished
-    // utterance. The HUD owns the teal acknowledgment and the half-second
-    // wait; the host still owns what entering means.
+    // HUD action voice tap: only while the button is up, and only a finished
+    // utterance. The keywords follow the button's meaning (ENTER, PICK UP,
+    // DROP OFF); the HUD owns the teal acknowledgment and the half-second
+    // wait, while the host still owns what entering means.
     private bool TryEnterPoi(string text)
     {
-        if (_hud is not { AtDestination: true })
+        if (_hud is not { AtDestination: true } hud)
         {
             return false;
         }
-        if (VoiceMatch.MatchLabel(text, EnterKeywords, _host.Content.Confusions) is null)
+        if (VoiceMatch.MatchLabel(text, hud.EnterKeywords, _host.Content.Confusions) is null)
         {
             return false;
         }
 
         _host.RecordActivity();
         _log.LogInfo($"voice button: {text}");
-        _hud.RequestEnter();
+        hud.RequestEnter();
         return true;
     }
 

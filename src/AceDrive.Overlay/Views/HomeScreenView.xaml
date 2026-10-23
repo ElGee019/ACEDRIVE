@@ -1,0 +1,57 @@
+<UserControl x:Class="AceDrive.Overlay.Views.HomeScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Home page (Unity's YouScreen): the player's own doors, not the job
+         board. The garage lives here, and so does the addresses page that
+         stands in for POI markers on the map; the remaining You-menu entries
+         join it as their pages land. Same page skeleton as the wallet page:
+         title band, centred body, BACK flush at the bottom. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=HomeTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <Button Content="{loc:Loc Key=HomeGarage}" Command="{Binding GarageCommand}"
+                    Margin="0,0,0,6">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding GarageFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=HomeAddresses}" Command="{Binding AddressesCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding AddressesFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+        <!-- Button bar: BACK stretches the full panel width in its own bottom
+             band; teal is the shared voice-ack highlight. -->
+        <Button Grid.Row="2" Content="{loc:Loc Key=HomeBack}" Command="{Binding BackCommand}">
+            <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                            <Setter Property="Foreground" Value="#FF97EAD2"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+        </Button>
+    </Grid>
+</UserControl>

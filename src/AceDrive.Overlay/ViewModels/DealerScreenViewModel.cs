@@ -18,7 +18,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// the car at once; BUY glows first since the follow-up page replaces this one,
 /// and BACK glows and navigates.
 /// </summary>
-public sealed class DealerScreenViewModel : ViewModelBase, IVoiceScreen
+public sealed class DealerScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen
 {
     private readonly IReadOnlyList<CarSpec> _catalog;
     private readonly Garage _garage;

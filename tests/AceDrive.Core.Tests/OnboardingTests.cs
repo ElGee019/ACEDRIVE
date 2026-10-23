@@ -50,6 +50,11 @@ public sealed class OnboardingTests
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            new PoiDirectory(), new FakePoiDirectoryStore(),
+            new PoiSpawner(
+                AddressMap.Default, PoiCatalog.Default,
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
+            new JobLedger(),
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
             new Trunk(), TaxiRules.Default);
     }
@@ -168,7 +173,7 @@ public sealed class OnboardingTests
         dialogue.ContinueCommand.Execute(null);
 
         Assert.True(store.State.BirthdayDone);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -195,7 +200,7 @@ public sealed class OnboardingTests
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
         dialogue.ContinueCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back
@@ -245,6 +250,11 @@ public sealed class OnboardingTests
             new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            new PoiDirectory(), new FakePoiDirectoryStore(),
+            new PoiSpawner(
+                AddressMap.Default, PoiCatalog.Default,
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
+            new JobLedger(),
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
             new Trunk(), TaxiRules.Default);
 
@@ -264,8 +274,8 @@ public sealed class OnboardingTests
         Assert.Equal("You", dialogue.SpeakerName);
 
         dialogue.ContinueCommand.Execute(null); // last page finishes
-        // The finished flow lands on the main control page; progress is persisted.
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        // The finished flow lands on the menu; progress is persisted.
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.True(store.State.BirthdayDone);
     }
 
@@ -408,7 +418,6 @@ public sealed class OnboardingTests
         Assert.Contains("nissan", loaded.Aliases["datsun"]); // live 17:13 Datsun garble
         Assert.Contains("nathan", loaded.Aliases["datsun"]); // live 17:17 Datsun garble
         Assert.Contains("henderson", loaded.Aliases["datsun"]); // live 17:17:36 Datsun fused-word garble
-        Assert.Equal("mazda", loaded.Confusions["him"]); // live 17:30:04 "the him"
         Assert.NotEmpty(loaded.PancakeDialogue); // home leg's dialogue ships with the build
         Assert.NotEmpty(loaded.CommunityCentreDialogue); // post-pancake leg's dialogue ships too
         Assert.Empty(log.Warnings);

@@ -47,6 +47,27 @@ public sealed class CityEconomy
     }
 
     /// <summary>
+    /// Adds one store that opened after the town was built (a placed
+    /// grocery/coffee shop). The cell starts on the row's own shelf fill,
+    /// exactly like a store present at boot; an existing key changes nothing.
+    /// Returns whether a cell was added.
+    /// </summary>
+    public bool AddStore(DeliveryStore store)
+    {
+        if (store is null
+            || string.IsNullOrWhiteSpace(store.Key)
+            || _index.ContainsKey(store.Key))
+        {
+            return false;
+        }
+
+        _index[store.Key] = _cells.Count;
+        _board.Add(store);
+        _cells.Add(Seed(store, null));
+        return true;
+    }
+
+    /// <summary>
     /// Moves the town up to a game moment: citizens adjust every
     /// <see cref="CityRules.CitizenTickMinutes"/> game minutes, demand pulls
     /// every <see cref="CityRules.DepletionTickMinutes"/> once

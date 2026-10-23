@@ -64,6 +64,13 @@ public sealed class TaxiJobState
     /// <summary>How many speed-challenge fines this ride collected.</summary>
     public int SpeedChallengeFines { get; set; }
 
+    /// <summary>
+    /// When the accepted speed challenge must reach the drop-off. Null when
+    /// the address map cannot supply a route (no deadline is invented) or
+    /// when this ride has no speed challenge.
+    /// </summary>
+    public DateTime? SpeedChallengeDeadline { get; set; }
+
     /// <summary>The patrols drawn when the speed challenge was accepted;
     /// empty for every other request and after the job ends.</summary>
     public IReadOnlyList<PolicePatrol> Patrols { get; set; } = [];

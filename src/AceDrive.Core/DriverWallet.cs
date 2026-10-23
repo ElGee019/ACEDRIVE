@@ -4,19 +4,27 @@
 // (Unity PlayerData.cash + PlayerData.xp accumulation on dropoff — the taxi
 // and the delivery; the haul banks cash alone, see AddHaul; the login bonus
 // lands here too, see AddBonus; the savings bank lives on the same
-// PlayerData, see BankBalance/Withdraw/ApplyInterest).
+// PlayerData, see BankBalance/Withdraw/ApplyInterest) and item 06 (the
+// driver-rating skills, see Rating).
 namespace AceDrive.Core;
 
 /// <summary>
-/// The driver's cash wallet + XP total + savings bank. Every settled receipt
-/// lands here; the store banks the snapshot. Cold paths only (dropoff,
-/// startup, the bank screen), so rounding per move is free of the 10 Hz loop.
+/// The driver's persisted account summary: cash, XP, savings bank and the
+/// three driver-rating skills. Every settled receipt lands here; the store
+/// banks the snapshot. Cold paths only (dropoff, startup, the bank/wallet
+/// screens), so rounding per move is free of the 10 Hz loop.
 /// </summary>
 public sealed class DriverWallet
 {
+    /// <summary>The CR a brand-new driver owns. It has to cover the overhead
+    /// of the first jobs (fuel, food, a wash) before any fare is banked, so a
+    /// fresh game never opens on an empty wallet. Only a first launch reads
+    /// it: a resumed save always beats the seed, never re-applies it.</summary>
+    public const double StartingCash = 100.0;
+
     public DriverWallet(DriverState? saved = null)
     {
-        Cash = Math.Max(0.0, saved?.Cash ?? 0.0);
+        Cash = Math.Max(0.0, saved?.Cash ?? StartingCash);
         Xp = Math.Max(0.0, saved?.Xp ?? 0.0);
         // The 1000.0 record default IS Unity's seed (PlayerDefaults + the map
         // boot 0→1000 migration): a pre-bank save deserializes straight to the
@@ -26,10 +34,22 @@ public sealed class DriverWallet
         HasEnteredBank = saved?.HasEnteredBank ?? false;
         PendingInsurance = Math.Max(0.0, saved?.PendingInsurance ?? 0.0);
         LastInsuranceChargeDate = saved?.LastInsuranceChargeDate;
+        // The state's defaults are Unity's new-game profile; a save from
+        // before the rating existed therefore reads 20/20/20 unchanged. The
+        // clamp still catches a hand-edited zero (Unity's ClampStat).
+        Rating = DriverRating.FromSaved(
+            saved?.Cornering ?? DriverRating.NewGameOverall,
+            saved?.Concentration ?? DriverRating.NewGameOverall,
+            saved?.OffTheLine ?? DriverRating.NewGameOverall);
     }
 
     public double Cash { get; private set; }
     public double Xp { get; private set; }
+
+    /// <summary>The persisted driver-rating skills (Unity PlayerData's three
+    /// driver* fields). The wallet screen shows them and the haul/insurance
+    /// math reads the overall; no skill event mutates them yet.</summary>
+    public DriverRating Rating { get; }
 
     /// <summary>The savings-bank balance (Unity PlayerData.bankAmount).
     /// Interest accrues here and compounds; job payouts land in Cash.</summary>
@@ -180,5 +200,8 @@ public sealed class DriverWallet
         HasEnteredBank = HasEnteredBank,
         PendingInsurance = PendingInsurance,
         LastInsuranceChargeDate = LastInsuranceChargeDate,
+        Cornering = Rating.Cornering,
+        Concentration = Rating.Concentration,
+        OffTheLine = Rating.OffTheLine,
     };
 }

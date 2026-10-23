@@ -58,10 +58,14 @@ public partial class App : Application, IDisposable
         // so their seeds are offset to keep the first resident from tracking
         // the first proposal.
         int taxiSeed = Environment.TickCount;
+        // One name-pool read for the residents and the generated business
+        // owners; the two draw from independent seeded streams.
+        NamePoolTable namePools = new JsonNamePoolStore(_log).Load();
         var residents = new ResidentBook(
             new JsonResidentStore(_log),
-            new ProceduralNameGenerator(new JsonNamePoolStore(_log).Load(), taxiSeed),
+            new ProceduralNameGenerator(namePools, taxiSeed),
             _log);
+        var poiNames = new ProceduralNameGenerator(namePools, taxiSeed + 4);
         var taxiProposals = new TaxiJobProposer(addressMap, residents, taxiSeed + 1);
         var content = new JsonOnboardingContent(_log);
         // WHY touch Content once at startup: the same eager first read (and
@@ -79,12 +83,48 @@ public partial class App : Application, IDisposable
         // its own seeded instance, never the shared global; tests pin the seed.
         var poiTable = new JsonPoiStore(_log).Load();
         var poiGenerator = new PoiGenerator(addressMap, poiTable, Environment.TickCount);
+        // The business POIs (PORTPLAN 24): no door exists on a new career. The
+        // spawner opens the car wash, bank, dealer, mechanic and insurance on
+        // free houses as the operating zone and the settled-job count cross
+        // Unity's thresholds; the host checks it at boot and on every settle.
+        // Separate seeded stream so a spawn never reshuffles a resident name.
+        var poiSpawner = new PoiSpawner(addressMap, poiTable, poiNames, taxiSeed + 4);
+        // The addresses page (PORTPLAN 24/27): every discovered door lands in
+        // one banked directory. Story doors arrive first, then the spawned
+        // businesses; both survive a restart.
+        var poiStore = new JsonPoiDirectoryStore(_log);
+        IReadOnlyList<PointOfInterest> savedPois = poiStore.Load();
+        var keptPois = new List<PointOfInterest>(savedPois.Count);
+        foreach (PointOfInterest poi in savedPois)
+        {
+            if (!IsRetiredAtStartDoor(poi, poiTable))
+            {
+                keptPois.Add(poi);
+            }
+        }
+        var poiDirectory = new PoiDirectory(keptPois);
+        if (keptPois.Count != savedPois.Count)
+        {
+            // The at-start build drew fixed doors named after their definition
+            // id ("bank", "dealer", …). The business doors now open from the
+            // street/job thresholds, so those fixed rows are dropped once; the
+            // generated ids ("bank_0") and every story door stay. The boot
+            // growth below re-opens whatever the saved progress actually earned.
+            poiStore.Save(poiDirectory.All);
+            _log.LogInfo(
+                $"[Poi] dropped {savedPois.Count - keptPois.Count} retired at-start door(s)");
+        }
         // Shop content (PORTPLAN items 24/26): the item database + per-store
         // layout. A missing/corrupt file degrades to the built-in catalog.
         var storeCatalog = new JsonStoreItemStore(_log).Load();
         var stores = new StoreNetwork(storeCatalog, poiTable);
         var playerName = new SteamPersonaNameSource(_log).TryReadName();
-        var deliveryCatalog = new JsonDeliveryCatalog(_log).Load();
+        // The delivery board: its printed rows plus every grocery/coffee
+        // store an earlier session placed. The POI directory is the persisted
+        // identity, so the board row and the shop interior rebuild the same
+        // store from the same catalogue; the town then restores its shelf cell.
+        var deliveryCatalog = new JsonDeliveryCatalog(_log).Load()
+            .WithStores(PlacedStore.Rows(poiDirectory.All, storeCatalog));
         // The delivery distance-charge table rides beside the taxi fares:
         // one file each, so balance edits never collide.
         var deliveryFares = new JsonFareStore(_log).LoadDelivery();
@@ -151,6 +191,10 @@ public partial class App : Application, IDisposable
         var driverStore = new JsonDriverStore(_log);
         DriverState? savedDriver = driverStore.Load();
         var driver = new DriverWallet(savedDriver);
+        // The lifetime settled-job total (PORTPLAN 24, Unity jobsCompleted):
+        // the dealer and mechanic POIs gate on it, so it must survive a
+        // restart beside the cash it was earned with.
+        var jobs = new JobLedger(savedDriver);
         // The open taxi shift resumes with its wall-clock stamps (PORTPLAN 12):
         // the 30-minute idle rule keeps running while the app and EVO are
         // closed, so a restart inside the window continues the same shift and
@@ -235,12 +279,13 @@ public partial class App : Application, IDisposable
         // Brand mileage (PORTPLAN 35): lifetime km per driven brand behind
         // the receipt's sponsorship rate, resumed across sessions.
         var brands = new JsonBrandMileageStore(_log);
-        // The typed POI router (PORTPLAN item 24): Max's grocery is the first
-        // interior. A future business joins by adding its handler here.
-        var poiArrivals = new PoiArrivalRouter(
+        // The typed POI handlers (PORTPLAN item 24): Max's grocery is the
+        // first interior. The business interiors (bank, dealer, …) are built
+        // by the host, which owns their destination changes and banking.
+        IPoiArrivalHandler[] poiHandlers =
         [
             new StorePoiHandler(stores, trunk, driver, garage, friendships, beat),
-        ]);
+        ];
         var taxiRules = new JsonTaxiRulesStore(_log).Load();
         // Customer request content (PORTPLAN item 11): suffix lines, quiz
         // categories and tier chances. Its own seeded stream, offset from the
@@ -253,6 +298,10 @@ public partial class App : Application, IDisposable
         var police = new PolicePatrolPlanner(addressMap, policeRules, taxiSeed + 3);
         var hud = new HudViewModel(addressMap, preferences, beat, wall, taxiRules);
         var onboardingStore = new JsonOnboardingStore();
+        // RESET GAME (settings): wipe every career file, then replace the
+        // process so no in-memory store survives into the fresh introduction.
+        var saveResets = new FileSaveDataResetter(_log);
+        var restarter = new ProcessAppRestarter(_log);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -303,8 +352,11 @@ public partial class App : Application, IDisposable
             // never the shared global (AGENTS.md).
             new BreakdownStrategy(maintenanceRules, Environment.TickCount),
             poiGenerator,
+            poiDirectory, poiStore,
+            poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, hud, poiArrivals, requests, requestTable, police);
+            trunk, taxiRules, hud, poiHandlers, requests, requestTable, police,
+            saveResets, restarter, storeCatalog);
 
         MainWindow = new MainWindow(vm, _log);
         // The 200 px companion: own placement file, width follows the main
@@ -313,6 +365,10 @@ public partial class App : Application, IDisposable
         // introduction and reveals it when the birthday dialogue ends.
         var hudWindow = new HudWindow(
             hud, HudSettings(), _log, MainWindow.Left, MainWindow.Top, MainWindow.Width);
+        // A page can hand its task text to the companion while the panel is
+        // still open (an address was just pinned): show it at once instead of
+        // waiting for the panel to hide.
+        hud.TaskTextRequested += (_, _) => hudWindow.ShowTaskTextOverPanel();
         MainWindow.SizeChanged += (_, _) => hudWindow.MatchWidth(MainWindow.ActualWidth);
         // The companion sits in the same corner as the panel; hide it while
         // the panel is on screen so it cannot cover page rows or eat clicks.
@@ -336,6 +392,24 @@ public partial class App : Application, IDisposable
         // reveals it (a save past the birthday reveals it at startup).
         vm.Show();
         MainWindow.Show();
+    }
+
+    // A saved door whose id is exactly a spawnable definition's id came from
+    // the retired at-start boot seed; generated doors suffix the id with the
+    // family index ("carwash_0") and are never mistaken for it.
+    private static bool IsRetiredAtStartDoor(
+        PointOfInterest poi, IReadOnlyList<PoiDefinition> table)
+    {
+        foreach (PoiDefinition definition in table)
+        {
+            if (definition.Spawn is not null
+                && string.Equals(poi.Id, definition.Id, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // The HUD banks its own placement beside the main window.json so resizing

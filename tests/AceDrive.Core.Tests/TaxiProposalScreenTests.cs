@@ -30,7 +30,8 @@ public sealed class TaxiProposalScreenTests
         List<TaxiJobState> Accepted)
         Create(
             NamePoolTable? table = null, int seed = 0, AddressMap? map = null,
-            AddressLocation? home = null, IResidentStore? residents = null)
+            AddressLocation? home = null, IResidentStore? residents = null,
+            int seats = 4)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var log = new TestLog();
@@ -43,7 +44,7 @@ public sealed class TaxiProposalScreenTests
             TaxiTestData.Proposer(
                 map: addressMap, table: table ?? SoloTable, seed: seed,
                 residents: residents),
-            addressMap, () => home, log, beat,
+            addressMap, () => home, () => seats, log, beat,
             new RelayCommand(() => fired[0] = true),
             new ParameterizedCommand<TaxiJobState>(job =>
             {
@@ -139,6 +140,24 @@ public sealed class TaxiProposalScreenTests
         // pricing the ride is the host's accept step.
         Assert.Equal(0, job.Fare);
         Assert.False(fired[0]);
+    }
+
+    [Fact]
+    public void SingleSeatCar_ShowsAndCommitsTheCustomerAlone()
+    {
+        var (vm, _, _, _, _, accepted) = Create(seats: 1);
+        vm.Open();
+
+        // One seat, one customer: the suffix-triggered companion group has no
+        // room in this car, so neither the page nor the job names it.
+        string phrase = vm.Phrase.Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.StartsWith("Solo Sohn\nneed a ride", phrase, StringComparison.Ordinal);
+        Assert.DoesNotContain("and some friends", phrase, StringComparison.Ordinal);
+
+        vm.AcceptCommand.Execute(null);
+        TaxiJobState job = Assert.Single(accepted);
+        Assert.Equal("Solo Sohn", job.Customer.Full);
+        Assert.Empty(job.Customer.Suffix);
     }
 
     [Fact]
@@ -306,7 +325,8 @@ public sealed class TaxiProposalScreenTests
         for (int seed = 0; seed < 100; seed++)
         {
             TaxiProposal proposal = TaxiTestData.Proposer(
-                map: LongMap, table: SoloTable, seed: seed).Next();
+                map: LongMap, table: SoloTable, seed: seed)
+                .Next(passengerCapacity: 4);
             if (AddressBook.DistanceMeters(
                     LongMap, home, proposal.CustomerHome!.Value) > 5_000.0
                 || AddressBook.DistanceMeters(

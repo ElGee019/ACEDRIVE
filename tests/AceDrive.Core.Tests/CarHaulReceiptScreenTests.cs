@@ -21,12 +21,25 @@ public sealed class CarHaulReceiptScreenTests
         // The fixture haul: class-15 car (tier 6), rating 50, 30 minutes.
         CarHaulReceipt settled = receipt ?? CarHaulReceiptBuilder.Build(
             "Test Hatch", carClass: 15, driverRating: 50, driveMinutes: 30);
-        var wallet = new DriverWallet();
+        // Empty wallet: the page lines must show the settle alone, not the
+        // fresh-start seed (covered in DriverWalletTests).
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
         wallet.AddHaul(settled);
         var vm = new CarHaulReceiptScreenViewModel(
             settled, wallet, beat,
             new RelayCommand(() => continued[0] = true));
         return (vm, continued, wallet);
+    }
+
+    [Fact]
+    public void Receipt_OptsOutOfTheIdleHide()
+    {
+        // The haul breakdown waits for CONTINUE; the shell must not close the
+        // panel 15 s into the read. The taxi receipt proves the shell rule end
+        // to end; this pins the haul page's opt-in.
+        var (vm, _, _) = Create();
+
+        Assert.IsAssignableFrom<IKeepPanelOpen>(vm);
     }
 
     [Fact]

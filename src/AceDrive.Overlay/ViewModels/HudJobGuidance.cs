@@ -15,4 +15,5 @@ public sealed record HudJobGuidance(
     string DriveKey,
     string ArrivedKey,
     string ActionKey,
-    double ArrivalRadiusMeters);
+    double ArrivalRadiusMeters,
+    DateTime? SpeedChallengeDeadline = null);

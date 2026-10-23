@@ -47,16 +47,37 @@ public sealed class PoiGenerator
             ? _definitions[0]
             : _definitions[_rng.Next(_definitions.Count)];
 
-        return DrawAddress(total) is { } address
-            ? new PointOfInterest(
-                definition.Id,
-                definition.Name,
-                address,
-                definition.Type,
-                definition.OwnerName,
-                definition.Category,
-                definition.GuaranteedItems)
-            : null;
+        return Place(definition, DrawAddress(total));
+    }
+
+    /// <summary>
+    /// Places one named definition at a freshly drawn house. The story errand
+    /// pins Max's shop by id, so it never depends on the random definition
+    /// pick above. Null when the id is unknown or the map has no house. Never
+    /// throws.
+    /// </summary>
+    public PointOfInterest? Spawn(string definitionId)
+    {
+        if (_map.Streets is not { Count: > 0 } || string.IsNullOrWhiteSpace(definitionId))
+        {
+            return null;
+        }
+
+        int total = TotalHouses();
+        if (total <= 0)
+        {
+            return null;
+        }
+
+        foreach (PoiDefinition definition in _definitions)
+        {
+            if (string.Equals(definition.Id, definitionId, StringComparison.Ordinal))
+            {
+                return Place(definition, DrawAddress(total));
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -86,19 +107,24 @@ public sealed class PoiGenerator
         {
             if (string.Equals(definition.Id, id, StringComparison.Ordinal))
             {
-                return new PointOfInterest(
-                    definition.Id,
-                    definition.Name,
-                    address,
-                    definition.Type,
-                    definition.OwnerName,
-                    definition.Category,
-                    definition.GuaranteedItems);
+                return Place(definition, address);
             }
         }
 
         return null;
     }
+
+    private static PointOfInterest? Place(PoiDefinition definition, AddressLocation? address) =>
+        address is { } door
+            ? new PointOfInterest(
+                definition.Id,
+                definition.Name,
+                door,
+                definition.Type,
+                definition.OwnerName,
+                definition.Category,
+                definition.GuaranteedItems)
+            : null;
 
     private AddressLocation? DrawAddress(int total)
     {

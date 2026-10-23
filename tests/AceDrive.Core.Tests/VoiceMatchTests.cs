@@ -308,4 +308,39 @@ public sealed class VoiceMatchTests
         Assert.Null(VoiceMatch.MatchLabel(text, ["OPEN NEW CAREER", "TIER 2"],
             new Dictionary<string, string>()));
     }
+
+    // 2026-10-23 menu sessions: the English model never heard "filth" whole.
+    // The attempts landed as "felt" (10:56:07, 10:56:13), "self" (10:56:10),
+    // "phil" (09:44:17) and "filled" (2026-10-22 21:07:19) — the tile only
+    // fired on the one attempt the model scored literally ("filled filth",
+    // 10:56:24). The table is the door those readings walk through. The swap
+    // is one word wide, so a phrase carrying the garbled word answers too;
+    // FILTH only ever reads out, never navigates, so a stray glow costs a
+    // three-second number on the menu.
+    [Theory]
+    [InlineData("felt", "FILTH")]
+    [InlineData("phil", "FILTH")]
+    [InlineData("phil s", "FILTH")]   // "phil's" normalizes to two words
+    [InlineData("filled", "FILTH")]
+    [InlineData("self", "FILTH")]
+    [InlineData("hunger", "HUNGER")]  // the exact hearing is untouched
+    [InlineData("blah blah", null)]   // the table never invents a match
+    public void MatchLabel_FilthMishearings_ResolveThroughTheTable(string text, string? expected)
+    {
+        var confusions = new Dictionary<string, string>
+        {
+            ["felt"] = "filth",
+            ["phil"] = "filth",
+            ["filled"] = "filth",
+            ["self"] = "filth",
+        };
+        string[] labels =
+        [
+            "WALLET", "JOBS", "CALENDAR",
+            "TRUNK", "EMPLOYEES", "HOME",
+            "HUNGER", "FILTH", "SETTINGS",
+        ];
+
+        Assert.Equal(expected, VoiceMatch.MatchLabel(text, labels, confusions));
+    }
 }

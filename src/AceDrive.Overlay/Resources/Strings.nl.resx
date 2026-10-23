@@ -46,6 +46,8 @@
   <data name="HudJobDistanceKm" xml:space="preserve"><value>{0:0.0} km</value></data>
   <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
+  <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Snelheidsuitdaging: {0}</value></data>
+  <data name="HudSpeedChallengeLate" xml:space="preserve"><value>TE LAAT — GEEN FOOI</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (nepklus)</value></data>
   <data name="NoJob" xml:space="preserve"><value>Geen klus. Druk op Nieuwe klus en rijd.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op OPHALEN.</value></data>
@@ -82,6 +84,10 @@
   <data name="PreferencesLanguage" xml:space="preserve"><value>TAAL</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="PreferencesBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="SettingsResetGame" xml:space="preserve"><value>SPEL RESETTEN</value></data>
+  <data name="SettingsResetConfirm" xml:space="preserve"><value>ALLE VOORTGANG WISSEN</value></data>
+  <data name="SettingsResetWarning" xml:space="preserve"><value>Dit wist je profiel, geld, auto's en alle voortgang. Je begint opnieuw bij de introductie.</value></data>
+  <data name="SettingsResetFailed" xml:space="preserve"><value>Het spel kon niet worden gereset. Sluit AceDrive en probeer het opnieuw.</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WAT IS JE FAVORIETE MERK</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>IN WELKE AUTO RIJDT OMA</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
@@ -103,12 +109,9 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>AUTOTRANSPORTKLUS</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>KLUSSEN</value></data>
-  <data name="ControlCalendar" xml:space="preserve"><value>KALENDER</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>OMA'S TAKENLIJSTJE</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>KOM TERUG OP {0} TUSSEN 8 EN 20 UUR</value></data>
-  <data name="HungerValue" xml:space="preserve"><value>HONGER {0}/{1}</value></data>
-  <data name="FilthValue" xml:space="preserve"><value>VUIL {0}/{1}</value></data>
   <data name="DaySun" xml:space="preserve"><value>Zondag</value></data>
   <data name="DayMon" xml:space="preserve"><value>Maandag</value></data>
   <data name="DayTue" xml:space="preserve"><value>Dinsdag</value></data>
@@ -116,13 +119,13 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DayThu" xml:space="preserve"><value>Donderdag</value></data>
   <data name="DayFri" xml:space="preserve"><value>Vrijdag</value></data>
   <data name="DaySat" xml:space="preserve"><value>Zaterdag</value></data>
-  <data name="DayShortSun" xml:space="preserve"><value>ZO</value></data>
-  <data name="DayShortMon" xml:space="preserve"><value>MA</value></data>
-  <data name="DayShortTue" xml:space="preserve"><value>DI</value></data>
-  <data name="DayShortWed" xml:space="preserve"><value>WO</value></data>
-  <data name="DayShortThu" xml:space="preserve"><value>DO</value></data>
-  <data name="DayShortFri" xml:space="preserve"><value>VR</value></data>
-  <data name="DayShortSat" xml:space="preserve"><value>ZA</value></data>
+  <data name="DayShortSun" xml:space="preserve"><value>ZON</value></data>
+  <data name="DayShortMon" xml:space="preserve"><value>MAA</value></data>
+  <data name="DayShortTue" xml:space="preserve"><value>DIN</value></data>
+  <data name="DayShortWed" xml:space="preserve"><value>WOE</value></data>
+  <data name="DayShortThu" xml:space="preserve"><value>DON</value></data>
+  <data name="DayShortFri" xml:space="preserve"><value>VRI</value></data>
+  <data name="DayShortSat" xml:space="preserve"><value>ZAT</value></data>
   <data name="EventCentoMiglia" xml:space="preserve"><value>Cento Miglia</value></data>
   <data name="EventValuation" xml:space="preserve"><value>Taxatie</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Wegtest</value></data>
@@ -180,6 +183,8 @@ Deze klus aannemen?</value></data>
   <data name="ProposalRadiusHint" xml:space="preserve"><value>Beperk hoe ver je van oma's huis vandaan taxi's wilt aannemen door hieronder een straal in te voeren.</value></data>
   <data name="RequestTitle" xml:space="preserve"><value>KLANTVERZOEK</value></data>
   <data name="RequestTime" xml:space="preserve"><value>RESTERENDE TIJD: {0}s</value></data>
+  <data name="SpeedChallengeTime" xml:space="preserve"><value>LEVER BINNEN {0}</value></data>
+  <data name="SpeedChallengeLate" xml:space="preserve"><value>TE LAAT</value></data>
   <data name="RequestAccept" xml:space="preserve"><value>Ja hoor...</value></data>
   <data name="RequestDecline" xml:space="preserve"><value>Echt niet, dat is te veel gevraagd</value></data>
   <data name="RequestCorrect" xml:space="preserve"><value>Indrukwekkend, dank je. Ik geef je een goede fooi.</value></data>
@@ -239,14 +244,51 @@ Deze klus aannemen?</value></data>
   <data name="BankAfter" xml:space="preserve"><value>Saldo na opname: CR{0:0.00}</value></data>
   <data name="BankWithdraw" xml:space="preserve"><value>OPNEMEN</value></data>
   <data name="BankBack" xml:space="preserve"><value>TERUG</value></data>
-  <data name="ControlBank" xml:space="preserve"><value>BANK</value></data>
-  <data name="ControlGarage" xml:space="preserve"><value>GARAGE</value></data>
-  <data name="ControlDealer" xml:space="preserve"><value>AUTODEALER</value></data>
+  <data name="WalletTitle" xml:space="preserve"><value>PORTEMONNEE</value></data>
+  <data name="WalletCashLabel" xml:space="preserve"><value>HUIDIGE CR</value></data>
+  <data name="WalletXpLabel" xml:space="preserve"><value>HUIDIGE XP</value></data>
+  <data name="WalletBankLabel" xml:space="preserve"><value>HUIDIG BANKSALDO</value></data>
+  <data name="WalletCrAmount" xml:space="preserve"><value>CR{0:0.00}</value></data>
+  <data name="WalletXpAmount" xml:space="preserve"><value>XP{0:0.00}</value></data>
+  <data name="WalletLeaderboard" xml:space="preserve"><value>WERELDWIJDE XP-RANGLIJST</value></data>
+  <data name="WalletRating" xml:space="preserve"><value>RIJDERSRATING</value></data>
+  <data name="WalletConcentration" xml:space="preserve"><value>Concentratie: {0:0}%</value></data>
+  <data name="WalletCornering" xml:space="preserve"><value>Bochten: {0:0}%</value></data>
+  <data name="WalletOffTheLine" xml:space="preserve"><value>Startreactie: {0:0}%</value></data>
+  <data name="WalletBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
+  <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
+  <data name="HomeAddresses" xml:space="preserve"><value>ADRESSEN</value></data>
+  <data name="HomeBack" xml:space="preserve"><value>TERUG</value></data>
+  <!-- Adressenpagina (PORTPLAN 24/27): elke ontdekte POI op naam, de tijdelijke
+       vervanger van markers op de kaart. Een rij zet de ritregel van de HUD;
+       {0} = POI-naam, {1} = straat en huisnummer. Placeholders blijven bij
+       vertaling bestaan; vertalers mogen herordenen, nooit verwijderen. -->
+  <data name="AddressesTitle" xml:space="preserve"><value>ADRESSEN</value></data>
+  <data name="AddressesEmpty" xml:space="preserve"><value>Nog geen adressen ontdekt.</value></data>
+  <data name="AddressesSelect" xml:space="preserve"><value>KIES EEN ADRES</value></data>
+  <data name="AddressesSelected" xml:space="preserve"><value>Opdracht ingesteld: rijd naar {0} op {1}</value></data>
+  <data name="AddressesBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="GarageTitle" xml:space="preserve"><value>GARAGE</value></data>
   <data name="GarageEmpty" xml:space="preserve"><value>Nog geen auto's in de garage.</value></data>
   <data name="GarageCurrent" xml:space="preserve"><value>HUIDIGE</value></data>
-  <data name="GarageCarSpecs" xml:space="preserve"><value>klasse {0} · {1} zitplaatsen · kofferbak {2} L · {3:0} km</value></data>
-  <data name="GarageCarValue" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="GarageSelect" xml:space="preserve"><value>KIES EEN AUTO</value></data>
+  <data name="GarageDrive" xml:space="preserve"><value>RIJD DEZE AUTO</value></data>
+  <data name="GarageCurrentCar" xml:space="preserve"><value>HUIDIGE AUTO</value></data>
+  <data name="GaragePriceLabel" xml:space="preserve"><value>PRIJS</value></data>
+  <data name="GarageEngineLabel" xml:space="preserve"><value>MOTOR</value></data>
+  <data name="GaragePowerLabel" xml:space="preserve"><value>VERMOGEN</value></data>
+  <data name="GarageConsumptionLabel" xml:space="preserve"><value>VERBRUIK</value></data>
+  <data name="GaragePassengersLabel" xml:space="preserve"><value>PASSAGIERS</value></data>
+  <data name="GarageBootLabel" xml:space="preserve"><value>KOFFERBAK</value></data>
+  <data name="GarageOdometerLabel" xml:space="preserve"><value>KILOMETERSTAND</value></data>
+  <data name="GaragePrice" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="GarageEngine" xml:space="preserve"><value>{0} cc</value></data>
+  <data name="GaragePower" xml:space="preserve"><value>{0} pk</value></data>
+  <data name="GarageConsumption" xml:space="preserve"><value>{0:0.#} L/100km</value></data>
+  <data name="GaragePassengers" xml:space="preserve"><value>{0}</value></data>
+  <data name="GarageBoot" xml:space="preserve"><value>{0} L</value></data>
+  <data name="GarageOdometer" xml:space="preserve"><value>{0:0} km</value></data>
   <data name="GarageBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="DealerTitle" xml:space="preserve"><value>AUTODEALER</value></data>
   <data name="DealerCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
@@ -261,7 +303,6 @@ Deze klus aannemen?</value></data>
   <data name="BoughtDrive" xml:space="preserve"><value>RIJD ERIN</value></data>
   <data name="BoughtKeep" xml:space="preserve"><value>HOUD HUIDIGE</value></data>
   <data name="BoughtSecondCar" xml:space="preserve"><value>Twee auto's in de garage. Kies welke je rijdt.</value></data>
-  <data name="ControlCarWash" xml:space="preserve"><value>CARWASH</value></data>
   <data name="CarWashTitle" xml:space="preserve"><value>CARWASH</value></data>
   <data name="CarWashFilth" xml:space="preserve"><value>Vuil: {0} / {1}</value></data>
   <data name="CarWashPrice" xml:space="preserve"><value>Prijs om je auto te wassen: CR{0:0.00}</value></data>
@@ -313,7 +354,6 @@ Deze klus aannemen?</value></data>
        motorenblok, de onderdelenrijen (efficiëntie, prijs, toevoeglabel) en de
        totaalregel met het saldo na betaling. Onderdeelnamen komen uit het
        datasleutel via MechanicPartNames. -->
-  <data name="ControlMechanic" xml:space="preserve"><value>MONTEUR</value></data>
   <data name="MechanicTitle" xml:space="preserve"><value>AUTOMONTEUR</value></data>
   <data name="MechanicCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
   <data name="MechanicNoCar" xml:space="preserve"><value>Nog geen auto om te onderhouden.</value></data>
@@ -343,7 +383,6 @@ Deze klus aannemen?</value></data>
   <!-- Verzekeringsmakelaar (PORTPLAN item 34, Unity InsuranceScreen): de
        schakelaar per auto, de dagprijsregels, het totaal en het blok om de
        dekking te innen. -->
-  <data name="ControlInsurance" xml:space="preserve"><value>VERZEKERING</value></data>
   <data name="InsuranceTitle" xml:space="preserve"><value>VERZEKERING</value></data>
   <data name="InsuranceCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
   <data name="InsuranceEmpty" xml:space="preserve"><value>Nog geen auto's om te verzekeren.</value></data>
@@ -389,4 +428,16 @@ Deze klus aannemen?</value></data>
   <data name="StoreFriendshipGoodFriend" xml:space="preserve"><value>{0} is een goede vriend.</value></data>
   <data name="StoreFriendshipCloseFriend" xml:space="preserve"><value>{0} is een hechte vriend.</value></data>
   <data name="StoreFriendshipBff" xml:space="preserve"><value>BFF met {0}!</value></data>
+  <data name="TrunkTitle" xml:space="preserve"><value>KOFFERBAK</value></data>
+  <data name="TrunkFree" xml:space="preserve"><value>Vrije ruimte: {0:0.00}/{1}L</value></data>
+  <data name="TrunkHunger" xml:space="preserve"><value>HONGER {0}/{1}</value></data>
+  <data name="TrunkEmpty" xml:space="preserve"><value>Je kofferbak is leeg.</value></data>
+  <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
+  <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
+  <data name="TrunkEat" xml:space="preserve"><value>ETEN</value></data>
+  <data name="TrunkBack" xml:space="preserve"><value>TERUG</value></data>
+  <!-- Menu-metertegels (PORTPLAN 26/33): een tik wisselt de getekende accu
+       voor de stand. {0} is een heel percentage; het teken staat direct op
+       het getal, zoals op de getekende labels. -->
+  <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
 </root>

@@ -25,6 +25,20 @@ internal static class TaxiFlow
         return proposal;
     }
 
+    /// <summary>
+    /// Confirms the pickup and waits out the drop-off task text's read-in
+    /// delay, so a rolled request reaches its page. Returns that page, or null
+    /// when the ride has no ask.
+    /// </summary>
+    public static CustomerRequestScreenViewModel? Pickup(
+        MainViewModel vm, FakeClock clock)
+    {
+        vm.PickupCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(TaxiRules.Default.RequestDelaySeconds));
+        vm.Poll();
+        return vm.CurrentScreen as CustomerRequestScreenViewModel;
+    }
+
     /// <summary>Accepts the first request option (passive/speed ACCEPT; a
     /// quiz's first value, which a quiz test must drive itself) and closes
     /// the page. No-request rides pass straight through.</summary>
@@ -35,7 +49,11 @@ internal static class TaxiFlow
             return;
         }
 
-        request.Options[0].Command.Execute(null);
+        if (request.Options.Count > 0)
+        {
+            request.Options[0].Command.Execute(null);
+        }
+
         request.BackCommand.Execute(null);
     }
 
@@ -57,7 +75,7 @@ internal static class TaxiFlow
         double km = DefaultDistanceKm)
     {
         Propose(vm);
-        vm.PickupCommand.Execute(null);
+        Pickup(vm, clock);
         AnswerRequest(vm);
         Drive(vm, clock, tel, km);
         vm.DropoffCommand.Execute(null);

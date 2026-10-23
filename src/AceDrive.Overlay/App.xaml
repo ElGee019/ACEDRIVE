@@ -14,6 +14,11 @@
              but for pack URIs, so a WebP-less WIC drops the art instead of the
              app. The startup assigns its Source once. -->
         <views:PackImageConverter x:Key="PackImage"/>
+        <!-- Battery tile fill: the meter fraction to the clip that reveals the
+             gradient bottom up, one step per meter point. WHY "Clip" in the
+             key: MenuScreenView has a local MeterFill Image style, and a shared
+             key would shadow it (a Style where a converter is expected). -->
+        <views:MeterFillConverter x:Key="MeterFillClip"/>
         <!-- Menu-tile voice acknowledgment: the shared teal glow around the
              artwork while its flash flag is up. -->
         <views:BoolToVoiceGlowConverter x:Key="VoiceGlow"/>

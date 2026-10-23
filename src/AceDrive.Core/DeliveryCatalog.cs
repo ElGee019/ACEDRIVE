@@ -40,4 +40,31 @@ public sealed record DeliveryCatalog(
     /// </summary>
     public double PayoutCost(DeliveryStore store) =>
         Math.Round(store.PricePerUnit * PayoutRate * store.UnitsNeeded, 2);
+
+    /// <summary>
+    /// The board with one placed store appended (Unity's backfill). An
+    /// existing key wins, so a repeated placement or a boot rebuild never
+    /// duplicates a row. Cold path: a hub purchase or the next expansion.
+    /// </summary>
+    public DeliveryCatalog WithStore(DeliveryStore store)
+    {
+        if (store is null || Find(store.Key) is not null)
+        {
+            return this;
+        }
+
+        var stores = new List<DeliveryStore>(Stores) { store };
+        return this with { Stores = stores };
+    }
+
+    /// <summary>The board with every not-yet-known row appended.</summary>
+    public DeliveryCatalog WithStores(IEnumerable<DeliveryStore> stores)
+    {
+        DeliveryCatalog board = this;
+        foreach (DeliveryStore store in stores)
+        {
+            board = board.WithStore(store);
+        }
+        return board;
+    }
 }

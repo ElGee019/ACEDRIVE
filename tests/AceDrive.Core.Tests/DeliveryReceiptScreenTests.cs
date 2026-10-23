@@ -22,13 +22,26 @@ public sealed class DeliveryReceiptScreenTests
         DeliveryReceipt settled = receipt ?? DeliveryReceiptBuilder.Build(
             8.2, paidForGoods: 49.00, receivedForGoods: 63.00,
             DeliveryFareTable.Default, streetKnowledgePct: 100, currentXp: 0.0);
-        var wallet = new DriverWallet();
+        // Empty wallet: the page lines must show the settle alone, not the
+        // fresh-start seed (covered in DriverWalletTests).
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
         wallet.AddDelivery(settled);
         var fake = rivals ?? new FakeRivals();
         var vm = new DeliveryReceiptScreenViewModel(
             settled, wallet, beat,
             new RelayCommand(() => continued[0] = true), fake);
         return (vm, continued, fake);
+    }
+
+    [Fact]
+    public void Receipt_OptsOutOfTheIdleHide()
+    {
+        // The breakdown waits for CONTINUE; the shell must not close the panel
+        // 15 s into the read. The taxi receipt proves the shell rule end to
+        // end; this pins the delivery page's opt-in.
+        var (vm, _, _) = Create();
+
+        Assert.IsAssignableFrom<IKeepPanelOpen>(vm);
     }
 
     [Fact]

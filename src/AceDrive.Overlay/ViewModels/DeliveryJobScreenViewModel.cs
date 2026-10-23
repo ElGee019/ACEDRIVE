@@ -26,7 +26,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
 {
-    private readonly DeliveryCatalog _catalog;
+    private DeliveryCatalog _catalog;
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
     private readonly DeliveryCart _cart = new();
@@ -99,8 +99,17 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
 
     /// <summary>Unity re-shows this screen after the hub page closes, so it
     /// re-pulls career state (spent CredP, newly connected stores). This
-    /// page is cached across navigation, hence the explicit refresh.</summary>
-    public void Refresh() => RebuildRows();
+    /// page is cached across navigation, hence the explicit refresh. A placed
+    /// store appends a board row, so the host passes the grown catalogue too.</summary>
+    public void Refresh(DeliveryCatalog? catalog = null)
+    {
+        if (catalog is not null)
+        {
+            _catalog = catalog;
+        }
+
+        RebuildRows();
+    }
 
     private void ToggleOrder(DeliveryRow? row)
     {

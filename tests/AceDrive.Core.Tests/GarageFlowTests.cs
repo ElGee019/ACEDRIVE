@@ -128,17 +128,27 @@ public sealed class GarageFlowTests
         var store = new FakeGarageStore();
         var (vm, _, _, _) = MainViewModelTests.Create(
             cars: Pool, garage: garage, garageStore: store, content: Content());
+        vm.ToggleShowCommand.Execute(null); // hide
+        vm.ToggleShowCommand.Execute(null); // call it back: the menu page
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
-        vm.GarageCommand.Execute(null);
+        // Unity's You menu owns the garage: the HOME tile, then GARAGE.
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
+        home.GarageCommand.Execute(null);
         var page = Assert.IsType<GarageScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(2, page.Rows.Count);
+        Assert.Equal(2, page.Cars.Count);
 
-        page.SwitchCommand.Execute(Assert.Single(page.Rows, r => r.Key == Mx5.Key));
+        page.SelectedCar = Assert.Single(page.Cars, r => r.Key == Mx5.Key);
+        page.SwitchCommand.Execute(null);
         Assert.Equal(Mx5.Key, garage.CurrentKey);
         Assert.Equal(1, store.Saves);
         Assert.Equal(Mx5.Key, store.Load()!.CurrentKey);
-        // The page stays open on the switch; BACK is the way out.
+        // The page stays open on the switch; BACK is the way out, to the home
+        // page it was opened from (Unity's You menu).
         Assert.Same(page, vm.CurrentScreen);
+        page.BackCommand.Execute(null);
+        Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -148,11 +158,13 @@ public sealed class GarageFlowTests
             Junior.Key, [new OwnedCarState(Junior.Key, 1, 0.0, false)]));
         var store = new FakeGarageStore();
         var wallet = new DriverWallet(new DriverState(15000.0, 0.0));
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            cars: Pool, garage: garage, garageStore: store, wallet: wallet, content: Content());
+            cars: Pool, garage: garage, garageStore: store, wallet: wallet, content: Content(),
+            progress: OnboardingState.Fresh with { BirthdayDone = true }, hud: hud,
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
 
-        vm.DealerCommand.Execute(null);
-        var dealer = Assert.IsType<DealerScreenViewModel>(vm.CurrentScreen);
+        var dealer = MainViewModelTests.OpenPoi<DealerScreenViewModel>(vm, hud, "Car Dealer");
         Assert.DoesNotContain(Junior.Key, dealer.Rows.Select(r => r.Key));
 
         dealer.SelectCommand.Execute(Assert.Single(dealer.Rows, r => r.Key == Mx5.Key));
@@ -180,11 +192,13 @@ public sealed class GarageFlowTests
             Junior.Key, [new OwnedCarState(Junior.Key, 1, 0.0, false)]));
         var store = new FakeGarageStore();
         var wallet = new DriverWallet(new DriverState(15000.0, 0.0));
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            cars: Pool, garage: garage, garageStore: store, wallet: wallet, content: Content());
+            cars: Pool, garage: garage, garageStore: store, wallet: wallet, content: Content(),
+            progress: OnboardingState.Fresh with { BirthdayDone = true }, hud: hud,
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
 
-        vm.DealerCommand.Execute(null);
-        var dealer = Assert.IsType<DealerScreenViewModel>(vm.CurrentScreen);
+        var dealer = MainViewModelTests.OpenPoi<DealerScreenViewModel>(vm, hud, "Car Dealer");
         dealer.SelectCommand.Execute(Assert.Single(dealer.Rows, r => r.Key == Mx5.Key));
         dealer.BuyCommand.Execute(null);
 
@@ -203,11 +217,13 @@ public sealed class GarageFlowTests
         var garage = new Garage(Pool);
         var store = new FakeGarageStore();
         var wallet = new DriverWallet(new DriverState(100.0, 0.0));
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            cars: Pool, garage: garage, garageStore: store, wallet: wallet, content: Content());
+            cars: Pool, garage: garage, garageStore: store, wallet: wallet, content: Content(),
+            progress: OnboardingState.Fresh with { BirthdayDone = true }, hud: hud,
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
 
-        vm.DealerCommand.Execute(null);
-        var dealer = Assert.IsType<DealerScreenViewModel>(vm.CurrentScreen);
+        var dealer = MainViewModelTests.OpenPoi<DealerScreenViewModel>(vm, hud, "Car Dealer");
         dealer.SelectCommand.Execute(Assert.Single(dealer.Rows, r => r.Key == Mx5.Key));
         dealer.BuyCommand.Execute(null);
 
@@ -218,7 +234,7 @@ public sealed class GarageFlowTests
     }
 
     [Fact]
-    public void ControlPage_AnswersTheGarageAndDealerEntries()
+    public void JobsPage_HasNoGarageDoor_HomePageDoes()
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var garage = new Garage(Pool);
@@ -228,13 +244,21 @@ public sealed class GarageFlowTests
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back: the menu page
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        // The Jobs tile opens the control page carrying every job door.
+        // The Jobs tile opens the control page carrying every job door — the
+        // garage is a You-menu page in Unity, so it is not one of them.
         menu.JobsCommand.Execute(null);
         var page = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
 
-        Assert.Contains("GARAGE", page.VoiceActions.Keys);
-        Assert.Contains("dealer", page.VoiceActions.Keys);
-        page.GarageCommand.Execute(null);
+        Assert.DoesNotContain("GARAGE", page.VoiceActions.Keys);
+        Assert.DoesNotContain("dealer", page.VoiceActions.Keys);
+
+        // The home page owns the garage and addresses doors, by click and by voice.
+        page.BackCommand.Execute(null);
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
+        Assert.Contains("GARAGE", home.VoiceActions.Keys);
+        Assert.Contains("ADDRESSES", home.VoiceActions.Keys);
+        home.GarageCommand.Execute(null);
         Assert.IsType<GarageScreenViewModel>(vm.CurrentScreen);
     }
 }

@@ -2,5 +2,13 @@
   "ArrivalRadiusMeters": 25.0,
   "MaxMeterSpeedKmh": 400.0,
   "DisplayDistanceStepMeters": 10.0,
-  "NoticeSeconds": 3.0
+  "NoticeSeconds": 3.0,
+  "RequestDelaySeconds": 5.0,
+  "SpeedChallenge": {
+    "TopSpeedFraction": 0.55,
+    "MinAverageKmh": 40.0,
+    "MaxAverageKmh": 130.0,
+    "SlackFactor": 1.25,
+    "BufferSeconds": 20
+  }
 }

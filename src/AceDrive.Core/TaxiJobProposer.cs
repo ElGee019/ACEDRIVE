@@ -15,7 +15,8 @@ public sealed class TaxiJobProposer(AddressMap map, ResidentBook residents, int 
 {
     private readonly Random _rng = new(seed);
 
-    public TaxiProposal Next(AddressLocation? home = null, int radiusKm = 0)
+    public TaxiProposal Next(
+        int passengerCapacity, AddressLocation? home = null, int radiusKm = 0)
     {
         bool hasAddresses = TaxiAddressPlan.TryDraw(
             map, _rng, home, radiusKm,
@@ -24,9 +25,11 @@ public sealed class TaxiJobProposer(AddressMap map, ResidentBook residents, int 
         // Unity resolves the residents before the flip, so a fixed seed sees
         // the same address/name/flip order as the source generator. The
         // data-broken fallback still names the passenger, just without doors.
-        ProceduralName customer = hasAddresses
+        // The car decides how much of the drawn party fits on this ride; the
+        // resident book still remembers the full identity at the address.
+        ProceduralName customer = (hasAddresses
             ? residents.GetOrCreate(customerHome).Name
-            : residents.DrawName();
+            : residents.DrawName()).ForCapacity(passengerCapacity);
         ProceduralName secondResident = hasAddresses
             ? residents.GetOrCreate(secondResidence).Name
             : residents.DrawName();

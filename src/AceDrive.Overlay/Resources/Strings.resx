@@ -58,6 +58,10 @@
        the fine notice when a patrol catches the car over its limit. -->
   <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Speeding fine: €{0:0}</value></data>
+  <!-- Forced speed challenge (PORTPLAN 14): the delivery clock on the
+       companion, in the design's Tourney face. {0} is already m:ss. -->
+  <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Speed challenge: {0}</value></data>
+  <data name="HudSpeedChallengeLate" xml:space="preserve"><value>TOO LATE — NO TIP</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (fake job)</value></data>
   <data name="NoJob" xml:space="preserve"><value>No job. Press New job, then drive.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press PICKUP.</value></data>
@@ -94,6 +98,10 @@
   <data name="PreferencesLanguage" xml:space="preserve"><value>LANGUAGE</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="PreferencesBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="SettingsResetGame" xml:space="preserve"><value>RESET GAME</value></data>
+  <data name="SettingsResetConfirm" xml:space="preserve"><value>DELETE ALL PROGRESS</value></data>
+  <data name="SettingsResetWarning" xml:space="preserve"><value>This deletes your profile, money, cars and every bit of progress. You start over from the introduction.</value></data>
+  <data name="SettingsResetFailed" xml:space="preserve"><value>Could not reset the game. Close AceDrive and try again.</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WHAT IS YOUR FAVORITE BRAND</value></data>
   <data name="GrandmaCarTitle" xml:space="preserve"><value>WHAT CAR DOES GRANDMA DRIVE</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
@@ -117,12 +125,9 @@ For instance "{0}".</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>CAR HAULING JOB</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>JOBS</value></data>
-  <data name="ControlCalendar" xml:space="preserve"><value>CALENDAR</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>GRANDMA'S TO DO</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>COME BACK ON {0} BETWEEN 8am AND 8pm</value></data>
-  <data name="HungerValue" xml:space="preserve"><value>HUNGER {0}/{1}</value></data>
-  <data name="FilthValue" xml:space="preserve"><value>FILTH {0}/{1}</value></data>
   <data name="DaySun" xml:space="preserve"><value>Sunday</value></data>
   <data name="DayMon" xml:space="preserve"><value>Monday</value></data>
   <data name="DayTue" xml:space="preserve"><value>Tuesday</value></data>
@@ -215,6 +220,8 @@ Accept this job?</value></data>
        the stat exists. -->
   <data name="RequestTitle" xml:space="preserve"><value>CUSTOMER REQUEST</value></data>
   <data name="RequestTime" xml:space="preserve"><value>TIME REMAINING: {0}s</value></data>
+  <data name="SpeedChallengeTime" xml:space="preserve"><value>DELIVER WITHIN {0}</value></data>
+  <data name="SpeedChallengeLate" xml:space="preserve"><value>TOO LATE</value></data>
   <data name="RequestAccept" xml:space="preserve"><value>Sure sure...</value></data>
   <data name="RequestDecline" xml:space="preserve"><value>No way, you are asking too much</value></data>
   <data name="RequestCorrect" xml:space="preserve"><value>That is impressive, thank you. I will tip you well.</value></data>
@@ -304,20 +311,65 @@ Accept this job?</value></data>
   <data name="BankAfter" xml:space="preserve"><value>Balance After Withdrawal: CR{0:0.00}</value></data>
   <data name="BankWithdraw" xml:space="preserve"><value>WITHDRAW</value></data>
   <data name="BankBack" xml:space="preserve"><value>BACK</value></data>
-  <data name="ControlBank" xml:space="preserve"><value>BANK</value></data>
-  <!-- Garage + car dealer (PORTPLAN items 29/30, Unity GarageScreen +
-       CarDealerScreen copy): page titles, the owned-car rows, the weekly floor
-       and the post-purchase choice. {0:0} = whole CR amounts, {0:0.00} = the
-       live wallet; both the CR marker and the · separators are ours and stay
-       inside the format. Placeholders survive translation; translators may
+  <!-- Wallet page (PORTPLAN items 06/43/48/60): the account summary, the
+       global XP leaderboard heading and the three driver-rating skills.
+       {0:0.00} = CR/XP on the two-decimal ledger, {0:0} = a whole-percent
+       skill share. Placeholders survive translation; translators may
        reorder, never remove. -->
-  <data name="ControlGarage" xml:space="preserve"><value>GARAGE</value></data>
-  <data name="ControlDealer" xml:space="preserve"><value>CAR DEALER</value></data>
+  <data name="WalletTitle" xml:space="preserve"><value>WALLET</value></data>
+  <data name="WalletCashLabel" xml:space="preserve"><value>CURRENT CR</value></data>
+  <data name="WalletXpLabel" xml:space="preserve"><value>CURRENT XP</value></data>
+  <data name="WalletBankLabel" xml:space="preserve"><value>CURRENT BANK SALDO</value></data>
+  <data name="WalletCrAmount" xml:space="preserve"><value>CR{0:0.00}</value></data>
+  <data name="WalletXpAmount" xml:space="preserve"><value>XP{0:0.00}</value></data>
+  <data name="WalletLeaderboard" xml:space="preserve"><value>GLOBAL XP LEADERBOARD</value></data>
+  <data name="WalletRating" xml:space="preserve"><value>DRIVER RATING</value></data>
+  <data name="WalletConcentration" xml:space="preserve"><value>Concentration: {0:0}%</value></data>
+  <data name="WalletCornering" xml:space="preserve"><value>Cornering: {0:0}%</value></data>
+  <data name="WalletOffTheLine" xml:space="preserve"><value>Off-The-Line: {0:0}%</value></data>
+  <data name="WalletBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Home page (Unity YouScreen): the player's own doors, starting with the
+       garage and the addresses page. -->
+  <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
+  <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
+  <data name="HomeAddresses" xml:space="preserve"><value>ADDRESSES</value></data>
+  <data name="HomeBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Addresses page (PORTPLAN 24/27): every discovered POI alphabetical by
+       name, the temporary stand-in for markers on the map. A row pins the
+       HUD's drive-to line; {0} = POI name, {1} = its formatted street and
+       house number. Placeholders survive translation; translators may
+       reorder, never remove. -->
+  <data name="AddressesTitle" xml:space="preserve"><value>ADDRESSES</value></data>
+  <data name="AddressesEmpty" xml:space="preserve"><value>No addresses discovered yet.</value></data>
+  <data name="AddressesSelect" xml:space="preserve"><value>PICK AN ADDRESS</value></data>
+  <data name="AddressesSelected" xml:space="preserve"><value>Task set: drive to {0} at {1}</value></data>
+  <data name="AddressesBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Garage + car dealer (PORTPLAN items 29/30, Unity GarageScreen +
+       CarDealerScreen copy): the page titles, the owned-car picker, the car
+       stats block and the weekly floor plus the post-purchase choice.
+       {0:0} = whole CR amounts, {0:0.00} = the live wallet; both the CR marker
+       and the · separators are ours and stay inside the format. Placeholders
+       survive translation; translators may reorder, never remove. -->
   <data name="GarageTitle" xml:space="preserve"><value>GARAGE</value></data>
   <data name="GarageEmpty" xml:space="preserve"><value>No cars in the garage yet.</value></data>
   <data name="GarageCurrent" xml:space="preserve"><value>CURRENT</value></data>
-  <data name="GarageCarSpecs" xml:space="preserve"><value>class {0} · {1} seats · trunk {2} L · {3:0} km</value></data>
-  <data name="GarageCarValue" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="GarageSelect" xml:space="preserve"><value>SELECT CAR</value></data>
+  <data name="GarageDrive" xml:space="preserve"><value>DRIVE THIS CAR</value></data>
+  <data name="GarageCurrentCar" xml:space="preserve"><value>CURRENT CAR</value></data>
+  <data name="GaragePriceLabel" xml:space="preserve"><value>PRICE</value></data>
+  <data name="GarageEngineLabel" xml:space="preserve"><value>ENGINE</value></data>
+  <data name="GaragePowerLabel" xml:space="preserve"><value>POWER</value></data>
+  <data name="GarageConsumptionLabel" xml:space="preserve"><value>CONSUMPTION</value></data>
+  <data name="GaragePassengersLabel" xml:space="preserve"><value>PASSENGERS</value></data>
+  <data name="GarageBootLabel" xml:space="preserve"><value>BOOT</value></data>
+  <data name="GarageOdometerLabel" xml:space="preserve"><value>ODOMETER</value></data>
+  <data name="GaragePrice" xml:space="preserve"><value>CR{0:0}</value></data>
+  <data name="GarageEngine" xml:space="preserve"><value>{0} cc</value></data>
+  <data name="GaragePower" xml:space="preserve"><value>{0} hp</value></data>
+  <data name="GarageConsumption" xml:space="preserve"><value>{0:0.#} L/100km</value></data>
+  <data name="GaragePassengers" xml:space="preserve"><value>{0}</value></data>
+  <data name="GarageBoot" xml:space="preserve"><value>{0} L</value></data>
+  <data name="GarageOdometer" xml:space="preserve"><value>{0:0} km</value></data>
   <data name="GarageBack" xml:space="preserve"><value>BACK</value></data>
   <data name="DealerTitle" xml:space="preserve"><value>CAR DEALER</value></data>
   <data name="DealerCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
@@ -336,7 +388,6 @@ Accept this job?</value></data>
        TaxiJobLifecycleHandler): the flat price, the reading, the post-wash
        result and the refusal line. {0:0.00}/{1:0.00} = CR amounts; the CR
        marker and the placeholders survive translation. -->
-  <data name="ControlCarWash" xml:space="preserve"><value>CAR WASH</value></data>
   <data name="CarWashTitle" xml:space="preserve"><value>CAR WASH</value></data>
   <data name="CarWashFilth" xml:space="preserve"><value>Filth: {0} / {1}</value></data>
   <data name="CarWashPrice" xml:space="preserve"><value>Price to wash your car: CR{0:0.00}</value></data>
@@ -394,7 +445,6 @@ Accept this job?</value></data>
        total/cash-after line. {0:0.00}/{1:0.00} = CR amounts; the placeholders
        survive translation. Part names resolve by the data key in
        MechanicPartNames, so each key maps to its own resx entry. -->
-  <data name="ControlMechanic" xml:space="preserve"><value>MECHANIC</value></data>
   <data name="MechanicTitle" xml:space="preserve"><value>CAR MECHANIC</value></data>
   <data name="MechanicCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
   <data name="MechanicNoCar" xml:space="preserve"><value>No car to service yet.</value></data>
@@ -424,7 +474,6 @@ Accept this job?</value></data>
   <!-- Insurance broker (PORTPLAN item 34, Unity InsuranceScreen): the per-car
        toggle, the daily-cost lines, the combined total and the escrow collect
        block. {0:0.00} = CR amounts; the placeholders survive translation. -->
-  <data name="ControlInsurance" xml:space="preserve"><value>INSURANCE</value></data>
   <data name="InsuranceTitle" xml:space="preserve"><value>INSURANCE</value></data>
   <data name="InsuranceCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
   <data name="InsuranceEmpty" xml:space="preserve"><value>No cars to insure yet.</value></data>
@@ -471,4 +520,24 @@ Accept this job?</value></data>
   <data name="StoreFriendshipGoodFriend" xml:space="preserve"><value>{0} is a good friend.</value></data>
   <data name="StoreFriendshipCloseFriend" xml:space="preserve"><value>{0} is a close friend.</value></data>
   <data name="StoreFriendshipBff" xml:space="preserve"><value>BFF with {0}!</value></data>
+  <!-- Trunk page (PORTPLAN item 26, Unity YouScreen's TrunkScreen copy): the
+       free-space line, the appetite reading, the per-stack quantity/hunger
+       columns, the EAT tap and the way back. {0:0.00} = free litres,
+       {1} = the car's rounded capacity; the L suffix is Unity's own unit.
+       Placeholders survive translation; translators may reorder, never
+       remove. -->
+  <data name="TrunkTitle" xml:space="preserve"><value>TRUNK</value></data>
+  <data name="TrunkFree" xml:space="preserve"><value>Free space: {0:0.00}/{1}L</value></data>
+  <data name="TrunkHunger" xml:space="preserve"><value>HUNGER {0}/{1}</value></data>
+  <data name="TrunkEmpty" xml:space="preserve"><value>Your trunk is empty.</value></data>
+  <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
+  <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
+  <data name="TrunkEat" xml:space="preserve"><value>EAT</value></data>
+  <data name="TrunkBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Menu meter tiles (PORTPLAN items 26/33): a tap swaps the drawn battery
+       for the reading. {0} is a whole percent — no decimals, because the
+       battery itself already shows the fraction. The sign sits on the number
+       without a space, like the baked tile labels. Placeholders survive
+       translation; translators may reorder, never remove. -->
+  <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
 </root>

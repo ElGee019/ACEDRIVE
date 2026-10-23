@@ -118,10 +118,16 @@ public partial class MainWindow : Window
             }
             _vm.SavePlacement(new WindowBounds(
                 Left, Top, Width, Height, WindowBounds.CurrentVersion));
-            _vm.SaveClock();
-            _vm.SaveCity();
-            _vm.SaveHunger();
-            _vm.SaveGarage();
+            // A reset already deleted the save files and is starting a fresh
+            // process: banking this session's state here would resurrect the
+            // career the player just wiped.
+            if (!_vm.SkipShutdownSave)
+            {
+                _vm.SaveClock();
+                _vm.SaveCity();
+                _vm.SaveHunger();
+                _vm.SaveGarage();
+            }
             _vm.Dispose();
         };
 

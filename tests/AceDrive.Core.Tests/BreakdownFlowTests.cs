@@ -99,6 +99,9 @@ public sealed class BreakdownFlowTests
             breakdowns: new BreakdownStrategy(rules, seed: 0), progress: Done);
 
         vm.FinishDialogue();
+        // The intro lands on the menu; Jobs opens the career page.
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.JobsCommand.Execute(null);
         var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);

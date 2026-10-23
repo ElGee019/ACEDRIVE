@@ -20,9 +20,10 @@ Confirmed decisions (2026-10-18):
   placeholder stays for the receipt's distance arithmetic only.
 - **`RoadTestCar` renamed to `CarSpec`**: the record is the car database now,
   not a road-test row.
-- Garage page and dealer floor are **temporary control-page entries**
-  (GARAGE, CAR DEALER + voice keywords) until the marker network (items 24/59)
-  gives them a place in the world — the BANK button precedent.
+- Garage page lives on the **home page** (Unity's You menu owns it, so the
+  port's HOME tile does); the car dealer floor remains a **temporary
+  control-page entry** (CAR DEALER + voice keyword) until the marker network
+  (items 24/59) gives it a place in the world — the BANK button precedent.
 - Deferred, with the reason: no selling/trade-in/depreciation (do not exist in
   the mother game), dealer familiarity bump (needs the POI owner — the bank's
   decision), garage job actions (car sharing/employee/zone expansion = items
@@ -67,8 +68,9 @@ Port to ACEDRIVE:
 - [x] `JsonCarStore` validates the spec columns (negative value = unusable row,
       dropped with a warning; `price <= 0` = legal but not for sale).
 - [x] `DealerRules` (Core): `MaxShownCars 14`, `WeekSeedStride 131`,
-      `SeedFor(week)`, and the parked POI gate (`FirstDealerJobs 10`,
-      `DealerIntervalStreets 37`, `DealersForStreets`).
+      `SeedFor(week)`. The dealer POI pacing lives in `Data/pois.json`
+      (`firstJobs 10`, `firstStreets/intervalStreets 37`) and is spawned by
+      `PoiSpawner`.
 - [x] `DealerStock.Build(pool, ownedKeys, week)` (Core, pure): the week's floor.
 - [x] `OwnedCar` (Core): key, purchaseWeek, odometer, insurance flag;
       `Drive(km)` rejects negative/NaN distance.

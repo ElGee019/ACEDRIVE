@@ -33,6 +33,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private string _addressLabel = Strings.Get("HudAddressLabel");
     private string _destinationText = string.Empty;
     private string _enterText = string.Empty;
+    private IReadOnlyList<string> _enterKeywords = HudVoiceKeywords.For("HudEnter");
     private string _wrongCarWarning = Strings.Get("HudWrongCar");
 
     // The destination itself, kept so a language switch can repaint the line
@@ -52,15 +53,23 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // paints it in place of the task text and lets its buttons run.
     private CustomerRequestScreenViewModel? _request;
 
-    // The line under the banner: the remaining job distance, or a transient
-    // host notice (the notice wins). Both are empty outside a job.
-    private string _jobDistanceText = string.Empty;
+    // The line under the banner: the remaining distance to the pinned leg (a
+    // taxi job or an intro drive), or a transient host notice (the notice
+    // wins). Both are empty with no leg.
+    private string _legDistanceText = string.Empty;
     private string _noticeText = string.Empty;
     private DateTime _noticeUntil;
     // The quantised distance already painted, so the 10 Hz poll only formats
     // when the displayed step moves. Sentinels force the first paint.
-    private long _shownJobDistance = long.MinValue;
-    private bool _jobDistanceInKm;
+    private long _shownLegDistance = long.MinValue;
+    private bool _legDistanceInKm;
+
+    // The speed challenge's remaining delivery time, painted under the
+    // distance line. The deadline rides on HudJobGuidance, so the HUD still
+    // formats and ticks it while the host owns the clock.
+    private string _speedChallengeText = string.Empty;
+    private bool _speedChallengeLate;
+    private long _shownSpeedSeconds = long.MinValue;
 
     // Voice acknowledgment: the ENTER button glows teal for one shared beat,
     // then the deferred voice tap acts. Cleared by the 10 Hz poll on expiry.
@@ -165,10 +174,19 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public RelayCommand EnterCommand { get; }
 
     /// <summary>
-    /// Remaining distance on the pinned job leg ("120 m"/"1.4 km"), empty when
-    /// no leg is up or the live sample has no track position.
+    /// Spoken words the action button answers to right now ("pick up" at the
+    /// pickup door, "drop off" at the drop-off). Resolved from the same action
+    /// key that paints the label, so voice follows whatever the button means;
+    /// the words stay English even when the label is translated.
     /// </summary>
-    public string JobDistanceText => _jobDistanceText;
+    public IReadOnlyList<string> EnterKeywords => _enterKeywords;
+
+    /// <summary>
+    /// Remaining distance to the pinned leg ("120 m"/"1.4 km") — a taxi job or
+    /// an intro drive — empty when no leg is up or the live sample has no
+    /// track position.
+    /// </summary>
+    public string LegDistanceText => _legDistanceText;
 
     /// <summary>A transient host notice (police fine, refusal hint); empty when none.</summary>
     public string NoticeText => _noticeText;
@@ -176,9 +194,34 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public bool HasNotice => _noticeText.Length > 0;
 
     /// <summary>The line under the banner: the notice wins over the distance.</summary>
-    public string HudLineText => HasNotice ? _noticeText : _jobDistanceText;
+    public string HudLineText => HasNotice ? _noticeText : _legDistanceText;
 
     public bool HasHudLine => HudLineText.Length > 0;
+
+    /// <summary>
+    /// The speed challenge's countdown ("2:31", then "TOO LATE — NO TIP"),
+    /// empty when no timed challenge is up. Painted in the design's Tourney
+    /// face so it reads as a clock rather than a guidance sentence.
+    /// </summary>
+    public string SpeedChallengeText
+    {
+        get => _speedChallengeText;
+        private set
+        {
+            if (SetField(ref _speedChallengeText, value))
+            {
+                OnPropertyChanged(nameof(HasSpeedChallenge));
+            }
+        }
+    }
+
+    public bool HasSpeedChallenge => _speedChallengeText.Length > 0;
+
+    public bool SpeedChallengeLate
+    {
+        get => _speedChallengeLate;
+        private set => SetField(ref _speedChallengeLate, value);
+    }
 
     /// <summary>
     /// True once the birthday dialogue has handed the errand over. The window
@@ -338,7 +381,25 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         HasDestination = destination is not null || _jobGuidance is not null;
         AtDestination = false;
         RepaintDestination();
+        // The distance line follows whatever the banner now shows (a pinned
+        // intro leg included), so repaint it from the last live sample without
+        // waiting for the next poll.
+        _shownLegDistance = long.MinValue;
+        UpdateLegDistance(_lastSample, force: true);
     }
+
+    /// <summary>
+    /// Raised when a page asks the companion to surface its task text while
+    /// the main panel is still open. The window owns visibility; the HUD only
+    /// reports the request.
+    /// </summary>
+    public event EventHandler? TaskTextRequested;
+
+    /// <inheritdoc />
+    public void ShowTaskText() => TaskTextRequested?.Invoke(this, EventArgs.Empty);
+
+    /// <summary>The door the banner is guiding the player to, or null.</summary>
+    public PointOfInterest? CurrentDestination => _destination;
 
     /// <summary>
     /// Pins the taxi leg the job is on, or clears it with null when the job
@@ -348,12 +409,15 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public void SetJobGuidance(HudJobGuidance? guidance)
     {
         _jobGuidance = guidance;
-        _shownJobDistance = long.MinValue;
-        SetJobDistanceText(string.Empty);
+        _shownLegDistance = long.MinValue;
+        _shownSpeedSeconds = long.MinValue;
+        SetLegDistanceText(string.Empty);
+        SetSpeedChallengeText(string.Empty, late: false);
         HasDestination = guidance is not null || _destination is not null;
         AtDestination = false;
         RepaintDestination();
-        UpdateJobDistance(_lastSample, force: true);
+        UpdateLegDistance(_lastSample, force: true);
+        UpdateSpeedChallenge(force: true);
     }
 
     /// <summary>
@@ -427,27 +491,34 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 : Strings.Format(
                     job.DriveKey, job.TargetName, job.Target.StreetName,
                     job.Target.HouseNumber, _map.City);
-            EnterText = Strings.Get(job.ActionKey);
+            SetAction(job.ActionKey);
         }
         else if (_destination is { } poi)
         {
             bool person = poi.Type == PoiTypes.Person;
             string arrivedKey = _copy?.ArrivedKey
                 ?? (person ? "HudArrivedPerson" : "HudArrived");
-            string actionKey = _copy?.ActionKey
-                ?? (person ? "HudPickUp" : "HudEnter");
             DestinationText = AtDestination
                 ? Strings.Format(arrivedKey, poi.Name)
                 : DriveTo(poi);
-            EnterText = Strings.Get(actionKey);
+            SetAction(_copy?.ActionKey ?? (person ? "HudPickUp" : "HudEnter"));
         }
         else
         {
             DestinationText = string.Empty;
-            EnterText = string.Empty;
+            SetAction(string.Empty);
         }
 
         RepaintBanner();
+    }
+
+    // Label and spoken words come from one action key: the label localizes,
+    // the keywords stay the English words Vosk hears. An empty key means no
+    // button is up, so nothing can fire.
+    private void SetAction(string actionKey)
+    {
+        EnterText = actionKey.Length > 0 ? Strings.Get(actionKey) : string.Empty;
+        _enterKeywords = HudVoiceKeywords.For(actionKey);
     }
 
     /// The hint replaces the generic drive-to wording (not appended): a story
@@ -520,7 +591,8 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         UpdateMileage(odometerKm, force);
         UpdateAddress(location, force);
         UpdateArrival(sample, location);
-        UpdateJobDistance(sample, force);
+        UpdateLegDistance(sample, force);
+        UpdateSpeedChallenge(force);
 
         if (sample is null)
         {
@@ -582,27 +654,34 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         return LapGeometry.IsArrived(position, target, length, job.ArrivalRadiusMeters);
     }
 
+    // The banner's leg owns the distance line too: the pinned job outranks a
+    // story destination, exactly like RepaintDestination.
+    private AddressLocation? PinnedTarget =>
+        _jobGuidance?.Target ?? _destination?.Address;
+
     // The distance line only repaints when the shown step moves: metres below
     // a kilometre (rules step), then tenths of a kilometre. The lookup and the
-    // arithmetic are cheap enough for the 10 Hz poll; the format is not.
-    private void UpdateJobDistance(TelemetrySample? sample, bool force)
+    // arithmetic are cheap enough for the 10 Hz poll; the format is not. It
+    // serves both leg kinds — a taxi job and an intro drive — so the driver
+    // always reads how far the pinned door is.
+    private void UpdateLegDistance(TelemetrySample? sample, bool force)
     {
-        if (_jobGuidance is not { } job
+        if (PinnedTarget is not { } target
             || sample?.NormalizedPosition is not { } position)
         {
-            _shownJobDistance = long.MinValue;
-            SetJobDistanceText(string.Empty);
+            _shownLegDistance = long.MinValue;
+            SetLegDistanceText(string.Empty);
             return;
         }
 
         double length = sample.Track?.LengthMeters ?? _map.TrackLengthMeters;
-        double target = AddressBook.LapOffsetMeters(_map, job.Target, length);
+        double targetOffset = AddressBook.LapOffsetMeters(_map, target, length);
         double distance = LapGeometry.DistanceMeters(
-            LapGeometry.OffsetMeters(position, length), target, length);
+            LapGeometry.OffsetMeters(position, length), targetOffset, length);
         if (!double.IsFinite(distance))
         {
-            _shownJobDistance = long.MinValue;
-            SetJobDistanceText(string.Empty);
+            _shownLegDistance = long.MinValue;
+            SetLegDistanceText(string.Empty);
             return;
         }
 
@@ -610,17 +689,47 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         long key = inKm
             ? (long)Math.Floor(distance / 100.0)
             : (long)Math.Floor(distance / _distanceStepMeters);
-        if (!force && key == _shownJobDistance && inKm == _jobDistanceInKm)
+        if (!force && key == _shownLegDistance && inKm == _legDistanceInKm)
         {
             return;
         }
 
-        _shownJobDistance = key;
-        _jobDistanceInKm = inKm;
-        SetJobDistanceText(inKm
+        _shownLegDistance = key;
+        _legDistanceInKm = inKm;
+        SetLegDistanceText(inKm
             ? Strings.Format("HudJobDistanceKm", key / 10.0)
             : Strings.Format("HudJobDistanceMeters", key * _distanceStepMeters));
     }
+
+    // The countdown repaints only when the displayed second moves, so the
+    // 10 Hz poll costs one subtraction and one comparison per tick.
+    private void UpdateSpeedChallenge(bool force)
+    {
+        if (_jobGuidance?.SpeedChallengeDeadline is not { } deadline)
+        {
+            _shownSpeedSeconds = long.MinValue;
+            SetSpeedChallengeText(string.Empty, late: false);
+            return;
+        }
+
+        double left = (deadline - _clock.UtcNow).TotalSeconds;
+        bool late = left < 0.0;
+        long seconds = late ? 0 : (long)Math.Ceiling(left);
+        if (!force && seconds == _shownSpeedSeconds && late == _speedChallengeLate)
+        {
+            return;
+        }
+
+        _shownSpeedSeconds = seconds;
+        SetSpeedChallengeText(
+            late
+                ? Strings.Get("HudSpeedChallengeLate")
+                : Strings.Format("HudSpeedChallengeLeft", ClockText(seconds)),
+            late);
+    }
+
+    private static string ClockText(long seconds) =>
+        $"{seconds / 60}:{seconds % 60:00}";
 
     private void UpdateNotice()
     {
@@ -630,15 +739,26 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         }
     }
 
-    private void SetJobDistanceText(string value)
+    private void SetLegDistanceText(string value)
     {
-        if (!SetField(ref _jobDistanceText, value, nameof(JobDistanceText)))
+        if (!SetField(ref _legDistanceText, value, nameof(LegDistanceText)))
         {
             return;
         }
 
         OnPropertyChanged(nameof(HudLineText));
         OnPropertyChanged(nameof(HasHudLine));
+    }
+
+    private void SetSpeedChallengeText(string value, bool late)
+    {
+        bool changed = SetField(
+            ref _speedChallengeText, value, nameof(SpeedChallengeText));
+        SpeedChallengeLate = late;
+        if (changed)
+        {
+            OnPropertyChanged(nameof(HasSpeedChallenge));
+        }
     }
 
     private void SetNoticeText(string value)

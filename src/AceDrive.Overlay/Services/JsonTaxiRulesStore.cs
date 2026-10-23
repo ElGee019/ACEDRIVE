@@ -41,7 +41,20 @@ public sealed class JsonTaxiRulesStore
 
             TaxiRules? rules = JsonSerializer.Deserialize<TaxiRules>(
                 File.ReadAllText(_file), JsonOptions);
-            if (rules is null || !IsValid(rules))
+            if (rules is null)
+            {
+                _log.LogWarning($"taxi_rules.json invalid at {_file}; using built-in defaults");
+                return TaxiRules.Default;
+            }
+
+            // A file written before the speed challenge existed has no block:
+            // that is a sane default, not an invalid file.
+            if (rules.SpeedChallenge is null)
+            {
+                rules = rules with { SpeedChallenge = SpeedChallengeRules.Default };
+            }
+
+            if (!IsValid(rules))
             {
                 _log.LogWarning($"taxi_rules.json invalid at {_file}; using built-in defaults");
                 return TaxiRules.Default;
@@ -50,7 +63,10 @@ public sealed class JsonTaxiRulesStore
             _log.LogInfo($"taxi rules loaded: arrival={rules.ArrivalRadiusMeters:0} m, " +
                 $"meter cap={rules.MaxMeterSpeedKmh:0} km/h, " +
                 $"distance step={rules.DisplayDistanceStepMeters:0} m, " +
-                $"notice={rules.NoticeSeconds:0.#} s");
+                $"notice={rules.NoticeSeconds:0.#} s, " +
+                $"request delay={rules.RequestDelaySeconds:0.#} s, " +
+                $"speed challenge avg={rules.SpeedChallenge.MinAverageKmh:0}-" +
+                $"{rules.SpeedChallenge.MaxAverageKmh:0} km/h");
             return rules;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
@@ -67,5 +83,7 @@ public sealed class JsonTaxiRulesStore
         double.IsFinite(rules.ArrivalRadiusMeters) && rules.ArrivalRadiusMeters > 0.0
         && double.IsFinite(rules.MaxMeterSpeedKmh) && rules.MaxMeterSpeedKmh > 0.0
         && double.IsFinite(rules.DisplayDistanceStepMeters) && rules.DisplayDistanceStepMeters > 0.0
-        && double.IsFinite(rules.NoticeSeconds) && rules.NoticeSeconds > 0.0;
+        && double.IsFinite(rules.NoticeSeconds) && rules.NoticeSeconds > 0.0
+        && double.IsFinite(rules.RequestDelaySeconds) && rules.RequestDelaySeconds >= 0.0
+        && rules.SpeedChallenge is { IsValid: true };
 }

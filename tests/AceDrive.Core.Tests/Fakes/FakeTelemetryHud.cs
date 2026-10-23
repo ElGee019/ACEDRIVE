@@ -14,18 +14,21 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     public bool WrongCar { get; private set; }
     public PlayerPreferences? Preferences { get; private set; }
     public PointOfInterest? Destination { get; private set; }
+    public PointOfInterest? CurrentDestination => Destination;
     public HudDestinationCopy? Copy { get; private set; }
     public string? HintKey => Copy?.DriveKey;
     public HudJobGuidance? JobGuidance { get; private set; }
     public string? Notice { get; private set; }
     public TimeSpan? NoticeDuration { get; private set; }
     public bool AtDestination { get; set; }
+    public IReadOnlyList<string> EnterKeywords { get; set; } = ["enter"];
     public bool Revealed { get; private set; }
     public int EnterRequests { get; private set; }
     public int JobEnterRequests { get; private set; }
     public CustomerRequestScreenViewModel? Request { get; private set; }
     public int ShowRequestCalls { get; private set; }
     public int ClearRequestCalls { get; private set; }
+    public int ShowTaskTextCalls { get; private set; }
 
     public IVoiceScreen? RequestScreen => Request;
 
@@ -86,4 +89,6 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
         ClearRequestCalls++;
         Request = null;
     }
+
+    public void ShowTaskText() => ShowTaskTextCalls++;
 }

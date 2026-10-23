@@ -25,13 +25,62 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
-        <!-- One art height for every tile: the PSD's 244 x 310 cells, with the
-             Employees glow naturally wider like its design layer. -->
-        <Style x:Key="MenuArt" TargetType="Image">
-            <Setter Property="Height" Value="310"/>
+        <!-- Artwork source every tile layer shares: Tag carries the pack URI
+             and the converter decodes it, so a machine whose WIC has no WebP
+             codec drops the art instead of the overlay. -->
+        <Style x:Key="PackArt" TargetType="Image">
             <Setter Property="RenderOptions.BitmapScalingMode" Value="HighQuality"/>
             <Setter Property="Source"
                     Value="{Binding Tag, RelativeSource={RelativeSource Self}, Converter={StaticResource PackImage}}"/>
+        </Style>
+        <!-- One art height for every tile: the PSD's 244 x 310 cells, with the
+             Employees glow naturally wider like its design layer. -->
+        <Style x:Key="MenuArt" TargetType="Image" BasedOn="{StaticResource PackArt}">
+            <Setter Property="Height" Value="310"/>
+        </Style>
+        <!-- The hunger/filth tiles measure a level in a battery (PORTPLAN
+             items 26/33): the tile art is the bare plate, the fill paints the
+             red-top/green-bottom gradient over it, and the plate (the icon
+             with its fill cut-outs transparent) draws the icon itself and
+             covers everything the gradient must not tint. Sizes and offsets
+             are the art's own 244 x 304 px; the tile's Viewbox scales the
+             stack to the 310 px cell height exactly like MenuArt. -->
+        <Style x:Key="TileArt" TargetType="Image" BasedOn="{StaticResource PackArt}">
+            <Setter Property="Width" Value="244"/>
+            <Setter Property="Height" Value="304"/>
+        </Style>
+        <Style x:Key="MeterFill" TargetType="Image" BasedOn="{StaticResource PackArt}">
+            <Setter Property="Width" Value="61"/>
+            <Setter Property="Height" Value="118"/>
+            <Setter Property="Stretch" Value="Fill"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style x:Key="MeterPlate" TargetType="Image" BasedOn="{StaticResource PackArt}">
+            <Setter Property="Width" Value="71"/>
+            <Setter Property="Height" Value="149"/>
+            <Setter Property="Stretch" Value="Fill"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <!-- Inter Thin 100 is the face the menu tiles label their buttons in
+             (SIL OFL, Assets/Fonts); the reading takes over the battery in the
+             same voice as the baked HUNGER/FILTH labels. Those labels' ink is
+             38 art px tall and Inter's cap height is 0.727 em, so 52 art px is
+             the same size once the tile's Viewbox scales the stack. A machine
+             without the embedded face falls back to the default. -->
+        <FontFamily x:Key="TileFace">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Inter Thin</FontFamily>
+        <!-- The danger reading wears the overlay's warning red (the colour the
+             settings reset and the mechanic's failure line use). A deeper,
+             saturated red keeps the reading readable against the tiles'
+             mid-tone bodies, where a paler wash lost contrast. -->
+        <SolidColorBrush x:Key="MeterHot" Color="#FFC80D0D"/>
+        <Style x:Key="MeterPercent" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="{StaticResource TileFace}"/>
+            <Setter Property="FontSize" Value="52"/>
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
     </UserControl.Resources>
     <!-- Home page skeleton: viewport-pinned MinHeight like every other page.
@@ -47,12 +96,15 @@
          would sit ~11 % too small and shifted inward.
          The order is the player's row layout: wallet / jobs / calendar,
          trunk / employees / home, hunger / filth / settings. Every tile is a
-         Button so a later feature can attach its action; Jobs opens the
-         control page, Calendar its weekly page and Settings the first-run
+         Button so a later feature can attach its action; Wallet opens the
+         account summary, Jobs opens the control page, Calendar its weekly
+         page, Trunk the carried-goods page, Home the player's own doors
+         (the garage and the addresses page) and Settings the first-run
          preferences form, the rest only acknowledge the tap until their
-         features land. Voice taps wear the shared teal glow for the voice
-         beat: the labels are baked into the bitmap, so the glow follows the
-         artwork's silhouette where a text button turns its foreground teal.
+         features land. Voice taps wear the
+         shared teal glow for the voice beat: the labels are baked into the
+         bitmap, so the glow follows the artwork's silhouette where a text
+         button turns its foreground teal.
          Artwork goes through the PackImage converter so a machine whose WIC
          has no WebP codec drops the tiles instead of the overlay. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
@@ -71,6 +123,7 @@
         <Viewbox Grid.Row="1" Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
             <Canvas Width="1080" Height="1077">
                 <Button Canvas.Left="105" Canvas.Top="0" Style="{StaticResource MenuTile}"
+                        Command="{Binding WalletCommand}"
                         Effect="{Binding WalletFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonWallet.webp"/>
@@ -88,6 +141,7 @@
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonCalendar.webp"/>
                 </Button>
                 <Button Canvas.Left="105" Canvas.Top="383" Style="{StaticResource MenuTile}"
+                        Command="{Binding TrunkCommand}"
                         Effect="{Binding TrunkFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonTrunk.webp"/>
@@ -98,19 +152,109 @@
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonEmployees.webp"/>
                 </Button>
                 <Button Canvas.Left="697" Canvas.Top="383" Style="{StaticResource MenuTile}"
+                        Command="{Binding HomeCommand}"
                         Effect="{Binding HomeFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHome.webp"/>
                 </Button>
                 <Button Canvas.Left="105" Canvas.Top="767" Style="{StaticResource MenuTile}"
+                        Command="{Binding RevealHungerCommand}"
                         Effect="{Binding HungerFlash, Converter={StaticResource VoiceGlow}}">
-                    <Image Style="{StaticResource MenuArt}"
-                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHunger.webp"/>
+                    <Viewbox Height="310">
+                        <Grid Width="244" Height="304">
+                            <Image Style="{StaticResource TileArt}"
+                                   Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonHunger.webp"/>
+                            <!-- The gradient's 64 x 120 maps onto the plate's
+                                 61 x 118; its bottom edge sits 5 art px under
+                                 the lowest cut-out (71 + 118 = 189 against the
+                                 cut-out's 184), so the bottom block reads full
+                                 and the plate's rim hides the spill. The plate
+                                 sits at 85,48; the fill lands 5 px in from
+                                 the icon's left wall. The clip is the mask:
+                                 empty at 0 and walking up one 36th per hunger
+                                 point, so the unlit blocks stay the plate's
+                                 own body. -->
+                            <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <!-- A tapped tile trades the whole
+                                                 meter for its reading: both
+                                                 layers go with it. -->
+                                            <DataTrigger Binding="{Binding IsHungerRevealed}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Image Style="{StaticResource MeterFill}" Margin="90,71,0,0"
+                                       Clip="{Binding HungerFill, Converter={StaticResource MeterFillClip}, ConverterParameter='61,118'}"
+                                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/Gradient.webp"/>
+                                <Image Style="{StaticResource MeterPlate}" Margin="85,48,0,0"
+                                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/Battery.webp"/>
+                            </Grid>
+                            <!-- The reading takes the plate's own band (y 48..197),
+                                 so it centres where the battery was. -->
+                            <Grid Height="149" Margin="0,48,0,0" VerticalAlignment="Top"
+                                  Visibility="{Binding IsHungerRevealed, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding HungerPercentText}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource MeterPercent}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding HungerPercentHot}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource MeterHot}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Grid>
+                    </Viewbox>
                 </Button>
                 <Button Canvas.Left="400" Canvas.Top="767" Style="{StaticResource MenuTile}"
+                        Command="{Binding RevealFilthCommand}"
                         Effect="{Binding FilthFlash, Converter={StaticResource VoiceGlow}}">
-                    <Image Style="{StaticResource MenuArt}"
-                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonFilth.webp"/>
+                    <!-- Same stack as the hunger tile; the filth plate sits
+                         2 px further right and down (87,50), so the fill
+                         follows it. The mask walks the car's own 25 filth
+                         steps. -->
+                    <Viewbox Height="310">
+                        <Grid Width="244" Height="304">
+                            <Image Style="{StaticResource TileArt}"
+                                   Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonFilth.webp"/>
+                            <Grid>
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsFilthRevealed}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Image Style="{StaticResource MeterFill}" Margin="92,73,0,0"
+                                       Clip="{Binding FilthFill, Converter={StaticResource MeterFillClip}, ConverterParameter='61,118'}"
+                                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/Gradient.webp"/>
+                                <Image Style="{StaticResource MeterPlate}" Margin="87,50,0,0"
+                                       Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/Battery.webp"/>
+                            </Grid>
+                            <Grid Height="149" Margin="0,50,0,0" VerticalAlignment="Top"
+                                  Visibility="{Binding IsFilthRevealed, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="{Binding FilthPercentText}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource MeterPercent}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding FilthPercentHot}" Value="True">
+                                                    <Setter Property="Foreground" Value="{StaticResource MeterHot}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </Grid>
+                    </Viewbox>
                 </Button>
                 <Button Canvas.Left="697" Canvas.Top="767" Style="{StaticResource MenuTile}"
                         Command="{Binding SettingsCommand}"

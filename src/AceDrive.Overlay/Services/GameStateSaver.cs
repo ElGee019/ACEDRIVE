@@ -23,6 +23,7 @@ public sealed class GameStateSaver
     private readonly DriverWallet _wallet;
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
+    private readonly JobLedger _jobs;
     private readonly Trunk _trunk;
     private readonly Garage _garage;
     private readonly CityEconomy _city;
@@ -39,7 +40,7 @@ public sealed class GameStateSaver
         IShiftStore shiftStore,
         DriverWallet wallet, DailyStreak streak, OperatingZone zone, Trunk trunk,
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
-        TaxiShift shift, ShiftRecord shifts)
+        TaxiShift shift, ShiftRecord shifts, JobLedger jobs)
     {
         _clock = clock;
         _game = game;
@@ -53,6 +54,7 @@ public sealed class GameStateSaver
         _wallet = wallet;
         _streak = streak;
         _zone = zone;
+        _jobs = jobs;
         _trunk = trunk;
         _garage = garage;
         _city = city;
@@ -141,6 +143,7 @@ public sealed class GameStateSaver
             ExpansionCount = _zone.ExpansionCount,
             StreetIds = _zone.StreetIds,
             ZoneKm = _zone.Km,
+            JobsCompleted = _jobs.Completed,
             Bank = _wallet.BankBalance,
             HasEnteredBank = _wallet.HasEnteredBank,
             Trunk = _trunk.Snapshot(),

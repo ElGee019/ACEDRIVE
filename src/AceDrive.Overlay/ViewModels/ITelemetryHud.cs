@@ -42,6 +42,13 @@ public interface ITelemetryHud
     void SetDestination(PointOfInterest? destination, HudDestinationCopy? copy = null);
 
     /// <summary>
+    /// The POI currently pinned by a story beat or the addresses page, or null.
+    /// The entry path reads it so one ENTER opens whichever door the HUD is
+    /// actually guiding the player to.
+    /// </summary>
+    PointOfInterest? CurrentDestination { get; }
+
+    /// <summary>
     /// Pins one taxi leg on the HUD or clears it with null when the job ends.
     /// Job guidance wins over a story destination; the wrong-car warning still
     /// wins over both. Called on phase changes, never per poll.
@@ -68,6 +75,14 @@ public interface ITelemetryHud
     void ClearRequest();
 
     /// <summary>
+    /// Surfaces the companion's task text even while the main panel is open,
+    /// so a destination pinned from a page (the addresses list) is readable at
+    /// once instead of waiting for the panel to hide. The companion keeps it
+    /// up until the panel next opens.
+    /// </summary>
+    void ShowTaskText();
+
+    /// <summary>
     /// The screen the companion is presenting (the customer request), or null.
     /// The voice router taps its labels while the overlay is up, panel hidden.
     /// </summary>
@@ -78,6 +93,14 @@ public interface ITelemetryHud
     /// up and voice may fire it.
     /// </summary>
     bool AtDestination { get; }
+
+    /// <summary>
+    /// Spoken words that fire the action button while it is up: "enter"
+    /// everywhere, plus "pick up"/"drop off" when the button says so. The
+    /// words are English regardless of the button's label language, because
+    /// the recognizer is.
+    /// </summary>
+    IReadOnlyList<string> EnterKeywords { get; }
 
     /// <summary>
     /// Voice activation: glows the button teal for the shared beat, then

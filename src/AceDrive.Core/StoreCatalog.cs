@@ -65,4 +65,60 @@ public sealed record StoreCatalog(
         }
         return found;
     }
+
+    /// <summary>
+    /// The average retail price of the items one store of this category can
+    /// draw, weighted by the layout's source counts. Used when a placed store
+    /// joins the delivery board, which keeps one collapsed price per unit
+    /// until the per-item order screen lands. Zero when the category is not
+    /// in the catalogue.
+    /// </summary>
+    public double AverageUnitPrice(string category)
+    {
+        if (Layouts is not null && Layouts.TryGetValue(category, out var layout))
+        {
+            double weighted = 0.0;
+            int units = 0;
+            foreach ((string source, int count) in layout)
+            {
+                if (count <= 0)
+                {
+                    continue;
+                }
+
+                (double average, int priced) = AveragePriceOf(source);
+                if (priced == 0)
+                {
+                    continue;
+                }
+
+                weighted += average * count;
+                units += count;
+            }
+
+            if (units > 0 && weighted > 0.0)
+            {
+                return weighted / units;
+            }
+        }
+
+        return AveragePriceOf(category).Average;
+    }
+
+    // Sum and count in one pass: an empty source category carries no weight.
+    private (double Average, int Count) AveragePriceOf(string category)
+    {
+        double total = 0.0;
+        int count = 0;
+        foreach (StoreItem item in Items)
+        {
+            if (string.Equals(item.Category, category, StringComparison.OrdinalIgnoreCase)
+                && item.Price > 0.0)
+            {
+                total += item.Price;
+                count++;
+            }
+        }
+        return count == 0 ? (0.0, 0) : (total / count, count);
+    }
 }

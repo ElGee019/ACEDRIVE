@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// flashes teal first and waits out the shared beat (receipt-page
 /// precedent).
 /// </summary>
-public sealed class CarHaulReceiptScreenViewModel : ViewModelBase, IVoiceScreen
+public sealed class CarHaulReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {
     private readonly CarHaulReceipt _receipt;
     private readonly DriverWallet _wallet;

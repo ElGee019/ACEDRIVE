@@ -1,18 +1,13 @@
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// One owned car as the garage page shows it: preformatted title, spec line and
-/// value, plus the flag the view paints. The specs come from the catalogue row the
-/// car's key resolves, never from a copy taken at purchase time. The current car is
-/// not a pick — Unity's CURRENT CAR row is non-interactable, and switching to the
-/// car already driven is a no-op.
+/// One owned car as the garage page's picker shows it: the preformatted title
+/// and the flag that marks the car driven now. The title comes from the
+/// catalogue row the car's key resolves, never from a copy taken at purchase
+/// time. Picking a car only moves the stats panel; the drive action is the
+/// page's separate button, so the current car is still selectable here.
 /// </summary>
 public sealed record GarageRow(
     string Key,
     string Title,
-    string SpecsLine,
-    string ValueLine,
-    bool IsCurrent)
-{
-    public bool IsSelectable => !IsCurrent;
-}
+    bool IsCurrent);

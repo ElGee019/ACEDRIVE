@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// block follows the backend's live updates. CONTINUE navigates back, so a
 /// voice tap flashes teal first and waits out the shared beat.
 /// </summary>
-public sealed class DeliveryReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class DeliveryReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen, IKeepPanelOpen
 {
     private readonly DeliveryReceipt _receipt;
     private readonly DriverWallet _wallet;

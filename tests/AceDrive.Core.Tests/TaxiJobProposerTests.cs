@@ -22,7 +22,9 @@ public sealed class TaxiJobProposerTests
         var second = TaxiTestData.Proposer(table: Table, seed: 9);
         foreach (int _ in Enumerable.Range(0, 12))
         {
-            Assert.Equal(first.Next(), second.Next());
+            Assert.Equal(
+                first.Next(passengerCapacity: 4),
+                second.Next(passengerCapacity: 4));
         }
     }
 
@@ -37,7 +39,7 @@ public sealed class TaxiJobProposerTests
         var flips = new HashSet<bool>();
         foreach (int _ in Enumerable.Range(0, 60))
         {
-            TaxiProposal proposal = proposer.Next();
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4);
             // Both residents come from the table's parts (any pool), and the
             // passenger keeps its companion suffix for the identity line.
             Assert.Contains(proposal.Customer.FirstName, FirstNames);
@@ -66,7 +68,7 @@ public sealed class TaxiJobProposerTests
 
         foreach (int _ in Enumerable.Range(0, 40))
         {
-            TaxiProposal proposal = proposer.Next();
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4);
             Resident customer = store.Residents.Single(
                 resident => resident.Address == proposal.CustomerHome);
             Resident second = store.Residents.Single(
@@ -98,7 +100,8 @@ public sealed class TaxiJobProposerTests
 
         foreach (int _ in Enumerable.Range(0, 40))
         {
-            TaxiProposal proposal = proposer.Next(home, radiusKm: 5);
+            TaxiProposal proposal = proposer.Next(
+                passengerCapacity: 4, home, radiusKm: 5);
             Assert.True(AddressBook.DistanceMeters(
                 map, home, proposal.CustomerHome!.Value) <= 5_000.0);
             Assert.True(AddressBook.DistanceMeters(
@@ -116,11 +119,40 @@ public sealed class TaxiJobProposerTests
         var proposer = TaxiTestData.Proposer(
             map: map, table: Table, seed: 1, residents: store);
 
-        TaxiProposal proposal = proposer.Next();
+        TaxiProposal proposal = proposer.Next(passengerCapacity: 1);
 
         Assert.Null(proposal.CustomerHome);
         Assert.Null(proposal.SecondResidence);
         Assert.False(string.IsNullOrWhiteSpace(proposal.Customer.FirstName));
         Assert.Empty(store.Residents);
+    }
+
+    [Fact]
+    public void SingleSeatCar_DropsTheCompanionSuffix_OnTheRideOnly()
+    {
+        var store = new FakeResidentStore();
+        var proposer = TaxiTestData.Proposer(
+            table: Table, seed: 4, residents: store);
+
+        TaxiProposal solo = proposer.Next(passengerCapacity: 1);
+        Resident customer = store.Residents.Single(
+            resident => resident.Address == solo.CustomerHome);
+
+        // One seat = one customer: the ride never promises companions.
+        Assert.Empty(solo.Customer.Suffix);
+        Assert.Equal(solo.Customer.BaseName, solo.Customer.Full);
+        // The resident keeps the full drawn identity, so the same door can
+        // still carry a group when a bigger car draws it.
+        Assert.NotEmpty(customer.Name.Suffix);
+    }
+
+    [Fact]
+    public void TwoSeatCar_KeepsTheCompanionSuffix()
+    {
+        var proposer = TaxiTestData.Proposer(table: Table, seed: 4);
+
+        TaxiProposal shared = proposer.Next(passengerCapacity: 2);
+
+        Assert.Contains(shared.Customer.Suffix, Suffixes);
     }
 }

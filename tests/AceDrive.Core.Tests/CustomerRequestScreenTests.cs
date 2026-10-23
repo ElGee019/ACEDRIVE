@@ -15,13 +15,16 @@ public sealed class CustomerRequestScreenTests
     public CustomerRequestScreenTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
-    private static Harness Build(CustomerRequest request, int timerSeconds = 14)
+    private static Harness Build(
+        CustomerRequest request, int timerSeconds = 14,
+        TimeSpan? speedAllowance = null)
     {
         var clock = new FakeClock();
         var outcomes = new List<CustomerRequestOutcome>();
         var vm = new CustomerRequestScreenViewModel(
             request, "Max Weber", timerSeconds, clock, new VoiceBeat(clock),
-            outcomes.Add);
+            outcomes.Add,
+            speedAllowance is { } allowance ? clock.UtcNow + allowance : null);
         return new Harness(vm, clock, outcomes);
     }
 
@@ -172,7 +175,9 @@ public sealed class CustomerRequestScreenTests
 
         Assert.Equal("Thank you. I'll tip you when we arrive.", h.Vm.Feedback);
         Assert.True(h.Vm.FeedbackPositive);
-        Assert.True(h.Vm.RequestTextVisible);
+        // The tip line replaces the suffix ask; the request text would
+        // otherwise still hang above the answer.
+        Assert.False(h.Vm.RequestTextVisible);
         h.Vm.BackCommand.Execute(null);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
@@ -190,6 +195,7 @@ public sealed class CustomerRequestScreenTests
 
         Assert.Equal("Fair enough. No tip then.", h.Vm.Feedback);
         Assert.False(h.Vm.FeedbackPositive);
+        Assert.False(h.Vm.RequestTextVisible);
         h.Vm.BackCommand.Execute(null);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
@@ -198,15 +204,49 @@ public sealed class CustomerRequestScreenTests
     }
 
     [Fact]
-    public void SpeedAccept_AgreesToTheChallenge()
+    public void SpeedChallenge_IsForcedAndShowsTheDeliveryClock()
     {
-        Harness h = Build(Speed());
+        Harness h = Build(Speed(), speedAllowance: TimeSpan.FromSeconds(90));
 
-        h.Vm.Options[0].Command.Execute(null);
+        Assert.True(h.Vm.IsSpeedChallenge);
+        Assert.True(h.Vm.ShowBack);
+        Assert.True(h.Vm.TimerVisible);
+        Assert.True(h.Vm.RequestTextVisible);
+        Assert.Empty(h.Vm.Options);
+        Assert.Equal("DELIVER WITHIN 1:30", h.Vm.TimeLine);
+        Assert.Contains("BACK", h.Vm.VoiceActions.Keys);
+
+        h.Clock.Advance(TimeSpan.FromSeconds(30.2));
+        h.Vm.Tick(h.Clock.UtcNow);
+        Assert.Equal("DELIVER WITHIN 1:00", h.Vm.TimeLine);
+
+        h.Vm.BackCommand.Execute(null);
         h.Vm.BackCommand.Execute(null);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
         Assert.True(outcome.SpeedChallengeAgreed);
+        Assert.True(outcome.TipEligible);
+        Assert.True(outcome.Answered);
+    }
+
+    [Fact]
+    public void SpeedChallenge_ExpiredClockSaysLateWithoutTimingThePageOut()
+    {
+        Harness h = Build(Speed(), speedAllowance: TimeSpan.FromSeconds(20));
+
+        h.Clock.Advance(TimeSpan.FromSeconds(21));
+        h.Vm.Tick(h.Clock.UtcNow);
+        h.Vm.Tick(h.Clock.UtcNow);
+
+        Assert.True(h.Vm.SpeedChallengeLate);
+        Assert.Equal("TOO LATE", h.Vm.TimeLine);
+        Assert.True(h.Vm.ShowBack);
+        Assert.Empty(h.Vm.Options);
+        Assert.Empty(h.Outcomes);
+
+        h.Vm.BackCommand.Execute(null);
+
+        CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
         Assert.True(outcome.TipEligible);
     }
 

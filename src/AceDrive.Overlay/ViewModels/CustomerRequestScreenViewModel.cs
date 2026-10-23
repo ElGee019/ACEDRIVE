@@ -6,12 +6,14 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The customer request interstitial (PORTPLAN item 11, port of Unity
-/// CustomerRequestScreen): a suffix-triggered passive ask, a speed challenge
-/// or a three-option car-stat quiz, with a countdown shared by all kinds.
-/// The page only reports the outcome; the host copies it onto the job, banks
-/// the quiz history and opens the drop-off guidance when BACK closes the
-/// page. The timer is ticked from <c>MainViewModel.Poll</c>, never a private
-/// dispatcher timer (AGENTS.md: one loop).
+/// CustomerRequestScreen): a suffix-triggered passive ask, a forced speed
+/// challenge or a three-option car-stat quiz. Passive and quiz asks run on
+/// the 14 s answer countdown; the speed challenge has no answer, so its page
+/// shows the host's delivery deadline instead and never times out. The page
+/// only reports the outcome; the host copies it onto the job, banks the quiz
+/// history and opens the drop-off guidance when BACK closes the page. The
+/// timer is ticked from <c>MainViewModel.Poll</c>, never a private dispatcher
+/// timer (AGENTS.md: one loop).
 /// </summary>
 public sealed class CustomerRequestScreenViewModel :
     ViewModelBase, IVoiceScreen, IJobsScreen, IKeepPanelOpen
@@ -21,6 +23,8 @@ public sealed class CustomerRequestScreenViewModel :
     private readonly Action<CustomerRequestOutcome> _onFinished;
     private readonly int _timerSeconds;
     private readonly DateTime _deadline;
+    private readonly bool _speedChallenge;
+    private readonly DateTime? _speedDeadline;
     private IReadOnlyList<CustomerRequestOption> _options = [];
     private CustomerRequestOutcome _outcome = CustomerRequestOutcome.None;
     private bool _finished;
@@ -28,20 +32,52 @@ public sealed class CustomerRequestScreenViewModel :
 
     public CustomerRequestScreenViewModel(
         CustomerRequest request, string customerName, int timerSeconds,
-        IClock clock, VoiceBeat beat, Action<CustomerRequestOutcome> onFinished)
+        IClock clock, VoiceBeat beat, Action<CustomerRequestOutcome> onFinished,
+        DateTime? speedDeadline = null)
     {
         _request = request;
         _beat = beat;
         _onFinished = onFinished;
         _timerSeconds = Math.Max(0, timerSeconds);
+        _speedChallenge = request.Kind == CustomerRequestKind.SpeedChallenge;
+        _speedDeadline = speedDeadline;
         CustomerName = customerName;
-        RemainingSeconds = _timerSeconds;
         _deadline = clock.UtcNow.AddSeconds(_timerSeconds);
+        if (_speedChallenge)
+        {
+            TimerVisible = _speedDeadline is not null;
+            RemainingSeconds = RemainingAt(clock.UtcNow);
+            SpeedChallengeLate = _speedDeadline is { } deadline
+                && deadline < clock.UtcNow;
+        }
+        else
+        {
+            RemainingSeconds = _timerSeconds;
+        }
 
         BackCommand = new RelayCommand(Back);
         BuildOptions();
         RebuildVoice();
     }
+
+    /// <summary>True for the forced speed challenge: no ACCEPT/DECLINE, and
+    /// the page's clock is the delivery deadline instead of the answer timer.</summary>
+    public bool IsSpeedChallenge => _speedChallenge;
+
+    /// <summary>True once the delivery deadline has passed, so the page can
+    /// paint the countdown line in its warning colour.</summary>
+    public bool SpeedChallengeLate
+    {
+        get => _speedChallengeLate;
+        private set
+        {
+            if (SetField(ref _speedChallengeLate, value))
+            {
+                OnPropertyChanged(nameof(TimeLine));
+            }
+        }
+    }
+    private bool _speedChallengeLate;
 
     /// <summary>The drawn passenger's full identity (the host's copy is the
     /// same one the proposal and receipt use).</summary>
@@ -49,9 +85,11 @@ public sealed class CustomerRequestScreenViewModel :
 
     public string RequestText => _request.Text;
 
-    /// <summary>The ask hides once a quiz ends: the feedback line replaces
-    /// the question instead of sitting underneath it. Passive/speed asks stay
-    /// visible, since the feedback answers the ask rather than replacing it.</summary>
+    /// <summary>The ask hides once the request ends: the feedback line
+    /// replaces the question instead of sitting underneath it. That covers the
+    /// suffix-triggered passive ask as well, whose "I'll tip you when we
+    /// arrive" answer would otherwise leave the request line above it. Only
+    /// the forced speed challenge keeps its line, and it never ends here.</summary>
     public bool RequestTextVisible
     {
         get => _requestTextVisible;
@@ -72,8 +110,27 @@ public sealed class CustomerRequestScreenViewModel :
     }
     private int _remainingSeconds;
 
-    /// <summary>Unity's "TIME REMAINING: {0}s" line.</summary>
-    public string TimeLine => Strings.Format("RequestTime", RemainingSeconds);
+    /// <summary>Unity's "TIME REMAINING: {0}s" line for an answer, or the
+    /// speed challenge's delivery clock once that request is up.</summary>
+    public string TimeLine
+    {
+        get
+        {
+            if (!_speedChallenge)
+            {
+                return Strings.Format("RequestTime", RemainingSeconds);
+            }
+
+            if (_speedDeadline is null)
+            {
+                return string.Empty;
+            }
+
+            return SpeedChallengeLate
+                ? Strings.Get("SpeedChallengeLate")
+                : Strings.Format("SpeedChallengeTime", ClockText(RemainingSeconds));
+        }
+    }
 
     /// <summary>Shown until the request is answered or times out.</summary>
     public bool TimerVisible { get => _timerVisible; private set => SetField(ref _timerVisible, value); }
@@ -131,11 +188,25 @@ public sealed class CustomerRequestScreenViewModel :
 
     /// <summary>
     /// Advances the countdown on integer seconds. Called at 10 Hz by the
-    /// host; a due timeout finishes the request exactly once and waits for
-    /// BACK to report it, so the host never loses a timed-out quiz.
+    /// host; a due timeout finishes an answer request exactly once and waits
+    /// for BACK to report it, so the host never loses a timed-out quiz. The
+    /// speed challenge only repaints its delivery clock.
     /// </summary>
     public void Tick(DateTime now)
     {
+        if (_speedChallenge)
+        {
+            // The speed challenge is already accepted; its clock is the
+            // delivery deadline, not the answer countdown, so it never times
+            // the page out or changes the outcome.
+            if (_speedDeadline is not null)
+            {
+                RemainingSeconds = RemainingAt(now);
+                SpeedChallengeLate = _speedDeadline < now;
+            }
+            return;
+        }
+
         if (_finished)
         {
             return;
@@ -152,8 +223,31 @@ public sealed class CustomerRequestScreenViewModel :
         }
     }
 
+    private int RemainingAt(DateTime now)
+    {
+        if (_speedDeadline is not { } deadline || deadline < now)
+        {
+            return 0;
+        }
+
+        double seconds = Math.Ceiling((deadline - now).TotalSeconds);
+        return seconds >= int.MaxValue ? int.MaxValue : (int)seconds;
+    }
+
+    private static string ClockText(int seconds) =>
+        $"{seconds / 60}:{seconds % 60:00}";
+
     private void BuildOptions()
     {
+        if (_speedChallenge)
+        {
+            // Forced challenge: the customer does not ask, so there is nothing
+            // to accept or decline. BACK only returns to the driving guidance.
+            ShowBack = true;
+            Options = [];
+            return;
+        }
+
         if (_request.Kind == CustomerRequestKind.CarQuiz && _request.Quiz is { } quiz)
         {
             List<CustomerRequestOption> options = [];
@@ -224,10 +318,7 @@ public sealed class CustomerRequestScreenViewModel :
         Feedback = Strings.Get(feedbackKey);
         FeedbackPositive = positive;
         TimerVisible = false;
-        if (_request.Kind == CustomerRequestKind.CarQuiz)
-        {
-            RequestTextVisible = false;
-        }
+        RequestTextVisible = false;
         Options = [];
         ShowBack = true;
         RebuildVoice();
@@ -239,7 +330,21 @@ public sealed class CustomerRequestScreenViewModel :
     private void Back()
     {
         BackFlash = false;
-        if (!_finished || _reported)
+        if (_reported)
+        {
+            return;
+        }
+
+        if (_speedChallenge)
+        {
+            // The forced challenge was accepted at the pickup; BACK only
+            // dismisses its page. Report the same outcome the old ACCEPT did.
+            _reported = true;
+            _onFinished(CustomerRequestGrader.Accept(_request));
+            return;
+        }
+
+        if (!_finished)
         {
             return;
         }
@@ -261,7 +366,7 @@ public sealed class CustomerRequestScreenViewModel :
         {
             actions[option.Text] = () => option.Command.Execute(null);
         }
-        if (_finished)
+        if (ShowBack)
         {
             actions[Strings.Get("DeliveryBack")] = FlashThenBack;
         }

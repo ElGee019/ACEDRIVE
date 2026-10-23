@@ -12,6 +12,9 @@ public static class PoiTypes
     /// <summary>Generic grocery-shop tag Unity's generated stores use.</summary>
     public const string GroceryStore = "grocery_store";
 
+    /// <summary>Unity's generated coffee-shop tag (the coffee hub's stores).</summary>
+    public const string CoffeeShop = "coffee_shop";
+
     /// <summary>Max's story-shop tag Unity's special row uses.</summary>
     public const string MaxsGrocery = "maxs_grocery_store";
 
@@ -32,4 +35,19 @@ public static class PoiTypes
     /// post-pancake stop where the taxi license dialogue opens.
     /// </summary>
     public const string CommunityCentre = "communitycenter";
+
+    /// <summary>The savings bank's interior (PORTPLAN 48).</summary>
+    public const string Bank = "bank";
+
+    /// <summary>The car dealer's weekly floor (PORTPLAN 29).</summary>
+    public const string Dealer = "dealer";
+
+    /// <summary>The car wash (PORTPLAN 33).</summary>
+    public const string CarWash = "carwash";
+
+    /// <summary>The car mechanic (PORTPLAN items 31/32).</summary>
+    public const string Mechanic = "mechanic";
+
+    /// <summary>The insurance broker (PORTPLAN 34).</summary>
+    public const string Insurance = "insurance";
 }

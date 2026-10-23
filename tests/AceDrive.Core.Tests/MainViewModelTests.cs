@@ -45,7 +45,11 @@ public sealed class MainViewModelTests
             ITelemetryHud? hud = null,
             FakeVoiceListener? voice = null,
             Trunk? trunk = null,
-            PoiArrivalRouter? poiArrivals = null,
+            IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
+            PoiDirectory? poiDirectory = null,
+            IPoiDirectoryStore? poiStore = null,
+            PoiSpawner? poiSpawner = null,
+            JobLedger? jobs = null,
             FakeOnboardingStore? onboarding = null,
             TaxiRules? taxiRules = null,
             ICustomerRequestRoller? requests = null,
@@ -56,7 +60,9 @@ public sealed class MainViewModelTests
             ShiftRecord? shifts = null,
             IShiftStandings? shiftStandings = null,
             IPlayerNameRegistry? playerNames = null,
-            TaxiShift? shift = null, IShiftStore? shiftStore = null)
+            TaxiShift? shift = null, IShiftStore? shiftStore = null,
+            FakeSaveDataResetter? saveResets = null,
+            FakeAppRestarter? restarter = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -81,12 +87,22 @@ public sealed class MainViewModelTests
         var friendsInstance = friendships ?? new FakeFriendshipStore();
         var trunkInstance = trunk ?? new Trunk(savedDriver?.Trunk);
         var storeNetwork = new StoreNetwork(StoreCatalog.Default, PoiCatalog.Default);
-        var router = poiArrivals ?? new PoiArrivalRouter(
+        IReadOnlyList<IPoiArrivalHandler> handlers = poiHandlers ??
         [
             new StorePoiHandler(
                 storeNetwork, trunkInstance, walletInstance, garageInstance,
                 friendsInstance, beat),
-        ]);
+        ];
+        PoiDirectory directory = poiDirectory ?? new PoiDirectory();
+        IPoiDirectoryStore directoryStore = poiStore ?? new FakePoiDirectoryStore();
+        if (poiDirectory is null)
+        {
+            directory = new PoiDirectory(directoryStore.Load());
+            // The real career opens these through the street/job thresholds;
+            // the flow tests need the doors up front, so the test directory
+            // carries one fixed door per generated family.
+            SeedTestBusinesses(directory, map);
+        }
         var vm = new MainViewModel(tel, clock, new GameClock(clock, gameStart ?? clock.UtcNow), shift ?? new TaxiShift(), shiftStore ?? new FakeShiftStore(), store,
             log ?? new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(map: map, seed: 0),
@@ -116,11 +132,16 @@ public sealed class MainViewModelTests
             // Seeded so a test can force a breakdown or keep every trip clean.
             breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
+            directory, directoryStore,
+            poiSpawner ?? new PoiSpawner(
+                map, PoiCatalog.Default,
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
+            jobs ?? new JobLedger(savedDriver),
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRules ?? TaxiRules.Default, hud, router,
-            requests, requestTable, police);
+            trunkInstance, taxiRules ?? TaxiRules.Default, hud, handlers,
+            requests, requestTable, police, saveResets, restarter);
         if (carKsId is not null)
         {
             // The watcher thread lands via the dispatcher, which runs inline
@@ -128,6 +149,110 @@ public sealed class MainViewModelTests
             brands.Fire("test", announced);
         }
         return (vm, clock, tel, store);
+    }
+
+    // The real career opens these through the street/job thresholds; the flow
+    // tests need the doors up front, so the test directory carries one fixed
+    // door per generated family (same display names the Unity rows use).
+    private static void SeedTestBusinesses(PoiDirectory directory, AddressMap map)
+    {
+        int house = 1;
+        foreach (PoiDefinition definition in PoiCatalog.Default)
+        {
+            if (definition.Spawn is null)
+            {
+                continue;
+            }
+
+            int number = Math.Min(house++, HouseNumberPlan.Count(map.Streets[0], map));
+            directory.Add(new PointOfInterest(
+                definition.Id, definition.Name,
+                new AddressLocation(
+                    map.Streets[0].Name, number, HouseNumberPlan.SideOf(number)),
+                definition.Type));
+        }
+    }
+
+    // The production way into a business: HOME → ADDRESSES, pin the row, then
+    // ENTER on the companion while parked at the cached destination.
+    internal static T OpenPoi<T>(
+        MainViewModel vm, FakeTelemetryHud hud, string name) where T : class
+    {
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
+        home.AddressesCommand.Execute(null);
+        var addresses = Assert.IsType<AddressesScreenViewModel>(vm.CurrentScreen);
+        AddressRow row = Assert.Single(addresses.Rows, r => r.Name == name);
+        addresses.SelectCommand.Execute(row);
+        Assert.Equal(row.Poi, hud.CurrentDestination);
+        hud.RaiseEnter();
+        return Assert.IsType<T>(vm.CurrentScreen);
+    }
+
+    // Delta assertions need a known base: a brand-new wallet now opens on
+    // DriverWallet.StartingCash, so the money tests start from an empty one.
+    private static DriverWallet EmptyWallet() => new(new DriverState(0.0, 0.0));
+
+    [Fact]
+    public void SettingsReset_TwoTaps_WipesSavesThenRestarts()
+    {
+        var resets = new FakeSaveDataResetter();
+        var restarter = new FakeAppRestarter();
+        var (vm, _, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            saveResets: resets, restarter: restarter);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.SettingsCommand.Execute(null);
+        var settings = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+        Assert.True(settings.CanReset);
+
+        settings.ResetCommand.Execute(null);
+
+        Assert.Equal(0, resets.Calls);
+        Assert.Equal(0, restarter.Calls);
+
+        settings.ResetCommand.Execute(null);
+
+        Assert.Equal(1, resets.Calls);
+        Assert.Equal(1, restarter.Calls);
+        // The window's close path must not bank the old career back to disk.
+        Assert.True(vm.SkipShutdownSave);
+    }
+
+    [Fact]
+    public void SettingsReset_WipeFailure_KeepsTheSession()
+    {
+        var resets = new FakeSaveDataResetter { Result = false };
+        var restarter = new FakeAppRestarter();
+        var (vm, _, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            saveResets: resets, restarter: restarter);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).SettingsCommand
+            .Execute(null);
+        var settings = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+
+        settings.ResetCommand.Execute(null);
+        settings.ResetCommand.Execute(null);
+
+        Assert.Equal(1, resets.Calls);
+        Assert.Equal(0, restarter.Calls);
+        Assert.False(vm.SkipShutdownSave);
+        Assert.Equal(
+            "Could not reset the game. Close AceDrive and try again.",
+            settings.ResetStatus);
+    }
+
+    [Fact]
+    public void SettingsWithoutResetServices_HidesTheResetAction()
+    {
+        var (vm, _, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true });
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).SettingsCommand
+            .Execute(null);
+
+        Assert.False(
+            Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen).CanReset);
     }
 
     [Fact]
@@ -286,6 +411,28 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void TaxiReceipt_KeepsThePanelUpPastTheIdleWindow()
+    {
+        // The fare breakdown waits for CONTINUE; the 15 s auto-hide must not
+        // close the panel while the player reads it.
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f,
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
+
+        clock.Advance(TimeSpan.FromSeconds(16));
+        vm.Poll();
+
+        Assert.True(vm.IsShown);
+        Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
     public void Accept_VariantCapacityFollowsThePreset()
     {
         // Two showroom variants in one folder (PORTPLAN 62): the announced
@@ -311,7 +458,7 @@ public sealed class MainViewModelTests
         // 2.66 brand sponsorship (first 8.2 km in the brand: 5%) = 66.44,
         // plus the 99% starter bonus (1.929 km zone) = 132.22 on the receipt
         // screen, banked to the wallet and the driver save.
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, wallet: wallet, driverStore: drivers,
@@ -358,7 +505,7 @@ public sealed class MainViewModelTests
         // refresh against the banked total, the push follows, and the saved
         // driver carries the snapshot for the next session.
         var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, wallet: wallet, driverStore: drivers, rivals: rivals,
@@ -403,7 +550,7 @@ public sealed class MainViewModelTests
         // Fresh driver, offline board: 0/0 keeps "never saved", the page
         // shows Unity's em-dash placeholder with an empty delta.
         var rivals = new FakeRivals();
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, wallet: wallet, driverStore: drivers, rivals: rivals,
@@ -458,8 +605,7 @@ public sealed class MainViewModelTests
     public void TaxiShiftTap_OpensProposalAndStartsShift_AcceptStartsJob()
     {
         var (vm, _, _, _) = Create(speedKmh: 0f);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
 
         // The tap owns the shift (Unity OnStartTaxiShift stamps it started
@@ -486,7 +632,12 @@ public sealed class MainViewModelTests
     public void JobFlow_PinsThePickupThenTheDropoff_AndSettlesFromTheHud()
     {
         var hud = new FakeTelemetryHud();
-        var (vm, clock, tel, _) = Create(speedKmh: 0f, hud: hud);
+        var pool = new List<CarSpec>
+        {
+            new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4),
+        };
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, hud: hud, cars: pool, carKsId: "ks_test_sedan");
 
         TaxiJobProposalViewModel proposal = TaxiFlow.Propose(vm);
         string customer = proposal.Phrase[..proposal.Phrase.IndexOf('\n')].TrimEnd('\r');
@@ -516,6 +667,26 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void TaxiProposal_OneSeatCar_NamesTheCustomerAlone()
+    {
+        var pool = new List<CarSpec>
+        {
+            new("ks_test_solo", 2020, "Test", "Solo", Passengers: 1),
+        };
+        var (vm, _, _, _) = Create(
+            speedKmh: 0f, cars: pool, carKsId: "ks_test_solo");
+
+        TaxiJobProposalViewModel proposal = TaxiFlow.Propose(vm);
+        string customer = proposal.Phrase[..proposal.Phrase.IndexOf('\n')].TrimEnd('\r');
+
+        // One seat means one customer, so the drawn companion group is never
+        // promised on the page (or on the job the host accepts).
+        Assert.DoesNotContain(
+            NamePoolTable.Default.Suffixes,
+            suffix => customer.EndsWith($" {suffix}", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Pickup_NoRequest_NoTip()
     {
         // Unity parity: a ride with no special request never tips, even when
@@ -538,13 +709,12 @@ public sealed class MainViewModelTests
         var (vm, clock, tel, _) = Create(speedKmh: 0f, hud: hud, requests: requests);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
         // The ask rides the companion, not the panel: the mini window owns it.
         Assert.Same(screen, hud.Request);
         Assert.False(vm.IsShown);
-        Assert.Equal("HudJobPickupDrive", hud.JobGuidance!.DriveKey);
+        Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
 
         screen.Options[0].Command.Execute(null);
         screen.BackCommand.Execute(null);
@@ -571,8 +741,8 @@ public sealed class MainViewModelTests
         var (vm, clock, tel, _) = Create(speedKmh: 0f, requests: requests);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
         screen.Options[1].Command.Execute(null);
         screen.BackCommand.Execute(null);
 
@@ -580,6 +750,34 @@ public sealed class MainViewModelTests
         vm.DropoffCommand.Execute(null);
 
         Assert.False(Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen).HasTip);
+    }
+
+    [Fact]
+    public void Pickup_RequestWaitsOutTheDropoffTaskText()
+    {
+        // The player must read where to drive before an ask replaces the HUD
+        // line: the drop-off task text goes up first and the rolled request
+        // waits out the rule's read-in delay.
+        var hud = new FakeTelemetryHud();
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.PassiveRequest,
+        };
+        var (vm, clock, _, _) = Create(speedKmh: 0f, hud: hud, requests: requests);
+
+        TaxiFlow.Propose(vm);
+        vm.PickupCommand.Execute(null);
+
+        Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
+        Assert.Null(hud.Request);
+
+        clock.Advance(TimeSpan.FromSeconds(TaxiRules.Default.RequestDelaySeconds - 0.1));
+        vm.Poll();
+        Assert.Null(hud.Request);
+
+        clock.Advance(TimeSpan.FromSeconds(0.2));
+        vm.Poll();
+        Assert.NotNull(hud.Request);
     }
 
     [Fact]
@@ -592,8 +790,8 @@ public sealed class MainViewModelTests
         var (vm, clock, _, _) = Create(speedKmh: 0f, requests: requests);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
 
         clock.Advance(TimeSpan.FromSeconds(1));
         vm.Poll();
@@ -613,12 +811,12 @@ public sealed class MainViewModelTests
         };
         var hud = new FakeTelemetryHud();
         var voice = new FakeVoiceListener();
-        var (vm, _, _, _) = Create(
+        var (vm, clock, _, _) = Create(
             speedKmh: 0f, hud: hud, voice: voice, requests: requests);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
         Assert.False(vm.IsShown);
 
         voice.Fire("sure sure", isFinal: true);
@@ -652,8 +850,8 @@ public sealed class MainViewModelTests
                 categories: CustomerRequestTestData.SixCategories));
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
         screen.Options[1].Command.Execute(null);
         screen.BackCommand.Execute(null);
 
@@ -685,8 +883,8 @@ public sealed class MainViewModelTests
                 categories: CustomerRequestTestData.SixCategories));
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
         screen.Options[0].Command.Execute(null);
         screen.BackCommand.Execute(null);
 
@@ -716,8 +914,8 @@ public sealed class MainViewModelTests
                 categories: CustomerRequestTestData.SixCategories));
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
 
         clock.Advance(TimeSpan.FromSeconds(14));
         vm.Poll();
@@ -771,11 +969,21 @@ public sealed class MainViewModelTests
         };
         var police = new PolicePatrolPlanner(
             AddressMap.Default, TestPoliceRules, seed: 0);
+        // Keep the delivery clock out of this test: it is about one patrol
+        // charging once, not about the deadline dropping the tip too.
+        TaxiRules rules = TaxiRules.Default with
+        {
+            SpeedChallenge = SpeedChallengeRules.Default with
+            {
+                SlackFactor = 10.0,
+            },
+        };
         var (vm, clock, tel, _) = Create(
-            speedKmh: 0f, hud: hud, requests: requests, police: police);
+            speedKmh: 0f, hud: hud, requests: requests, police: police,
+            taxiRules: rules);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
+        TaxiFlow.Pickup(vm, clock);
         TaxiFlow.AnswerRequest(vm);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
 
@@ -801,11 +1009,22 @@ public sealed class MainViewModelTests
         };
         var police = new PolicePatrolPlanner(
             AddressMap.Default, TestPoliceRules, seed: 0);
+        // The test drives 8.2 km in about 82 s, much longer than the real
+        // route between the two doors; a generous deadline isolates the
+        // police rule this test is about from the delivery clock.
+        TaxiRules rules = TaxiRules.Default with
+        {
+            SpeedChallenge = SpeedChallengeRules.Default with
+            {
+                SlackFactor = 10.0,
+            },
+        };
         var (vm, clock, tel, _) = Create(
-            speedKmh: 0f, hud: hud, requests: requests, police: police);
+            speedKmh: 0f, hud: hud, requests: requests, police: police,
+            taxiRules: rules);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
+        TaxiFlow.Pickup(vm, clock);
         TaxiFlow.AnswerRequest(vm);
         DriveLaps(vm, clock, tel, laps: 1, speedKmh: 40f);
         vm.DropoffCommand.Execute(null);
@@ -817,29 +1036,59 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void Pickup_SpeedChallenge_Declined_NoPatrolAndNoFine()
+    public void Pickup_SpeedChallenge_Late_RemovesTheTip()
     {
+        var hud = new FakeTelemetryHud();
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.SpeedRequest,
+        };
+        // A deliberately tiny allowance makes the 82 s test drive late.
+        TaxiRules rules = TaxiRules.Default with
+        {
+            SpeedChallenge = new SpeedChallengeRules(
+                TopSpeedFraction: 0.55, MinAverageKmh: 130.0,
+                MaxAverageKmh: 130.0, SlackFactor: 0.1,
+                BufferSeconds: 0),
+        };
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, taxiRules: rules);
+
+        TaxiFlow.Propose(vm);
+        TaxiFlow.Pickup(vm, clock);
+        TaxiFlow.AnswerRequest(vm);
+        DriveLaps(vm, clock, tel, laps: 1, speedKmh: 40f);
+        vm.DropoffCommand.Execute(null);
+
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.False(receipt.HasTip);
+        Assert.Equal(Strings.Get("HudSpeedChallengeLate"), hud.Notice);
+    }
+
+    [Fact]
+    public void Pickup_SpeedChallenge_IsForced_NoDecline()
+    {
+        var hud = new FakeTelemetryHud();
         var requests = new FakeCustomerRequestRoller
         {
             Result = CustomerRequestTestData.SpeedRequest,
         };
         var police = new PolicePatrolPlanner(
             AddressMap.Default, TestPoliceRules, seed: 0);
-        var (vm, clock, tel, _) = Create(
-            speedKmh: 0f, requests: requests, police: police);
+        var (vm, clock, _, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, police: police);
 
         TaxiFlow.Propose(vm);
-        vm.PickupCommand.Execute(null);
-        var screen = Assert.IsType<CustomerRequestScreenViewModel>(vm.CurrentScreen);
-        screen.Options[1].Command.Execute(null);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
+        Assert.True(screen.IsSpeedChallenge);
+        Assert.Empty(screen.Options);
+        Assert.True(screen.ShowBack);
+
         screen.BackCommand.Execute(null);
 
-        DriveLaps(vm, clock, tel, laps: 1, speedKmh: 80f);
-        vm.DropoffCommand.Execute(null);
-
-        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.False(receipt.HasFine);
-        Assert.False(receipt.HasTip);
+        Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
+        Assert.NotNull(hud.JobGuidance.SpeedChallengeDeadline);
     }
 
     [Fact]
@@ -900,11 +1149,51 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void ControlBack_ReturnsToTheMenu()
+    {
+        // The control page (the menu's Jobs tile) is the jobs hub; BACK is its
+        // one way out and lands on the menu, the same page a call opens.
+        var (vm, _, _, _) = Create(speedKmh: 0f);
+        var control = FinishIntro(vm);
+
+        control.BackCommand.Execute(null);
+
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void MenuWallet_OpensTheAccountSummary_AndBackReturnsToMenu()
+    {
+        // The menu's WALLET tile opens the account page; every figure reads
+        // the live wallet, so a job settled since the last visit shows.
+        var wallet = new DriverWallet(new DriverState(123.45, 678.0, Bank: 1500.0));
+        var (vm, _, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true }, wallet: wallet,
+            // Today already claimed: the boot grant must not add to the cash
+            // the page is about to show.
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+
+        menu.WalletCommand.Execute(null);
+
+        var page = Assert.IsType<WalletScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("CURRENT CR", page.CashLabel);
+        Assert.Equal("CR123.45", page.CashAmount);
+        Assert.Equal("CURRENT XP", page.XpLabel);
+        Assert.Equal("XP678.00", page.XpAmount);
+        Assert.Equal("CURRENT BANK SALDO", page.BankLabel);
+        Assert.Equal("CR1500.00", page.BankAmount);
+        Assert.Equal("Concentration: 20%", page.ConcentrationLine);
+
+        page.BackCommand.Execute(null);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
     public void ShiftTimeout_EndsShift_FlipsLabelBack()
     {
         var (vm, clock, _, _) = Create(speedKmh: 0f);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
         vm.TaxiShiftCommand.Execute(null);
         Assert.Equal("CONTINUE TAXI SHIFT", control.TaxiLabel);
 
@@ -1299,6 +1588,24 @@ public sealed class MainViewModelTests
     private static string TuesdayButton(CalendarScreenViewModel calendar) =>
         Assert.Single(calendar.Days, d => d.DayLabel == "Tuesday").EventLabel;
 
+    // The intro's last CONTINUE lands on the menu and leaves the panel up;
+    // these flows take the Jobs tile into the career page they exercise.
+    private static MainControlScreenViewModel FinishIntro(MainViewModel vm)
+    {
+        vm.FinishDialogue();
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        return ShowControl(vm);
+    }
+
+    // A call opens the menu; its Jobs tile is the door into the career page.
+    private static MainControlScreenViewModel ShowControl(MainViewModel vm)
+    {
+        vm.Show();
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.JobsCommand.Execute(null);
+        return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
     // A call lands on the menu; its Calendar tile opens the page whose week
     // strip these tests read.
     private static CalendarScreenViewModel ShowCalendar(MainViewModel vm)
@@ -1378,16 +1685,16 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void FinishDialogue_ShowsControlPageButLeavesThePanelHidden()
+    public void FinishDialogue_ShowsTheMenuAndKeepsThePanelUp()
     {
         var (vm, _, _, _) = Create();
         vm.FinishDialogue();
 
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.False(vm.IsOnboarding);
-        // The birthday hands the screen to the HUD until the player calls the
-        // panel back.
-        Assert.False(vm.IsShown);
+        // The intro hands over in place: the player lands on the menu and the
+        // panel stays up until idle-hide or a call toggles it.
+        Assert.True(vm.IsShown);
     }
 
     [Fact]
@@ -1409,7 +1716,8 @@ public sealed class MainViewModelTests
             [], new Dictionary<string, string[]>(), [],
             [new DialogueLine("GRANDMA", "Stop by [POI] on [STREET].")], [], []);
         PointOfInterest expected =
-            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5).Spawn()!;
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
+                .Spawn(PoiCatalog.MaxGroceryId)!;
         var (vm, _, _, _) = Create(
             content: content,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5));
@@ -1426,7 +1734,8 @@ public sealed class MainViewModelTests
     public void FinishDialogue_PinsTheErrandOnTheHud()
     {
         PointOfInterest expected =
-            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5).Spawn()!;
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
+                .Spawn(PoiCatalog.MaxGroceryId)!;
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
             content: OneLineDialogue,
@@ -1440,6 +1749,32 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void FinishDialogue_AddsTheErrandToTheAddressesPage()
+    {
+        var poiStore = new FakePoiDirectoryStore();
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(
+            content: OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud, poiStore: poiStore);
+
+        vm.ShowDialogue();
+        vm.FinishDialogue();
+
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
+        home.AddressesCommand.Execute(null);
+        var addresses = Assert.IsType<AddressesScreenViewModel>(vm.CurrentScreen);
+        AddressRow errand = Assert.Single(
+            addresses.Rows, row => row.Poi.Id == PoiCatalog.MaxGroceryId);
+
+        Assert.Equal("Max's Grocery Store", errand.Name);
+        Assert.Contains(
+            poiStore.Saved, poi => poi.Id == PoiCatalog.MaxGroceryId);
+    }
+
+    [Fact]
     public void BirthdayErrand_ReusesTheBankedStoreAcrossLaunches()
     {
         var onboarding = new FakeOnboardingStore();
@@ -1450,7 +1785,8 @@ public sealed class MainViewModelTests
 
         first.ShowDialogue();
         PointOfInterest expected =
-            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5).Spawn()!;
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
+                .Spawn(PoiCatalog.MaxGroceryId)!;
         Assert.Equal(expected.Address, onboarding.State.MaxStoreAddress);
         Assert.Equal(expected.Id, onboarding.State.MaxStoreId);
 
@@ -1471,7 +1807,8 @@ public sealed class MainViewModelTests
     public void EnterRequested_OpensTheStoreInterior()
     {
         PointOfInterest expected =
-            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5).Spawn()!;
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
+                .Spawn(PoiCatalog.MaxGroceryId)!;
         var log = new TestLog();
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
@@ -1542,6 +1879,44 @@ public sealed class MainViewModelTests
             saved.Trunk is { Count: > 0 }
             && saved.Trunk.Any(item => item.Name == "MAPLE SYRUP"));
         Assert.True(store.BoughtVisible);
+    }
+
+    [Fact]
+    public void MenuTrunkTile_OpensTheCarriedGoodsPage_AndABiteBanksTrunkAndHunger()
+    {
+        var car = new CarSpec(
+            "ks_test_trunk", 2020, "Test", "Trunk", Passengers: 1,
+            TrunkLitres: 60);
+        var pool = new[] { car };
+        var garage = new Garage(pool);
+        garage.Add(car, week: 1);
+        var trunk = new Trunk([new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 2 }]);
+        var hunger = new Hunger(
+            HungerRules.Default, new HungerState(10, ThresholdTriggered: false));
+        var hungerStore = new FakeHungerStore();
+        var drivers = new FakeDriverStore();
+        var (vm, _, _, _) = Create(
+            cars: pool, garage: garage, trunk: trunk, hunger: hunger,
+            hungerStore: hungerStore, driverStore: drivers);
+
+        vm.FinishDialogue();
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.TrunkCommand.Execute(null);
+        var page = Assert.IsType<TrunkScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("Free space: 59.20/60L", page.FreeSpaceLine);
+
+        page.EatCommand.Execute(Assert.Single(page.Rows));
+
+        // A bite moves two files: the trunk rides driver.json, the appetite
+        // has its own store, so the host banks both in the same tap.
+        Assert.Equal(1, trunk.Items.Single().Quantity);
+        Assert.Equal(7, hunger.Value);
+        Assert.Contains(drivers.Saved, saved =>
+            saved.Trunk is { Count: 1 } && saved.Trunk[0].Quantity == 1);
+        Assert.Contains(hungerStore.Saved, state => state.Hunger == 7);
+
+        page.BackCommand.Execute(null);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -1980,6 +2355,61 @@ public sealed class MainViewModelTests
         Assert.Equal(0, hud.EnterRequests);
     }
 
+    [Theory]
+    [InlineData("pick up")]
+    [InlineData("drop off")]
+    public void VoiceJobAction_AnswersTheHudsOwnWords(string spoken)
+    {
+        // The HUD hands the router the words its action button means (PICK UP /
+        // DROP OFF), so the player says what the button prints instead of the
+        // generic "enter".
+        var hud = new FakeTelemetryHud
+        {
+            AtDestination = true,
+            EnterKeywords = ["enter", spoken],
+        };
+        var mic = new FakeVoiceListener();
+        _ = Create(hud: hud, voice: mic);
+
+        mic.Fire(spoken, isFinal: true);
+
+        Assert.Equal(1, hud.EnterRequests);
+    }
+
+    [Fact]
+    public void VoiceJobAction_IgnoredWhileTheButtonOnlySaysEnter()
+    {
+        // The router carries no pickup words of its own: the HUD's table is the
+        // only door, so a stale "pick up" cannot fire a plain ENTER button.
+        var hud = new FakeTelemetryHud
+        {
+            AtDestination = true,
+            EnterKeywords = ["enter"],
+        };
+        var mic = new FakeVoiceListener();
+        _ = Create(hud: hud, voice: mic);
+
+        mic.Fire("pick up", isFinal: true);
+
+        Assert.Equal(0, hud.EnterRequests);
+    }
+
+    [Fact]
+    public void VoiceJobAction_IgnoredBeforeArrival()
+    {
+        var hud = new FakeTelemetryHud
+        {
+            AtDestination = false,
+            EnterKeywords = ["enter", "pick up"],
+        };
+        var mic = new FakeVoiceListener();
+        _ = Create(hud: hud, voice: mic);
+
+        mic.Fire("pick up", isFinal: true);
+
+        Assert.Equal(0, hud.EnterRequests);
+    }
+
     [Fact]
     public void CompletedOnboarding_BootsToTheMenuPage()
     {
@@ -1998,8 +2428,7 @@ public sealed class MainViewModelTests
             [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50)],
             0.7, 100);
         var (vm, _, _, _) = Create(catalog: catalog);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
         Assert.True(control.DeliveryCommand.CanExecute(null));
 
         control.DeliveryCommand.Execute(null);
@@ -2033,8 +2462,7 @@ public sealed class MainViewModelTests
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)]),
                 new HubCareer("coffee_beans", "COFFEE BEANS", [new HubLevel("CoffeeUs", 100)])])]);
         var (vm, _, _, _) = Create(catalog: catalog, hubs: hubs);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
 
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
@@ -2054,6 +2482,46 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void GroceryHub_Purchase_PlacesTheFirstStore_AndShowsItOnTheBoard()
+    {
+        // Unity StorePlacementHelper.BackfillStoresOnExistingStreets: buying
+        // the grocery career immediately opens one store, even before the
+        // first expansion. The door is a POI and a delivery-board row.
+        var hubs = new HubCatalog([
+            new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES",
+                    [new HubLevel("Grocers and Sons", 100)])])]);
+        var catalog = new DeliveryCatalog([], 0.7, 100);
+        var directory = new PoiDirectory();
+        var (vm, _, _, _) = Create(
+            catalog: catalog, hubs: hubs, poiDirectory: directory);
+        var control = FinishIntro(vm);
+
+        control.DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        Assert.False(board.HasStores); // no catalogue row and no placed store yet
+
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+
+        PointOfInterest store = Assert.Single(
+            directory.All, poi => poi.Type == PoiTypes.GroceryStore);
+        Assert.Equal("groceries", store.Category);
+        Assert.False(string.IsNullOrWhiteSpace(store.OwnerName));
+
+        DeliveryRow row = Assert.Single(board.Rows);
+        Assert.Equal(store.Id, row.Store.Key);
+        Assert.Equal(store.Name, row.Store.Name);
+        Assert.Equal(store.OwnerName, row.Store.Owner);
+        Assert.Equal("groceries", row.Store.Category);
+        Assert.Equal(200, row.Store.UnitCapacity); // 10 layout slots × 20
+        Assert.True(board.HasStores);
+    }
+
+    [Fact]
     public void Deliver_JumpsStraightToTheDeliveryReceipt()
     {
         // Like the taxi ACCEPT skip (PORTPLAN 16): with no driving slice the
@@ -2068,13 +2536,12 @@ public sealed class MainViewModelTests
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
             CredPRamp.UnityDefault, ["Elena Marchetti"]);
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var friends = new FakeFriendshipStore();
         var (vm, _, _, _) = Create(
             catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
             friendships: friends);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
 
@@ -2121,7 +2588,7 @@ public sealed class MainViewModelTests
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
             CredPRamp.UnityDefault, ["Elena Marchetti"]);
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var rarity = new FakeCarRarity { CarCount = 3 };
         var telemetry = new FakePlayerTelemetry();
         var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
@@ -2130,8 +2597,7 @@ public sealed class MainViewModelTests
             catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
             carKsId: "ks_mazda_mx5_na", rarity: rarity,
             telemetry: telemetry, rivals: rivals, driverStore: drivers);
-        vm.FinishDialogue();
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen).DeliveryCommand.Execute(null);
+        FinishIntro(vm).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -2166,22 +2632,21 @@ public sealed class MainViewModelTests
         {
             new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
         };
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var (vm, _, _, _) = Create(
             cars: pool, carKsId: "ks_test_hatch", roads: new RoadTestLedger(pool, seed: 0),
             wallet: wallet, speedKmh: 0f);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
 
         control.HaulCommand.Execute(null);
         var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
-        // Class 15 -> tier 6: 0.83 * (50 rating * 6 / 100) = 2.49/min,
-        // the 30-minute placeholder leg earns 74.70. No XP rides a haul.
-        Assert.Equal(74.70, wallet.Cash);
+        // Class 15 -> tier 6: 0.83 * (20 rating * 6 / 100) = 0.996/min,
+        // the 30-minute placeholder leg earns 29.88. No XP rides a haul.
+        Assert.Equal(29.88, wallet.Cash);
         Assert.Equal(0.0, wallet.Xp);
         Assert.Equal("TEST HATCH", receipt.CarLine);
         Assert.Equal("The current class is Tier 6", receipt.TierLine);
-        Assert.Equal("Wallet: €74.70", receipt.WalletLine);
+        Assert.Equal("Wallet: €29.88", receipt.WalletLine);
 
         // CONTINUE hands back to a fresh control page (taxi-receipt rule).
         receipt.ContinueCommand.Execute(null);
@@ -2193,20 +2658,19 @@ public sealed class MainViewModelTests
     {
         // No announced identity: the receipt names the customer's car
         // instead and prices the lowest band rather than crashing.
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var (vm, _, _, _) = Create(wallet: wallet, speedKmh: 0f);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
 
         control.HaulCommand.Execute(null);
         var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal("the customer's new car", receipt.CarLine);
-        // Lowest band (placeholder class 1): 0.83 * (50 * 1 / 100) = 0.415
-        // cents-rewritten to a 0.42 rate, 30 minutes earn 12.45.
-        Assert.Equal(12.45, wallet.Cash);
+        // Lowest band (placeholder class 1): 0.83 * (20 * 1 / 100) = 0.166
+        // cents-rewritten to a 0.17 rate, 30 minutes earn 4.98.
+        Assert.Equal(4.98, wallet.Cash);
         Assert.Equal(0.0, wallet.Xp);
         Assert.Equal("The current class is Tier 1", receipt.TierLine);
-        Assert.Equal("Resulting in a rate of €0.42/min", receipt.RateLine);
+        Assert.Equal("Resulting in a rate of €0.17/min", receipt.RateLine);
     }
 
     [Fact]
@@ -2280,15 +2744,14 @@ public sealed class MainViewModelTests
         // Unity parity: car-hauling pays cash alone — no expansion counter,
         // no bank interest (48). The settle also writes no driver save, so
         // nothing rides the counters in from the tap.
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
         var (vm, _, _, _) = Create(wallet: wallet, driverStore: drivers, speedKmh: 0f);
-        vm.FinishDialogue();
-        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var control = FinishIntro(vm);
         int savesBefore = drivers.Saved.Count;
         control.HaulCommand.Execute(null);
         _ = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(12.45, wallet.Cash); // the haul paid
+        Assert.Equal(4.98, wallet.Cash); // the haul paid
         Assert.Equal(1000.0, wallet.BankBalance); // interest never accrued
         Assert.Equal(savesBefore, drivers.Saved.Count);
     }
@@ -2316,10 +2779,10 @@ public sealed class MainViewModelTests
         // Temporary entry (48): the BANK verb opens the withdraw screen and
         // stamps the visit; CONTINUE hands back to the control page.
         var wallet = new DriverWallet();
-        var (vm, _, _, _) = Create(speedKmh: 0f, wallet: wallet);
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(speedKmh: 0f, wallet: wallet, hud: hud);
         vm.FinishDialogue();
-        vm.BankCommand.Execute(null);
-        var bank = Assert.IsType<BankScreenViewModel>(vm.CurrentScreen);
+        var bank = OpenPoi<BankScreenViewModel>(vm, hud, "Bank");
         Assert.True(wallet.HasEnteredBank);
         Assert.Equal("Current Bank Saldo: CR1000.00", bank.SaldoLine);
         bank.BackCommand.Execute(null);
@@ -2334,11 +2797,11 @@ public sealed class MainViewModelTests
         var saved = new DriverState(0, 0, Bank: 1200.0);
         var wallet = new DriverWallet(saved);
         var drivers = new FakeDriverStore(saved);
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers,
-            savedDriver: saved);
+            savedDriver: saved, hud: hud);
         vm.FinishDialogue();
-        vm.BankCommand.Execute(null);
-        var bank = Assert.IsType<BankScreenViewModel>(vm.CurrentScreen);
+        var bank = OpenPoi<BankScreenViewModel>(vm, hud, "Bank");
         bank.AmountText = "150";
         bank.WithdrawCommand.Execute(null);
         DriverState banked = drivers.Saved[^1];
@@ -2387,6 +2850,48 @@ public sealed class MainViewModelTests
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
         Assert.Equal(25, garage.Current!.Filth.Value);
+    }
+
+    [Fact]
+    public void TaxiDropoff_BanksTheLifetimeJobCount()
+    {
+        // PORTPLAN 24, Unity jobsCompleted++: the lifetime total gates the
+        // dealer and mechanic POIs and must survive the restart.
+        var drivers = new FakeDriverStore();
+        var (vm, clock, tel, _) = Create(speedKmh: 0f, driverStore: drivers);
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+
+        Assert.Equal(1, drivers.Saved[^1].JobsCompleted);
+    }
+
+    [Fact]
+    public void FreshCareer_OpensNoBusinessDoor()
+    {
+        // Unity starts with story POIs only: the car wash, bank, dealer,
+        // mechanic and insurance open from the street/job thresholds.
+        var directory = new PoiDirectory();
+
+        _ = Create(poiDirectory: directory);
+
+        Assert.Empty(directory.All);
+    }
+
+    [Fact]
+    public void SavedProgress_OpensTheBusinessesTheThresholdsUnlocked()
+    {
+        var directory = new PoiDirectory();
+        var saved = new DriverState(
+            500.0, 0.0,
+            StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"],
+            JobsCompleted: 10);
+
+        _ = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            savedDriver: saved, poiDirectory: directory);
+
+        Assert.Contains(directory.All, poi => poi.Type == PoiTypes.CarWash);
+        Assert.Contains(directory.All, poi => poi.Type == PoiTypes.Dealer);
     }
 
     [Fact]
@@ -2441,8 +2946,7 @@ public sealed class MainViewModelTests
         var (vm, _, _, _) = Create(
             catalog: catalog, hubs: hubs, speedKmh: 0f,
             garage: garage, garageStore: store);
-        vm.FinishDialogue();
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen).DeliveryCommand.Execute(null);
+        FinishIntro(vm).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -2467,13 +2971,13 @@ public sealed class MainViewModelTests
         var garageStore = new FakeGarageStore();
         var wallet = new DriverWallet(new DriverState(500.0, 0.0));
         var drivers = new FakeDriverStore(new DriverState(500.0, 0.0));
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
             speedKmh: 0f, garage: garage, garageStore: garageStore,
-            wallet: wallet, driverStore: drivers);
+            wallet: wallet, driverStore: drivers, hud: hud);
         vm.FinishDialogue();
 
-        vm.CarWashCommand.Execute(null);
-        var wash = Assert.IsType<CarWashScreenViewModel>(vm.CurrentScreen);
+        var wash = OpenPoi<CarWashScreenViewModel>(vm, hud, "Car Wash");
         wash.WashCommand.Execute(null);
 
         Assert.Equal(0, garage.Current!.Filth.Value);
@@ -2537,7 +3041,7 @@ public sealed class MainViewModelTests
         {
             new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4, Class: 15),
         };
-        var wallet = new DriverWallet();
+        var wallet = EmptyWallet();
         var rarity = new FakeCarRarity { CarCount = 3 };
         var telemetry = new FakePlayerTelemetry();
         var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };

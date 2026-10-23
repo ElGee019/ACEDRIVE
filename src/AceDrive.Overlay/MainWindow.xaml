@@ -38,8 +38,20 @@
         <DataTemplate DataType="{x:Type vm:MenuScreenViewModel}">
             <views:MenuScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:HomeScreenViewModel}">
+            <views:HomeScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AddressesScreenViewModel}">
+            <views:AddressesScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:WalletScreenViewModel}">
+            <views:WalletScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:CalendarScreenViewModel}">
             <views:CalendarScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TrunkScreenViewModel}">
+            <views:TrunkScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TaxiJobProposalViewModel}">
             <views:TaxiJobProposalScreenView/>

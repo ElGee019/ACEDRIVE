@@ -269,4 +269,23 @@ public sealed class CityEconomyTests
         Assert.Equal(0, city.TotalCitizens([stranger]));
         Assert.Equal(30, city.Live(stranger).StockedUnits);
     }
+
+    [Fact]
+    public void AddStore_JoinsTheTownAtItsOwnShelfFill()
+    {
+        // A grocery store placed mid-session (Unity's hub backfill) starts
+        // with the same cell a boot-time row would: the rules' citizens and
+        // the row's shelf fill.
+        var city = Town(Shelf(40));
+        var placed = new DeliveryStore("grocery_store_0", "Marco's Grocery", "Marco", 200, 200, 5.0, "groceries");
+
+        Assert.True(city.AddStore(placed));
+        Assert.Equal(200, Stock(city, placed));
+        Assert.Equal(CityRules.Default.DefaultCitizens, Citizens(city, placed));
+
+        // A repeated key is a no-op, so a boot rebuild and a live placement
+        // can never double-count the same shop.
+        Assert.False(city.AddStore(placed));
+        Assert.False(city.AddStore(placed with { Key = "" }));
+    }
 }

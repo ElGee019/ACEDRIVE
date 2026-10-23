@@ -41,6 +41,9 @@ public partial class HudWindow : Window
     private readonly ILog _log;
     private readonly Brush? _blueBackdrop;
     private bool _panelOpen;
+    // A page can summon the task text while the panel is still up (pinning an
+    // address); the strip then stays over the panel until the panel next opens.
+    private bool _showTaskTextOverPanel;
 
     public HudWindow(
         HudViewModel viewModel, ISettingsStore store, ILog log,
@@ -106,14 +109,32 @@ public partial class HudWindow : Window
 
     /// <summary>
     /// The companion and the main panel share the same screen corner. While
-    /// the panel is open the HUD steps aside: a topmost, no-activate strip on
-    /// top of a page would cover a row and turn its click into a HUD drag
-    /// (logged at Max's store), so it returns only once the player drives and
-    /// the panel hides again.
+    /// the panel is open the HUD normally steps aside: a topmost, no-activate
+    /// strip on top of a page would cover a row and turn its click into a HUD
+    /// drag (logged at Max's store), so it returns once the player drives and
+    /// the panel hides again. <see cref="ShowTaskTextOverPanel"/> is the one
+    /// deliberate exception, for a destination the player just pinned.
     /// </summary>
     public void SetPanelOpen(bool open)
     {
         _panelOpen = open;
+        // A fresh panel opening restores the step-aside rule; the summon only
+        // bridges the panel session that was already up when it happened.
+        if (open)
+        {
+            _showTaskTextOverPanel = false;
+        }
+        ApplyShown();
+    }
+
+    /// <summary>
+    /// Shows the companion's task text without waiting for the panel to hide.
+    /// A page calls this when it pins a destination the player should read at
+    /// once; the normal step-aside resumes the next time the panel opens.
+    /// </summary>
+    public void ShowTaskTextOverPanel()
+    {
+        _showTaskTextOverPanel = true;
         ApplyShown();
     }
 
@@ -129,8 +150,9 @@ public partial class HudWindow : Window
         }
     }
 
-    // The VM owns the hand-over: hidden through the introduction, shown once
-    // the birthday dialogue finishes. The window itself has no timer or rule.
+    // The VM owns the hand-over: hidden through the introduction, revealed once
+    // the birthday dialogue finishes. The window itself has no timer or rule;
+    // an open main panel keeps it aside until the panel closes again.
     private void ApplyShown()
     {
         if (DataContext is not HudViewModel vm)
@@ -138,7 +160,7 @@ public partial class HudWindow : Window
             return;
         }
 
-        if (vm.IsRevealed && !_panelOpen)
+        if (vm.IsRevealed && (!_panelOpen || _showTaskTextOverPanel))
         {
             if (!IsVisible)
             {

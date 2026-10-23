@@ -130,15 +130,4 @@ public sealed class DealerStockTests
         Assert.Equal(DealerRules.SeedFor(1), DealerRules.SeedFor(-4));
         Assert.NotEqual(0, DealerRules.SeedFor(1));
     }
-
-    [Fact]
-    public void DealerPlacementGate_KeysOnStreets()
-    {
-        // Parked Unity parity for the marker network (items 24/59): the first
-        // dealer needs 10 jobs, then one dealer per 37 discovered streets.
-        Assert.Equal(10, DealerRules.FirstDealerJobs);
-        Assert.Equal(0, DealerRules.DealersForStreets(36));
-        Assert.Equal(1, DealerRules.DealersForStreets(37));
-        Assert.Equal(2, DealerRules.DealersForStreets(74));
-    }
 }

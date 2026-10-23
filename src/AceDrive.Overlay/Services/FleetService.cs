@@ -23,8 +23,8 @@ public sealed class FleetService
     private readonly InsuranceRules _insurance;
     private readonly ILog _log;
     private readonly IFleetHost _host;
-    // No driver rating system exists yet (PORTPLAN item 06), so the insurance
-    // math runs on the band's midpoint like the other placeholder receipts.
+    // The driver's overall rating behind the insurance discount (PORTPLAN
+    // item 06); the composition root hands in the wallet's live average.
     private readonly int _driverRating;
 
     public FleetService(

@@ -31,11 +31,11 @@ public sealed class InsuranceFlowTests
         clock.Advance(TimeSpan.FromSeconds(13.5 * 60 * 2.2));
         vm.Poll();
 
-        Assert.Equal(100.0 - 3.45, wallet.Cash, 6); // 6.90 base − 50% driver rating
+        Assert.Equal(100.0 - 5.52, wallet.Cash, 6); // 6.90 base − 20% driver rating
         Assert.NotNull(wallet.LastInsuranceChargeDate);
 
         vm.Poll(); // same date and hour: no second charge
-        Assert.Equal(100.0 - 3.45, wallet.Cash, 6);
+        Assert.Equal(100.0 - 5.52, wallet.Cash, 6);
     }
 
     [Fact]
@@ -58,11 +58,13 @@ public sealed class InsuranceFlowTests
         var garage = GarageWith(insured: true);
         garage.Current!.Drive(1200.0); // fully wears the oil part
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            speedKmh: 0f, garage: garage, wallet: wallet, cars: Pool);
+            speedKmh: 0f, garage: garage, wallet: wallet, cars: Pool, hud: hud,
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
 
-        vm.MechanicCommand.Execute(null);
-        var mechanic = Assert.IsType<MechanicScreenViewModel>(vm.CurrentScreen);
+        var mechanic = MainViewModelTests.OpenPoi<MechanicScreenViewModel>(vm, hud, "Mechanic");
         mechanic.AddCommand.Execute(mechanic.Rows.Single(r => r.Key == "oil_change"));
         mechanic.RepairPartsCommand.Execute(null);
 
@@ -76,11 +78,13 @@ public sealed class InsuranceFlowTests
         var garage = GarageWith(insured: false);
         garage.Current!.Drive(1200.0);
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            speedKmh: 0f, garage: garage, wallet: wallet, cars: Pool);
+            speedKmh: 0f, garage: garage, wallet: wallet, cars: Pool, hud: hud,
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
 
-        vm.MechanicCommand.Execute(null);
-        var mechanic = Assert.IsType<MechanicScreenViewModel>(vm.CurrentScreen);
+        var mechanic = MainViewModelTests.OpenPoi<MechanicScreenViewModel>(vm, hud, "Mechanic");
         mechanic.AddCommand.Execute(mechanic.Rows.Single(r => r.Key == "oil_change"));
         mechanic.RepairPartsCommand.Execute(null);
 
@@ -93,11 +97,13 @@ public sealed class InsuranceFlowTests
     {
         var garage = GarageWith(insured: false);
         var store = new FakeGarageStore();
+        var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            speedKmh: 0f, garage: garage, garageStore: store, cars: Pool);
+            speedKmh: 0f, garage: garage, garageStore: store, cars: Pool, hud: hud,
+            progress: OnboardingState.Fresh with { BirthdayDone = true });
 
-        vm.InsuranceCommand.Execute(null);
-        var insurance = Assert.IsType<InsuranceScreenViewModel>(vm.CurrentScreen);
+        var insurance = MainViewModelTests.OpenPoi<InsuranceScreenViewModel>(
+            vm, hud, "Insurance Broker");
         insurance.ToggleCommand.Execute(insurance.Rows.Single(r => r.Key == PricedCar.Key));
 
         Assert.True(garage.Current!.HasInsurance);

@@ -18,6 +18,10 @@
         <DataTemplate DataType="{x:Type vm:CustomerRequestScreenViewModel}">
             <views:CustomerRequestScreenView/>
         </DataTemplate>
+        <!-- The speed challenge's delivery clock uses the design's Tourney
+             face, like the menu clock. A machine without the embedded font
+             falls back to the default face rather than failing the HUD. -->
+        <FontFamily x:Key="TourneyThin">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Tourney Thin</FontFamily>
     </Window.Resources>
     <!-- The fill is the dark XAML default; the blue request backdrop is applied
          in code (HudWindow.ApplyRequest) because a WebP ImageSource would
@@ -55,23 +59,43 @@
                                    Foreground="#FFFFFFFF" FontSize="16"
                                    TextWrapping="Wrap"
                                    Visibility="{Binding HasBanner, Converter={StaticResource BoolToVis}}"/>
-                        <!-- Remaining job distance, or a transient host notice
-                             (police fine): the notice wins and turns the line teal
-                             so it reads as an event rather than guidance. -->
-                        <TextBlock Grid.Row="1" Text="{Binding HudLineText}"
-                                   FontSize="13" TextTrimming="CharacterEllipsis"
-                                   Visibility="{Binding HasHudLine, Converter={StaticResource BoolToVis}}">
-                            <TextBlock.Style>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="#FFCCCCCC"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding HasNotice}" Value="True">
-                                            <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </TextBlock.Style>
-                        </TextBlock>
+                        <!-- Remaining distance to the pinned leg (a taxi job
+                             or an intro drive) or a transient host notice
+                             (police fine) over the speed-challenge clock. The
+                             notice wins the distance line and turns it teal so
+                             it reads as an event rather than guidance; the
+                             clock keeps its own Tourney line. -->
+                        <StackPanel Grid.Row="1">
+                            <TextBlock Text="{Binding HudLineText}"
+                                       FontSize="13" TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding HasHudLine, Converter={StaticResource BoolToVis}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#FFCCCCCC"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasNotice}" Value="True">
+                                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding SpeedChallengeText}"
+                                       FontFamily="{StaticResource TourneyThin}"
+                                       FontSize="22" TextTrimming="CharacterEllipsis"
+                                       Visibility="{Binding HasSpeedChallenge, Converter={StaticResource BoolToVis}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Foreground" Value="#FFFFFFFF"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SpeedChallengeLate}" Value="True">
+                                                <Setter Property="Foreground" Value="#FFFF9E64"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
                         <Button x:Name="EnterButton" Grid.Row="2" Content="{Binding EnterText}"
                                 Command="{Binding EnterCommand}"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"

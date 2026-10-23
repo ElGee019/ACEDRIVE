@@ -1,0 +1,111 @@
+<UserControl x:Class="AceDrive.Overlay.Views.TrunkScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- EAT is the row's only action: compact, and visibly dimmed when the
+             catalogue no longer defines the stack (it cannot feed a value the
+             data does not have). -->
+        <Style x:Key="EatButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,1"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.4"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+    <!-- Trunk page (PORTPLAN item 26, port of Unity YouScreen's TrunkScreen):
+         the driven car's free space over its capacity, the appetite reading
+         (amber inside Unity's band) and one row per carried stack with its
+         quantity, the hunger a bite removes and the EAT tap. The glove
+         compartment and the reward-card slots Unity lists below are not part
+         of this port yet (PORTPLAN 61), so the page stops after the trunk.
+         Same page skeleton as the bank page: title band, body, BACK flush
+         with the bottom edge. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=TrunkTitle}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Top">
+            <TextBlock Text="{Binding FreeSpaceLine}" Foreground="#FFF" FontSize="14"
+                       TextAlignment="Center" Margin="0,2,0,2"/>
+            <!-- Unity colours this label orange inside the amber band and calm
+                 teal elsewhere; the band itself is Core data, not view copy. -->
+            <TextBlock Text="{Binding HungerLine}" FontSize="13" FontWeight="Bold"
+                       TextAlignment="Center" Margin="0,0,0,8">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HungerAmber}" Value="True">
+                                <Setter Property="Foreground" Value="#FFFFA600"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+
+            <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" Margin="0,6,0,6"
+                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+
+            <ItemsControl ItemsSource="{Binding Rows}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1"
+                                Padding="2,3">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                           Foreground="#FFF" FontSize="13"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Grid.Column="1" Text="{Binding QuantityLine}"
+                                           Foreground="#FFBFC4C9" FontSize="12"
+                                           Margin="8,0" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="2" Text="{Binding HungerLine}"
+                                           Foreground="#FFBFC4C9" FontSize="12"
+                                           Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                <Button Grid.Column="3" Content="{loc:Loc Key=TrunkEat}"
+                                        Style="{StaticResource EatButton}"
+                                        Command="{Binding DataContext.EatCommand,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}"
+                                        IsEnabled="{Binding CanEat}"/>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- Button bar: BACK stretches the full panel width in its own bottom
+             band like every other page; teal is the shared voice-ack highlight. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=TrunkBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

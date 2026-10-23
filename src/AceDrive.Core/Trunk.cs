@@ -99,6 +99,39 @@ public sealed class Trunk
         _items.Add(new TrunkItem(name, unitVolume) { Quantity = quantity });
     }
 
+    /// <summary>
+    /// Removes one unit of a stack and drops it when the last unit goes
+    /// (Unity YouScreen.OnTrunkItemClicked decrements, then removes at zero).
+    /// False when the stack is absent, so the caller never eats from nowhere.
+    /// </summary>
+    public bool RemoveOne(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < _items.Count; i++)
+        {
+            TrunkItem item = _items[i];
+            if (!string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (item.Quantity > 1)
+            {
+                item.Quantity--;
+            }
+            else
+            {
+                _items.RemoveAt(i);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
     /// <summary>A detached copy for driver.json.</summary>
     public IReadOnlyList<TrunkItem> Snapshot()
     {

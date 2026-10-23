@@ -4,7 +4,12 @@
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Customer request page (PORTPLAN 11, Unity CustomerRequestScreen):
          the ask, the 14 s countdown, three quiz values or ACCEPT/DECLINE,
-         then feedback and BACK. The host ticks the countdown. -->
+         then feedback and BACK. The host ticks the countdown. The forced
+         speed challenge reuses the page without options; its delivery clock
+         is the Tourney face from the design. -->
+    <UserControl.Resources>
+        <FontFamily x:Key="TourneyThin">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Tourney Thin</FontFamily>
+    </UserControl.Resources>
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -16,9 +21,26 @@
             <TextBlock Text="{Binding RequestText}" Foreground="#FFF" FontSize="14"
                        TextWrapping="Wrap" TextAlignment="Center" Margin="0,6,0,10"
                        Visibility="{Binding RequestTextVisible, Converter={StaticResource BoolToVis}}"/>
-            <TextBlock Text="{Binding TimeLine}" Foreground="#FFBFC4C9" FontSize="12"
+            <TextBlock Text="{Binding TimeLine}"
                        TextAlignment="Center" Margin="0,0,0,10"
-                       Visibility="{Binding TimerVisible, Converter={StaticResource BoolToVis}}"/>
+                       Visibility="{Binding TimerVisible, Converter={StaticResource BoolToVis}}">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#FFBFC4C9"/>
+                        <Setter Property="FontSize" Value="12"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSpeedChallenge}" Value="True">
+                                <Setter Property="FontFamily" Value="{StaticResource TourneyThin}"/>
+                                <Setter Property="FontSize" Value="30"/>
+                                <Setter Property="Foreground" Value="#FFFFFFFF"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding SpeedChallengeLate}" Value="True">
+                                <Setter Property="Foreground" Value="#FFFF9E64"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
             <ItemsControl ItemsSource="{Binding Options}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>

@@ -60,6 +60,18 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void ShowTaskText_RaisesTheSurfaceRequest()
+    {
+        var vm = Create();
+        int requests = 0;
+        vm.TaskTextRequested += (_, _) => requests++;
+
+        vm.ShowTaskText();
+
+        Assert.Equal(1, requests);
+    }
+
+    [Fact]
     public void Request_ReplacesTheTaskTextThenClears()
     {
         // The customer request rides the companion (PORTPLAN 11): the view
@@ -452,9 +464,11 @@ public sealed class HudViewModelTests
             new AddressLocation("Street 1", 17, HouseSide.Right));
 
     private static HudJobGuidance Job(
-        string name = "Max", string street = "Street 1", int number = 17) =>
+        string name = "Max", string street = "Street 1", int number = 17,
+        DateTime? speedDeadline = null) =>
         new(name, new AddressLocation(street, number, HouseSide.Right),
-            "HudJobPickupDrive", "HudJobPickupArrived", "HudJobPickupAction", 25.0);
+            "HudJobPickupDrive", "HudJobPickupArrived", "HudJobPickupAction",
+            25.0, speedDeadline);
 
     private static PointOfInterest Friend() =>
         new(StoryFriends.Justin.Id, StoryFriends.Justin.Name,
@@ -541,7 +555,7 @@ public sealed class HudViewModelTests
 
         Assert.True(vm.HasDestination);
         Assert.Equal("Pick up Max at Street 1 No. 17 in Brands", vm.BannerText);
-        Assert.Equal("480 m", vm.JobDistanceText);
+        Assert.Equal("480 m", vm.LegDistanceText);
         Assert.Equal("PICK UP", vm.EnterText);
         Assert.False(vm.AtDestination);
     }
@@ -597,17 +611,138 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
-    public void JobGuidance_ClearingRestoresTheStoryDestination()
+    public void JobGuidance_PickUpAndDropOffEachAnswerTheirOwnWords()
+    {
+        // The companion's action button is the same control on both legs; the
+        // spoken words follow the leg so the player says what the button says.
+        var vm = Create();
+        vm.SetJobGuidance(Job());
+
+        Assert.Equal("PICK UP", vm.EnterText);
+        Assert.Contains("pick up", vm.EnterKeywords);
+        Assert.Contains("pickup", vm.EnterKeywords);
+        Assert.DoesNotContain("drop off", vm.EnterKeywords);
+
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Max", new AddressLocation("Street 1", 17, HouseSide.Right),
+            "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction", 25.0));
+
+        Assert.Equal("DROP OFF", vm.EnterText);
+        Assert.Contains("drop off", vm.EnterKeywords);
+        Assert.Contains("dropoff", vm.EnterKeywords);
+        Assert.DoesNotContain("pick up", vm.EnterKeywords);
+    }
+
+    [Fact]
+    public void PersonDestination_AnswersToPickUp()
     {
         var vm = Create();
+
+        vm.SetDestination(Friend());
+
+        Assert.Equal("PICK UP", vm.EnterText);
+        Assert.Contains("pick up", vm.EnterKeywords);
+    }
+
+    [Fact]
+    public void PlainEnterDestination_KeepsOnlyTheEnterWord()
+    {
+        var vm = Create();
+
         vm.SetDestination(Errand());
+
+        Assert.Equal("ENTER", vm.EnterText);
+        Assert.Equal("enter", Assert.Single(vm.EnterKeywords));
+    }
+
+    [Fact]
+    public void TranslatedActionButton_StillAnswersTheEnglishWords()
+    {
+        // The Vosk model is English, so a translated label must not take the
+        // spoken words with it: "AFZETTEN" still fires on "drop off".
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            var vm = Create();
+            CultureInfo.CurrentUICulture = new CultureInfo("nl-NL");
+            vm.SetJobGuidance(new HudJobGuidance(
+                "Max", new AddressLocation("Street 1", 17, HouseSide.Right),
+                "HudJobDropoffDrive", "HudJobDropoffArrived",
+                "HudJobDropoffAction", 25.0));
+
+            Assert.Equal("AFZETTEN", vm.EnterText);
+            Assert.Contains("drop off", vm.EnterKeywords);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void JobGuidance_ClearingRestoresTheStoryDestination()
+    {
+        // The job door owns the banner and the distance line while it is up;
+        // clearing it hands both back to the intro leg underneath.
+        var vm = Create();
+        vm.SetDestination(new PointOfInterest("max-grocery", "Max's Grocery Store",
+            new AddressLocation("Street 1", 1, HouseSide.Right)));
         vm.SetJobGuidance(Job());
+
+        vm.Update(Sample(position: 0.5f, speedKmh: 50f), 10.0, gameRunning: true);
+        Assert.Equal("480 m", vm.LegDistanceText); // the job's house
 
         vm.SetJobGuidance(null);
 
         Assert.True(vm.HasDestination);
-        Assert.Equal("Drive to Max's Grocery Store, Street 1 No. 17 in Brands", vm.DestinationText);
-        Assert.Equal(string.Empty, vm.JobDistanceText);
+        Assert.Equal("Drive to Max's Grocery Store, Street 1 No. 1 in Brands", vm.DestinationText);
+        Assert.Equal("960 m", vm.LegDistanceText); // the story door again
+    }
+
+    [Fact]
+    public void IntroDestination_ShowsTheDistanceToTheDoor()
+    {
+        // The intro drives carry the same distance line a taxi leg does: the
+        // errand, the friends, home and the centre all pin a story
+        // destination, so the driver reads how far the door is.
+        var vm = Create();
+        vm.SetDestination(Errand());
+
+        vm.Update(Sample(position: 0.5f, speedKmh: 50f), 10.0, gameRunning: true);
+
+        Assert.Equal("480 m", vm.LegDistanceText);
+        Assert.Equal("480 m", vm.HudLineText);
+        Assert.True(vm.HasHudLine);
+    }
+
+    [Fact]
+    public void IntroDestination_PinningANewLegRepaintsTheDistanceAtOnce()
+    {
+        // The tour pins the next house while the car is still at the last
+        // one: the line must answer from the last live sample instead of
+        // waiting for the next poll.
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.Update(Sample(position: 0.5f, speedKmh: 0f), 10.0, gameRunning: true);
+        Assert.Equal("480 m", vm.LegDistanceText);
+
+        vm.SetDestination(new PointOfInterest("max-grocery", "Max's Grocery Store",
+            new AddressLocation("Street 1", 1, HouseSide.Right)));
+
+        Assert.Equal("960 m", vm.LegDistanceText);
+    }
+
+    [Fact]
+    public void IntroDestination_ClearingTheLegClearsTheDistance()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.Update(Sample(position: 0.5f, speedKmh: 50f), 10.0, gameRunning: true);
+
+        vm.SetDestination(null);
+
+        Assert.Equal(string.Empty, vm.LegDistanceText);
+        Assert.False(vm.HasHudLine);
     }
 
     [Fact]
@@ -619,6 +754,33 @@ public sealed class HudViewModelTests
 
         Assert.Equal(Strings.Get("HudWrongCar"), vm.BannerText);
         Assert.True(vm.HasBanner);
+    }
+
+    [Fact]
+    public void SpeedChallenge_CountsDownThenSaysLate()
+    {
+        var clock = new FakeClock();
+        var vm = Create(clock: clock);
+        vm.SetJobGuidance(Job(
+            speedDeadline: clock.UtcNow.AddSeconds(90)));
+
+        Assert.True(vm.HasSpeedChallenge);
+        Assert.Equal("Speed challenge: 1:30", vm.SpeedChallengeText);
+        Assert.False(vm.SpeedChallengeLate);
+
+        clock.Advance(TimeSpan.FromSeconds(30));
+        vm.Update(Sample(position: 0.5f, speedKmh: 40f), 10.0, gameRunning: true);
+        Assert.Equal("Speed challenge: 1:00", vm.SpeedChallengeText);
+
+        clock.Advance(TimeSpan.FromSeconds(61));
+        vm.Update(Sample(position: 0.5f, speedKmh: 40f), 10.0, gameRunning: true);
+        Assert.Equal(Strings.Get("HudSpeedChallengeLate"), vm.SpeedChallengeText);
+        Assert.True(vm.SpeedChallengeLate);
+
+        vm.SetJobGuidance(null);
+        Assert.False(vm.HasSpeedChallenge);
+        Assert.Equal(string.Empty, vm.SpeedChallengeText);
+        Assert.False(vm.SpeedChallengeLate);
     }
 
     [Fact]

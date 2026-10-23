@@ -180,6 +180,7 @@ public sealed class ConditionFlowTests
             catalog: catalog, hubs: hubs, speedKmh: 0f, garage: garage,
             garageStore: new FakeGarageStore());
         vm.FinishDialogue();
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);

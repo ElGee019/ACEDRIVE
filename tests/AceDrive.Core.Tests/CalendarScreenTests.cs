@@ -45,6 +45,8 @@ public sealed class CalendarScreenTests
         Assert.Equal("Market valuation", monday.EventLabel);
         // Monday opens the strip, Sunday closes it; Thursday carries no event.
         Assert.Equal("Monday", vm.Days[0].DayLabel);
+        Assert.Equal("MON", vm.Days[0].ShortLabel);
+        Assert.Equal("SUN", vm.Days[6].ShortLabel);
         Assert.False(vm.Days[6].IsToday);
         Assert.Equal(string.Empty, vm.Days[3].EventLabel);
     }
@@ -222,20 +224,26 @@ public sealed class CalendarScreenTests
     [Fact]
     public void Voice_EventKeywords_FlashTheirDayRows()
     {
-        // Only the highlighted row answers, so each garbled name is heard
-        // on its own game morning: Sunday for Cento, Wednesday for Willy.
+        // Every event row answers, not just the highlighted one: each garbled
+        // name reaches its own row, and the gate — not the voice table —
+        // decides whether the tap opens or warns. Sunday page: Cento is
+        // today, Willy is an off-day row.
         var sunday = Create(gameStart: new DateTime(2026, 10, 11, 12, 0, 0, DateTimeKind.Utc));
         sunday.VoiceActions["cento"].Invoke();
         CalendarRow sundayRow = Assert.Single(sunday.Days, d => d.DayLabel == "Sunday");
         Assert.True(sundayRow.Flash);
-        Assert.False(sunday.VoiceActions.ContainsKey("where is"));
+
+        sunday.VoiceActions["where is"].Invoke();
+        // Willy is DayOfWeek 4: a Wednesday, still an answerable row here.
+        CalendarRow offDayWilly = Assert.Single(sunday.Days, d => d.DayLabel == "Wednesday");
+        Assert.True(offDayWilly.Flash);
 
         var wednesday = Create(gameStart: new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc));
         wednesday.VoiceActions["where is"].Invoke();
         // Willy is DayOfWeek 4: a Wednesday.
         CalendarRow willyDay = Assert.Single(wednesday.Days, d => d.DayLabel == "Wednesday");
         Assert.True(willyDay.Flash);
-        Assert.False(wednesday.VoiceActions.ContainsKey("cento"));
+        Assert.True(wednesday.VoiceActions.ContainsKey("cento"));
     }
 
     [Fact]

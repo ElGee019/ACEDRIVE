@@ -3,56 +3,81 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <UserControl.Resources>
-        <!-- The current car wears the teal edge and text (Unity's CURRENT CAR
-             row) instead of the white every other row shows; the row is not
-             pickable, so the edge is the whole tell. -->
-        <Style x:Key="GarageRowButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsCurrent}" Value="True">
-                    <Setter Property="BorderBrush" Value="#FF97EAD2"/>
-                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                </DataTrigger>
-            </Style.Triggers>
+        <!-- One label/value line of the stats block: the label column is fixed
+             so every value starts on the same edge, whatever the label's
+             translation runs to. -->
+        <Style x:Key="StatsRow" TargetType="Grid">
+            <Setter Property="Margin" Value="0,2"/>
+        </Style>
+        <Style x:Key="StatsValue" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
         </Style>
     </UserControl.Resources>
-    <!-- Garage page (PORTPLAN 30, Unity GarageScreen): one row per owned car,
-         title + specs + value, the current car marked and non-pickable. Tapping
-         another row makes it the car that is driven. Same page skeleton as the
-         bank page: title band, body centered, BACK flush at the bottom. -->
+    <!-- Garage page (PORTPLAN 30, Unity GarageScreen): the owned cars in a
+         picker and the picked car's stats below it. Unity lists the cars as
+         rows and shows the six dealer-style preview values for the selection
+         (price, engine size, power, consumption, passengers, boot); the
+         odometer joins them because the port tracks mileage per car. The
+         current car opens selected and the drive button names that state, so
+         the same button explains why it cannot be used. Same page skeleton as
+         the wallet page: title band, centred body, BACK flush at the bottom. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=GarageTitle}"/>
-        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=GarageTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
             <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" Margin="0,0,0,6"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
-            <ItemsControl ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Button Margin="0,0,0,6" Padding="4,3"
-                                Style="{StaticResource GarageRowButton}"
-                                IsEnabled="{Binding IsSelectable}"
-                                Command="{Binding DataContext.SwitchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}">
-                            <StackPanel>
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}" FontWeight="Bold"/>
-                                    <TextBlock Text="{loc:Loc Key=GarageCurrent}" Margin="8,0,0,0" FontSize="12"
-                                               Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}"/>
-                                </StackPanel>
-                                <TextBlock Text="{Binding SpecsLine}" FontSize="12" Foreground="#FFBFC4C9"
-                                           HorizontalAlignment="Center"/>
-                                <TextBlock Text="{Binding ValueLine}" FontSize="12" Foreground="#FFBFC4C9"
-                                           HorizontalAlignment="Center"/>
+            <StackPanel Visibility="{Binding HasCars, Converter={StaticResource BoolToVis}}">
+                <TextBlock Style="{StaticResource FormLabel}" Text="{Binding SelectLabel}"/>
+                <!-- The dropdown is the whole picker: the item template feeds
+                     both the closed box and the popup, so a car reads the same
+                     in either place. The current car keeps its marker there
+                     rather than in a separate row, and stays selectable — the
+                     drive button is what refuses to re-pick it. -->
+                <ComboBox Style="{StaticResource FormCombo}"
+                          ItemsSource="{Binding Cars}"
+                          SelectedItem="{Binding SelectedCar, Mode=TwoWay}">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Title}" Foreground="#FFF"/>
+                                <TextBlock Text="{loc:Loc Key=GarageCurrent}" Margin="8,0,0,0"
+                                           FontSize="11" Foreground="#FF97EAD2"
+                                           VerticalAlignment="Center"
+                                           Visibility="{Binding IsCurrent, Converter={StaticResource BoolToVis}}"/>
                             </StackPanel>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <ItemsControl ItemsSource="{Binding Stats}" Margin="0,10,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Style="{StaticResource StatsRow}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding Label}" Style="{StaticResource FormLabel}"/>
+                                <TextBlock Grid.Column="1" Text="{Binding Value}"
+                                           Style="{StaticResource StatsValue}"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <!-- Unity's Change button: the current car reads CURRENT CAR and
+                     cannot be picked again, so the same label carries the state. -->
+                <Button Content="{Binding SwitchLabel}" Command="{Binding SwitchCommand}"
+                        Margin="0,12,0,0"/>
+            </StackPanel>
         </StackPanel>
         <!-- Button bar: own bottom band so BACK stretches the full panel width
              like the delivery page's buttons; teal is the shared voice-ack

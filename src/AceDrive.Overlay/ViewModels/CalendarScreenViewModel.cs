@@ -21,8 +21,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
 {
-    // resx keys for Day 1=Sunday..7=Saturday: indexed by weekday number, so
-    // the labels are independent of the strip's Monday-first display order.
+    // resx key suffixes for Day 1=Sunday..7=Saturday: indexed by weekday
+    // number, so the labels are independent of the strip's Monday-first
+    // display order. Both label tables (Day* full name, DayShort* strip form)
+    // are built from these so their weekday ordering never drifts.
     private static readonly string[] DaySuffixes = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
     private readonly VoiceBeat _beat;
@@ -103,11 +105,11 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen, IJobs
     private string _warnText = string.Empty;
     private DateTime _warnUntil;
 
-    /// <summary>Spoken text -&gt; action. Every row answers to its event label
-    /// (the road test to the short label only); only the highlighted row
-    /// registers, and BACK navigates. Past days never answer to voice. Every
-    /// tap — click or voice — is decided by the day's gate (see
-    /// <c>TapDay</c>).</summary>
+    /// <summary>Spoken text -&gt; action. Every event row answers to its event
+    /// label (the road test to the short label only), and BACK navigates.
+    /// Off-day rows are registered too: every tap — click or voice — is
+    /// decided by the day's gate (see <c>TapDay</c>), so an off-day request
+    /// flashes and shows the COME BACK warning instead of firing.</summary>
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
 
@@ -150,8 +152,10 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen, IJobs
         {
             CalendarDay day = ControlCalendar.Week[i];
             bool isToday = day.DayOfWeek == today;
+            string suffix = DaySuffixes[day.DayOfWeek - 1];
             rows[i] = new CalendarRow(
-                Strings.Get("Day" + DaySuffixes[day.DayOfWeek - 1]),
+                Strings.Get("Day" + suffix),
+                Strings.Get("DayShort" + suffix),
                 DisplayLabel(i, day),
                 day.DayOfWeek,
                 isToday,
@@ -205,9 +209,11 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen, IJobs
         for (int i = 0; i < Days.Count; i++)
         {
             if (Days[i].EventLabel.Length == 0) continue;
-            // Only the highlighted row answers to voice: other days carry no
-            // voice key, their taps are click-only and end in the warning.
-            if (!Days[i].IsToday) continue;
+            // Every event row answers to voice, like the jobs page's buttons
+            // before the strip got its own page. Off-day taps are not muted:
+            // they run the same gate as a click and end in the COME BACK
+            // warning, so the player hears their request land and learns when
+            // the event opens.
             int index = i;
             Action day = () => FireVoiceDay(index);
             // The road-test button names the week's car, but the mic only

@@ -18,11 +18,22 @@ public sealed class ProceduralNameGenerator(NamePoolTable table, int seed)
 
     public ProceduralName Next()
     {
+        ProceduralName person = NextPerson();
+        return person with { Suffix = table.Suffixes[_rng.Next(table.Suffixes.Count)] };
+    }
+
+    /// <summary>
+    /// A bare resident identity (first name + surname) for content that is
+    /// not a ride: the business owners behind generated POIs have no companion
+    /// suffix. Draws from the same seeded stream, in the same order as the
+    /// head of <see cref="Next"/>, so passenger sequences stay unchanged.
+    /// </summary>
+    public ProceduralName NextPerson()
+    {
         NamePool pool = PickPool();
         return new ProceduralName(
             pool.FirstNames[_rng.Next(pool.FirstNames.Count)],
-            pool.Surnames[_rng.Next(pool.Surnames.Count)],
-            table.Suffixes[_rng.Next(table.Suffixes.Count)]);
+            pool.Surnames[_rng.Next(pool.Surnames.Count)]);
     }
 
     // Unity's loop kept shape-for-shape: roll inside the total weight,

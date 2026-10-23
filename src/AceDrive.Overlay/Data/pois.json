@@ -6,5 +6,84 @@
     "ownerName": "Max Silvestri",
     "category": "groceries",
     "guaranteedItems": ["MAPLE SYRUP"]
+  },
+  {
+    "id": "carwash",
+    "name": "Car Wash",
+    "type": "carwash",
+    "namePattern": "{0}'s Carwash",
+    "spawn": {
+      "pacing": "streets",
+      "firstStreets": 6,
+      "intervalStreets": 47
+    }
+  },
+  {
+    "id": "insurance",
+    "name": "Insurance Broker",
+    "type": "insurance",
+    "namePattern": "{0}'s Insurance",
+    "spawn": {
+      "pacing": "streets",
+      "firstStreets": 13,
+      "intervalStreets": 57
+    }
+  },
+  {
+    "id": "bank",
+    "name": "Bank",
+    "type": "bank",
+    "namePattern": "{0}'s Bank",
+    "spawn": {
+      "pacing": "streets",
+      "firstStreets": 15,
+      "intervalStreets": 51
+    }
+  },
+  {
+    "id": "dealer",
+    "name": "Car Dealer",
+    "type": "dealer",
+    "namePattern": "{0}'s Cars",
+    "spawn": {
+      "pacing": "either",
+      "firstStreets": 37,
+      "intervalStreets": 37,
+      "firstJobs": 10
+    }
+  },
+  {
+    "id": "mechanic",
+    "name": "Mechanic",
+    "type": "mechanic",
+    "namePattern": "{0}'s Mechanic",
+    "spawn": {
+      "pacing": "jobsFirstThenStreets",
+      "firstStreets": 3,
+      "intervalStreets": 36,
+      "firstJobs": 36
+    }
+  },
+  {
+    "id": "groceries_store",
+    "name": "Grocery Store",
+    "type": "grocery_store",
+    "category": "groceries",
+    "namePattern": "{0}'s Grocery",
+    "spawn": {
+      "pacing": "ownedCategory",
+      "intervalStreets": 20
+    }
+  },
+  {
+    "id": "coffee_shop",
+    "name": "Coffee Shop",
+    "type": "coffee_shop",
+    "category": "coffee_beans",
+    "namePattern": "{0}'s Coffee Shop",
+    "spawn": {
+      "pacing": "ownedCategory",
+      "intervalStreets": 14
+    }
   }
 ]

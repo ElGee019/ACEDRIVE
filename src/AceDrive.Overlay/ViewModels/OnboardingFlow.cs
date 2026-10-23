@@ -20,6 +20,10 @@ public sealed class OnboardingFlow : IScreenController
     private readonly AddressMap _addressMap;
     private readonly string? _detectedPlayerName;
     private readonly PoiGenerator _pois;
+    // Every discovered door lands here (PORTPLAN 24/27); the addresses page
+    // reads it and the HUD's ENTER routes from the same destination.
+    private readonly PoiDirectory _poiDirectory;
+    private readonly IPoiDirectoryStore _poiStore;
     private readonly PoiArrivalRouter? _poiArrivals;
     private readonly Trunk _trunk;
     private readonly IPreferencesStore _preferencesStore;
@@ -80,7 +84,8 @@ public sealed class OnboardingFlow : IScreenController
         IOnboardingStore onboarding, IContentSource content,
         IProfileStore profiles, IPlayerNameRegistry playerNames,
         AddressMap addressMap, string? detectedPlayerName,
-        PoiGenerator pois, PoiArrivalRouter? poiArrivals, Trunk trunk,
+        PoiGenerator pois, PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
+        PoiArrivalRouter? poiArrivals, Trunk trunk,
         IPreferencesStore preferencesStore, PlayerPreferences preferences,
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
         Garage garage, Func<int> displayWeek, Action saveGarage,
@@ -93,6 +98,8 @@ public sealed class OnboardingFlow : IScreenController
         _addressMap = addressMap;
         _detectedPlayerName = detectedPlayerName;
         _pois = pois;
+        _poiDirectory = poiDirectory;
+        _poiStore = poiStore;
         _poiArrivals = poiArrivals;
         _trunk = trunk;
         _preferencesStore = preferencesStore;
@@ -109,11 +116,12 @@ public sealed class OnboardingFlow : IScreenController
         _storyArrivals = new Dictionary<string, Action<PointOfInterest>>(StringComparer.Ordinal)
         {
             [PoiTypes.Person] = PickUpFriend,
-            [PoiTypes.Home] = _ => ShowPancakeDialogue(),
-            [PoiTypes.CommunityCentre] = _ => ShowCommunityCentreDialogue(),
+            [PoiTypes.Home] = _ => EnterHome(),
+            [PoiTypes.CommunityCentre] = _ => EnterCommunityCentre(),
         };
         _progress = _onboarding.Load();
         _profile = _profiles.Load();
+        RestoreSavedPois();
         if (_hud is not null)
         {
             _hud.EnterRequested += (_, _) => EnterPoi();
@@ -133,8 +141,8 @@ public sealed class OnboardingFlow : IScreenController
     /// The walk page first paint opens on: the one the player closed the
     /// overlay on, or the preferences page for a fresh install. Past the
     /// birthday the caller opens the menu instead, so this only ever returns
-    /// an introduction page. The chain ends on the main control page, so the
-    /// walk is never a dead end. No new IScreenController verbs: each page
+    /// an introduction page. The chain ends on the menu, so the walk is never
+    /// a dead end. No new IScreenController verbs: each page
     /// takes its actions by constructor (composition over interface growth).
     /// </summary>
     public object? StartPage() => ResumeStage() switch
@@ -200,11 +208,13 @@ public sealed class OnboardingFlow : IScreenController
     /// language picker the first-run walk opens on, labelled BACK instead of
     /// CONTINUE and answering that word from the mic. Its action hands back to
     /// the caller's page instead of advancing the walk, while a selection still
-    /// saves and applies through the walk's one preferences writer.
+    /// saves and applies through the walk's one preferences writer. The
+    /// optional reset action adds the settings page's destructive button; the
+    /// first-run page passes none, so it never offers to wipe a career.
     /// </summary>
-    public PreferencesScreenViewModel CreateSettingsPage(Action done) =>
+    public PreferencesScreenViewModel CreateSettingsPage(Action done, Func<bool>? resetGame = null) =>
         new(_preferences, OnPreferencesChanged, done,
-            SettingsDoneLabelKey, SettingsVoiceBackLabel);
+            SettingsDoneLabelKey, SettingsVoiceBackLabel, resetGame);
 
     private object? OpeningPage()
     {
@@ -308,10 +318,11 @@ public sealed class OnboardingFlow : IScreenController
             && _progress.MaxStoreId is { } id
             && _pois.Place(id, stored) is { } banked)
         {
+            Remember(banked);
             return banked;
         }
 
-        PointOfInterest? drawn = _pois.Spawn();
+        PointOfInterest? drawn = _pois.Spawn(PoiCatalog.MaxGroceryId);
         if (drawn is not null)
         {
             _progress = _progress with
@@ -320,6 +331,7 @@ public sealed class OnboardingFlow : IScreenController
                 MaxStoreAddress = drawn.Address,
             };
             _onboarding.Save(_progress);
+            Remember(drawn);
         }
 
         return drawn;
@@ -333,17 +345,29 @@ public sealed class OnboardingFlow : IScreenController
         // dialogue hands it over (PORTPLAN 5/24/27). A save that already
         // carries the story item skips straight to the next phase.
         HandOverErrand();
-        _log.LogInfo("birthday dialogue done: main control page unlocked");
-        _host.ShowScreen(_host.ControlScreen());
-        // The birthday is the hand-over from the intro panel to the companion:
-        // the HUD appears here, the panel leaves until the player calls it
-        // back with the hotkey or wake word.
-        _host.Hide();
+        _log.LogInfo("birthday dialogue done: main page unlocked");
+        // The intro hands over on the menu and leaves the panel up, so the
+        // player sees the page they will call back from now on; idle-hide and
+        // the hotkey own it from here. The HUD is revealed behind the panel
+        // and steps forward once the panel closes.
+        _host.ShowScreen(_host.MenuScreen());
         _hud?.Reveal();
     }
 
     // Unity's PANCAKES! arrival at grandma's house: the first tour stop that
-    // can hand over a dialogue from the HUD.
+    // can hand over a dialogue from the HUD. The addresses page keeps the
+    // house listed after the tour, so a later visit is a plain closed door:
+    // the pancake conversation only opens on its live leg.
+    private void EnterHome()
+    {
+        if (!_progress.AnnabellaPickedUp || _progress.PancakesDone)
+        {
+            return;
+        }
+
+        ShowPancakeDialogue();
+    }
+
     private void ShowPancakeDialogue() =>
         ShowStoryDialogue(
             Content.PancakeDialogue, "PancakeTitle", "pancake", FinishPancakes);
@@ -363,6 +387,18 @@ public sealed class OnboardingFlow : IScreenController
 
     // The community-centre arrival grants the taxi license. Its Continue banks
     // the visit so the HUD never sends a licensed driver back to the same door.
+    // The address stays on the addresses page, but a later visit is closed:
+    // the license conversation only opens on its live leg.
+    private void EnterCommunityCentre()
+    {
+        if (!_progress.PancakesDone || _progress.CommunityCentreDone)
+        {
+            return;
+        }
+
+        ShowCommunityCentreDialogue();
+    }
+
     private void ShowCommunityCentreDialogue() =>
         ShowStoryDialogue(
             Content.CommunityCentreDialogue, "CommunityCentreTitle",
@@ -453,6 +489,7 @@ public sealed class OnboardingFlow : IScreenController
         }
 
         _hud?.SetDestination(poi);
+        Remember(poi);
         _log.LogInfo($"birthday errand: {poi.Name} at {AddressFormatter.Format(poi.Address)}");
     }
 
@@ -465,7 +502,10 @@ public sealed class OnboardingFlow : IScreenController
     // leaving it can only ever finish this errand.
     private void EnterPoi()
     {
-        if (_poi is not { } poi)
+        // The HUD knows which door it is guiding to: a story leg pins one, and
+        // the addresses page pins another through the same SetDestination, so
+        // one ENTER enters whichever place the player actually drove to.
+        if ((_hud?.CurrentDestination ?? _poi) is not { } poi)
         {
             return;
         }
@@ -504,6 +544,11 @@ public sealed class OnboardingFlow : IScreenController
     {
         if (friend.Id == StoryFriends.Justin.Id)
         {
+            if (_progress.JustinPickedUp)
+            {
+                return;
+            }
+
             _progress = _progress with { JustinPickedUp = true };
             _onboarding.Save(_progress);
             _log.LogInfo($"picked up {friend.OwnerName}");
@@ -516,6 +561,11 @@ public sealed class OnboardingFlow : IScreenController
             // Unscripted person: the log-only fallback, like an unclaimed POI.
             _log.LogInfo(
                 $"no pickup for {friend.Name} at {AddressFormatter.Format(friend.Address)}");
+            return;
+        }
+
+        if (_progress.AnnabellaPickedUp)
+        {
             return;
         }
 
@@ -645,6 +695,7 @@ public sealed class OnboardingFlow : IScreenController
     private void Pin(PointOfInterest poi, HudDestinationCopy copy)
     {
         _poi = poi;
+        Remember(poi);
         _hud?.SetDestination(poi, copy);
     }
 
@@ -792,6 +843,50 @@ public sealed class OnboardingFlow : IScreenController
 
     private static PointOfInterest Place(PoiDefinition friend, AddressLocation address) =>
         new(friend.Id, friend.Name, address, friend.Type, friend.OwnerName);
+
+    // The addresses page is the discovery list until the marker network lands:
+    // every door the story hands over is banked once, and a restart reopens
+    // the same list. A duplicate id never rewrites a known address.
+    private void Remember(PointOfInterest poi)
+    {
+        if (_poiDirectory.Add(poi))
+        {
+            _poiStore.Save(_poiDirectory.All);
+        }
+    }
+
+    // A save written before the directory file existed still carries the story
+    // addresses: rebuild those doors so an upgraded career opens the same
+    // addresses page. The current tour leg is pinned again in ResumeTour.
+    private void RestoreSavedPois()
+    {
+        if (_progress.MaxStoreId is { } id
+            && _progress.MaxStoreAddress is { } maxStore
+            && _pois.Place(id, maxStore) is { } max)
+        {
+            Remember(max);
+        }
+
+        if (_progress.CommunityCentreAddress is { } centre)
+        {
+            Remember(Place(StoryCommunityCentre.Definition, centre));
+        }
+
+        if (_progress.JustinAddress is { } justin)
+        {
+            Remember(Place(StoryFriends.Justin, justin));
+        }
+
+        if (_progress.AnnabellaAddress is { } annabella)
+        {
+            Remember(Place(StoryFriends.Annabella, annabella));
+        }
+
+        if (_profile is not null && HomeAddress() is { } home)
+        {
+            Remember(Place(StoryHome.Definition, home));
+        }
+    }
 
     // A shop purchase moves cash + trunk; the driver save is the one bank
     // both live in (PORTPLAN 51 interim).

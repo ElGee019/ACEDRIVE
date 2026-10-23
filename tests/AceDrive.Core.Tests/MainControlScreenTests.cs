@@ -5,8 +5,8 @@ using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>Main control page runs headless: todo lines, HUD readings and
-/// voice actions resolve from the stores and resx.</summary>
+/// <summary>Main control page runs headless: todo lines and voice actions
+/// resolve from the stores and resx.</summary>
 public sealed class MainControlScreenTests
 {
     // FakeClock default: Monday 2026-10-12 12:00 UTC.
@@ -14,29 +14,22 @@ public sealed class MainControlScreenTests
         FakeClock? clock = null, TodoTable? todos = null,
         bool deliveryOpen = false, TaxiShift? shift = null,
         bool taxiStartsShift = false, VoiceBeat? beat = null,
-        Hunger? hunger = null, Garage? garage = null,
-        ICommand? carWashCommand = null)
+        ICommand? backCommand = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
         TaxiShift shiftState = shift ?? new TaxiShift();
         return new MainControlScreenViewModel(
             beat ?? new VoiceBeat(tick),
-            todos ?? TodoTable.Default, hunger ?? new Hunger(HungerRules.Default),
-            garage ?? new Garage([]),
+            todos ?? TodoTable.Default,
             shiftState,
             new ControlActions(
                 taxiStartsShift
                     ? new RelayCommand(() => shiftState.Start(tick.UtcNow))
                     : new RelayCommand(() => { }),
                 new RelayCommand(() => { }, () => deliveryOpen),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                carWashCommand ?? new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { })));
+                new RelayCommand(() => { })),
+            backCommand ?? new RelayCommand(() => { }));
     }
 
     [Fact]
@@ -55,6 +48,45 @@ public sealed class MainControlScreenTests
         Assert.True(vm.VoiceActions.ContainsKey("START TAXI SHIFT"));
         Assert.True(vm.VoiceActions.ContainsKey("DELIVERY JOB"));
         Assert.True(vm.VoiceActions.ContainsKey("CAR HAULING JOB"));
+        Assert.True(vm.VoiceActions.ContainsKey("BACK"));
+    }
+
+    [Fact]
+    public void Back_Click_ReturnsToTheMenu()
+    {
+        // The page's one way out: the injected command owns the navigation
+        // (the screen controller opens the menu), the page only forwards it.
+        int back = 0;
+        var vm = Create(backCommand: new RelayCommand(() => back++));
+        vm.BackCommand.Execute(null);
+        Assert.Equal(1, back);
+        Assert.False(vm.BackFlash);
+    }
+
+    [Fact]
+    public void Voice_BackTap_GlowsThenWaitsOutTheBeatBeforeNavigating()
+    {
+        // BACK navigates, so its voice tap glows teal for the shared beat
+        // first and the page changes only when the beat is due — the same
+        // contract as the delivery page's navigating tap.
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        int back = 0;
+        var vm = Create(clock, beat: beat,
+            backCommand: new RelayCommand(() => back++));
+
+        vm.VoiceActions["BACK"].Invoke();
+        Assert.True(vm.BackFlash);
+        Assert.Equal(0, back); // the page has not flipped yet
+
+        clock.Advance(TimeSpan.FromMilliseconds(499));
+        beat.Poll();
+        Assert.Equal(0, back); // still inside the beat
+
+        clock.Advance(TimeSpan.FromMilliseconds(2));
+        beat.Poll(); // what the 10 Hz poll does at the beat's end
+        Assert.Equal(1, back);
+        Assert.False(vm.BackFlash); // the glow ends with the tap
     }
 
     [Fact]
@@ -84,18 +116,12 @@ public sealed class MainControlScreenTests
         bool fired = false;
         var vm = new MainControlScreenViewModel(
             beat, TodoTable.Default,
-            new Hunger(HungerRules.Default), new Garage([]),
             new TaxiShift(),
             new ControlActions(
                 new RelayCommand(() => { }),
                 new RelayCommand(() => fired = true),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { }),
-                new RelayCommand(() => { })));
+                new RelayCommand(() => { })),
+            new RelayCommand(() => { }));
 
         vm.VoiceActions["DELIVERY JOB"].Invoke();
         Assert.True(vm.DeliveryFlash);
@@ -229,83 +255,15 @@ public sealed class MainControlScreenTests
     }
 
     [Fact]
-    public void HungerLine_ShowsTheReadingWhereTheJobButtonsSit()
+    public void Voice_NoLongerOffersTheBusinessDoors()
     {
-        // Unity's map HUD prints HUNGER x/36 above the job entries; the port
-        // prints it above the job buttons (PORTPLAN 26).
+        // The bank/dealer/wash/mechanic/insurance entries left the jobs page:
+        // they are POIs on the addresses page now (PORTPLAN 24/59).
         var vm = Create();
-        Assert.Equal("HUNGER 0/36", vm.HungerText);
-        Assert.False(vm.HungerAmber);
-    }
-
-    [Fact]
-    public void HungerLine_WearsTheAmberBand()
-    {
-        // Unity YouScreen colours the reading orange from h 16 to h 29.
-        var clock = new FakeClock();
-        DateTime start = clock.UtcNow;
-        var hunger = new Hunger(HungerRules.Default);
-        _ = hunger.AdvanceTo(start, onboarded: true, hasPancakes: false);
-        for (int i = 0; i < 16; i++)
-        {
-            _ = hunger.AdvanceTo(start.AddHours(i + 1), onboarded: true, hasPancakes: false);
-        }
-
-        var vm = Create(clock, hunger: hunger);
-        Assert.Equal("HUNGER 16/36", vm.HungerText);
-        Assert.True(vm.HungerAmber);
-    }
-
-    [Fact]
-    public void FilthLine_ShowsTheCurrentCarsDirt()
-    {
-        // Unity's MapScreen HUD prints FILTH x/25 beside the hunger line
-        // (PORTPLAN 33); the reading is the car driven now.
-        var vm = Create(garage: Dirty(0));
-        Assert.Equal("FILTH 0/25", vm.FilthText);
-        Assert.False(vm.FilthAmber);
-        Assert.False(vm.FilthFullyDirty);
-    }
-
-    [Fact]
-    public void FilthLine_WearsTheAmberBand()
-    {
-        // Unity MapScreen colours the reading orange from 15 up to the cap.
-        var vm = Create(garage: Dirty(15));
-        Assert.Equal("FILTH 15/25", vm.FilthText);
-        Assert.True(vm.FilthAmber);
-        Assert.False(vm.FilthFullyDirty);
-    }
-
-    [Fact]
-    public void FilthLine_AtTheCapReadsFullyDirty()
-    {
-        // Unity paints the cap the shared mint instead of the amber.
-        var vm = Create(garage: Dirty(25));
-        Assert.Equal("FILTH 25/25", vm.FilthText);
-        Assert.False(vm.FilthAmber);
-        Assert.True(vm.FilthFullyDirty);
-    }
-
-    [Fact]
-    public void Voice_CarWashAnswersItsLabelAndTheSpokenSlice()
-    {
-        // The temporary entry (PORTPLAN 33) answers to its text and to what
-        // the mic hears short of it, like the bank/garage/dealer entries.
-        bool opened = false;
-        var vm = Create(carWashCommand: new RelayCommand(() => opened = true));
-        Assert.True(vm.VoiceActions.ContainsKey("CAR WASH"));
-        Assert.True(vm.VoiceActions.ContainsKey("wash"));
-        vm.VoiceActions["wash"].Invoke();
-        Assert.True(opened);
-        Assert.True(vm.CarWashFlash);
-    }
-
-    private static Garage Dirty(int filth)
-    {
-        var car = new CarSpec("ks_mazda_mx5_na", 1990, "Mazda", "mx5 na", Passengers: 1);
-        var garage = new Garage([car]);
-        garage.Add(car, week: 1).Filth.Add(filth);
-        return garage;
+        Assert.DoesNotContain("bank", vm.VoiceActions.Keys);
+        Assert.DoesNotContain("dealer", vm.VoiceActions.Keys);
+        Assert.DoesNotContain("wash", vm.VoiceActions.Keys);
+        Assert.DoesNotContain("mechanic", vm.VoiceActions.Keys);
+        Assert.DoesNotContain("insurance", vm.VoiceActions.Keys);
     }
 }

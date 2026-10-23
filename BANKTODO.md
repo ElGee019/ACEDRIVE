@@ -129,9 +129,8 @@ Port to ACEDRIVE:
       `MarkBankEntered()`; the snapshot carries the bank slice.
 - [x] `BankRules.cs` (Core) — `Rate(streets, daysInARow)`,
       `ComputeInterest(bank, …) = bank × rate / 10000`,
-      `MaxWithdraw(bank) = bank − 1000`, `MinBankSaldo = 1000`, and the
-      15/51 placement gate (`RequiredStreetCountFor`) parked for the POI
-      work.
+      `MaxWithdraw(bank) = bank − 1000`, `MinBankSaldo = 1000`. The 15/51
+      placement gate moved to `Data/pois.json` and `PoiSpawner` (item 24).
 - [x] Interest applied at the two settle points with the REAL factors:
       `zone.StreetCount × streak.DaysInARow` — no placeholders left. It
       lands before the expansion street joins (Unity orders it the same),

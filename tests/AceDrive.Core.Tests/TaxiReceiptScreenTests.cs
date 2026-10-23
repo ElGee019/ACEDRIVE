@@ -21,7 +21,9 @@ public sealed class TaxiReceiptScreenTests
             8.2, capacity: 1, carClass: 1, carRarity: 1,
             streetKnowledgePct: 100, tipEligible: true, fines: 1,
             FareTable.Default, currentXp: 0.0, carKey: carKey);
-        var wallet = new DriverWallet();
+        // Empty wallet: the page lines must show the settle alone, not the
+        // fresh-start seed (covered in DriverWalletTests).
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
         wallet.AddReceipt(receipt);
         var shift = new TaxiShift();
         shift.RecordCompleted(

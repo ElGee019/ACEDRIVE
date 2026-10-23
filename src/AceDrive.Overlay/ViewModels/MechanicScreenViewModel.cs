@@ -21,7 +21,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// once like a click; BACK navigates, so its voice tap glows teal first and
 /// waits out the shared beat.
 /// </summary>
-public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen
+public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen
 {
     private readonly Garage _garage;
     private readonly DriverWallet _wallet;

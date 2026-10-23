@@ -26,7 +26,14 @@ namespace AceDrive.Core;
 /// highestShiftEarningsFirstEarnedAt) with its lifetime counters
 /// (totalShiftsCompleted + longestShiftJobCount) and its last world rank
 /// snapshot ride here too, so the online board resumes without re-pushing on
-/// every launch.</summary>
+/// every launch.
+/// The driver-rating skills (PORTPLAN 06, Unity PlayerData.driverCornering /
+/// driverConcentration / driverOffTheLine) default to Unity's new-game
+/// overall, so a save written before the rating existed opens on a legal
+/// fresh-driver profile instead of three zeros.
+/// The lifetime settled-job total (Unity PlayerData.jobsCompleted) gates the
+/// dealer and mechanic POIs; it is separate from the zone's expansion counter,
+/// which resets on every expansion.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -49,7 +56,11 @@ public sealed record DriverState(
     int ShiftRank = 0,
     int ShiftTotal = 0,
     int ShiftsCompleted = 0,
-    int LongestShiftJobs = 0)
+    int LongestShiftJobs = 0,
+    double Cornering = DriverRating.NewGameOverall,
+    double Concentration = DriverRating.NewGameOverall,
+    double OffTheLine = DriverRating.NewGameOverall,
+    int JobsCompleted = 0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

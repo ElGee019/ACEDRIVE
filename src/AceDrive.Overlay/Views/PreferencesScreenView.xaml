@@ -48,6 +48,25 @@
                     </ComboBox.ItemTemplate>
                 </ComboBox>
             </Grid>
+
+            <!-- Settings entry only: a first run has no career to wipe, so the
+                 whole block stays collapsed there. The warning appears between
+                 the two taps of the reset button. -->
+            <StackPanel Margin="0,28,0,0"
+                        Visibility="{Binding CanReset, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="{Binding ResetWarning}"
+                           Foreground="#FFFF7A7A" FontSize="12"
+                           TextWrapping="Wrap" TextAlignment="Center"
+                           Visibility="{Binding IsConfirmingReset, Converter={StaticResource BoolToVis}}"/>
+                <Button Content="{Binding ResetLabel}"
+                        Command="{Binding ResetCommand}"
+                        Foreground="#FFFF7A7A" BorderBrush="#FFFF7A7A"
+                        Margin="0,8,0,0"/>
+                <TextBlock Text="{Binding ResetStatus}"
+                           Foreground="#FFFF7A7A" FontSize="12"
+                           TextWrapping="Wrap" TextAlignment="Center"
+                           Margin="0,6,0,0"/>
+            </StackPanel>
         </StackPanel>
         <Button Grid.Row="2" Content="{Binding ContinueLabel}"
                 Command="{Binding ContinueCommand}"/>

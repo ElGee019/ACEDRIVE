@@ -8,8 +8,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// <summary>
 /// Taxi job proposal page (PORTPLAN item 11, port of Unity
 /// TaxiJobProposalScreen): the drawn passenger identity with its companion
-/// suffix, the ride's two legs and the ACCEPT / DECLINE / BACK buttons plus
-/// the optional job radius — the same information the Unity page shows.
+/// suffix (dropped when the car seats only the customer), the ride's two legs
+/// and the ACCEPT / DECLINE / BACK buttons plus the optional job radius — the
+/// same information the Unity page shows.
 /// Like Unity's generator, a proposal pairs the customer's home address with
 /// a second address and a coin flip decides which leg is the pickup: the
 /// home leg reads "home, {address}", the other "the {surname} residence,
@@ -28,6 +29,7 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     private readonly TaxiJobProposer _proposals;
     private readonly AddressMap _map;
     private readonly Func<AddressLocation?> _home;
+    private readonly Func<int> _passengerCapacity;
     private readonly ILog _log;
     private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
@@ -37,11 +39,13 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
 
     public TaxiJobProposalViewModel(
         TaxiJobProposer proposals, AddressMap map, Func<AddressLocation?> home,
-        ILog log, VoiceBeat beat, ICommand backCommand, ICommand acceptCommand)
+        Func<int> passengerCapacity, ILog log, VoiceBeat beat,
+        ICommand backCommand, ICommand acceptCommand)
     {
         _proposals = proposals;
         _map = map;
         _home = home;
+        _passengerCapacity = passengerCapacity;
         _log = log;
         _beat = beat;
         _backCommand = backCommand;
@@ -123,7 +127,8 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJob
     private void Generate()
     {
         RefusalText = "";
-        TaxiProposal proposal = _proposals.Next(_home(), _radiusKm);
+        TaxiProposal proposal = _proposals.Next(
+            _passengerCapacity(), _home(), _radiusKm);
         // Both legs are described before the flip (Unity resolves the two
         // residents first); the flip then decides which door becomes the
         // pickup, exactly like isCustomerHomePickup.

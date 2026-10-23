@@ -12,7 +12,8 @@ public sealed class PoiGeneratorTests
     {
         var generator = new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0);
 
-        PointOfInterest poi = Assert.IsType<PointOfInterest>(generator.Spawn());
+        PointOfInterest poi = Assert.IsType<PointOfInterest>(
+            generator.Spawn(PoiCatalog.MaxGroceryId));
 
         Assert.Equal("max-grocery", poi.Id);
         Assert.Equal("Max's Grocery Store", poi.Name);

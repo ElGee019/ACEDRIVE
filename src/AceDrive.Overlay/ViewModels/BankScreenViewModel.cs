@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// at once like a click (it stays on this page), BACK navigates, so its
 /// voice tap glows teal first and the page waits out the shared beat.
 /// </summary>
-public sealed class BankScreenViewModel : ViewModelBase, IVoiceScreen
+public sealed class BankScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen
 {
     private readonly DriverWallet _wallet;
     private readonly ICommand _backCommand;

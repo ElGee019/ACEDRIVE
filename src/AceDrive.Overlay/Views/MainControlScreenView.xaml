@@ -1,17 +1,18 @@
-﻿<UserControl x:Class="AceDrive.Overlay.Views.MainControlScreenView"
+<UserControl x:Class="AceDrive.Overlay.Views.MainControlScreenView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
-         title band on top. The body is two bands: the job buttons (Unity
-         JobSelectionScreen order: taxi, then delivery, then the car-hauling
-         placeholder) centered in the upper band, Grandma's ToDo centered in
-         the lower. The weekly calendar strip lives on its own page now,
-         reached from the menu's CALENDAR tile. -->
+         title band on top, BACK in the bottom band. The body is two bands: the
+         job buttons (Unity JobSelectionScreen order: taxi, then delivery, then
+         the car-hauling placeholder) centered in the upper band, Grandma's ToDo
+         centered in the lower. The weekly calendar strip lives on its own page
+         now, reached from the menu's CALENDAR tile. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=ControlJobs}"/>
         <Grid Grid.Row="1">
@@ -20,44 +21,9 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <!-- Job buttons: centered in the band above Grandma's ToDo.
-                 The hunger meter line (PORTPLAN 26, Unity map HUD) leads the
-                 job entries; the amber band carries the Unity trunk colour,
-                 teal everywhere else. The filth line (PORTPLAN 33, Unity
-                 MapScreen HUD) sits beside it: grey when calm, amber in the
-                 15..cap band, mint at the cap. -->
+                 The hunger and filth readings live on the menu's battery
+                 tiles (PORTPLAN items 26/33), so the job entries lead here. -->
             <StackPanel Grid.Row="0" VerticalAlignment="Center">
-                <TextBlock Text="{Binding HungerText}" FontSize="13" Margin="0,0,0,6"
-                           HorizontalAlignment="Center">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="#FF97EAD2"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding HungerAmber}" Value="True">
-                                    <Setter Property="Foreground" Value="#FFA600"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
-                <TextBlock Text="{Binding FilthText}" FontSize="13" Margin="0,0,0,6"
-                           HorizontalAlignment="Center">
-                    <TextBlock.Style>
-                        <Style TargetType="TextBlock">
-                            <Setter Property="Foreground" Value="#FF999999"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding FilthAmber}" Value="True">
-                                    <Setter Property="Foreground" Value="#FFA600"/>
-                                </DataTrigger>
-                                <!-- Order matters: the cap's mint must win over
-                                     the amber edge when both bindings could
-                                     ever be true (they are exclusive bands). -->
-                                <DataTrigger Binding="{Binding FilthFullyDirty}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </TextBlock.Style>
-                </TextBlock>
                 <Button Content="{Binding TaxiLabel}" Margin="0,0,0,6"
                         Command="{Binding TaxiCommand}">
                     <Button.Style>
@@ -94,90 +60,6 @@
                         </Style>
                     </Button.Style>
                 </Button>
-                <!-- Temporary bank entry (PORTPLAN 48): moves behind the bank
-                     POI marker (items 24/59), label and command travel with it. -->
-                <Button Content="{Binding BankLabel}"
-                        Command="{Binding BankCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding BankFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <!-- Temporary garage + dealer entries (PORTPLAN 29/30): the
-                     garage is a You-menu page and the dealer a POI in Unity;
-                     both move behind the marker network (items 24/59). -->
-                <Button Content="{Binding GarageLabel}" Margin="0,6,0,0"
-                        Command="{Binding GarageCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding GarageFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <Button Content="{Binding DealerLabel}"
-                        Command="{Binding DealerCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DealerFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <!-- Temporary car-wash entry (PORTPLAN 33): a POI in Unity,
-                     moving behind the marker network (items 24/59) like the
-                     garage and dealer entries. -->
-                <Button Content="{Binding CarWashLabel}"
-                        Command="{Binding CarWashCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding CarWashFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <!-- Temporary mechanic entry (PORTPLAN items 31/32): a POI in
-                     Unity, moving behind the marker network with the rest. -->
-                <Button Content="{Binding MechanicLabel}"
-                        Command="{Binding MechanicCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding MechanicFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <!-- Temporary insurance-broker entry (PORTPLAN 34): a POI in
-                     Unity, moving behind the marker network with the rest. -->
-                <Button Content="{Binding InsuranceLabel}"
-                        Command="{Binding InsuranceCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding InsuranceFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
             </StackPanel>
             <!-- Grandma's ToDo: centered in the band below the job buttons. -->
             <StackPanel Grid.Row="1" VerticalAlignment="Center">
@@ -193,5 +75,20 @@
                 </ItemsControl>
             </StackPanel>
         </Grid>
+        <!-- Bottom band: the one way back to the menu, flush with the panel
+             edge like every page's back button. Teal is the shared voice-ack
+             highlight: the BACK the mic tapped glows for one beat before the
+             page waits it out. -->
+        <Button Grid.Row="2" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+            <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                            <Setter Property="Foreground" Value="#FF97EAD2"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Button.Style>
+        </Button>
     </Grid>
 </UserControl>

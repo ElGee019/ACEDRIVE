@@ -1,0 +1,143 @@
+<UserControl x:Class="AceDrive.Overlay.Views.WalletScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views">
+    <UserControl.Resources>
+        <!-- Section heading: same calm teal the HUD and the standings delta
+             use, so the wallet reads as one page with the other screens. -->
+        <Style x:Key="SectionHeading" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FF97EAD2"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,4"/>
+        </Style>
+        <Style x:Key="SectionRule" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="0,1,0,1"/>
+            <Setter Property="Padding" Value="0,8"/>
+            <Setter Property="Margin" Value="0,8"/>
+        </Style>
+        <!-- Two blank text lines between the three blocks: the account table,
+             the leaderboard and the rating get room to breathe instead of
+             stacking straight onto each other's rules. 38 px is two 14 px
+             text lines on the page's scale. -->
+        <Style x:Key="SectionSpacer" TargetType="Border">
+            <Setter Property="Height" Value="38"/>
+        </Style>
+    </UserControl.Resources>
+    <!-- Wallet page (PORTPLAN items 06/43/48/60): current CR, XP and bank
+         saldo, then the global XP leaderboard and the three driver-rating
+         skills. Same page skeleton as the bank page: title band, centred
+         body, BACK flush with the bottom edge. Figures are all live Core
+         state, so opening the page is enough to refresh them. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=WalletTitle}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <!-- The three balances as one two-column table: names share the
+                 left column, amounts the right, so every figure lands on the
+                 same edge. The star/auto split keeps the right column wide
+                 enough for the widest amount while still hugging the page
+                 edge. The horizontal margin insets both columns from the
+                 page's left and right borders. A rule separates the savings
+                 bank from the two current balances above it. -->
+            <Grid Margin="16,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding CashLabel}"
+                           Foreground="#FFBFC4C9" FontSize="14" HorizontalAlignment="Left"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding CashAmount}"
+                           Foreground="#FFF" FontSize="16" HorizontalAlignment="Right"/>
+                <TextBlock Grid.Row="1" Grid.Column="0" Text="{Binding XpLabel}"
+                           Foreground="#FFBFC4C9" FontSize="14" HorizontalAlignment="Left" Margin="0,3,0,0"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding XpAmount}"
+                           Foreground="#FFF" FontSize="16" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+                <Border Grid.Row="2" Grid.ColumnSpan="2" BorderBrush="#33FFFFFF"
+                        BorderThickness="0,1,0,0" Margin="0,5"/>
+                <TextBlock Grid.Row="3" Grid.Column="0" Text="{Binding BankLabel}"
+                           Foreground="#FFBFC4C9" FontSize="14" HorizontalAlignment="Left" Margin="0,3,0,0"/>
+                <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding BankAmount}"
+                           Foreground="#FFF" FontSize="16" HorizontalAlignment="Right" Margin="0,3,0,0"/>
+            </Grid>
+
+            <Border Style="{StaticResource SectionSpacer}"/>
+
+            <!-- Global XP leaderboard: the shared receipt block, so the
+                 offline placeholder and the live board event match every
+                 other standings surface. -->
+            <Border Style="{StaticResource SectionRule}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeading}"
+                               Text="{loc:Loc Key=WalletLeaderboard}"/>
+                    <views:StandingsLine Text="{Binding Leaderboard.Line}"
+                                         PulseSignal="{Binding Leaderboard.PulseSignal}"
+                                         Foreground="#FFF" FontSize="16"
+                                         TextAlignment="Center"/>
+                    <TextBlock Text="{Binding Leaderboard.DeltaLine}" FontSize="13"
+                               TextAlignment="Center" Margin="0,2,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="#FFBFC4C9"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Leaderboard.Changed}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource SectionSpacer}"/>
+
+            <!-- Driver rating (PORTPLAN 06, Unity DriverRatingProfile): the
+                 three shares, each a percentage in (11, 100]. -->
+            <Border Style="{StaticResource SectionRule}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeading}"
+                               Text="{loc:Loc Key=WalletRating}"/>
+                    <TextBlock Text="{Binding ConcentrationLine}" Foreground="#FFF"
+                               FontSize="15" TextAlignment="Center" Margin="0,2"/>
+                    <TextBlock Text="{Binding CorneringLine}" Foreground="#FFF"
+                               FontSize="15" TextAlignment="Center" Margin="0,2"/>
+                    <TextBlock Text="{Binding OffTheLineLine}" Foreground="#FFF"
+                               FontSize="15" TextAlignment="Center" Margin="0,2"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Button bar: BACK stretches the full panel width in its own bottom
+             band like every other page; teal is the shared voice-ack highlight. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=WalletBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>
