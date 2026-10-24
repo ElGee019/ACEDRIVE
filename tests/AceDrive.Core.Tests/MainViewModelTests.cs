@@ -93,7 +93,8 @@ public sealed class MainViewModelTests
         var garageInstance = garage ?? new Garage(cars ?? TestRoadCars.Pool);
         var friendsInstance = friendships ?? new FakeFriendshipStore();
         var trunkInstance = trunk ?? new Trunk(savedDriver?.Trunk);
-        var storeNetwork = new StoreNetwork(storeCatalog ?? StoreCatalog.Default, PoiCatalog.Default);
+        var storeCatalogInstance = storeCatalog ?? StoreCatalog.Default;
+        var storeNetwork = new StoreNetwork(storeCatalogInstance, PoiCatalog.Default);
         IReadOnlyList<IPoiArrivalHandler> handlers = poiHandlers ??
         [
             new StorePoiHandler(
@@ -161,6 +162,14 @@ public sealed class MainViewModelTests
             faresInstance, taxiRulesInstance, beat, hud, logger);
         var shops = new ShopInteriors(
             walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver, beat, logger);
+        var spawnerInstance = poiSpawner ?? new PoiSpawner(
+            map, PoiCatalog.Default,
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0);
+        var poiWorld = new PoiWorld(
+            spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
+            cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
+            onboardingStore, shops, logger);
+        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(handlers));
         var proposalsInstance = TaxiTestData.Proposer(map: map, seed: 0);
         var taxi = new TaxiJobFlow(
             proposalsInstance, map, brands, pool, requests,
@@ -197,17 +206,12 @@ public sealed class MainViewModelTests
             rng ?? new Random(0),
             pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
             directory, directoryStore,
-            poiSpawner ?? new PoiSpawner(
-                map, PoiCatalog.Default,
-                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            jobsInstance,
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
             trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(),
-            meter, shops, taxi, delivery, hud, handlers,
-            saveResets, restarter,
-            storeCatalog ?? StoreCatalog.Default);
+            meter, shops, taxi, delivery, poiWorld, poiArrivals, hud,
+            saveResets, restarter, storeCatalogInstance);
         if (carKsId is not null)
         {
             // The watcher thread lands via the dispatcher, which runs inline

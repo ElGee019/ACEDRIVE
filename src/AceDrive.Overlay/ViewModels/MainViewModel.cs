@@ -14,7 +14,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class MainViewModel
     : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost,
-      IDeliveryHost, IDisposable
+      IDeliveryHost, IPoiWorldHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -48,12 +48,6 @@ public sealed class MainViewModel
     private readonly DriverWallet _wallet;
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
-    // Lifetime settled jobs (PORTPLAN 24, Unity jobsCompleted): the dealer and
-    // mechanic gates read this; the zone's own counter resets per expansion.
-    private readonly JobLedger _jobs;
-    // The business side of the POI directory (PORTPLAN 24): checks the street
-    // and job thresholds and draws a free house for every newly opened place.
-    private readonly PoiSpawner _poiGrowth;
     // What the driven car carries (PORTPLAN 26): the trunk page lists it and
     // the EAT tap consumes from it. Persisted through _saver, never here.
     private readonly Trunk _trunk;
@@ -98,8 +92,13 @@ public sealed class MainViewModel
     private readonly DeliveryCareer _career;
     // The delivery board. A placed grocery/coffee store appends its row at
     // runtime, so the live catalogue is a holder the board page, the run
-    // planner and the settle all read (S3 moves its growth into PoiWorld).
+    // planner and the settle all read.
     private readonly DeliveryBoard _deliveryBoard;
+    // The discovered POIs behind the addresses page and the introduction's
+    // errand doors; PoiWorld owns the growth that fills them.
+    private readonly PoiDirectory _poiDirectory;
+    // The POI world: the business/store/hub doors and the arrival handlers.
+    private readonly PoiWorld _poiWorld;
     // The delivery run from DELIVER to receipt: owns the live run and the board
     // page; the panel, the HUD line and the settle arrive through IDeliveryHost.
     private readonly DeliveryFlow _delivery;
@@ -118,11 +117,6 @@ public sealed class MainViewModel
     // The placeholder free-roam map: the HUD, the onboarding home and the
     // taxi draw all read the same streets and lap geometry (PORTPLAN Step 1).
     private readonly AddressMap _addressMap;
-    // The discovered POIs behind the addresses page (PORTPLAN 24/27): the
-    // story and the business spawner fill it, the addresses page reads it.
-    private readonly PoiDirectory _poiDirectory;
-    // The directory's own file: every newly opened business is banked once.
-    private readonly IPoiDirectoryStore _poiStore;
     // The driving-slice balance the meter, the HUD radius and the distance
     // line share (Data/taxi_rules.json).
     private readonly TaxiRules _taxiRules;
@@ -251,15 +245,14 @@ public sealed class MainViewModel
         Random rng,
         PoiGenerator pois,
         PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
-        PoiSpawner poiGrowth, JobLedger jobs,
         IPreferencesStore preferencesStore, PlayerPreferences preferences, ICultureService culture,
         Trunk trunk,
         TaxiRules taxiRules,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
-        TaxiJobFlow taxi, DeliveryFlow delivery,
+        TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
+        PoiArrivalRouter poiArrivals,
         ITelemetryHud? hud = null,
-        IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
         ISaveDataResetter? saveResets = null,
         IAppRestarter? restarter = null,
         StoreCatalog? storeCatalog = null)
@@ -278,9 +271,6 @@ public sealed class MainViewModel
         _fares = fares;
         _addressMap = addressMap;
         _poiDirectory = poiDirectory;
-        _poiStore = poiStore;
-        _poiGrowth = poiGrowth;
-        _jobs = jobs;
         _taxiRules = taxiRules;
         _content = content;
         _todos = todos;
@@ -322,10 +312,13 @@ public sealed class MainViewModel
         _shops = shops;
         _taxi = taxi;
         _delivery = delivery;
-        // Both flows are built before the shell they report to; these are the
-        // late edges, and they close here before anything can fire a command.
+        _poiWorld = poiWorld;
+        // All three collaborators are built before the shell they report to;
+        // these are the late edges, and they close here before anything can
+        // fire a command or enter a door.
         _taxi.Attach(this);
         _delivery.Attach(this);
+        _poiWorld.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications, and re-derive the page-shape flags.
         _shell.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
@@ -337,12 +330,9 @@ public sealed class MainViewModel
         // The meter is shared with the settle: the poll feeds it and the
         // receipt reads (and resets) the same accumulator.
         _meter = meter;
-        // The POI entry router: the store handler rides in from the root, the
-        // business interiors are built here because they bank through this host
-        // and change the page themselves (dealer -> bought-car choice).
-        var poiArrivals = new PoiArrivalRouter(BuildPoiHandlers(poiHandlers));
         // The story collaborator owns the persisted walk + profile + errand POI;
-        // it is built before the garage seed below reads its progress.
+        // it is built before the garage seed below reads its progress. The POI
+        // router arrives from the root, which built it from PoiWorld's handlers.
         _story = new OnboardingFlow(
             onboarding, content, profiles, playerNames, addressMap, detectedPlayerName,
             pois, poiDirectory, poiStore, poiArrivals, trunk,
@@ -355,7 +345,7 @@ public sealed class MainViewModel
         // a save whose street/job counters already crossed a threshold opens
         // the missing doors now. A fresh career is still in onboarding, so the
         // gate keeps the business list empty until the introduction ends.
-        GrowPois();
+        _poiWorld.Grow();
         // Grandma's car is the first OwnedCar (PORTPLAN Career Start item 3 +
         // item 30): a save whose onboarding already ran but whose garage is
         // still empty — every save written before this slice — seeds the car
@@ -552,7 +542,7 @@ public sealed class MainViewModel
     void IJobSettlementHost.OnProgressBanked()
     {
         TryExpandZone();
-        GrowPois();
+        _poiWorld.Grow();
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
     void IJobSettlementHost.GoToControlPage() => SetScreen(CreateControlScreen());
@@ -592,6 +582,12 @@ public sealed class MainViewModel
     }
     void IDeliveryHost.Settle(DeliveryRun run) =>
         _settlement.SettleDeliveryRun(run, HomeCountry, this);
+
+    // The host slice the POI world sees: the world owns the doors and the
+    // board growth; the shell owns the board page and the dealer's follow-up.
+    void IPoiWorldHost.RefreshBoard() => _delivery.RefreshBoard();
+    int IPoiWorldHost.DisplayWeek => _displayWeek;
+    void IPoiWorldHost.CarBought(CarSpec car) => OnCarBought(car);
 
     // Reveal the panel on the requested POI screen. Show() deliberately
     // resets a hidden start to the control page; entering a shop must land
@@ -665,7 +661,7 @@ public sealed class MainViewModel
     {
         // A hub bought on the previous visit may have opened store doors; the
         // board must include them before the cached page paints.
-        GrowPois();
+        _poiWorld.Grow();
         SetScreen(_delivery.OpenBoard());
     }
 
@@ -731,13 +727,13 @@ public sealed class MainViewModel
             _career, _deliveryBoard.Catalog, _city, _log,
             new RelayCommand(CloseHub),
             _beat,
-            PlaceHubDoor));
+            _poiWorld.PlaceHubDoor));
 
     private void CloseHub()
     {
         // Unity's backfill runs when the career opens: the newly owned
         // category places its first store before the board is shown again.
-        GrowPois();
+        _poiWorld.Grow();
         _delivery.RefreshBoard();
         SetScreen(_delivery.Board ?? (object)CreateControlScreen());
     }
@@ -1388,81 +1384,6 @@ public sealed class MainViewModel
         }
     }
 
-    // The business/store side of the marker network (PORTPLAN 24, Unity's
-    // CarWash/Bank/Insurance/Dealer/Mechanic generators plus the hub store
-    // backfill): every unlocked place opens on a free house. Cold path only
-    // (boot + settle + hub close), never the 10 Hz poll. The directory only
-    // grows, so a door the player already knows never moves.
-    private void GrowPois()
-    {
-        if (!OnboardingDone)
-        {
-            return;
-        }
-
-        IReadOnlyList<PointOfInterest> grown = _poiGrowth.Spawn(
-            _zone.StreetIds.Count, _jobs.Completed, _poiDirectory,
-            _career.OwnsCategory);
-        bool banked = false;
-        foreach (PointOfInterest poi in grown)
-        {
-            if (!_poiDirectory.Add(poi))
-            {
-                continue;
-            }
-
-            banked = true;
-            _log.LogInfo($"[Poi] opened {poi.Name} at " +
-                AddressFormatter.Format(poi.Address));
-        }
-
-        if (banked)
-        {
-            _poiStore.Save(_poiDirectory.All);
-        }
-
-        // A placed grocery/coffee store is also a delivery target: the shop
-        // interior and the board row share the same POI identity, so the town
-        // and the board gain the store together. Max's story grocery is the
-        // career's first real grocery; adopting every known shop door also
-        // covers the session where onboarding drew it after the catalog was
-        // built at boot.
-        if (AdoptShopDoors() || banked)
-        {
-            _delivery.RefreshBoard();
-        }
-    }
-
-    // Adds every known shop POI to the delivery board and the town, once.
-    // This is what makes the board list real stores instead of printed
-    // placeholder rows: Max's grocery plus the stores each owned hub has
-    // backfilled so far.
-    private bool AdoptShopDoors()
-    {
-        bool changed = false;
-        foreach (PointOfInterest poi in _poiDirectory.All)
-        {
-            if (PlacedStore.Row(poi, _storeCatalog) is not { } store)
-            {
-                continue;
-            }
-
-            bool newCell = _city.AddStore(store);
-            if (_deliveryBoard.Catalog.Find(store.Key) is not null)
-            {
-                changed |= newCell;
-                continue;
-            }
-
-            _deliveryBoard.Add(store);
-            _log.LogInfo($"delivery board connected: {store.Name} " +
-                $"({store.Category}) at {AddressFormatter.Format(poi.Address)}");
-            changed = true;
-        }
-
-        return changed;
-    }
-
     // One shift ends at both timeout sites (the poll and the START tap);
     // bank the record once and push the best to the world board. Pushing on
     // every end (not only an improvement) also syncs a best restored from a
@@ -1524,31 +1445,6 @@ public sealed class MainViewModel
             _wallet, _rivals,
             new RelayCommand(() => SetScreen(CreateMenuScreen())),
             _beat));
-    }
-
-    // The POI router's business families: the root supplies the store handler,
-    // the host appends one registration per interior it builds. A new business
-    // joins here, never in the entry path (PORTPLAN item 24, OCP).
-    private List<IPoiArrivalHandler> BuildPoiHandlers(
-        IReadOnlyList<IPoiArrivalHandler>? supplied)
-    {
-        var handlers = new List<IPoiArrivalHandler>();
-        if (supplied is not null)
-        {
-            handlers.AddRange(supplied);
-        }
-
-        handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Bank, (_, back, changed) => _shops.Bank(back, changed)));
-        handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Dealer, (_, back, _) => _shops.Dealer(back, _displayWeek, OnCarBought)));
-        handlers.Add(new DelegatePoiHandler(
-            PoiTypes.CarWash, (_, back, changed) => _shops.CarWash(back, changed)));
-        handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Mechanic, (_, back, changed) => _shops.Mechanic(back, changed)));
-        handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Insurance, (_, back, changed) => _shops.Insurance(back, changed)));
-        return handlers;
     }
 
     // The garage page (PORTPLAN 30, Unity GarageScreen): a fresh page per visit,
@@ -1627,15 +1523,12 @@ public sealed class MainViewModel
         }
     }
 
-    // The map side of one stop: a hub's pickup door (placed at purchase) or the
-    // shop's own address. The flow asks for the pin; the door lives here until
-    // PoiWorld owns it in S3.
+    // The map side of one stop: the door PoiWorld placed or the shop's own
+    // address. The flow asks for the pin; the world owns the door, the shell
+    // only formats the companion line and the arrival radius.
     private HudJobGuidance? DeliveryGuidance(DeliveryStop leg)
     {
-        AddressLocation? door = leg.Kind == DeliveryStopKind.Hub
-            ? OwnedHubDoor(leg.Key)?.Address
-            : _deliveryBoard.Catalog.Find(leg.Key)?.Address;
-        if (door is not { } target)
+        if (_poiWorld.StopDoor(leg) is not { } target)
         {
             return null;
         }
@@ -1649,45 +1542,6 @@ public sealed class MainViewModel
                 leg.Name, target,
                 "HudDeliveryStoreDrive", "HudDeliveryStoreArrived", "HudDeliveryStoreAction",
                 _taxiRules.ArrivalRadiusMeters);
-    }
-
-    // The host's map side of a hub purchase: place its pickup door in the
-    // free-house pool before the backfilled stores draw their addresses, then
-    // bank the directory. A failed placement logs and leaves the pickup leg
-    // skipped; the rest of the run still works.
-    private void PlaceHubDoor(OwnedHub hub) => _ = EnsureHubDoor(hub);
-
-    private PointOfInterest? OwnedHubDoor(string key)
-    {
-        foreach (OwnedHub hub in _career.Owned)
-        {
-            if (hub.Key == key)
-            {
-                return EnsureHubDoor(hub);
-            }
-        }
-        return null;
-    }
-
-    private PointOfInterest? EnsureHubDoor(OwnedHub hub)
-    {
-        if (_poiDirectory.Find(hub.Key) is { } known)
-        {
-            return known;
-        }
-
-        PointOfInterest? door = _poiGrowth.Place(
-            hub.Key, hub.Name, PoiTypes.Hub, hub.OwnerName, hub.Category, _poiDirectory);
-        if (door is null || !_poiDirectory.Add(door))
-        {
-            _log.LogWarning($"hub door not placed: {hub.Name} ({hub.Key})");
-            return null;
-        }
-
-        _poiStore.Save(_poiDirectory.All);
-        _log.LogInfo($"[Poi] opened hub {hub.Name} at " +
-            AddressFormatter.Format(door.Address));
-        return door;
     }
 
     private void RefreshJob()

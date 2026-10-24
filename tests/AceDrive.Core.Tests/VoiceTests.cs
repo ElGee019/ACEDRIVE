@@ -108,6 +108,15 @@ public sealed class VoiceTests
             city, deliveryFares, meter, fares, taxiRules, beat, null, logger);
         var shops = new ShopInteriors(
             wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
+        var poiDirectory = new PoiDirectory();
+        var poiStore = new FakePoiDirectoryStore();
+        var poiWorld = new PoiWorld(
+            new PoiSpawner(
+                AddressMap.Default, PoiCatalog.Default,
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
+            poiDirectory, poiStore, deliveryBoard, career, city, StoreCatalog.Default,
+            zone, jobs, onboarding, shops, logger);
+        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers());
         var proposals = TaxiTestData.Proposer();
         var taxi = new TaxiJobFlow(
             proposals, AddressMap.Default, car, cars, null,
@@ -136,14 +145,10 @@ public sealed class VoiceTests
             garage, garageStore, InsuranceRules.Default,
             new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
-            new PoiDirectory(), new FakePoiDirectoryStore(),
-            new PoiSpawner(
-                AddressMap.Default, PoiCatalog.Default,
-                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            jobs,
+            poiDirectory, poiStore,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
             trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops,
-            taxi, delivery);
+            taxi, delivery, poiWorld, poiArrivals);
         return (vm, clock, mic, car);
     }
 

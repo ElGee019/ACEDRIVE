@@ -35,8 +35,9 @@ Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean)
 | `c5bd948` | Five shop interiors → `ShopInteriors`, −83 lines |
 | `4d4c0e2` | Taxi job → `TaxiJobFlow` + `ITaxiJobHost`, −397 lines and six constructor parameters |
 | S2 | Delivery run → `DeliveryFlow` + `IDeliveryHost`; `TripBreakdowns` and the `DeliveryBoard` holder, −145 lines |
+| S3 | POI growth/doors/handlers → `PoiWorld` + `IPoiWorldHost`, −146 lines |
 
-`MainViewModel`: 2658 → 1742 lines. Over 1,200 of the remaining lines are
+`MainViewModel`: 2658 → 1596 lines. Over 1,000 of the remaining lines are
 domain work that belongs to someone else; the target coordinator is roughly
 500.
 
@@ -78,7 +79,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
 | `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
-| `PoiWorld` | the board growth (`Grow`, `AdoptShopDoors`, hub doors) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `OwnedHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: refresh board page |
+| `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, calendar week, bought-car page |
 | `Navigation` | `_control`, `_menu`, `_calendar`, `_openDayAction`, `_roadTestDay` | `Control()`, `Menu()`, `Calendar()`, `Home()`, `Wallet()`, `Garage()`, `Addresses()`, `Trunk()`, `Settings()`, `Delivery()`, `Hub()` | `OverlayShell` (page swap) + `GameStateSaver` |
 | `TelemetryReadouts` | the seven painted strings + their caches | `Paint(sample)`, `PaintWaiting()`, `RefreshJob(job, shift)` | `IReadoutSink` (or returns a record) |
 | `DayCycle` | `_displayWeek`, `_lastDay`, `_lastShiftSecs` | `Tick(today)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: pages' `DisplayWeek`, shift-ended page, `SaveClock` |
@@ -129,8 +130,8 @@ stores + saved state
                       └ MainViewModel (all of the above)
 ```
 
-`PoiArrivalRouter` is built by `PoiWorld.Handlers(...)` once `Navigation`
-exists; the store handler still comes in from the root.
+`PoiArrivalRouter` is built in the root right after `PoiWorld`, from
+`PoiWorld.Handlers(...)`; the store handler still comes in from the root.
 
 ## 6. Extraction sequence
 
@@ -161,10 +162,18 @@ takes the holder instead of a boot-time snapshot. The flow's `Guidance` moved to
 the host as `PinStop(leg)` returning false: the stop's door (catalogue row or hub
 POI) is still the shell's map knowledge until `PoiWorld` owns it in S3.
 
-**S3 — `PoiWorld`** (~200 lines: `GrowPois`, `AdoptShopDoors`, doors,
-`BuildPoiHandlers`). Introduces the `DeliveryBoard` holder so the catalog can be
-replaced without a mutable service reference.
-*Unblocks:* `PoiArrivalRouter` becomes constructible in the root.
+**S3 — `PoiWorld`** ✅ (this commit, ~225 lines: `Grow`, `AdoptDoors`,
+hub doors, `StopDoor`, `Handlers`). Takes the `DeliveryBoard` holder S2
+introduced and owns its growth.
+*Unblocked:* `PoiArrivalRouter` is built in the root now (`PoiWorld.Handlers`
+returns the full list), and `MainViewModel` lost `GrowPois`,
+`AdoptShopDoors`, `BuildPoiHandlers`, the hub-door trio and their two fields.
+*Deviations:* `IPoiWorldHost` also carries `DisplayWeek` and `CarBought`.
+The dealer handler needs the calendar week and the bought-car choice page;
+both stay coordinator state until `DayCycle` (S5) and `Navigation` (S4) own
+them, so they cross as reports instead of the world reaching for the shell.
+The world takes `IOnboardingStore` for its introduction gate, the same
+`Load().IsComplete` contract `TripBreakdowns` already uses.
 
 **S4 — `Navigation`** (~260 lines: control/menu/calendar/home/wallet/garage/
 addresses/trunk/settings/delivery/hub + the bought-car choice). Takes the
@@ -255,28 +264,32 @@ in S1, when the gate moves.
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2 (this commit) is green locally.
-`MainViewModel` 1742 lines (was 1887), fields down by three (the run, its meter
-edge and the page are the flow's; the catalogue is a holder), 1670 tests green
-(+11: `DeliveryFlowTests`, `TripBreakdownsTests`, `JobSettlementTests`).
+State: S1 pushed as `4d4c0e2`; S2 pushed; S3 is green locally.
+`MainViewModel` 1596 lines (was 1742), −146 lines: the POI growth, shop
+adoption, hub doors and handler assembly left, along with `_poiGrowth` and
+`_jobs`. 1678 tests green (+8: `PoiWorldTests`).
 
-Next: **S3 — `PoiWorld`** (~200 lines: `GrowPois`, `AdoptShopDoors`, hub doors,
-`BuildPoiHandlers`). It takes the `DeliveryBoard` holder S2 introduced and owns
-its growth; `DeliveryGuidance`'s hub lookup and `PlaceHubDoor` move with the
-doors.
-*Unblocks:* `PoiArrivalRouter` becomes constructible in the root.
+Next: **S4 — `Navigation`** (~260 lines: control/menu/calendar/home/wallet/
+garage/addresses/trunk/settings/delivery/hub + the bought-car choice). Takes
+the flows' `ICommand`s; owns the page caches.
+*Unblocks:* `IStoryHost.ControlScreen`/`MenuScreen`, so `OnboardingFlow` is
+constructible in the root. After S4 the coordinator constructs nothing.
 
 Working agreements earned so far:
 
 - The coordinator implements the host; a flow attaches with `Attach(this)` in
   the coordinator's constructor — the one late edge, closed before any command
-  can fire.
+  can fire. `PoiWorld` joins that list: its arrival delegates only read the
+  host when a door is entered.
 - A collaborator that only *produces* a page takes no host at all:
   `TripBreakdowns.Interrupt` charges the tow and returns the page, and the
   caller's own host puts it up with its own BACK command.
 - Collaborators take the saver, watcher and rivals directly; the host only
   reports (page, saves, readouts). A stop's door is asked as
   `bool PinStop(leg)` — reporting plus a degrade signal, never a host getter.
+- A value that a collaborator needs now but another collaborator will own later
+  crosses the host explicitly and moves with its new owner (`DisplayWeek`:
+  coordinator → `DayCycle` in S5).
 - Tests: one instance per service graph; builders hoist their locals.
 - Never round-trip UTF-8 through `Get-Content`/`Set-Content` (PowerShell 5.1
   decodes as ANSI and re-encodes, silently mangling `—` and `€`); use

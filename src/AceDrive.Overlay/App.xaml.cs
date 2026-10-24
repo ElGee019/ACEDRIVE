@@ -324,7 +324,7 @@ public partial class App : Application, IDisposable
         var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
         // The live board (a shop that connects while the overlay runs appends a
         // row) and the one instance the board page, the run planner and the
-        // settle all read. S3 moves the growth that fills it into PoiWorld.
+        // settle all read.
         var deliveryBoard = new DeliveryBoard(deliveryCatalog);
         // Prices and banks one finished job; the poll feeds the same meter, so
         // the instance is shared rather than owned by either side.
@@ -342,6 +342,14 @@ public partial class App : Application, IDisposable
         var shell = new OverlayShell();
         var shops = new ShopInteriors(
             driver, garage, game, insuranceRules, cars, saver, beat, _log);
+        // The POI world and its arrival router: the store handler rides in from
+        // here, the business interiors are appended by the world. The world
+        // attaches to the coordinator as its host inside the VM's constructor;
+        // its arrival delegates only read the host when a door is entered.
+        var poiWorld = new PoiWorld(
+            poiSpawner, poiDirectory, poiStore, deliveryBoard, deliveryCareer,
+            city, storeCatalog, zone, jobs, onboardingStore, shops, _log);
+        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(poiHandlers));
         // The trip-start breakdown roll (PORTPLAN 39): one seeded instance,
         // never the shared global (AGENTS.md), read by both job flows.
         var breakdowns = new TripBreakdowns(
@@ -405,10 +413,10 @@ public partial class App : Application, IDisposable
             new Random(taxiSeed + 5),
             poiGenerator,
             poiDirectory, poiStore,
-            poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops, taxi, delivery,
-            hud, poiHandlers,
+            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
+            taxi, delivery, poiWorld, poiArrivals,
+            hud,
             saveResets, restarter, storeCatalog);
 
         MainWindow = new MainWindow(vm, _log);
