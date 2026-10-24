@@ -109,31 +109,61 @@ public sealed class MainViewModelTests
             // carries one fixed door per generated family.
             SeedTestBusinesses(directory, map);
         }
-        var vm = new MainViewModel(tel, clock, new GameClock(clock, gameStart ?? clock.UtcNow), shift ?? new TaxiShift(), shiftStore ?? new FakeShiftStore(), store,
-            log ?? new NullLogger(), FareTable.Default,
+        // One instance per service graph: the saver and the fleet must see the
+        // same stores and state the VM does, so the inline `??` literals below
+        // are hoisted and shared instead of being built twice.
+        var game = new GameClock(clock, gameStart ?? clock.UtcNow);
+        var shiftInstance = shift ?? new TaxiShift();
+        var shiftStoreInstance = shiftStore ?? new FakeShiftStore();
+        var contentSource = new FakeContentSource(content ?? EmptyContent);
+        var logger = log ?? new NullLogger();
+        var cityInstance = city ?? new CityEconomy(board.Stores, CityRules.Default);
+        var cityStoreInstance = cityStore ?? new FakeCityStore();
+        var roadsInstance = roads ?? TestRoadCars.Ledger();
+        var roadTestStoreInstance = roadTestStore ?? new FakeRoadTestStore();
+        var clockStoreInstance = clocks ?? new FakeGameClockStore();
+        var driverStoreInstance = driverStore ?? new FakeDriverStore();
+        var streakInstance = new DailyStreak(clock, savedDriver);
+        // Production seeds the interim zone length from the placeholder map
+        // (App.OnStartup), so the starter bonus decays the same way.
+        var zoneInstance = new OperatingZone(savedDriver, seed: 0, AddressBook.MapLengthKm(map));
+        var pool = cars ?? TestRoadCars.Pool;
+        var shiftsInstance = shifts ?? new ShiftRecord(savedDriver);
+        var hungerInstance = hunger ?? new Hunger(HungerRules.Default);
+        var hungerStoreInstance = hungerStore ?? new FakeHungerStore();
+        var garageStoreInstance = garageStore ?? new FakeGarageStore();
+        var jobsInstance = jobs ?? new JobLedger(savedDriver);
+        var saver = new GameStateSaver(
+            clock, game, clockStoreInstance, driverStoreInstance, garageStoreInstance,
+            cityStoreInstance, hungerStoreInstance, roadTestStoreInstance, shiftStoreInstance,
+            walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
+            cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance, jobsInstance);
+        var fleet = new FleetService(
+            garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
+            brands, contentSource);
+        var vm = new MainViewModel(tel, clock, game, shiftInstance, shiftStoreInstance, store,
+            logger, FareTable.Default,
             TaxiTestData.Proposer(map: map, seed: 0),
-            onboardingStore, new FakeContentSource(content ?? EmptyContent),
+            onboardingStore, contentSource,
             profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
             brands, TodoTable.Default, board, deliveryCareer,
             deliveryFares ?? DeliveryFareTable.Default,
-            city ?? new CityEconomy(board.Stores, CityRules.Default), cityStore ?? new FakeCityStore(),
-            roads ?? TestRoadCars.Ledger(), roadTestStore ?? new FakeRoadTestStore(),
-            clocks ?? new FakeGameClockStore(), startWeek,
+            cityInstance, cityStoreInstance,
+            roadsInstance, roadTestStoreInstance,
+            clockStoreInstance, startWeek,
             beat, walletInstance,
-            driverStore ?? new FakeDriverStore(),
-            new DailyStreak(clock, savedDriver),
-            // Production seeds the interim zone length from the placeholder
-            // map (App.OnStartup), so the starter bonus decays the same way.
-            new OperatingZone(savedDriver, seed: 0, AddressBook.MapLengthKm(map)),
-            friendsInstance, cars ?? TestRoadCars.Pool,
+            driverStoreInstance,
+            streakInstance,
+            zoneInstance,
+            friendsInstance, pool,
             brandMileage ?? new FakeBrandMileageStore(), rivals ?? new FakeRivals(),
             rarity ?? new FakeCarRarity(),
             telemetry ?? new FakePlayerTelemetry(),
-            shifts ?? new ShiftRecord(savedDriver),
+            shiftsInstance,
             shiftStandings ?? new FakeShiftStandings(),
-            hunger ?? new Hunger(HungerRules.Default), hungerStore ?? new FakeHungerStore(),
-            garageInstance, garageStore ?? new FakeGarageStore(),
+            hungerInstance, hungerStoreInstance,
+            garageInstance, garageStoreInstance,
             InsuranceRules.Default,
             // Seeded so a test can force a breakdown or keep every trip clean.
             breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
@@ -143,11 +173,11 @@ public sealed class MainViewModelTests
             poiSpawner ?? new PoiSpawner(
                 map, PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            jobs ?? new JobLedger(savedDriver),
+            jobsInstance,
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRules ?? TaxiRules.Default, hud, handlers,
+            trunkInstance, taxiRules ?? TaxiRules.Default, saver, fleet, hud, handlers,
             requests, requestTable, police, saveResets, restarter,
             storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)

@@ -32,23 +32,54 @@ public sealed class OnboardingTests
         var store = onboarding ?? new FakeOnboardingStore();
         if (start is not null) store.Save(start);
         clock ??= new FakeClock();
-        return new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
-            new FakeStore(), new NullLogger(), FareTable.Default,
+        // One instance per service graph: the saver and the fleet share the
+        // stores and state the VM gets (the root builds them the same way).
+        var game = new GameClock(clock, clock.UtcNow);
+        var shift = new TaxiShift();
+        var shiftStore = new FakeShiftStore();
+        var contentSource = new FakeContentSource(Content);
+        var logger = new NullLogger();
+        var city = new CityEconomy([], CityRules.Default);
+        var cityStore = new FakeCityStore();
+        var roads = new RoadTestLedger([], seed: 0);
+        var roadTestStore = new FakeRoadTestStore();
+        var clockStore = new FakeGameClockStore();
+        var wallet = new DriverWallet();
+        var driverStore = new FakeDriverStore();
+        var streak = new DailyStreak(clock, null);
+        var zone = new OperatingZone(null, seed: 0);
+        IReadOnlyList<CarSpec> cars = [];
+        var garage = new Garage([]);
+        var garageStore = new FakeGarageStore();
+        var hunger = new Hunger(HungerRules.Default);
+        var hungerStore = new FakeHungerStore();
+        var shifts = new ShiftRecord(null);
+        var jobs = new JobLedger();
+        var trunk = new Trunk();
+        var carBrands = new FakeCarBrandSource();
+        var saver = new GameStateSaver(
+            clock, game, clockStore, driverStore, garageStore, cityStore,
+            hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
+            garage, city, hunger, roads, shift, shifts, jobs);
+        var fleet = new FleetService(
+            garage, cars, game, wallet, InsuranceRules.Default, logger, carBrands, contentSource);
+        return new MainViewModel(new FakeTelemetry(), clock, game, shift, shiftStore,
+            new FakeStore(), logger, FareTable.Default,
             TaxiTestData.Proposer(),
-            store, new FakeContentSource(Content),
+            store, contentSource,
             profiles ?? new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
-            new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
+            carBrands, TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
             DeliveryFareTable.Default,
-            new CityEconomy([], CityRules.Default), new FakeCityStore(),
-            new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
-            new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
-            new OfflineCarRarity(), new OfflinePlayerTelemetry(), new ShiftRecord(null),
+            city, cityStore,
+            roads, roadTestStore,
+            clockStore, 1, new VoiceBeat(clock), wallet, driverStore,
+            streak, zone, new FakeFriendshipStore(), cars, new FakeBrandMileageStore(), new FakeRivals(),
+            new OfflineCarRarity(), new OfflinePlayerTelemetry(), shifts,
             new OfflineShiftStandings(),
-            new Hunger(HungerRules.Default), new FakeHungerStore(),
-            new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
+            hunger, hungerStore,
+            garage, garageStore, InsuranceRules.Default,
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
@@ -56,9 +87,9 @@ public sealed class OnboardingTests
             new PoiSpawner(
                 AddressMap.Default, PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            new JobLedger(),
+            jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            new Trunk(), TaxiRules.Default);
+            trunk, TaxiRules.Default, saver, fleet);
     }
 
     // The first-run page (unit + language) sits before the name form; its
@@ -265,34 +296,9 @@ public sealed class OnboardingTests
     public void FullFlow_PersistsEveryStep()
     {
         var store = new FakeOnboardingStore();
-        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var clock = new FakeClock();
-        var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
-            new FakeStore(), new NullLogger(), FareTable.Default,
-            TaxiTestData.Proposer(),
-            store, new FakeContentSource(Content),
-            new FakeProfileStore(), new OfflinePlayerNameRegistry(), AddressMap.Default, "ElGee",
-            new FakeVoiceListener(available: false),
-            new FakeCarBrandSource(), TodoTable.Default, DeliveryCatalog.Default, HubCareerShell(),
-            DeliveryFareTable.Default,
-            new CityEconomy([], CityRules.Default), new FakeCityStore(),
-            new RoadTestLedger([], seed: 0), new FakeRoadTestStore(),
-            new FakeGameClockStore(), 1, new VoiceBeat(clock), new DriverWallet(), new FakeDriverStore(),
-            new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new FakeFriendshipStore(), [], new FakeBrandMileageStore(), new FakeRivals(),
-            new OfflineCarRarity(), new OfflinePlayerTelemetry(), new ShiftRecord(null),
-            new OfflineShiftStandings(),
-            new Hunger(HungerRules.Default), new FakeHungerStore(),
-            new Garage([]), new FakeGarageStore(), InsuranceRules.Default,
-            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
-            new Random(0),
-            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
-            new PoiDirectory(), new FakePoiDirectoryStore(),
-            new PoiSpawner(
-                AddressMap.Default, PoiCatalog.Default,
-                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            new JobLedger(),
-            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            new Trunk(), TaxiRules.Default);
+        // Same shell as the other onboarding tests: one shared service graph.
+        var vm = Create(clock: clock, onboarding: store);
 
         vm.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);

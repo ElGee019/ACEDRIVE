@@ -313,10 +313,22 @@ public partial class App : Application, IDisposable
         // process so no in-memory store survives into the fresh introduction.
         var saveResets = new FileSaveDataResetter(_log);
         var restarter = new ProcessAppRestarter(_log);
+        var game = new GameClock(
+            wall, saved?.GameNow ?? new DateTime(2026, 10, 10, 8, 0, 0, DateTimeKind.Utc));
+        var carBrands = new CarLogWatcher(_log);
+        // The fleet and the shared state bank are built before the shell:
+        // neither may depend on it, and the poll plus both settles take these
+        // instances from here (AGENTS.md: this is the only composition point).
+        var fleet = new FleetService(
+            garage, cars, game, driver, insuranceRules, _log, carBrands, content);
+        var saver = new GameStateSaver(
+            wall, game, clockStore, driverStore, garageStore, cityStore,
+            hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
+            garage, city, hunger, roadTests, shift, shifts, jobs);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
-            new GameClock(wall, saved?.GameNow ?? new DateTime(2026, 10, 10, 8, 0, 0, DateTimeKind.Utc)),
+            game,
             shift,
             shiftStore,
             new JsonSettingsStore(),
@@ -330,7 +342,7 @@ public partial class App : Application, IDisposable
             addressMap,
             playerName,
             CreateVoice(_log),
-            new CarLogWatcher(_log),
+            carBrands,
             todos,
             deliveryCatalog,
             deliveryCareer,
@@ -369,7 +381,7 @@ public partial class App : Application, IDisposable
             poiDirectory, poiStore,
             poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, hud, poiHandlers, requests, requestTable, police,
+            trunk, taxiRules, saver, fleet, hud, poiHandlers, requests, requestTable, police,
             saveResets, restarter, storeCatalog);
 
         MainWindow = new MainWindow(vm, _log);

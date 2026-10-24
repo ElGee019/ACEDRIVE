@@ -284,6 +284,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IStoryHost, IDisp
         IPreferencesStore preferencesStore, PlayerPreferences preferences, ICultureService culture,
         Trunk trunk,
         TaxiRules taxiRules,
+        GameStateSaver saver, FleetService fleet,
         ITelemetryHud? hud = null,
         IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
         ICustomerRequestRoller? requests = null,
@@ -349,15 +350,11 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IStoryHost, IDisp
         _shifts = shifts;
         _shiftBoard = shiftStandings;
         _cars = cars;
-        // The persistence collaborator is built from the injected services, so
-        // the early banks below (garage seed, streak bonus) already route
-        // through it instead of assembling snapshots here.
-        _saver = new GameStateSaver(
-            clock, game, clockStore, driverStore, garageStore, cityStore,
-            hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
-            garage, city, hunger, roadTests, shift, shifts, jobs);
-        _fleet = new FleetService(
-            garage, cars, game, wallet, insuranceRules, log, carBrands, content);
+        // The persistence collaborator and the fleet are built by the root: the
+        // shell may not own a stateful service (AGENTS.md), and both are handed
+        // in so the settles and the poll share one instance.
+        _saver = saver;
+        _fleet = fleet;
         // The POI entry router: the store handler rides in from the root, the
         // business interiors are built here because they bank through this host
         // and change the page themselves (dealer -> bought-car choice).
