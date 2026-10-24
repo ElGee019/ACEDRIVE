@@ -33,8 +33,9 @@ Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean)
 | `e332839` | Receipts → `JobSettlement` + `IJobSettlementHost` (12 members), −284 lines |
 | `231be1f` | Panel/page/activity → `OverlayShell` |
 | `c5bd948` | Five shop interiors → `ShopInteriors`, −83 lines |
+| `4d4c0e2` | Taxi job → `TaxiJobFlow` + `ITaxiJobHost`, −397 lines and six constructor parameters |
 
-`MainViewModel`: 2658 → 2284 lines. Over 1,500 of the remaining lines are
+`MainViewModel`: 2658 → 1887 lines. Over 1,300 of the remaining lines are
 domain work that belongs to someone else; the target coordinator is roughly
 500.
 
@@ -72,8 +73,7 @@ coordinator. Pages take commands from the domain that owns them.
 
 | Collaborator | Owns (state) | Public surface | Reporting host |
 |---|---|---|---|
-| `TripMeter` | `TaxiDriveMeter`, reset policy | `Add(sample, dt)`, `Reset()`, `DistanceKm` | none |
-| `TaxiJobFlow` | `_job`, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_trackLengthMeters` | `AcceptJob`, `ConfirmPickup`, `AnswerRequest`, `RefuseDirtyPickup`, `ConfirmDropoff`, `Abandon`, `OnEnter`, `Tick(sample, dt)`, `Guidance` | `ITaxiJobHost`: show/reveal page, refresh readouts, settle, bank saves, grow career, HUD guidance |
+| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (10 members) |
 | `DeliveryFlow` | `_deliveryJob`, `_deliveryStoreLegStarted`, `_deliveryScreen` | `Start(run)`, `Stop`, `Deliver`, `Guidance` | `IDeliveryHost`: show board, settle, HUD |
 | `PoiWorld` | `DeliveryBoard` (mutable holder for `_deliveryCatalog`) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `OwnedHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: refresh board page |
 | `Navigation` | `_control`, `_menu`, `_calendar`, `_openDayAction`, `_roadTestDay` | `Control()`, `Menu()`, `Calendar()`, `Home()`, `Wallet()`, `Garage()`, `Addresses()`, `Trunk()`, `Settings()`, `Delivery()`, `Hub()` | `OverlayShell` (page swap) + `GameStateSaver` |
@@ -111,11 +111,11 @@ The DAG, top to bottom; each row may only use rows above it.
 
 ```
 stores + saved state
-  └ FleetService (watcher, content)      TripMeter (taxiRules)
+  └ FleetService (watcher, content)      TaxiDriveMeter (taxiRules)
   └ GameStateSaver                        OverlayShell
       └ JobSettlement (state owners + meter; the host supplies the saves)
       └ ShopInteriors (saver)
-          └ TaxiJobFlow (meter, proposals, requests, police, wallet, …)
+          └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, …)
           └ DeliveryFlow (meter, career, city, board)
           └ PoiWorld (growth, directory, career, shops)
               └ Navigation (flows' commands, shop pages, saver)
@@ -132,13 +132,15 @@ exists; the store handler still comes in from the root.
 Each slice is one commit, green at the end. Do not start the next until the
 previous is pushed.
 
-**S1 — `TripMeter` + `TaxiJobFlow`** (~430 lines: open/accept, pickup, request,
+**S1 — `TaxiJobFlow`** ✅ (`4d4c0e2`, ~430 lines: open/accept, pickup, request,
 quiz, speed challenge, police, dropoff, abandon, guidance).
-Owns the job state and the proposal page. `Poll` calls `TaxiJobFlow.Tick`.
-*Unblocks:* `IVoiceHost.Show`'s gate (`jobFlow.InProgress`), the control page's
-`TaxiShiftCommand`, and `RefreshJob`.
-*Watch:* the money path — `ConfirmDropoff` now calls `host.Settle(_job)`; the
-receipt tests must stay green untouched.
+Owns the job state and the proposal page. `Poll` calls `TaxiJobFlow.Tick` and
+hands it the paid leg.
+*Unblocked:* `IVoiceHost.Show`'s gate now reads `jobFlow.InProgress`, the control
+page's `TaxiShiftCommand` no longer needs the coordinator's job, and six
+constructor parameters left with the flow.
+*Deviation:* no `TripMeter` wrapper — it would have had no behaviour of its own,
+so both flows take `TaxiDriveMeter` directly.
 
 **S2 — `DeliveryFlow`** (~150 lines incl. `SourceOwners`). Owns the run and the
 board page; `Start` calls the breakdown roll, `Stop` settles.
