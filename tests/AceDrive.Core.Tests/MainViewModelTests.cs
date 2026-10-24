@@ -9,14 +9,6 @@ namespace AceDrive.Core.Tests;
 /// <summary>ViewModel flows run headless against fakes (LSP in action).</summary>
 public sealed class MainViewModelTests
 {
-    internal static readonly OnboardingContent EmptyContent = new(
-        [], new Dictionary<string, string[]>(), [], [], [], [], []);
-    // The birthday walk's minimum: one line, so the dialogue can be finished
-    // without depending on Data/dialogue.json content. Max's post-intro
-    // delivery offer rides along for the career hand-over tests.
-    internal static readonly OnboardingContent OneLineDialogue = new(
-        [], new Dictionary<string, string[]>(), [], [new DialogueLine("GRANDMA", "Go.")],
-        [], [], [new DialogueLine("MAX", "Easy job, fast cash.")]);
     // A returning tour whose Max visit is already banked: later-leg tests can
     // skip the store without relying on a persistent maple-syrup item.
     private static OnboardingState ErrandDone =>
@@ -60,200 +52,84 @@ public sealed class MainViewModelTests
             ICustomerRequestRoller? requests = null,
             CustomerRequestTable? requestTable = null,
             PolicePatrolPlanner? police = null,
-            FakeCarRarity? rarity = null,
-            FakePlayerTelemetry? telemetry = null,
+            ICarRaritySource? rarity = null,
+            IPlayerTelemetry? telemetry = null,
             ShiftRecord? shifts = null,
             IShiftStandings? shiftStandings = null,
             IPlayerNameRegistry? playerNames = null,
             TaxiShift? shift = null, IShiftStore? shiftStore = null,
             FakeSaveDataResetter? saveResets = null,
             FakeAppRestarter? restarter = null,
-            StoreCatalog? storeCatalog = null)
-    {
-        // Deterministic locale: resources resolve to en, numbers format with '.'.
-        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
-        var clock = new FakeClock();
-        var tel = new FakeTelemetry();
-        tel.Next = tel.Next with { SpeedKmh = speedKmh };
-        var store = new FakeStore();
-        var onboardingStore = onboarding ?? new FakeOnboardingStore();
-        if (progress is not null)
+            StoreCatalog? storeCatalog = null,
+            FakeClock? clock = null, FakeCarBrandSource? carBrands = null,
+            FakeTelemetry? physics = null) =>
+        TestSession.Create(new TestSessionOptions
         {
-            onboardingStore.Save(progress);
-        }
-        var board = catalog ?? DeliveryCatalog.Default;
-        var deliveryCareer = career ?? new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
-        var deliveryBoard = new DeliveryBoard(board);
-        CarIdentity? announced = carKsId is null ? null : new CarIdentity(carKsId, carPreset);
-        var brands = new FakeCarBrandSource { CurrentIdentity = announced };
-        var profiles = profileStore ?? new FakeProfileStore(profile);
-        AddressMap map = addressMap ?? AddressMap.Default;
-        var beat = new VoiceBeat(clock);
-        var walletInstance = wallet ?? new DriverWallet(savedDriver);
-        var garageInstance = garage ?? new Garage(cars ?? TestRoadCars.Pool);
-        var friendsInstance = friendships ?? new FakeFriendshipStore();
-        var trunkInstance = trunk ?? new Trunk(savedDriver?.Trunk);
-        var storeCatalogInstance = storeCatalog ?? StoreCatalog.Default;
-        var storeNetwork = new StoreNetwork(storeCatalogInstance, PoiCatalog.Default);
-        IReadOnlyList<IPoiArrivalHandler> handlers = poiHandlers ??
-        [
-            new StorePoiHandler(
-                storeNetwork, trunkInstance, walletInstance, garageInstance,
-                friendsInstance, beat),
-        ];
-        PoiDirectory directory = poiDirectory ?? new PoiDirectory();
-        IPoiDirectoryStore directoryStore = poiStore ?? new FakePoiDirectoryStore();
-        if (poiDirectory is null)
-        {
-            directory = new PoiDirectory(directoryStore.Load());
-            // The real career opens these through the street/job thresholds;
-            // the flow tests need the doors up front, so the test directory
-            // carries one fixed door per generated family.
-            SeedTestBusinesses(directory, map);
-        }
-        // One instance per service graph: the saver and the fleet must see the
-        // same stores and state the VM does, so the inline `??` literals below
-        // are hoisted and shared instead of being built twice.
-        var game = new GameClock(clock, gameStart ?? clock.UtcNow);
-        var shiftInstance = shift ?? new TaxiShift();
-        var shiftStoreInstance = shiftStore ?? new FakeShiftStore();
-        var contentSource = new FakeContentSource(content ?? EmptyContent);
-        var logger = log ?? new NullLogger();
-        var cityInstance = city ?? new CityEconomy(board.Stores, CityRules.Default);
-        var cityStoreInstance = cityStore ?? new FakeCityStore();
-        var roadsInstance = roads ?? TestRoadCars.Ledger();
-        var roadTestStoreInstance = roadTestStore ?? new FakeRoadTestStore();
-        var clockStoreInstance = clocks ?? new FakeGameClockStore();
-        var driverStoreInstance = driverStore ?? new FakeDriverStore();
-        var streakInstance = new DailyStreak(clock, savedDriver);
-        // Production seeds the interim zone length from the placeholder map
-        // (App.OnStartup), so the starter bonus decays the same way.
-        var zoneInstance = new OperatingZone(savedDriver, seed: 0, AddressBook.MapLengthKm(map));
-        var pool = cars ?? TestRoadCars.Pool;
-        var shiftsInstance = shifts ?? new ShiftRecord(savedDriver);
-        var hungerInstance = hunger ?? new Hunger(HungerRules.Default);
-        var hungerStoreInstance = hungerStore ?? new FakeHungerStore();
-        var garageStoreInstance = garageStore ?? new FakeGarageStore();
-        var jobsInstance = jobs ?? new JobLedger(savedDriver);
-        var saver = new GameStateSaver(
-            clock, game, clockStoreInstance, driverStoreInstance, garageStoreInstance,
-            cityStoreInstance, hungerStoreInstance, roadTestStoreInstance, shiftStoreInstance,
-            walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
-            cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance, jobsInstance);
-        var fleet = new FleetService(
-            garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
-            brands, contentSource);
-        var faresInstance = FareTable.Default;
-        var taxiRulesInstance = taxiRules ?? TaxiRules.Default;
-        var deliveryFaresInstance = deliveryFares ?? DeliveryFareTable.Default;
-        var rarityInstance = rarity ?? new FakeCarRarity();
-        var rivalsInstance = rivals ?? new FakeRivals();
-        var brandMileageInstance = brandMileage ?? new FakeBrandMileageStore();
-        var telemetryInstance = telemetry ?? new FakePlayerTelemetry();
-        var meter = new TaxiDriveMeter(taxiRulesInstance.MaxMeterSpeedKmh);
-        var breakdownsInstance = new TripBreakdowns(
-            breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
-            garageInstance, onboardingStore, walletInstance, rivalsInstance, saver, beat, logger);
-        var settlement = new JobSettlement(
-            walletInstance, garageInstance, shiftInstance, zoneInstance, jobsInstance,
-            streakInstance, clock, fleet, rarityInstance, friendsInstance,
-            brandMileageInstance, telemetryInstance, rivalsInstance, deliveryBoard,
-            deliveryCareer, cityInstance, deliveryFaresInstance, meter,
-            faresInstance, taxiRulesInstance, beat, hud, logger);
-        var shops = new ShopInteriors(
-            walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver, beat, logger);
-        var spawnerInstance = poiSpawner ?? new PoiSpawner(
-            map, PoiCatalog.Default,
-            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0);
-        // The session calendar and the readout formatter: the week the pages
-        // stamp, the shift timeout that opens its page and the painted strings.
-        // One board instance for the cycle and the assertions, like the stores.
-        IShiftStandings shiftBoard = shiftStandings ?? new FakeShiftStandings();
-        var dayCycle = new DayCycle(
-            game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
-            profiles, rivalsInstance, saver, beat, startWeek, logger);
-        var readouts = new TelemetryReadouts();
-        var poiWorld = new PoiWorld(
-            spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
-            cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
-            onboardingStore, shops, dayCycle, logger);
-        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(handlers));
-        var proposalsInstance = TaxiTestData.Proposer(map: map, seed: 0);
-        var taxi = new TaxiJobFlow(
-            proposalsInstance, map, brands, pool, requests,
-            requestTable ?? CustomerRequestTable.Empty, police,
-            taxiRulesInstance, faresInstance, garageInstance, walletInstance,
-            friendsInstance, fleet, game, clock, beat, meter, saver, rivalsInstance,
-            breakdownsInstance, hud, logger);
-        var delivery = new DeliveryFlow(
-            deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
-            breakdownsInstance, beat, logger);
-        // The page graph shares the one shell the VM binds: the tests assert
-        // vm.CurrentScreen, so both must report the same panel.
-        var shell = new OverlayShell();
-        var navigation = new Navigation(
-            shell, beat, game, clock, shiftInstance, TodoTable.Default, roadsInstance,
-            saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
-            hungerInstance, storeCatalogInstance, directory, hud, deliveryBoard,
-            deliveryCareer, cityInstance, taxi, delivery, poiWorld, dayCycle, logger);
-        var vm = new MainViewModel(tel, clock, game, shiftInstance, store,
-            logger, faresInstance,
-            onboardingStore, contentSource,
-            profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
-            voice ?? new FakeVoiceListener(available: false),
-            brands, deliveryBoard, deliveryCareer,
-            deliveryFaresInstance,
-            cityInstance,
-            beat, walletInstance,
-            streakInstance,
-            zoneInstance,
-            friendsInstance, pool,
-            rivalsInstance,
-
-            telemetryInstance,
-            hungerInstance,
-            garageInstance,
-            InsuranceRules.Default,
-            rng ?? new Random(0),
-            pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
-            directory, directoryStore,
-            preferencesStore ?? new FakePreferencesStore(),
-            preferences ?? PlayerPreferences.Default,
-            culture ?? new FakeCultureService(),
-            trunkInstance, taxiRulesInstance, saver, fleet, settlement, shell,
-            meter, shops, taxi, delivery, poiWorld, poiArrivals, navigation,
-            readouts, dayCycle, hud,
-            saveResets, restarter);
-        if (carKsId is not null)
-        {
-            // The watcher thread lands via the dispatcher, which runs inline
-            // headless: the VM now follows the announced car like live.
-            brands.Fire("test", announced);
-        }
-        return (vm, clock, tel, store);
-    }
-
-    // The real career opens these through the street/job thresholds; the flow
-    // tests need the doors up front, so the test directory carries one fixed
-    // door per generated family (same display names the Unity rows use).
-    private static void SeedTestBusinesses(PoiDirectory directory, AddressMap map)
-    {
-        int house = 1;
-        foreach (PoiDefinition definition in PoiCatalog.Default)
-        {
-            if (definition.Spawn is null)
-            {
-                continue;
-            }
-
-            int number = Math.Min(house++, HouseNumberPlan.Count(map.Streets[0], map));
-            directory.Add(new PointOfInterest(
-                definition.Id, definition.Name,
-                new AddressLocation(
-                    map.Streets[0].Name, number, HouseNumberPlan.SideOf(number)),
-                definition.Type));
-        }
-    }
+            SpeedKmh = speedKmh,
+            Progress = progress,
+            Catalog = catalog,
+            Hubs = hubs,
+            Log = log,
+            Career = career,
+            Roads = roads,
+            Clocks = clocks,
+            StartWeek = startWeek,
+            GameStart = gameStart,
+            RoadTestStore = roadTestStore,
+            City = city,
+            CityStore = cityStore,
+            Wallet = wallet,
+            DriverStore = driverStore,
+            Friendships = friendships,
+            Cars = cars,
+            CarKsId = carKsId,
+            CarPreset = carPreset,
+            BrandMileage = brandMileage,
+            Rivals = rivals,
+            DeliveryFares = deliveryFares,
+            SavedDriver = savedDriver,
+            Hunger = hunger,
+            HungerStore = hungerStore,
+            Garage = garage,
+            GarageStore = garageStore,
+            Breakdowns = breakdowns,
+            Rng = rng,
+            Content = content,
+            Profile = profile,
+            ProfileStore = profileStore,
+            AddressMap = addressMap,
+            DetectedName = detectedName,
+            PreferencesStore = preferencesStore,
+            Preferences = preferences,
+            Culture = culture,
+            Pois = pois,
+            Hud = hud,
+            Voice = voice,
+            Trunk = trunk,
+            PoiHandlers = poiHandlers,
+            PoiDirectory = poiDirectory,
+            PoiStore = poiStore,
+            PoiSpawner = poiSpawner,
+            Jobs = jobs,
+            Onboarding = onboarding,
+            TaxiRules = taxiRules,
+            Requests = requests,
+            RequestTable = requestTable,
+            Police = police,
+            Rarity = rarity,
+            Telemetry = telemetry,
+            Shifts = shifts,
+            ShiftStandings = shiftStandings,
+            PlayerNames = playerNames,
+            Shift = shift,
+            ShiftStore = shiftStore,
+            SaveResets = saveResets,
+            Restarter = restarter,
+            StoreCatalog = storeCatalog,
+            Clock = clock,
+            CarBrands = carBrands,
+            Physics = physics,
+        });
 
     // The production way into a business: HOME → ADDRESSES, pin the row, then
     // ENTER on the companion while parked at the cached destination.
@@ -1854,7 +1730,7 @@ public sealed class MainViewModelTests
                 .Spawn(PoiCatalog.MaxGroceryId)!;
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud);
 
@@ -1870,7 +1746,7 @@ public sealed class MainViewModelTests
         var poiStore = new FakePoiDirectoryStore();
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, poiStore: poiStore);
 
@@ -1895,7 +1771,7 @@ public sealed class MainViewModelTests
     {
         var onboarding = new FakeOnboardingStore();
         var (first, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             onboarding: onboarding);
 
@@ -1908,7 +1784,7 @@ public sealed class MainViewModelTests
 
         var hud = new FakeTelemetryHud();
         var (second, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             // A different seed proves the banked address wins over a fresh draw.
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 99),
             hud: hud, onboarding: onboarding);
@@ -1928,7 +1804,7 @@ public sealed class MainViewModelTests
         var log = new TestLog();
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud,
             log: log);
@@ -1953,7 +1829,7 @@ public sealed class MainViewModelTests
         var onboarding = new FakeOnboardingStore();
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, onboarding: onboarding, career: career);
 
@@ -1980,7 +1856,7 @@ public sealed class MainViewModelTests
             JustinPickedUp: true, AnnabellaPickedUp: true, PancakesDone: true,
             MaxErrandDone: true, CommunityCentreDone: true);
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue, progress: progress,
+            content: TestSession.OneLineDialogue, progress: progress,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, onboarding: onboarding, career: career);
 
@@ -2027,7 +1903,7 @@ public sealed class MainViewModelTests
         });
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, onboarding: onboarding, career: career,
             progress: onboarding.State);
@@ -2047,7 +1923,7 @@ public sealed class MainViewModelTests
     {
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud);
 
@@ -2076,7 +1952,7 @@ public sealed class MainViewModelTests
         var drivers = new FakeDriverStore();
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, wallet: wallet, cars: pool, garage: garage,
             driverStore: drivers);
@@ -2139,7 +2015,7 @@ public sealed class MainViewModelTests
     {
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud);
 
@@ -2166,7 +2042,7 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         var onboarding = new FakeOnboardingStore();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, onboarding: onboarding);
 
@@ -2200,7 +2076,7 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, wallet: wallet, cars: pool, garage: garage, trunk: trunk);
 
@@ -2231,7 +2107,7 @@ public sealed class MainViewModelTests
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, wallet: wallet, cars: pool, garage: garage);
 
@@ -2261,7 +2137,7 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk);
 
@@ -2281,7 +2157,7 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         var onboarding = new FakeOnboardingStore();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, onboarding: onboarding, progress: ErrandDone);
         vm.ShowDialogue();
@@ -2309,7 +2185,7 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         var onboarding = new FakeOnboardingStore();
         var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-2", 5);
-        var content = OneLineDialogue with
+        var content = TestSession.OneLineDialogue with
         {
             PancakeDialogue = [new DialogueLine("GRANDMA", "Pancakes!")],
             CommunityCentreDialogue =
@@ -2431,7 +2307,7 @@ public sealed class MainViewModelTests
             MaxStoreId: "max-grocery", MaxStoreAddress: address);
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            progress: progress, hud: hud, content: OneLineDialogue,
+            progress: progress, hud: hud, content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5));
 
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
@@ -2453,7 +2329,7 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress);
 
@@ -2476,7 +2352,7 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-2", 5);
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress, profile: profile);
 
@@ -2503,7 +2379,7 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress);
 
@@ -2524,7 +2400,7 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-2", 5);
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, profile: profile, progress: ErrandDone);
 
@@ -2546,7 +2422,7 @@ public sealed class MainViewModelTests
             null, null, BirthdayDone: true, JustinAddress: stored, MaxErrandDone: true);
         var hud = new FakeTelemetryHud();
         var (vm, _, _, _) = Create(
-            content: OneLineDialogue,
+            content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress);
 

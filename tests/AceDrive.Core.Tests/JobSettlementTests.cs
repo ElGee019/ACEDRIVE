@@ -112,7 +112,7 @@ public sealed class JobSettlementTests
         };
         var fleet = new FleetService(
             garage, [], game, wallet, InsuranceRules.Default, new NullLogger(),
-            brands, new FakeContentSource(MainViewModelTests.EmptyContent));
+            brands, new FakeContentSource(TestSession.EmptyContent));
         var zone = new OperatingZone(null, seed: 0);
         var jobs = new JobLedger();
         var online = new FakePlayerTelemetry();

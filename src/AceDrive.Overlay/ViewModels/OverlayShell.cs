@@ -40,6 +40,13 @@ public sealed class OverlayShell : ViewModelBase
     /// </summary>
     public DateTime LastActivity { get; private set; }
 
+    /// <summary>
+    /// True once the panel has been visible at any point this session. The
+    /// first show of a hidden start reveals the page already built; every
+    /// later call opens the menu, and this latch is what tells the two apart.
+    /// </summary>
+    public bool HasBeenShown { get; private set; }
+
     /// <summary>Raised after the page changed, for the state derived from it.</summary>
     public event EventHandler? ScreenChanged;
 
@@ -50,10 +57,18 @@ public sealed class OverlayShell : ViewModelBase
     public void Reveal(object screen)
     {
         CurrentScreen = screen;
-        IsShown = true;
+        SetShown(true);
     }
 
-    public void SetShown(bool shown) => IsShown = shown;
+    public void SetShown(bool shown)
+    {
+        if (shown)
+        {
+            HasBeenShown = true;
+        }
+
+        IsShown = shown;
+    }
 
     public void RecordActivity(DateTime now) => LastActivity = now;
 }

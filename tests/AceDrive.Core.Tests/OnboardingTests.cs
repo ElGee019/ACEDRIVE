@@ -1,4 +1,3 @@
-using System.Globalization;
 using AceDrive.Core;
 using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.Services;
@@ -28,111 +27,19 @@ public sealed class OnboardingTests
         OnboardingState? start = null, FakeClock? clock = null,
         FakeProfileStore? profiles = null, FakeOnboardingStore? onboarding = null)
     {
-        CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var store = onboarding ?? new FakeOnboardingStore();
         if (start is not null) store.Save(start);
-        clock ??= new FakeClock();
-        // One instance per service graph: the saver and the fleet share the
-        // stores and state the VM gets (the root builds them the same way).
-        var game = new GameClock(clock, clock.UtcNow);
-        var shift = new TaxiShift();
-        var shiftStore = new FakeShiftStore();
-        var contentSource = new FakeContentSource(Content);
-        var logger = new NullLogger();
-        var city = new CityEconomy([], CityRules.Default);
-        var cityStore = new FakeCityStore();
-        var roads = new RoadTestLedger([], seed: 0);
-        var roadTestStore = new FakeRoadTestStore();
-        var clockStore = new FakeGameClockStore();
-        var wallet = new DriverWallet();
-        var driverStore = new FakeDriverStore();
-        var streak = new DailyStreak(clock, null);
-        var zone = new OperatingZone(null, seed: 0);
-        IReadOnlyList<CarSpec> cars = [];
-        var garage = new Garage([]);
-        var garageStore = new FakeGarageStore();
-        var hunger = new Hunger(HungerRules.Default);
-        var hungerStore = new FakeHungerStore();
-        var shifts = new ShiftRecord(null);
-        var jobs = new JobLedger();
-        var trunk = new Trunk();
-        var carBrands = new FakeCarBrandSource();
-        var beat = new VoiceBeat(clock);
-        var fares = FareTable.Default;
-        var taxiRules = TaxiRules.Default;
-        var catalog = DeliveryCatalog.Default;
-        var career = HubCareerShell();
-        var deliveryFares = DeliveryFareTable.Default;
-        var friendships = new FakeFriendshipStore();
-        var brandMileage = new FakeBrandMileageStore();
-        var rivals = new FakeRivals();
-        var rarity = new OfflineCarRarity();
-        var playerTelemetry = new OfflinePlayerTelemetry();
-        var saver = new GameStateSaver(
-            clock, game, clockStore, driverStore, garageStore, cityStore,
-            hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
-            garage, city, hunger, roads, shift, shifts, jobs);
-        var fleet = new FleetService(
-            garage, cars, game, wallet, InsuranceRules.Default, logger, carBrands, contentSource);
-        var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
-        var deliveryBoard = new DeliveryBoard(catalog);
-        var breakdowns = new TripBreakdowns(
-            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
-            garage, store, wallet, rivals, saver, beat, logger);
-        var settlement = new JobSettlement(
-            wallet, garage, shift, zone, jobs, streak, clock, fleet, rarity,
-            friendships, brandMileage, playerTelemetry, rivals, deliveryBoard, career,
-            city, deliveryFares, meter, fares, taxiRules, beat, null, logger);
-        var shops = new ShopInteriors(
-            wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
-        var poiDirectory = new PoiDirectory();
-        var poiStore = new FakePoiDirectoryStore();
-        var dayCycle = new DayCycle(
-            game, shift, shifts, new OfflineShiftStandings(), playerTelemetry,
-            profiles ?? new FakeProfileStore(), rivals, saver, beat, 1, logger);
-        var poiWorld = new PoiWorld(
-            new PoiSpawner(
-                AddressMap.Default, PoiCatalog.Default,
-                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            poiDirectory, poiStore, deliveryBoard, career, city, StoreCatalog.Default,
-            zone, jobs, store, shops, dayCycle, logger);
-        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers());
-        var proposals = TaxiTestData.Proposer();
-        var taxi = new TaxiJobFlow(
-            proposals, AddressMap.Default, carBrands, cars, null,
-            CustomerRequestTable.Empty, null, taxiRules, fares, garage, wallet,
-            friendships, fleet, game, clock, beat, meter, saver, rivals, breakdowns,
-            null, logger);
-        var delivery = new DeliveryFlow(
-            deliveryBoard, career, city, friendships, meter, breakdowns, beat, logger);
-        var shell = new OverlayShell();
-        var navigation = new Navigation(
-            shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
-            wallet, garage, rivals, trunk, hunger, StoreCatalog.Default,
-            poiDirectory, null, deliveryBoard, career, city,
-            taxi, delivery, poiWorld, dayCycle, logger);
-        return new MainViewModel(new FakeTelemetry(), clock, game, shift,
-            new FakeStore(), logger, fares,
-            store, contentSource,
-            profiles ?? new FakeProfileStore(), new OfflinePlayerNameRegistry(),
-            AddressMap.Default, "ElGee",
-            new FakeVoiceListener(available: false),
-            carBrands, deliveryBoard, career,
-            deliveryFares,
-            city, beat, wallet,
-            streak, zone,
-            friendships, cars,
-            rivals,
-            playerTelemetry,
-            hunger,
-            garage, InsuranceRules.Default,
-            new Random(0),
-            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
-            poiDirectory, poiStore,
-            new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
-            taxi, delivery, poiWorld, poiArrivals, navigation,
-            new TelemetryReadouts(), dayCycle);
+        // The walk suite's session: an empty career and the smallest content
+        // that can carry the pages, driven through the shared builder.
+        var (vm, _, _, _) = MainViewModelTests.Create(
+            clock: clock, onboarding: store, profileStore: profiles,
+            content: Content, cars: [], garage: new Garage([]),
+            city: new CityEconomy([], CityRules.Default),
+            roads: new RoadTestLedger([], seed: 0),
+            shiftStandings: new OfflineShiftStandings(),
+            rarity: new OfflineCarRarity(),
+            telemetry: new OfflinePlayerTelemetry());
+        return vm;
     }
 
     // The first-run page (unit + language) sits before the name form; its

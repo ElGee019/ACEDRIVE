@@ -38,11 +38,16 @@ Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean)
 | S3 | POI growth/doors/handlers → `PoiWorld` + `IPoiWorldHost`, −146 lines |
 | S4 | Pages → `Navigation` + `INavigationHost`; the control/menu/calendar caches and the bought-car choice, −291 lines |
 | S5 | Readouts → `TelemetryReadouts` + `ReadoutPaint`; day flip, week and shift timeout → `DayCycle` + `IDayCycleHost`; the week's mirror in `Navigation` and the host getter in `PoiWorld` go with it, −155 lines |
+| S6 | The composition root builds the whole DAG: `PanelPresenter` + `StoryHost`, `OnboardingFlow` and `VoiceRouter` (which loses `IVoiceHost`) are root-built; `MainViewModel` takes the finished graph, −184 lines |
 
-`MainViewModel`: 2658 → 1151 lines. `Poll` is 46 code lines (160 with its
+`MainViewModel`: 2658 → 967 lines. `Poll` is 46 code lines (160 with its
 rationale): what is left is the idle-hide policy, the world ticks (city,
-hunger, insurance), the wall-clock bank and the telemetry feed. The target
-coordinator is roughly 500.
+hunger, insurance), the wall-clock bank and the telemetry feed. The coordinator
+weighs more than the 500 the split targeted: the world ticks need their own
+state (`GameClock`, `CityEconomy`, `Hunger`, `Garage`, `DeliveryBoard`,
+`DeliveryCareer`, `DriverWallet`, `DailyStreak`, `OperatingZone`, `Random`), so
+the constructor landed at 39 named parameters rather than 20. Moving those
+would be a `WorldTicks` slice of its own, not a rewrite of this one.
 
 ## 3. Target shape
 
@@ -64,9 +69,10 @@ coordinator is roughly 500.
    │               │              │                                 │
    │          Navigation ─────────┼─────────────────────────────────┤
    │               │              │                                 │
-   │        OnboardingFlow    VoiceRouter  ◄──── OverlayShell + brand/content
-   │        (IStoryHost ← Navigation + saver)   (IVoiceHost ← shell + flows)
-   │
+   │          PanelPresenter ─────┤  (call / reveal / hide policy)  │
+   │               │              │                                 │
+   │          StoryHost ──► OnboardingFlow     VoiceRouter         │
+   │                                                 │              │
    └────────────► MainViewModel  (lifecycle, poll, intent routing, readouts)
 ```
 
@@ -89,8 +95,10 @@ coordinator. Pages take commands from the domain that owns them.
 | `JobSettlement` ✅ | — | `SettleTaxiRide`, `SettleDeliveryRun` | `IJobSettlementHost` |
 | `ShopInteriors` ✅ | — | `Bank`, `Dealer`, `CarWash`, `Mechanic`, `Insurance` | none |
 | `FleetService` ✅, `GameStateSaver` ✅ | their own | — | none |
-| `OnboardingFlow` (exists) | walk progress | — | `IStoryHost` ← `Navigation` + `GameStateSaver` |
-| `VoiceRouter` (exists) | mute/beat state | — | `IVoiceHost` ← `OverlayShell` + content + watcher + `TaxiJobFlow.InProgress` |
+| `PanelPresenter` ✅ | — (`_introShown` became `OverlayShell.HasBeenShown`) | `Show`, `Hide`, `Present`, `PresentJob`, `ShowMenu`, `RecordActivity`, `IsShown`, `CurrentScreen` | none: it *is* the reporting host for the panel |
+| `StoryHost` ✅ | — | the `IStoryHost` members | `IStoryHost` ← `Navigation` + `PanelPresenter` + `GameStateSaver` |
+| `OnboardingFlow` ✅ | walk progress, profile, errand POI | pages + `Done`/`Intro*` | `IStoryHost` |
+| `VoiceRouter` ✅ | mute state | `Handle`, `ResetMute` | none: `PanelPresenter` + `ICarBrandSource` + `IContentSource` (the `IVoiceHost` interface is deleted) |
 
 ## 4. What the coordinator keeps
 
@@ -99,18 +107,22 @@ After the split `MainViewModel` is a coordinator, not an owner:
 - lifecycle: `Start`, `Poll`, `Dispose`, the timer;
 - the 10 Hz loop: feed the meter, tick `TaxiJobFlow`, tick `DayCycle`, apply
   `ReadoutPaint` — 46 code lines, not 229;
-- intent routing: `OnVoiceHeard`, `OnCarBrand`, the hotkey/toggle, POI `ENTER`;
-- panel policy: the mid-job call gate (reads `TaxiJobFlow.InProgress`), which
-  page a call opens, `Present`/`Hide`;
+- intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
+- the panel policy's *call sites*: the navigator's page reports route into
+  `PanelPresenter`, which owns the mid-job call gate, which page a call opens
+  and `Present`/`Hide` (S6 moved the policy off the coordinator so the story
+  flow and the voice router could be root-built);
 - session plumbing that is genuinely view-owned: settings store, save-data
   reset, app restart, HUD wiring, `SkipShutdownSave`;
 - the bindable readout properties (the target of `ReadoutPaint`).
 
-Target constructor: ~15–20 parameters, all collaborators plus the view-owned
-bits (`ITelemetrySource`, `IClock`, `ILog`, `ITelemetryHud`, `ISettingsStore`,
-`ISaveDataResetter`, `IAppRestarter`, `IContentSource`, `AddressMap`,
-`IVoiceListener`). No `MainViewModelDependencies` god record: each collaborator
-takes its own dependencies, which is what makes it testable.
+Constructor: 39 parameters (36 required, 3 optional), all of them finished services — the root does
+every `new`. No `MainViewModelDependencies` god record: each collaborator takes
+its own dependencies, which is what makes it testable. The number stayed above
+the original ~20 estimate because §4's world ticks read their own state
+(`GameClock`, `CityEconomy`, `Hunger`, `Garage`, `DeliveryBoard`,
+`DeliveryCareer`, `DriverWallet`, `DailyStreak`, `OperatingZone`, `Random`);
+grouping those is a `WorldTicks` slice, not a constructor rewrite.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -129,16 +141,21 @@ stores + saved state
           └ DeliveryFlow (board, career, city, meter, breakdowns)
           └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
               └ Navigation (flows' pages, page data, saver, DayCycle's week)
-                  └ OnboardingFlow (Navigation, saver)
-                  └ VoiceRouter (shell, brand, content, TaxiJobFlow)
-                      └ MainViewModel (all of the above)
+                  └ PanelPresenter (shell, pages, the two flows' InProgress)
+                      └ StoryHost (panel, pages, saver, standings)
+                          └ OnboardingFlow (story host, pages, brand, week)
+                          └ VoiceRouter (panel, brand source, content, HUD)
+                              └ MainViewModel (all of the above)
 ```
 
 `PoiArrivalRouter` is built in the root right after `PoiWorld`, from
 `PoiWorld.Handlers(...)`; the store handler still comes in from the root.
 `Navigation` reports back to `MainViewModel` through `INavigationHost`, the
 same late `Attach` the four flows use, and reads the display week off
-`DayCycle` instead of keeping a mirror of it.
+`DayCycle` instead of keeping a mirror of it. The story flow and the voice
+router are root-built too: they take `PanelPresenter`/`StoryHost` instead of
+the coordinator, so nothing but `MainViewModel`'s own late `Attach`s remains
+coordinator-assembled.
 
 ## 6. Extraction sequence
 
@@ -239,33 +256,49 @@ page); the second cannot move to the navigator without closing a cycle
   cycle's, so it builds it and the host only reveals it — the same split
   `IJobSettlementHost.ShowReceipt` already uses.
 
-**S6 — `App.OnStartup` rewrite.** Build the DAG above, delete the 195-line
-constructor's parameter list, collapse the test builders to named collaborators.
+**S6 — `App.OnStartup` rewrite.** ✅ (−184 lines in the coordinator): the root
+now builds the whole DAG, including `PanelPresenter`, `StoryHost`,
+`OnboardingFlow` and `VoiceRouter`; `MainViewModel` takes the finished graph and
+news up nothing. The three test builders collapsed into `TestSession`.
+*Unblocked:* the coordinator constructs nothing (the two host reads are
+root-assembled), and the constructor lost the story's 20-odd parameters
+(`IOnboardingStore`, `IContentSource`, profiles, name registry, `PoiGenerator`,
+directory + store, `PoiArrivalRouter`, `Trunk`, preference store + preferences,
+culture, `FareTable`, `InsuranceRules`, `IFriendshipStore`, delivery fares,
+`TaxiDriveMeter`, `ShopInteriors`).
+*Deviations:*
+- A `PanelPresenter` owns the call gate, the first-show rule and
+  `Present`/`Hide`; the story flow and the voice router both need them before
+  the coordinator exists. The latch that used to be the coordinator's
+  `_introShown` moved to `OverlayShell.HasBeenShown` (it is a fact about the
+  panel, not a policy).
+- `IVoiceHost` is deleted: `VoiceRouter` takes `PanelPresenter`,
+  `ICarBrandSource`, `IContentSource`, the HUD, the clock and the log directly,
+  which is the option §6 left open.
+- The brand moved into `ICarBrandSource` (`Brand`; the watcher already owned the
+  identity). The coordinator now only logs the transition instead of mirroring
+  the field, so the UI thread reads the source's volatile brand.
+- The panel stays a coordinator *call site* only: `Show`/`Hide`/
+  `RecordActivity`/`IsShown`/`CurrentScreen` forward to the presenter; the idle
+  countdown still lives in `Poll` and reads `OverlayShell.LastActivity`.
+- 39 constructor parameters, not 15-20: the world ticks (§4) keep their own
+  state. See §2 for the `WorldTicks` note.
+- `RoadTestDayOfWeek` was dead on the coordinator; `Brands` only fed the
+  deleted host, and `CarBrand`/`CarIdentity` were mirrors of the watcher, which
+  the flow, the voice router and the haul now read directly.
 
-### Host implementations after S5
+### Host implementations after S6
 
-The navigator and the calendar exist, so the reads are close to place:
+The reads now live with their owners:
 
-- `IStoryHost` — `Navigation` supplies `ControlScreen`/`MenuScreen`/
-  `ShowScreen`/`ShowMenu`, `OverlayShell` supplies `CurrentScreen`/`IsShown`/
-  `Present`/`Hide`, and `GameStateSaver` supplies `SaveDriver`. Until the S6
-  rewrite the coordinator still assembles them.
-- `IStoryHost`'s remaining gap is `Present`/`Hide`: they carry the reveal
-  policy (`_introShown`, the log lines), so they stay with the coordinator —
-  the same panel policy §4 keeps there.
-- `IVoiceHost` — `OverlayShell` supplies `IsShown`/`CurrentScreen`/`Show`/
-  `RecordActivity` once the call gate reads `TaxiJobFlow.InProgress`,
-  `IContentSource` supplies `Content`, `ICarBrandSource` supplies `CarBrand`.
-- `INavigationHost` — the navigator's own reports stay (the settings page, the
-  haul settle, the readout refresh); a shift that already timed out is a
-  one-liner into `DayCycle.EndShift`, which builds its own page.
-- `IDayCycleHost` — nothing to assemble in S6: its four members are the
-  coordinator's own panel policy and page routing.
-
-If assembling those reads into a host object is not worth a file, `VoiceRouter`
-can take the four dependencies directly and `IVoiceHost` is deleted; the
-interface exists only to keep the router off the coordinator's surface. Decide
-in S6, when the root assembles it.
+- `IStoryHost` — `StoryHost` composes `Navigation` (pages), `PanelPresenter`
+  (reveal/hide), `GameStateSaver` + `IRivalsService` (the shared driver save).
+- `IVoiceHost` — deleted; `VoiceRouter` takes its six collaborators directly
+  (panel, brand source, content, HUD, clock, log).
+- `INavigationHost` — unchanged (settings page, haul settle, readout refresh,
+  timed-out shift into `DayCycle.EndShift`).
+- `IDayCycleHost` — unchanged; its four members are the coordinator's panel
+  call sites and page routing.
 
 ## 7. Rules for every slice
 
@@ -301,6 +334,12 @@ in S6, when the root assembles it.
   week roll, the countdown guard and the timeout page through
   `FakeDayCycleHost`; the paint record through direct calls (there is nothing
   to fake, and the assertions are the returned strings).
+- S6 collapsed the three duplicated graphs into `TestSession` (see
+  `TestSessionOptions`): every suite builds the *same* session the root builds,
+  with named collaborators and fakes, so a constructor change fans out once.
+  `FakeCarBrandSource` owns the primed brand the watcher would publish, and the
+  builder primes it (`Start` does that in production) so voice tests can speak
+  the wake word without a lifecycle call.
 
 ## 9. Open decisions
 
@@ -330,21 +369,26 @@ in S6, when the root assembles it.
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5 is green locally.
-`MainViewModel` 1151 lines (was 1306), −155 lines: the readout formatting and
-its seven caches, the day flip, the display week, the shift countdown and the
-shift-end path left, along with `_lastDay`, `_displayWeek`, `_lastShiftSecs`,
-`_shifts`, `_shiftBoard` and the readout sentinels. 1701 tests green (+14:
-`DayCycleTests`, `TelemetryReadoutsTests`).
+State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5 and S6 are green
+locally. `MainViewModel` 967 lines (was 1151 after S5), −184 lines: the story
+flow's 20-odd construction parameters, the voice router construction, the panel
+policy and the brand mirror left. The flow and the router stay as collaborators
+— nothing in the class builds one. The injected field list shrank 46 → 40
+(`_fares`, `_friends`, `_meter`, `_shops`, `_content`, `_deliveryFares` and
+`_insuranceRules` left; `_panel` arrived), and the constructor lost 19
+parameters. 1701 tests green (count unchanged: S6 is a composition slice, and
+the three duplicated test graphs collapsed into `TestSession`).
 
-Next: **S6 — the `App.OnStartup` rewrite.** Build the DAG above (it is all
-root-built except `OnboardingFlow`/`VoiceRouter`), delete the 195-line
-constructor's parameter list, and collapse the test builders to named
-collaborators. `MainViewModel` should end near 500 lines; what is left is
-lifecycle, `Poll`'s world ticks, intent routing and panel policy.
-*Unblocks:* the coordinator constructs nothing (the two host reads `IStoryHost`
-and `IVoiceHost` get assembled in the root), and the tests build a session from
-the same named collaborators instead of a 50-argument call.
+Next: the split plan is complete. Candidates the slices left behind:
+- **`WorldTicks`** (§4): the city/hunger/insurance ticks plus their state
+  (`GameClock`, `CityEconomy`, `Hunger`, `Garage`, `DeliveryBoard`,
+  `DeliveryCareer`, `DriverWallet`, `DailyStreak`, `OperatingZone`, `Random`)
+  would take the constructor from 39 to ~22 and `Poll` to the meter edge.
+- **`OnCarHaul`** (open decision 2) is the last job type still living in the
+  coordinator.
+- `MainViewModel`'s onboarding forwarding (`ChooseBrand`/`ChooseCar`/
+  `ShowDialogue`/`FinishDialogue` + the three flags) exists for the tests now
+  that the view binds only `CurrentScreen`; it can move behind `_story`.
 
 Working agreements earned so far:
 
@@ -353,18 +397,21 @@ Working agreements earned so far:
   can fire. `PoiWorld` joins that list: its arrival delegates only read the
   host when a door is entered. `Navigation` joins it too, for the four entries
   that are not pages. `DayCycle` joins it for the shift-end page it builds.
+  The story flow and the voice router are the exception: their host reads are
+  root-built objects (`StoryHost`, `PanelPresenter`), so they take no late
+  edge at all.
 - A collaborator that only *produces* a page takes no host at all:
   `TripBreakdowns.Interrupt` charges the tow and returns the page, and the
   caller's own host puts it up with its own BACK command. The opposite case
   (`DayCycle`'s shift-ended page) takes one report for its CONTINUE instead, so
-  the page stays the cycle's and the panel policy stays the coordinator's.
+  the page stays the cycle's and the panel policy stays the presenter's.
 - Collaborators take the saver, watcher and rivals directly; the host only
   reports (page, saves, readouts). A stop's door is asked as
   `bool PinStop(leg)` — reporting plus a degrade signal, never a host getter.
 - Pages are built by one collaborator and cached there; the coordinator keeps
-  only the panel policy (`Present`/`Hide`, the mid-job call gate, which page a
-  call opens) and routes its own page swaps through `Navigation.ShowScreen`,
-  the one beat-cancelling seam.
+  only the panel *call sites* (`PanelPresenter` owns `Present`/`Hide`, the
+  mid-job call gate and which page a call opens) and routes its own page swaps
+  through `Navigation.ShowScreen`, the one beat-cancelling seam.
 - A page whose domain belongs elsewhere is a report on the host, not a builder
   in the navigator: the settings page (story flow + RESET GAME), the haul
   settle (a job) and a shift that already timed out (`DayCycle.EndShift`).

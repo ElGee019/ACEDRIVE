@@ -7,13 +7,17 @@ using AceDrive.Overlay.Services;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// All overlay behaviour. Dependencies are constructor-injected (DIP);
-/// time, telemetry, logging and fares are abstracted so every flow is
-/// unit-testable with fakes. Knows NOTHING about HWNDs or files.
+/// The session coordinator: lifecycle, the 10 Hz poll, intent routing and the
+/// panel policy's call sites. Every collaborator is injected — the composition
+/// root (<c>App.OnStartup</c>) builds the whole graph, including the
+/// introduction flow and the voice router, so this class news up nothing.
+///
+/// Time, telemetry, logging and fares stay abstracted behind interfaces so the
+/// flows are unit-testable with fakes. Knows NOTHING about HWNDs or files.
 /// </summary>
 public sealed class MainViewModel
-    : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost,
-      IDeliveryHost, IPoiWorldHost, INavigationHost, IDayCycleHost, IDisposable
+    : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
+      IPoiWorldHost, INavigationHost, IDayCycleHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -27,11 +31,17 @@ public sealed class MainViewModel
     private readonly JobSettlement _settlement;
     // The panel, the page it shows and the activity stamp.
     private readonly OverlayShell _shell;
-    // The five shop interiors: assembly only, the banking callbacks included.
-    private readonly ShopInteriors _shops;
+    // What a call and a reveal do to that panel: one owner for the first-show
+    // rule and the mid-job gate (the story flow and the voice router use it).
+    private readonly PanelPresenter _panel;
     // The taxi job from proposal to receipt: owns the job, the request and the
     // patrols; the shell's half arrives through ITaxiJobHost.
     private readonly TaxiJobFlow _taxi;
+    // The delivery run from DELIVER to receipt: owns the live run and the board
+    // page; the panel, the HUD line and the settle arrive through IDeliveryHost.
+    private readonly DeliveryFlow _delivery;
+    // The POI world: the business/store/hub doors and the arrival handlers.
+    private readonly PoiWorld _poiWorld;
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
@@ -42,11 +52,9 @@ public sealed class MainViewModel
     private readonly ISaveDataResetter? _saveResets;
     private readonly IAppRestarter? _restarter;
     private readonly ILog _log;
-    private readonly FareTable _fares;
     private readonly DriverWallet _wallet;
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
-    private readonly IFriendshipStore _friends;
     // XP world standings backend (PORTPLAN 60, Unity RivalsService): the
     // receipt's rivals block reads through it on every settle.
     private readonly IRivalsService _rivals;
@@ -54,24 +62,19 @@ public sealed class MainViewModel
     // Unity CarRarityService): reads are cached, the km write is fire-and-forget.
     // Zone, best-shift and country pushes (Unity FirestoreService + CountryKm).
     private readonly IPlayerTelemetry _online;
-    // Lifetime km per driven brand behind the receipt's sponsorship rate
-    // (PORTPLAN 35, Unity PlayerData.brandDistanceDriven).
     // The car pool behind the road-test ledger, reused for the receipt's
     // passenger lookup (the driven car's ks id resolves against it).
     private readonly IReadOnlyList<CarSpec> _cars;
-    private readonly IContentSource _content;
-    // WHY read through on demand: Data/*.json edits (wake aliases, transcript
-    // confusions) take effect while the overlay runs; screens built later pick
-    // up the new snapshot automatically.
-    private OnboardingContent Content => _content.Content;
+    // The driven car's brand: the watcher owns it (the story flow and the
+    // voice router read it there), so only its lifecycle stays here.
+    private readonly ICarBrandSource _carBrands;
     // The introduction walk + its errand (PORTPLAN Career Start 1-5): owns the
     // persisted progress, the profile, the errand POI and the trunk read.
     private readonly OnboardingFlow _story;
+    private readonly VoiceRouter _voiceRouter;
+    // The view-owned mic: this class owns its lifecycle (start, dispose) and
+    // the UI-thread marshalling of its fragments; the router dispatches them.
     private readonly IVoiceListener _voice;
-    private readonly ICarBrandSource _carBrands;
-    // The delivery distance-charge table (no forfait/tip/fine): the dropped
-    // goods are paid by distance alone (Data/delivery_fares.json).
-    private readonly DeliveryFareTable _deliveryFares;
     // CredP balance + owned hubs, shared by the board and the hub page.
     // In-memory until the persistent save lands (PORTPLAN 51).
     private readonly DeliveryCareer _career;
@@ -79,22 +82,6 @@ public sealed class MainViewModel
     // runtime, so the live catalogue is a holder the board page, the run
     // planner and the settle all read.
     private readonly DeliveryBoard _deliveryBoard;
-    // The POI world: the business/store/hub doors and the arrival handlers.
-    private readonly PoiWorld _poiWorld;
-    // The delivery run from DELIVER to receipt: owns the live run and the board
-    // page; the panel, the HUD line and the settle arrive through IDeliveryHost.
-    private readonly DeliveryFlow _delivery;
-    // The proposal draw behind the taxi page: two map addresses, the
-    // persisted resident at each door and the home/residence flip
-    // (Data/name_pools.json, Germany pools + Unity suffix list, PORTPLAN
-    // 11/13/45/61).
-    // The customer request draw (PORTPLAN item 11): suffix/passive, speed
-    // challenge and the car-stat quiz, with its own seeded stream.
-    // Timer length, tier chances and quiz categories; the host also uses the
-    // category count for the per-car asked-history reset.
-    // Speed-challenge patrols (Phase C): one seeded plan per accepted job.
-    // The last live track length, so a patrol planned after the request page
-    // sits on the same lap offsets the HUD resolves.
 
     // The placeholder free-roam map: the HUD, the onboarding home and the
     // taxi draw all read the same streets and lap geometry (PORTPLAN Step 1).
@@ -112,9 +99,6 @@ public sealed class MainViewModel
     // its own garage.json: the catalogue row behind each car is the data, the
     // per-car state (odometer, insurance) grows with items 31/32/34.
     private readonly Garage _garage;
-    // The insurance table (PORTPLAN 34): the nightly charge rate and the broker
-    // page's daily-cost math (Data/insurance_rules.json).
-    private readonly InsuranceRules _insuranceRules;
     // The seeded roll behind the streak's random skill gains (PORTPLAN 06/47,
     // Unity ApplyRandomSkillDelta): the root owns the seed, so a test can pin
     // the skills a resumed streak lands on.
@@ -153,24 +137,12 @@ public sealed class MainViewModel
     // Companion parity: hidden until "hey {brand}", idle hides after 15 s,
     // one utterance fires one button (muted until the final fragment).
     private const double IdleHideSec = 15.0;
+    // The wake word a fresh session listens for until the watcher announces
+    // the car actually driven.
     private const string DefaultBrand = "mazda";
 
-
-    // The intro (opening screen) is the constructor's first paint; the first
-    // hidden -> shown edge must reveal it instead of jumping to control. Every
-    // later call keeps the existing "open control" rule.
-    private bool _introShown;
     private bool _resizing;
-
-    // Wake brand = the car currently driven in ACE (watcher-published),
-    // never the saved favorite.
-    private string _carBrand = DefaultBrand;
-    // Car identity behind the brand, when the logs announced one: the receipt's
-    // passenger lookup resolves against the car pool (one brand spans 1- and
-    // 4-seaters, one folder spans showroom variants).
-    private CarIdentity? _carIdentity;
     private readonly DispatcherTimer _timer;
-    private readonly VoiceRouter _voiceRouter;
     private DateTime _lastTick;
     private bool _disposed;
 
@@ -179,38 +151,20 @@ public sealed class MainViewModel
     // rule and the overlay call both read this one definition, so a new leg
     // cannot mean two different things.
     private bool JobInProgress => _taxi.InProgress || _delivery.InProgress;
-    // The passenger-leg distance. Lives outside the job so a refused pickup or
-    // a breakdown can discard the ride without leaving a half-run meter.
-    private readonly TaxiDriveMeter _meter;
 
     public MainViewModel(
-        ITelemetrySource telemetry, IClock clock, GameClock game,
-        TaxiShift shift, ISettingsStore store,
-        ILog log, FareTable fares,
-        IOnboardingStore onboarding, IContentSource content,
-        IProfileStore profiles, IPlayerNameRegistry playerNames,
-        AddressMap addressMap, string? detectedPlayerName,
-        IVoiceListener voice, ICarBrandSource carBrands,
-        DeliveryBoard deliveryBoard, DeliveryCareer career,
-        DeliveryFareTable deliveryFares,
-        CityEconomy city,
-        VoiceBeat beat, DriverWallet wallet,
-        DailyStreak streak, OperatingZone zone, IFriendshipStore friendships, IReadOnlyList<CarSpec> cars,
-        IRivalsService rivals,
-        IPlayerTelemetry playerTelemetry,
-        Hunger hunger,
-        Garage garage, InsuranceRules insuranceRules,
-        Random rng,
-        PoiGenerator pois,
-        PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
-        IPreferencesStore preferencesStore, PlayerPreferences preferences, ICultureService culture,
-        Trunk trunk,
-        TaxiRules taxiRules,
+        ITelemetrySource telemetry, IClock clock, GameClock game, TaxiShift shift,
+        ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
+        AddressMap addressMap, TaxiRules taxiRules,
+        DeliveryBoard deliveryBoard, DeliveryCareer career, CityEconomy city,
+        VoiceBeat beat, DriverWallet wallet, DailyStreak streak, OperatingZone zone,
+        IReadOnlyList<CarSpec> cars, IRivalsService rivals, IPlayerTelemetry playerTelemetry,
+        Hunger hunger, Garage garage, Random rng,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
-        OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
+        OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
+        VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
-        PoiArrivalRouter poiArrivals, Navigation navigation,
-        TelemetryReadouts readouts, DayCycle day,
+        Navigation navigation, TelemetryReadouts readouts, DayCycle day,
         ITelemetryHud? hud = null,
         ISaveDataResetter? saveResets = null,
         IAppRestarter? restarter = null)
@@ -224,19 +178,15 @@ public sealed class MainViewModel
         _saveResets = saveResets;
         _restarter = restarter;
         _log = log;
-        _fares = fares;
         _addressMap = addressMap;
         _taxiRules = taxiRules;
-        _content = content;
         _voice = voice;
         _carBrands = carBrands;
         _deliveryBoard = deliveryBoard;
-        _deliveryFares = deliveryFares;
         _career = career;
         _city = city;
         _hunger = hunger;
         _garage = garage;
-        _insuranceRules = insuranceRules;
         _rng = rng;
         _hud = hud;
         if (_hud is not null)
@@ -248,7 +198,6 @@ public sealed class MainViewModel
         _wallet = wallet;
         _streak = streak;
         _zone = zone;
-        _friends = friendships;
         _rivals = rivals;
         _online = playerTelemetry;
         _cars = cars;
@@ -259,7 +208,7 @@ public sealed class MainViewModel
         _settlement = settlement;
         _fleet = fleet;
         _shell = shell;
-        _shops = shops;
+        _panel = panel;
         _taxi = taxi;
         _delivery = delivery;
         _poiWorld = poiWorld;
@@ -289,20 +238,15 @@ public sealed class MainViewModel
             OnPropertyChanged(nameof(IsOnboarding));
             OnPropertyChanged(nameof(JobsVisible));
         };
-        // The meter is shared with the settle: the poll feeds it and the
-        // receipt reads (and resets) the same accumulator.
-        _meter = meter;
-        // The story collaborator owns the persisted walk + profile + errand POI;
-        // it is built before the garage seed below reads its progress. The POI
-        // router arrives from the root, which built it from PoiWorld's handlers.
-        _story = new OnboardingFlow(
-            onboarding, content, profiles, playerNames, addressMap, detectedPlayerName,
-            pois, poiDirectory, poiStore, poiArrivals, trunk,
-            career, deliveryBoard.Catalog.StartCredP,
-            preferencesStore, preferences,
-            culture, beat, hud, garage, () => _day.DisplayWeek, SaveGarage,
-            () => _carBrand, log, this);
-        _carBrands.BrandChanged += (_, e) => OnCarBrand(e.Brand, e.Identity);
+        // The story flow owns the persisted walk + profile + errand POI; the
+        // root built it (and the voice router, which reads the same panel) once
+        // the navigator and the calendar existed.
+        _story = story;
+        _voiceRouter = voiceRouter;
+        // The brand itself lives in the watcher (the story flow and the voice
+        // router read it there); what is left here is the transition line.
+        _carBrands.BrandChanged += (_, e) =>
+            _log.LogInfo($"now following: {e.Brand} (say 'hey {e.Brand}')");
         // Business catch-up at boot (Unity MapScreen.Show's generator checks):
         // a save whose street/job counters already crossed a threshold opens
         // the missing doors now. A fresh career is still in onboarding, so the
@@ -342,9 +286,6 @@ public sealed class MainViewModel
                 $"{days} random skill point(s))");
         }
         _shell.RecordActivity(_clock.UtcNow);
-        // The router's warn-free reads go through IVoiceHost (see the explicit
-        // implementations below), so the host surface stays small.
-        _voiceRouter = new VoiceRouter(this, clock, log, hud);
         _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _timer.Tick += (_, _) => Poll();
@@ -383,9 +324,6 @@ public sealed class MainViewModel
         // finished. The app root calls Show() at launch for the other starts,
         // so a real start opens on the intro either way.
         _shell.SetShown(!voice.IsAvailable && !IntroTourInProgress);
-        // A visible start has already shown the intro; a hidden start keeps
-        // the intro on the first wake (see Show).
-        _introShown = IsShown;
     }
 
     // ---- bindable state -------------------------------------------------
@@ -471,25 +409,9 @@ public sealed class MainViewModel
 
     public void FinishDialogue() => _story.FinishDialogue();
 
-    // The host slice the story flow sees (interface segregation): page swaps,
-    // panel reveal/hide, the control page and the shared driver save.
-    object? IStoryHost.CurrentScreen => CurrentScreen;
-    bool IStoryHost.IsShown => IsShown;
-    void IStoryHost.ShowScreen(object? screen) => _nav.ShowScreen(screen);
-    void IStoryHost.Present(object screen) => Present(screen);
-    void IStoryHost.Hide() => Hide();
-    object IStoryHost.ControlScreen() => _nav.ControlPage();
-    object IStoryHost.MenuScreen() => _nav.MenuPage();
-    void IStoryHost.ShowMenu()
-    {
-        _nav.ShowMenuPage();
-        Show();
-    }
-    void IStoryHost.SaveDriver() => SaveDriver(_rivals.LastResult);
-
     // The host slice the settle sees: it prices and banks the job, the shell
     // owns the page, the saves and the career growth the receipt triggers.
-    void IJobSettlementHost.ShowReceipt(object screen) => ShowJobScreen(screen);
+    void IJobSettlementHost.ShowReceipt(object screen) => _panel.PresentJob(screen);
     void IJobSettlementHost.RefreshJob() => RefreshJob();
     void IJobSettlementHost.SaveDriver(RivalsResult? standings) => SaveDriver(standings);
     void IJobSettlementHost.SaveShift() => SaveShift();
@@ -509,20 +431,20 @@ public sealed class MainViewModel
     // The host slice the taxi flow sees: the flow owns the job and the ask; the
     // shell owns the panel and the settle that prices the ride.
     void ITaxiJobHost.ShowPage(object screen) => _nav.ShowScreen(screen);
-    void ITaxiJobHost.RevealPage(object screen) => ShowJobScreen(screen);
-    void ITaxiJobHost.HidePanel() => Hide();
+    void ITaxiJobHost.RevealPage(object screen) => _panel.PresentJob(screen);
+    void ITaxiJobHost.HidePanel() => _panel.Hide();
     void ITaxiJobHost.RefreshJob() => RefreshJob();
     void ITaxiJobHost.RefreshControlPage() => _nav.RefreshControl();
     object ITaxiJobHost.ControlPage() => _nav.ControlPage();
     AddressLocation? ITaxiJobHost.HomeAddress() => AddressBook.Home(_addressMap, _story.Profile);
     void ITaxiJobHost.SettleRide(TaxiJobState job) =>
-        _settlement.SettleTaxiRide(job, HomeCountry, _carBrand, this);
+        _settlement.SettleTaxiRide(job, HomeCountry, _carBrands.Brand, this);
 
     // The host slice the delivery run sees: the flow owns the run and the board;
     // the shell owns the panel, the companion's line, the hub page and the settle.
     void IDeliveryHost.ShowPage(object screen) => _nav.ShowScreen(screen);
-    void IDeliveryHost.RevealPage(object screen) => ShowJobScreen(screen);
-    void IDeliveryHost.HidePanel() => Hide();
+    void IDeliveryHost.RevealPage(object screen) => _panel.PresentJob(screen);
+    void IDeliveryHost.HidePanel() => _panel.Hide();
     object IDeliveryHost.ControlPage() => _nav.ControlPage();
     void IDeliveryHost.OpenHub() => _nav.ShowHub();
     void IDeliveryHost.ClearGuidance() => _hud?.SetJobGuidance(null);
@@ -556,19 +478,8 @@ public sealed class MainViewModel
     // here to be revealed (the panel policy stays in this class).
     void IDayCycleHost.DisplayWeekChanged(int week) => _nav.DisplayWeekChanged(week);
     void IDayCycleHost.ReadoutsChanged() => RefreshJob();
-    void IDayCycleHost.ShowShiftEnded(object page) => ShowJobScreen(page);
+    void IDayCycleHost.ShowShiftEnded(object page) => _panel.PresentJob(page);
     void IDayCycleHost.GoToControlPage() => _nav.ShowControl();
-
-    // Reveal the panel on the requested POI screen. Show() deliberately
-    // resets a hidden start to the control page; entering a shop must land
-    // on the shop instead, so set the screen before flipping visibility.
-    private void Present(object screen)
-    {
-        RecordActivity();
-        _introShown = true;
-        _shell.Reveal(screen);
-        _log.LogInfo("overlay shown (POI)");
-    }
 
     // Car-hauling contracts (PORTPLAN 20): today the tap settles the haul
     // straight into its receipt — the taxi ACCEPT skip's third use. With no
@@ -583,7 +494,7 @@ public sealed class MainViewModel
         // car is the one the player is driving now: the pool row resolves
         // its display name and real class band via the watcher's identity
         // (exact variant -> folder -> sole row), unknown falls through.
-        CarSpec? car = _carIdentity?.FindIn(_cars);
+        CarSpec? car = _carBrands.CurrentIdentity?.FindIn(_cars);
         string carName = car is not null
             ? $"{car.Brand} {car.Model}".ToUpperInvariant()
             : Strings.Get("HaulReceiptCarUnknown");
@@ -628,9 +539,8 @@ public sealed class MainViewModel
     public void Start()
     {
         _lastTick = _clock.UtcNow;
-        _carBrand = _carBrands.Prime(DefaultBrand);
-        _carIdentity = _carBrands.CurrentIdentity;
-        _log.LogInfo($"listening for 'hey {_carBrand}'");
+        string brand = _carBrands.Prime(DefaultBrand);
+        _log.LogInfo($"listening for 'hey {brand}'");
         _carBrands.StartWatching();
         _voice.StartListening();
         _timer.Start();
@@ -855,17 +765,8 @@ public sealed class MainViewModel
 
     // ---- visibility + voice --------------------------------------------------
 
-    // The host slices the collaborators see (interface segregation): only the
-    // reads they actually make. IsShown, CurrentScreen, Show, RecordActivity
-    // and OnboardingDone are already public and satisfy their interfaces
-    // directly.
-    OnboardingContent IVoiceHost.Content => Content;
-    public CarIdentity? CarIdentity => _carIdentity;
-    public string CarBrand => _carBrand;
-    public IReadOnlyList<string> Brands => Content.Brands;
-
     /// <summary>Called by the view on any mouse/key activity.</summary>
-    public void RecordActivity() => _shell.RecordActivity(_clock.UtcNow);
+    public void RecordActivity() => _panel.RecordActivity();
 
     /// <summary>
     /// Called by the view when a window resize drag starts/stops.
@@ -878,39 +779,9 @@ public sealed class MainViewModel
         RecordActivity();
     }
 
-    public void Show()
-    {
-        // WHY: from ACCEPT to the receipt the HUD owns the screen and the
-        // mic (guidance + customer request). A call mid-job would let the
-        // player open the job centre over the ride and start a second job,
-        // so the call is ignored until the job settles or is abandoned.
-        if (JobInProgress)
-        {
-            _log.LogInfo("overlay call ignored: job in progress");
-            return;
-        }
+    public void Show() => _panel.Show();
 
-        RecordActivity();
-        if (IsShown) return;
-        _shell.SetShown(true);
-        // The single "the app was called" seam: the Ctrl+Shift+C hotkey and
-        // the wake word both land here. The first show of a hidden start
-        // reveals the page already built in the constructor (the resumed walk
-        // page, or the menu past the introduction); every later show opens the
-        // menu page (Jobs leads to the control page) instead of resuming
-        // whatever page was last open. It rides the hidden -> shown edge only —
-        // a reveal while already visible must not yank the player off the page
-        // they are using.
-        if (!_introShown && CurrentScreen is not null)
-        {
-            _introShown = true;
-            _log.LogInfo("overlay shown (first page)");
-            return;
-        }
-        _introShown = true;
-        _nav.ShowMenuPage();
-        _log.LogInfo("overlay shown (menu)");
-    }
+    private void Hide() => _panel.Hide();
 
     // The Settings tile reuses the first-run unit + language page: selections
     // save and apply immediately through the walk's writer, and BACK comes
@@ -950,36 +821,6 @@ public sealed class MainViewModel
         return false;
     }
 
-    private void Hide()
-    {
-        if (!IsShown) return;
-        _shell.SetShown(false);
-        _voiceRouter.ResetMute();
-        _log.LogInfo("overlay hidden");
-    }
-
-    // Watcher thread lands here; marshal to the UI thread like voice.
-    private void OnCarBrand(string brand, CarIdentity? identity)
-    {
-        try
-        {
-            _timer.Dispatcher.Invoke(() =>
-            {
-                _carBrand = brand;
-                _carIdentity = identity;
-                _log.LogInfo($"now following: {brand} (say 'hey {brand}')");
-            });
-        }
-        catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
-        {
-            // WHY: Dispatcher.Invoke posts to a dispatcher that may have shut
-            // down mid-race; InvalidOperationException is that exact signal.
-            // The lambda's own work (assign + log) never throws: FileLogger
-            // swallows sink errors, stores swallow IO. Anything else here is
-            // a real bug and must surface, not die silent on this thread.
-        }
-    }
-
     // Mic thread lands here; marshal to the UI thread for all state changes.
     private void OnVoiceHeard(string text, bool isFinal)
     {
@@ -989,11 +830,12 @@ public sealed class MainViewModel
         }
         catch (Exception ex) when (ex is InvalidOperationException or ObjectDisposedException)
         {
-            // WHY: same shutdown race as OnCarBrand: the post or the inline
-            // UI-thread run can meet a dispatcher that is going down. Screen
-            // commands only touch VM state and stores that swallow their own
-            // IO, so these two types are the whole recoverable set; a bug
-            // inside the router stays visible instead of being muted here.
+            // WHY: the post or the inline UI-thread run can meet a dispatcher
+            // that is going down mid-race; InvalidOperationException is that
+            // exact signal. Screen commands only touch VM state and stores
+            // that swallow their own IO, so these two types are the whole
+            // recoverable set; a bug inside the router stays visible instead
+            // of being muted here.
         }
     }
 
@@ -1013,17 +855,6 @@ public sealed class MainViewModel
         {
             DropoffCommand.Execute(null);
         }
-    }
-
-    // Reveals the panel on a job page (refusal, breakdown, receipt, shift
-    // ended). Show() deliberately opens the menu instead, so the page must be
-    // set first.
-    private void ShowJobScreen(object screen)
-    {
-        RecordActivity();
-        _introShown = true;
-        _shell.Reveal(screen);
-        _log.LogInfo("overlay shown (job)");
     }
 
     // One driver save the whole VM shares (PORTPLAN 51 interim): every state
@@ -1122,20 +953,6 @@ public sealed class MainViewModel
         Apply(TelemetryReadouts.PaintJob(_taxi.Job, _shift, _clock.UtcNow));
         ((RelayCommand)PickupCommand).RaiseCanExecuteChanged();
         ((RelayCommand)DropoffCommand).RaiseCanExecuteChanged();
-    }
-
-    // Road-test weekday number, read off the calendar data (no Unity-day
-    // literal here: the strip owns which weekday hosts the event).
-    private static int RoadTestDayOfWeek()
-    {
-        foreach (CalendarDay day in ControlCalendar.Week)
-        {
-            if (day.EventId == ControlCalendar.RoadTest)
-            {
-                return day.DayOfWeek;
-            }
-        }
-        return -1;
     }
 
     public void Dispose()

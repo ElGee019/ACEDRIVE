@@ -386,6 +386,25 @@ public partial class App : Application, IDisposable
             driver, garage, rivals, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, poiWorld, dayCycle, _log);
+        // The panel's reveal policy: what a call opens, what revealing a POI
+        // or a job page does, and hiding. The story flow, the voice router and
+        // the coordinator share this one instance, so the root can build the
+        // two host reads the coordinator used to assemble.
+        var panel = new PanelPresenter(shell, navigation, taxi, delivery, wall, _log);
+        // The introduction walk and its errand: it reports through its own
+        // host (page swaps, panel reveals, the shared driver save), so it is
+        // built here like every other collaborator. Its car brand is read live
+        // off the watcher, the week off the calendar.
+        var story = new OnboardingFlow(
+            onboardingStore, content, profileStore, playerNames, addressMap, playerName,
+            poiGenerator, poiDirectory, poiStore, poiArrivals, trunk,
+            deliveryCareer, deliveryBoard.Catalog.StartCredP,
+            preferencesStore, preferences, culture, beat, hud, garage,
+            () => dayCycle.DisplayWeek, saver.SaveGarage, () => carBrands.Brand,
+            _log, new StoryHost(panel, navigation, saver, rivals));
+        // Voice dispatch: the wake word and the button taps, on the same panel
+        // and content tables the screens use.
+        var voiceRouter = new VoiceRouter(panel, carBrands, content, wall, _log, hud);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -393,39 +412,27 @@ public partial class App : Application, IDisposable
             shift,
             new JsonSettingsStore(),
             _log,
-            fares,
-            onboardingStore,
-            content,
-            profileStore,
-            playerNames,
-            addressMap,
-            playerName,
             CreateVoice(_log),
             carBrands,
+            addressMap,
+            taxiRules,
             deliveryBoard,
             deliveryCareer,
-            deliveryFares,
             city,
             beat,
             driver,
             streak,
             zone,
-            friendships,
             cars,
             rivals,
             telemetry,
             hunger,
             garage,
-            insuranceRules,
             // The streak's random skill gains (PORTPLAN 06/47): its own seeded
             // stream, offset from the taxi seed like the other draws.
             new Random(taxiSeed + 5),
-            poiGenerator,
-            poiDirectory, poiStore,
-            preferencesStore, preferences, culture,
-            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
-            taxi, delivery, poiWorld, poiArrivals, navigation,
-            readouts, dayCycle,
+            saver, fleet, settlement, shell, panel, story, voiceRouter,
+            taxi, delivery, poiWorld, navigation, readouts, dayCycle,
             hud,
             saveResets, restarter);
 

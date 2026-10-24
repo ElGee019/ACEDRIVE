@@ -25,6 +25,12 @@ public interface ICarBrandSource : IDisposable
     /// <summary>Initial brand from recent history, or the given fallback.</summary>
     string Prime(string fallback);
 
+    /// <summary>
+    /// The brand the wake word listens for: the one <see cref="Prime"/> found
+    /// or the last switch announced. Empty before the first prime.
+    /// </summary>
+    string Brand { get; }
+
     /// <summary>Identity behind the current brand, when one was announced.</summary>
     CarIdentity? CurrentIdentity { get; }
 

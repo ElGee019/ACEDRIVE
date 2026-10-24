@@ -78,7 +78,7 @@ public sealed class NavigationTests
             garageInstance, wallet, friends,
             new FleetService(
                 garageInstance, poolCars, game, wallet, InsuranceRules.Default, log,
-                brands, new FakeContentSource(MainViewModelTests.EmptyContent)),
+                brands, new FakeContentSource(TestSession.EmptyContent)),
             game, clock, beat, meter, saver, rivals, breakdowns, null, log);
         var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
         var nav = new Navigation(

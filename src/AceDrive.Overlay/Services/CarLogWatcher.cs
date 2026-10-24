@@ -25,10 +25,16 @@ public sealed class CarLogWatcher : ICarBrandSource
     private string? _watchedFile;
     private long _offset;
     private string _pending = "";
-    private string? _brand;
-    private CarIdentity? _identity;
+    // WHY volatile: the watcher thread writes these, and the UI thread reads
+    // Brand every utterance (the wake word) and CurrentIdentity on every poll.
+    // The brand used to be mirrored onto the coordinator's UI thread; reading
+    // the source directly needs the publish.
+    private volatile string? _brand;
+    private volatile CarIdentity? _identity;
 
     public CarIdentity? CurrentIdentity => _identity;
+
+    public string Brand => _brand ?? "";
 
     public CarLogWatcher(ILog log, DirectoryInfo? logsDir = null)
     {

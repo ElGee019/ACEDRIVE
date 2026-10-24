@@ -8,7 +8,12 @@ namespace AceDrive.Overlay.ViewModels;
 /// Voice dispatch: the wake word, the companion HUD's ENTER button, and the
 /// label match that taps the current screen's button. Owns the utterance-level
 /// mute state so one utterance fires one button, and nothing about screens or
-/// HWNDs beyond the <see cref="IVoiceHost"/> slice it is handed.
+/// HWNDs beyond the panel presenter and the content tables it is handed.
+///
+/// The dependencies are named directly (panel, driven car, content, HUD, clock)
+/// instead of behind a <c>IVoiceHost</c>: the root builds this router, so the
+/// interface that only existed to keep it off the coordinator's surface has no
+/// job left.
 /// </summary>
 public sealed class VoiceRouter
 {
@@ -18,7 +23,9 @@ public sealed class VoiceRouter
     // label says so), keeping this router free of button copy.
     private const double WakeCooldownSec = 3.0;
 
-    private readonly IVoiceHost _host;
+    private readonly PanelPresenter _panel;
+    private readonly ICarBrandSource _carBrands;
+    private readonly IContentSource _content;
     private readonly IClock _clock;
     private readonly ILog _log;
     private readonly ITelemetryHud? _hud;
@@ -27,13 +34,24 @@ public sealed class VoiceRouter
     private Action? _mutedAction;
     private string _mutedText = string.Empty;
 
-    public VoiceRouter(IVoiceHost host, IClock clock, ILog log, ITelemetryHud? hud)
+    public VoiceRouter(
+        PanelPresenter panel, ICarBrandSource carBrands, IContentSource content,
+        IClock clock, ILog log, ITelemetryHud? hud)
     {
-        _host = host;
+        _panel = panel;
+        _carBrands = carBrands;
+        _content = content;
         _clock = clock;
         _log = log;
         _hud = hud;
+        // Hiding the panel is a hard context break: the next utterance is a
+        // fresh request, not a repeat of the one the old page just answered.
+        _panel.Hidden += (_, _) => ResetMute();
     }
+
+    // WHY read through on demand: Data/*.json edits (wake aliases, transcript
+    // confusions) take effect while the overlay runs.
+    private OnboardingContent Content => _content.Content;
 
     /// <summary>
     /// Forgets the last fired tap. Hiding the panel is a hard context break:
@@ -69,22 +87,22 @@ public sealed class VoiceRouter
             return;
         }
 
-        if (!_host.IsShown)
+        if (!_panel.IsShown)
         {
-            string brand = _host.CarBrand;
-            if (VoiceMatch.IsWake(text, brand, AliasesFor(brand), _host.Content.Confusions, isFinal))
+            string brand = _carBrands.Brand;
+            if (VoiceMatch.IsWake(text, brand, AliasesFor(brand), Content.Confusions, isFinal))
             {
                 DateTime now = _clock.UtcNow;
                 if ((now - _lastWake).TotalSeconds < WakeCooldownSec) return;
                 _lastWake = now;
                 _log.LogInfo($"wake heard: {text}");
-                _host.Show();
+                _panel.Show();
             }
 
             return;
         }
 
-        if (_host.CurrentScreen is IVoiceScreen screen)
+        if (_panel.CurrentScreen is IVoiceScreen screen)
         {
             Tap(screen, text, isFinal);
         }
@@ -95,7 +113,7 @@ public sealed class VoiceRouter
     // so both obey the same mute rule.
     private void Tap(IVoiceScreen screen, string text, bool isFinal)
     {
-        string? label = VoiceMatch.MatchLabel(text, screen.VoiceActions.Keys, _host.Content.Confusions);
+        string? label = VoiceMatch.MatchLabel(text, screen.VoiceActions.Keys, Content.Confusions);
         if (label is null)
         {
             if (isFinal)
@@ -109,14 +127,14 @@ public sealed class VoiceRouter
                 // without clearing here a tail that maps to nothing would
                 // keep the mute armed and swallow the next real tap.
                 ResetMute();
-                _host.RecordActivity();
+                _panel.RecordActivity();
             }
             return;
         }
         // Voice control counts as user input: same idle-reset as a click.
         // Repeats of the same tap still count as presence (restarting the
         // 15 s window) even though the repeat itself stays muted below.
-        _host.RecordActivity();
+        _panel.RecordActivity();
         // Mute repeats of the same tap until the utterance's final fragment.
         // One utterance can reach a button under two different keys (a
         // partial hearing "where is" alias, the final "Where is Willy"
@@ -163,12 +181,12 @@ public sealed class VoiceRouter
         {
             return false;
         }
-        if (VoiceMatch.MatchLabel(text, hud.EnterKeywords, _host.Content.Confusions) is null)
+        if (VoiceMatch.MatchLabel(text, hud.EnterKeywords, Content.Confusions) is null)
         {
             return false;
         }
 
-        _host.RecordActivity();
+        _panel.RecordActivity();
         _log.LogInfo($"voice button: {text}");
         hud.RequestEnter();
         return true;
@@ -176,7 +194,7 @@ public sealed class VoiceRouter
 
     private string[] AliasesFor(string brand)
     {
-        OnboardingContent content = _host.Content;
+        OnboardingContent content = Content;
         if (content.Aliases.TryGetValue(brand, out string[]? hit)) return hit;
         return content.Aliases.TryGetValue(VoiceMatch.Normalize(brand), out string[]? norm) ? norm : [];
     }
