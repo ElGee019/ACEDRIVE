@@ -13,7 +13,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// unit-testable with fakes. Knows NOTHING about HWNDs or files.
 /// </summary>
 public sealed class MainViewModel
-    : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, IDisposable
+    : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -30,6 +30,9 @@ public sealed class MainViewModel
     private readonly OverlayShell _shell;
     // The five shop interiors: assembly only, the banking callbacks included.
     private readonly ShopInteriors _shops;
+    // The taxi job from proposal to receipt: owns the job, the request and the
+    // patrols; the shell's half arrives through ITaxiJobHost.
+    private readonly TaxiJobFlow _taxi;
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
@@ -62,7 +65,6 @@ public sealed class MainViewModel
     private readonly IRivalsService _rivals;
     // The dynamic car-rarity board behind the XP multiplier (PORTPLAN 35,
     // Unity CarRarityService): reads are cached, the km write is fire-and-forget.
-    private readonly ICarRaritySource _rarity;
     // Zone, best-shift and country pushes (Unity FirestoreService + CountryKm).
     private readonly IPlayerTelemetry _online;
     // The persisted best single shift (PORTPLAN 12): the settle path banks it
@@ -73,7 +75,6 @@ public sealed class MainViewModel
     private readonly IShiftStandings _shiftBoard;
     // Lifetime km per driven brand behind the receipt's sponsorship rate
     // (PORTPLAN 35, Unity PlayerData.brandDistanceDriven).
-    private readonly IBrandMileageStore _brands;
     // The car pool behind the road-test ledger, reused for the receipt's
     // passenger lookup (the driven car's ks id resolves against it).
     private readonly IReadOnlyList<CarSpec> _cars;
@@ -101,18 +102,14 @@ public sealed class MainViewModel
     // persisted resident at each door and the home/residence flip
     // (Data/name_pools.json, Germany pools + Unity suffix list, PORTPLAN
     // 11/13/45/61).
-    private readonly TaxiJobProposer _proposals;
     // The customer request draw (PORTPLAN item 11): suffix/passive, speed
     // challenge and the car-stat quiz, with its own seeded stream.
-    private readonly ICustomerRequestRoller? _requests;
     // Timer length, tier chances and quiz categories; the host also uses the
     // category count for the per-car asked-history reset.
-    private readonly CustomerRequestTable _requestTable;
     // Speed-challenge patrols (Phase C): one seeded plan per accepted job.
-    private readonly PolicePatrolPlanner? _police;
     // The last live track length, so a patrol planned after the request page
     // sits on the same lap offsets the HUD resolves.
-    private double? _trackLengthMeters;
+
     // The placeholder free-roam map: the HUD, the onboarding home and the
     // taxi draw all read the same streets and lap geometry (PORTPLAN Step 1).
     private readonly AddressMap _addressMap;
@@ -155,16 +152,6 @@ public sealed class MainViewModel
     // another page; the poll refreshes it on the minute guard.
     private MenuScreenViewModel? _menu;
     private DeliveryJobScreenViewModel? _deliveryScreen;
-    private TaxiJobProposalViewModel? _proposal;
-    private CustomerRequestScreenViewModel? _requestScreen;
-    // A rolled request waits out the drop-off task text before it shows; the
-    // deadline is real time, never a tick count.
-    private CustomerRequest? _pendingRequest;
-    private DateTime _requestDueAt;
-    // The speed challenge arms its patrols once at the pickup; the request
-    // page's BACK must not draw a second plan later in the ride.
-    private bool _speedChallengeArmed;
-    private ParameterizedCommand<TaxiJobState>? _acceptJobAction;
     private ParameterizedCommand<int>? _openDayAction;
     private int _lastDay = -1;
     // Display week: rolls on the Sunday-midnight crossing, persists across
@@ -215,7 +202,6 @@ public sealed class MainViewModel
     private DateTime _lastTick;
     private bool _disposed;
 
-    private TaxiJobState _job = new();
     // The live delivery run (PORTPLAN 19): ordered hub pickups + store
     // drop-offs. Null outside a run; the taxi job and this cannot overlap
     // because a call/board is refused while either is in progress.
@@ -228,17 +214,11 @@ public sealed class MainViewModel
     // settles, or from DELIVER until the last store is served. The idle-shift
     // rule and the overlay call both read this one definition, so a new leg
     // cannot mean two different things.
-    private bool JobInProgress =>
-        _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute || DeliveryInProgress;
+    private bool JobInProgress => _taxi.InProgress || DeliveryInProgress;
     private bool DeliveryInProgress => _deliveryJob is { IsComplete: false };
     // The passenger-leg distance. Lives outside the job so a refused pickup or
     // a breakdown can discard the ride without leaving a half-run meter.
     private readonly TaxiDriveMeter _meter;
-    // WHICH shown proposal already paid the dirty-car friendship penalty
-    // (Unity's _tooDirtyArrived guard): tapping ACCEPT twice on the same
-    // proposal must not charge the customer twice. A fresh proposal is a new
-    // TaxiJobState instance (Unity's new job).
-    private TaxiJobState? _dirtyRefusedJob;
     private int _lastShiftSecs = -1;
 
     // The last painted telemetry readouts. The 10 Hz poll re-formats only when
@@ -259,7 +239,7 @@ public sealed class MainViewModel
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, GameClock game,
         TaxiShift shift, IShiftStore shiftStore, ISettingsStore store,
-        ILog log, FareTable fares, TaxiJobProposer proposals,
+        ILog log, FareTable fares,
         IOnboardingStore onboarding, IContentSource content,
         IProfileStore profiles, IPlayerNameRegistry playerNames,
         AddressMap addressMap, string? detectedPlayerName,
@@ -271,8 +251,8 @@ public sealed class MainViewModel
         IGameClockStore clockStore, int startWeek,
         VoiceBeat beat, DriverWallet wallet, IDriverStore driverStore,
         DailyStreak streak, OperatingZone zone, IFriendshipStore friendships, IReadOnlyList<CarSpec> cars,
-        IBrandMileageStore brands, IRivalsService rivals,
-        ICarRaritySource rarity, IPlayerTelemetry playerTelemetry, ShiftRecord shifts,
+        IRivalsService rivals,
+        IPlayerTelemetry playerTelemetry, ShiftRecord shifts,
         IShiftStandings shiftStandings,
         Hunger hunger, IHungerStateStore hungerStore,
         Garage garage, IGarageStore garageStore, InsuranceRules insuranceRules,
@@ -286,11 +266,9 @@ public sealed class MainViewModel
         TaxiRules taxiRules,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
+        TaxiJobFlow taxi,
         ITelemetryHud? hud = null,
         IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
-        ICustomerRequestRoller? requests = null,
-        CustomerRequestTable? requestTable = null,
-        PolicePatrolPlanner? police = null,
         ISaveDataResetter? saveResets = null,
         IAppRestarter? restarter = null,
         StoreCatalog? storeCatalog = null)
@@ -307,10 +285,6 @@ public sealed class MainViewModel
         _restarter = restarter;
         _log = log;
         _fares = fares;
-        _proposals = proposals;
-        _requests = requests;
-        _requestTable = requestTable ?? CustomerRequestTable.Empty;
-        _police = police;
         _addressMap = addressMap;
         _poiDirectory = poiDirectory;
         _poiStore = poiStore;
@@ -343,9 +317,7 @@ public sealed class MainViewModel
         _trunk = trunk;
         _storeCatalog = storeCatalog ?? StoreCatalog.Default;
         _friends = friendships;
-        _brands = brands;
         _rivals = rivals;
-        _rarity = rarity;
         _online = playerTelemetry;
         _shifts = shifts;
         _shiftBoard = shiftStandings;
@@ -358,6 +330,10 @@ public sealed class MainViewModel
         _fleet = fleet;
         _shell = shell;
         _shops = shops;
+        _taxi = taxi;
+        // The flow is built before the shell it reports to; this is the one
+        // late edge, and it closes here before anything can fire a command.
+        _taxi.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications, and re-derive the page-shape flags.
         _shell.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
@@ -435,8 +411,6 @@ public sealed class MainViewModel
 
         TaxiShiftCommand = new RelayCommand(OpenTaxiShift);
         GarageCommand = new RelayCommand(OpenGarage);
-        PickupCommand = new RelayCommand(ConfirmPickup, () => _job.Phase == JobPhase.ToPickup);
-        DropoffCommand = new RelayCommand(ConfirmDropoff, () => _job.Phase == JobPhase.EnRoute);
         ToggleShowCommand = new RelayCommand(() =>
         {
             if (IsShown) Hide(); else Show();
@@ -504,8 +478,8 @@ public sealed class MainViewModel
     public string ShiftText { get => _shiftText; private set => SetField(ref _shiftText, value); }
 
     public ICommand TaxiShiftCommand { get; }
-    public ICommand PickupCommand { get; }
-    public ICommand DropoffCommand { get; }
+    public ICommand PickupCommand => _taxi.PickupCommand;
+    public ICommand DropoffCommand => _taxi.DropoffCommand;
     public ICommand ToggleShowCommand { get; }
 
     /// <summary>Temporary garage entry (PORTPLAN 30): a You-menu page in Unity,
@@ -599,6 +573,21 @@ public sealed class MainViewModel
     }
     void IJobSettlementHost.GoToDeliveryBoard() =>
         SetScreen(_deliveryScreen ?? (object)CreateControlScreen());
+
+    // The host slice the taxi flow sees: the flow owns the job and the ask; the
+    // shell owns the panel, the breakdown the job shares with delivery, and the
+    // settle that prices the ride.
+    void ITaxiJobHost.ShowPage(object screen) => SetScreen(screen);
+    void ITaxiJobHost.RevealPage(object screen) => ShowJobScreen(screen);
+    void ITaxiJobHost.HidePanel() => Hide();
+    void ITaxiJobHost.RefreshJob() => RefreshJob();
+    void ITaxiJobHost.RefreshControlPage() => _control?.Refresh();
+    object ITaxiJobHost.ControlPage() => CreateControlScreen();
+    AddressLocation? ITaxiJobHost.HomeAddress() => AddressBook.Home(_addressMap, _story.Profile);
+    BreakdownOutcome? ITaxiJobHost.RollTripStart(BreakdownKind kind) => RollTripStart(kind);
+    void ITaxiJobHost.ShowBreakdown(BreakdownOutcome breakdown) => ShowBreakdown(breakdown);
+    void ITaxiJobHost.SettleRide(TaxiJobState job) =>
+        _settlement.SettleTaxiRide(job, HomeCountry, _carBrand, this);
 
     // Reveal the panel on the requested POI screen. Show() deliberately
     // resets a hidden start to the control page; entering a shop must land
@@ -861,17 +850,9 @@ public sealed class MainViewModel
         // The request countdown is part of the one allowed loop: integer
         // seconds only, and a timeout finishes the ask exactly once. It runs
         // whether or not EVO is still attached so a closed game cannot freeze
-        // an open request.
-        _requestScreen?.Tick(now);
-
-        // A rolled ask replaces the drop-off task text only once the read-in
-        // delay has passed. One null check per tick; the clock comparison is
-        // the only thing that appears while an ask is waiting.
-        if (_pendingRequest is { } pending && now >= _requestDueAt)
-        {
-            _pendingRequest = null;
-            ShowCustomerRequest(pending);
-        }
+        // an open request. The read-in delay that lets the drop-off task text
+        // show first rides the same call.
+        _taxi.Tick(now);
 
         // The control page date stays live whether or not EVO is attached.
         // Refresh self-guards on the minute: no per-tick allocations.
@@ -985,7 +966,7 @@ public sealed class MainViewModel
         // Shift countdown: second-guarded so an open-but-idle shift costs one
         // string per second, never per 10 Hz tick. While EnRoute the meter
         // below already repaints every tick, so this path skips it.
-        if (_shift.IsStarted && _job.Phase != JobPhase.EnRoute)
+        if (_shift.IsStarted && !_taxi.LegActive)
         {
             int secs = (int)_shift.Remaining(now).TotalSeconds;
             if (secs != _lastShiftSecs)
@@ -1011,7 +992,7 @@ public sealed class MainViewModel
         IsLive = true;
         if (s.Track is { LengthMeters: > 0.0 } track && double.IsFinite(track.LengthMeters))
         {
-            _trackLengthMeters = track.LengthMeters;
+            _taxi.SetTrackLength(track.LengthMeters);
         }
         ShowLiveReadouts(s);
 
@@ -1034,21 +1015,14 @@ public sealed class MainViewModel
         // read from inflating a fare or a delivery charge. The delivery run
         // resets it when the first store leg starts, so hub pickups are not
         // charged as delivery distance.
-        if (_job.Phase == JobPhase.EnRoute || DeliveryInProgress)
+        if (_taxi.LegActive)
         {
-            double before = _meter.DistanceKm;
+            // The flow owns the leg: meter, distance, fare and the patrols.
+            _taxi.AdvanceLeg(s, dt);
+        }
+        else if (DeliveryInProgress)
+        {
             _meter.Add(s.SpeedKmh, dt);
-            if (_job.Phase == JobPhase.EnRoute && _meter.DistanceKm != before)
-            {
-                _job.DistanceKm = _meter.DistanceKm;
-                _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
-                RefreshJob();
-            }
-
-            if (_job.Phase == JobPhase.EnRoute && _job.SpeedChallengeAgreed)
-            {
-                CheckPolice(s);
-            }
         }
     }
 
@@ -1337,183 +1311,11 @@ public sealed class MainViewModel
             SaveShift();
         }
 
-        // Built once and reused like the delivery board: the committed radius
-        // survives leaving the page, and every visit opens on a fresh
-        // proposal (the Unity screen shows a newly generated job per visit).
-        _proposal ??= new TaxiJobProposalViewModel(
-            _proposals, _addressMap, () => AddressBook.Home(_addressMap, _story.Profile),
-            () => _fleet.PassengerCapacity(), _log, _beat,
-            new RelayCommand(() => SetScreen(CreateControlScreen())),
-            _acceptJobAction ??= new ParameterizedCommand<TaxiJobState>(TaxiAccepted));
-        _proposal.Open();
-        SetScreen(_proposal);
+        // The proposal page is the flow's: built once and reused like the
+        // delivery board, so the committed radius survives leaving the page.
+        SetScreen(_taxi.OpenProposal());
         RefreshJob();
         _control?.Refresh();
-    }
-
-    // ACCEPT only commits the proposal: the customer is not aboard yet, so
-    // the dirt gate and the breakdown roll wait at the pickup door (Unity's
-    // TaxiJobLifecycleHandler). The overlay steps aside and the HUD pins the
-    // pickup, counting the drive down to the arrival radius.
-    private void TaxiAccepted(TaxiJobState? job)
-    {
-        if (job is null) return;
-        _job = job;
-        _job.Phase = JobPhase.ToPickup;
-        _job.DistanceKm = 0.0;
-        _job.Fare = 0.0;
-        _job.Patrols = [];
-        _job.FinedPatrolIds.Clear();
-        _job.WarnedPatrolIds.Clear();
-        _job.SpeedChallengeDeadline = null;
-        _speedChallengeArmed = false;
-        _pendingRequest = null;
-        _meter.Reset();
-        ShowPickupGuidance();
-        Hide();
-        _log.LogInfo($"job accepted: {job.Customer.Full} {job.PickupName} -> {job.DropoffName}");
-        RefreshJob();
-    }
-
-    // Unity's pickup moment: the car is parked at the customer's door. The
-    // dirt gate and the trip-start breakdown roll live here, not at ACCEPT,
-    // because the customer only sees the car on arrival.
-    private void ConfirmPickup()
-    {
-        if (_job.Phase != JobPhase.ToPickup) return;
-        if (RefuseDirtyPickup(_job))
-        {
-            AbandonJob();
-            if (_proposal is { } proposal)
-            {
-                ShowJobScreen(proposal);
-            }
-            return;
-        }
-
-        // Breakdown roll at the trip start (PORTPLAN 39, Unity
-        // BeginTripSession): a triggered trip is cut before it pays — the job
-        // never becomes active, the customer loses 1 familiarity, the
-        // mechanic's tow fee is charged, and the breakdown page replaces the
-        // proposal.
-        if (RollTripStart(BreakdownKind.Taxi) is { } breakdown)
-        {
-            _friends.AddFamiliarity(_job.Customer.BaseName, -1);
-            _log.LogInfo($"taxi job cut by breakdown: {_job.Customer.Full} " +
-                $"{_job.PickupName} -> {_job.DropoffName}");
-            AbandonJob();
-            ShowBreakdown(breakdown);
-            return;
-        }
-
-        _meter.Reset();
-        _job.Phase = JobPhase.EnRoute;
-        _job.DistanceKm = 0.0;
-        _job.Fare = TaxiFare.ComputeBase(0.0, _fares);
-        _log.LogInfo($"job pickup: {_job.PickupName}");
-        // The drop-off task text goes up first: the player must read where to
-        // drive before an ask may replace the HUD line. Unity rolls the special
-        // request at the pickup, while the customer is still parked at the
-        // door; the ask then rides the companion after the read-in delay
-        // (ShowCustomerRequest on the poll). The panel is hidden for this leg.
-        ShowDropoffGuidance();
-        CustomerRequest? request = _requests?.Roll(
-            _job.Customer, CurrentCarSpec(), _game.GameNow.Year,
-            _garage.Current?.AskedCategories ?? []);
-        if (request is not null)
-        {
-            _pendingRequest = request;
-            _requestDueAt = _clock.UtcNow
-                + TimeSpan.FromSeconds(_taxiRules.RequestDelaySeconds);
-        }
-        RefreshJob();
-    }
-
-    // The customer asks once the drop-off task text has had its read-in time.
-    // The job only carries the request from this moment, and the forced speed
-    // challenge starts its clock here: the player is not timed while reading
-    // where to drive. A forced challenge is not an ask: its page is a short
-    // read-in with no answer countdown or button, so it closes itself and the
-    // task text takes back over with the same clock still running.
-    private void ShowCustomerRequest(CustomerRequest request)
-    {
-        _job.Request = request;
-        if (request.IsSpeedChallenge)
-        {
-            BeginSpeedChallenge();
-        }
-
-        _requestScreen = new CustomerRequestScreenViewModel(
-            request, _job.Customer.Full, _requestTable.TimerSeconds,
-            _clock, _beat, OnRequestFinished,
-            request.IsSpeedChallenge ? _job.SpeedChallengeDeadline : null,
-            request.IsSpeedChallenge
-                ? TimeSpan.FromSeconds(_taxiRules.NoticeSeconds)
-                : null);
-        SetScreen(_requestScreen);
-        _hud?.ShowRequest(_requestScreen);
-        _log.LogInfo($"customer request: {request.Kind} for {_job.Customer.Full}");
-        RefreshJob();
-    }
-
-    // Unity's dirty-car refusal at the pickup door: the customer refuses the
-    // ride, familiarity drops by one (the store banks itself), and the
-    // proposal page shows the reason. A repeated ACCEPT on the same proposal
-    // shows it again but never charges the customer twice
-    // (Unity's _tooDirtyArrived).
-    private bool RefuseDirtyPickup(TaxiJobState job)
-    {
-        if (_garage.Current is not { } car || !car.Filth.RefusesPickup)
-        {
-            _dirtyRefusedJob = null;
-            return false;
-        }
-
-        string customer = job.Customer.BaseName;
-        if (!ReferenceEquals(job, _dirtyRefusedJob))
-        {
-            _dirtyRefusedJob = job;
-            _friends.AddFamiliarity(customer, -1);
-            // Unity HandleTooDirtyArrival: a ride cancelled for a filthy car
-            // costs one concentration point, once per cancelled pickup.
-            _wallet.AddConcentration(-1.0);
-            SaveDriver(_rivals.LastResult);
-            _log.LogWarning($"[Filth] pickup refused at {car.Filth.Value}/{car.Filth.Max}: " +
-                $"{customer} friendship -1, concentration {_wallet.Rating.Concentration:0.00}");
-        }
-        _proposal?.ShowRefusal(Strings.Format("TaxiTooDirty", customer));
-        return true;
-    }
-
-    // The customer is at the drop-off door: settle, show the receipt and drop
-    // the HUD guidance.
-    private void ConfirmDropoff()
-    {
-        if (_job.Phase != JobPhase.EnRoute) return;
-        _job.Phase = JobPhase.Complete;
-        _pendingRequest = null;
-        _hud?.SetJobGuidance(null);
-        _settlement.SettleTaxiRide(_job, HomeCountry, _carBrand, this);
-        _job.Patrols = [];
-        _job.FinedPatrolIds.Clear();
-        _job.WarnedPatrolIds.Clear();
-    }
-
-    // A refused or broken-down pickup leaves no active job: the HUD line goes
-    // away and the command guards close until the next ACCEPT.
-    private void AbandonJob()
-    {
-        _job.Phase = JobPhase.None;
-        _job.Patrols = [];
-        _job.FinedPatrolIds.Clear();
-        _job.WarnedPatrolIds.Clear();
-        _job.SpeedChallengeDeadline = null;
-        _speedChallengeArmed = false;
-        _pendingRequest = null;
-        _requestScreen = null;
-        _hud?.ClearRequest();
-        _hud?.SetJobGuidance(null);
-        RefreshJob();
     }
 
     private void OnJobEntered()
@@ -1531,208 +1333,6 @@ public sealed class MainViewModel
             DropoffCommand.Execute(null);
         }
     }
-
-    // The request's one exit lands here exactly once: BACK on an answered ask,
-    // its timeout, or the forced challenge's read-in closing itself. Copy the
-    // outcome onto the job, bank the quiz history for this car, clear the
-    // companion overlay and resume the drop-off guidance. The police patrols
-    // arm from the speed flag in the police slice; this host stays the single
-    // owner of job state.
-    private void OnRequestFinished(CustomerRequestOutcome outcome)
-    {
-        _requestScreen = null;
-        _hud?.ClearRequest();
-        _job.TipEligible = outcome.TipEligible;
-        _job.QuizAnsweredCorrectly = outcome.QuizAnsweredCorrectly;
-        _job.SpeedChallengeAgreed = outcome.SpeedChallengeAgreed;
-        ApplyQuizRating(outcome);
-
-        if (outcome.SpeedChallengeAgreed)
-        {
-            // The forced challenge already armed when its page opened; this
-            // keeps the single exit idempotent without drawing a second plan.
-            ArmSpeedChallenge();
-        }
-
-        if (_job.Request?.Quiz is { } quiz && _garage.Current is { } car)
-        {
-            // Unity marks the category on answer AND on timeout (HandleAnswer
-            // covers both), then saves; the at-count reset lives in Core.
-            car.MarkAskedCategory(quiz.Category.Key, _requestTable.QuestionCategories.Count);
-            SaveGarage();
-        }
-
-        ShowDropoffGuidance();
-        Hide();
-        _log.LogInfo($"customer request done: {_job.Request?.Kind} " +
-            $"answered={outcome.Answered} tip={outcome.TipEligible} " +
-            $"quiz={outcome.QuizAnsweredCorrectly} speed={outcome.SpeedChallengeAgreed}");
-        RefreshJob();
-    }
-
-    // The quiz asks about the car in the garage, like Unity's playerCar: the
-    // catalogue row behind the current key, never a copy taken at purchase.
-    private CarSpec? CurrentCarSpec() =>
-        _garage.Current is { } car ? _garage.SpecOf(car) : null;
-
-    // Unity CustomerRequestScreen.HandleAnswer: a correct quiz answer lifts
-    // off-the-line by 1, a wrong answer or a timeout drops it by 1 (both reach
-    // here with QuizAnsweredCorrectly false). The skill belongs to the driver,
-    // not the car, so an unowned free-roam car pays the same.
-    private void ApplyQuizRating(CustomerRequestOutcome outcome)
-    {
-        if (_job.Request?.Quiz is null)
-        {
-            return;
-        }
-
-        bool correct = outcome.Answered && outcome.QuizAnsweredCorrectly;
-        _wallet.AddOffTheLine(correct ? 1.0 : -1.0);
-        SaveDriver(_rivals.LastResult);
-        _log.LogInfo($"[Rating] quiz {(correct ? "correct" : "missed")}: " +
-            $"off-the-line {_wallet.Rating.OffTheLine:0.00}");
-    }
-
-    private double TrackLengthMeters() =>
-        _trackLengthMeters ?? _addressMap.TrackLengthMeters;
-
-    // The forced speed challenge starts with its page, after the drop-off task
-    // text: the deadline and patrols are live even while the player is reading
-    // the ask. The route is the same closed-lap distance the guidance and
-    // patrol planner already use, so no routing service is needed.
-    private void BeginSpeedChallenge()
-    {
-        double routeMeters = SpeedChallengeRouteMeters();
-        CarSpec? timedCar = _fleet.XpCar()
-            ?? _carIdentity?.FindIn(_cars)
-            ?? CurrentCarSpec();
-        TimeSpan? allowance = SpeedChallengeTimer.Estimate(
-            routeMeters, timedCar?.TopSpeedKmh ?? 0, _taxiRules.SpeedChallenge);
-        _job.SpeedChallengeDeadline = allowance is { } span
-            ? _clock.UtcNow + span
-            : null;
-        _job.TipEligible = true;
-        _job.SpeedChallengeAgreed = true;
-        ArmSpeedChallenge();
-        _log.LogInfo(allowance is { } estimated
-            ? $"speed challenge deadline: {estimated.TotalSeconds:0}s " +
-              $"({routeMeters / 1000.0:0.00} km, " +
-              $"{timedCar?.TopSpeedKmh ?? 0} km/h top)"
-            : "speed challenge has no deadline: route unavailable");
-    }
-
-    private double SpeedChallengeRouteMeters() =>
-        _job.PickupAddress is { } pickup && _job.DropoffAddress is { } dropoff
-            ? AddressBook.DistanceMeters(
-                _addressMap, pickup, dropoff, TrackLengthMeters())
-            : double.NaN;
-
-    private void ArmSpeedChallenge()
-    {
-        if (_speedChallengeArmed || _police is not { } planner)
-        {
-            return;
-        }
-
-        // Unity spawns at the pickup for every job; this loop only needs the
-        // plan when the gamble is on, and once per accepted job.
-        _job.Patrols = planner.Plan(
-            _job.PickupAddress, _job.DropoffAddress,
-            TrackLengthMeters(), planner.Rules.PatrolsPerJob);
-        _job.FinedPatrolIds.Clear();
-        _job.WarnedPatrolIds.Clear();
-        _speedChallengeArmed = true;
-        _log.LogInfo(
-            $"speed challenge armed: {_job.Patrols.Count} patrol(s), " +
-            $"limit {planner.Rules.SpeedLimitKmh} km/h");
-    }
-
-    // Speed-challenge police check, once per live poll while the passenger is
-    // aboard. A warning shows once per patrol on approach; a fine lands once
-    // per patrol, clears the ordinary tip and adds the receipt deduction.
-    private void CheckPolice(TelemetrySample sample)
-    {
-        if (_police is not { } planner)
-        {
-            return;
-        }
-
-        double length = TrackLengthMeters();
-        double offset = sample.NormalizedPosition is { } position
-            ? LapGeometry.OffsetMeters(position, length)
-            : double.NaN;
-        if (double.IsFinite(offset))
-        {
-            foreach (PolicePatrol patrol in _job.Patrols)
-            {
-                if (_job.FinedPatrolIds.Contains(patrol.Id)
-                    || _job.WarnedPatrolIds.Contains(patrol.Id))
-                {
-                    continue;
-                }
-
-                double distance = LapGeometry.DistanceMeters(
-                    offset, patrol.LapOffsetMeters, length);
-                if (distance <= planner.Rules.WarningRadiusMeters)
-                {
-                    _job.WarnedPatrolIds.Add(patrol.Id);
-                    _hud?.ShowNotice(
-                        Strings.Format("HudPoliceWarning", patrol.SpeedLimitKmh),
-                        TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
-                }
-            }
-        }
-
-        PolicePatrol? caught = SpeedChallengeFines.Check(
-            _job.Patrols, sample.NormalizedPosition ?? double.NaN,
-            length, sample.SpeedKmh, _job.FinedPatrolIds,
-            _job.SpeedChallengeAgreed);
-        if (caught is not { } fine)
-        {
-            return;
-        }
-
-        _job.FinedPatrolIds.Add(fine.Id);
-        _job.SpeedChallengeFines++;
-        // Unity's OR tip rule: the fine kills the ordinary ask tip but a
-        // correct quiz tip rides its own flag through the settle.
-        _job.TipEligible = false;
-        _hud?.ShowNotice(
-            Strings.Format("HudPoliceFine", _fares.FineAmount),
-            TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
-        _log.LogWarning(
-            $"speed challenge fine: €{_fares.FineAmount:0} " +
-            $"(patrol {fine.Id}, {sample.SpeedKmh:0} km/h in {fine.SpeedLimitKmh} zone)");
-    }
-
-    // The HUD line names the customer, not the leg: the templates carry the
-    // door's street, number and town from the structured address, so passing
-    // an address descriptor here would print it twice (Unity names the
-    // passenger on the PICK UP / DROP OFF prompt too). The pickup names the
-    // whole party (companion suffix included); the drop-off names the
-    // customer alone, like Unity's base-name identity.
-    private void ShowPickupGuidance() =>
-        _hud?.SetJobGuidance(Guidance(
-            _job.Customer.Full, _job.PickupAddress,
-            "HudJobPickupDrive", "HudJobPickupArrived", "HudJobPickupAction"));
-
-    private void ShowDropoffGuidance() =>
-        _hud?.SetJobGuidance(Guidance(
-            _job.Customer.BaseName, _job.DropoffAddress,
-            "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction",
-            _job.SpeedChallengeDeadline));
-
-    // A proposal generated on a map that cannot supply two doors has no
-    // structured address; the HUD then has nothing to route to and stays
-    // unpinned rather than showing a wrong street.
-    private HudJobGuidance? Guidance(
-        string name, AddressLocation? target, string driveKey,
-        string arrivedKey, string actionKey, DateTime? speedDeadline = null) =>
-        target is { } door
-            ? new HudJobGuidance(
-                name, door, driveKey, arrivedKey, actionKey,
-                _taxiRules.ArrivalRadiusMeters, speedDeadline)
-            : null;
 
     // Reveals the panel on a job page (refusal, breakdown, receipt, shift
     // ended). Show() deliberately opens the menu instead, so the page must be
@@ -2237,16 +1837,19 @@ public sealed class MainViewModel
 
     private void RefreshJob()
     {
-        JobLine = _job.Phase switch
+        // The readouts read the flow's job; they take it as a parameter once
+        // they move into their own collaborator (S5).
+        TaxiJobState job = _taxi.Job;
+        JobLine = job.Phase switch
         {
             JobPhase.None => Strings.Get("NoJob"),
-            JobPhase.Proposed => Strings.Format("JobProposed", _job.PickupName, _job.DropoffName),
-            JobPhase.ToPickup => Strings.Format("JobToPickup", _job.PickupName, _job.DropoffName),
-            JobPhase.EnRoute => Strings.Format("JobEnRoute", _job.PickupName, _job.DropoffName, _job.DistanceKm),
-            JobPhase.Complete => Strings.Format("JobComplete", _job.PickupName, _job.DropoffName, _job.Tip),
+            JobPhase.Proposed => Strings.Format("JobProposed", job.PickupName, job.DropoffName),
+            JobPhase.ToPickup => Strings.Format("JobToPickup", job.PickupName, job.DropoffName),
+            JobPhase.EnRoute => Strings.Format("JobEnRoute", job.PickupName, job.DropoffName, job.DistanceKm),
+            JobPhase.Complete => Strings.Format("JobComplete", job.PickupName, job.DropoffName, job.Tip),
             _ => string.Empty,
         };
-        FareText = Strings.Format("FareTotal", _job.Total);
+        FareText = Strings.Format("FareTotal", job.Total);
         ShiftText = _shift.IsStarted
             ? Strings.Format("ShiftSummaryActive",
                 _shift.JobsDone, _shift.Earned, FormatRemaining(_shift.Remaining(_clock.UtcNow)))

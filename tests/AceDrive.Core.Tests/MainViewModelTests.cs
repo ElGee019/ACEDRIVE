@@ -157,9 +157,14 @@ public sealed class MainViewModelTests
             faresInstance, taxiRulesInstance, beat, hud, logger);
         var shops = new ShopInteriors(
             walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver, beat, logger);
+        var proposalsInstance = TaxiTestData.Proposer(map: map, seed: 0);
+        var taxi = new TaxiJobFlow(
+            proposalsInstance, map, brands, pool, requests,
+            requestTable ?? CustomerRequestTable.Empty, police,
+            taxiRulesInstance, faresInstance, garageInstance, walletInstance,
+            friendsInstance, fleet, game, clock, beat, meter, saver, rivalsInstance, hud, logger);
         var vm = new MainViewModel(tel, clock, game, shiftInstance, shiftStoreInstance, store,
             logger, faresInstance,
-            TaxiTestData.Proposer(map: map, seed: 0),
             onboardingStore, contentSource,
             profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
@@ -173,8 +178,8 @@ public sealed class MainViewModelTests
             streakInstance,
             zoneInstance,
             friendsInstance, pool,
-            brandMileageInstance, rivalsInstance,
-            rarityInstance,
+            rivalsInstance,
+
             telemetryInstance,
             shiftsInstance,
             shiftStandings ?? new FakeShiftStandings(),
@@ -193,8 +198,8 @@ public sealed class MainViewModelTests
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(), meter, shops, hud, handlers,
-            requests, requestTable, police, saveResets, restarter,
+            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(), meter, shops, taxi, hud, handlers,
+            saveResets, restarter,
             storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)
         {

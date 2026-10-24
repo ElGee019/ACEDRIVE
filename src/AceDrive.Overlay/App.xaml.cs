@@ -338,6 +338,12 @@ public partial class App : Application, IDisposable
         var shell = new OverlayShell();
         var shops = new ShopInteriors(
             driver, garage, game, insuranceRules, cars, saver, beat, _log);
+        // The taxi job from proposal to receipt; the shell attaches itself as
+        // its host right after construction.
+        var taxi = new TaxiJobFlow(
+            taxiProposals, addressMap, carBrands, cars, requests, requestTable,
+            police, taxiRules, fares, garage, driver, friendships, fleet, game, wall,
+            beat, meter, saver, rivals, hud, _log);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -347,7 +353,6 @@ public partial class App : Application, IDisposable
             new JsonSettingsStore(),
             _log,
             fares,
-            taxiProposals,
             onboardingStore,
             content,
             profileStore,
@@ -373,9 +378,7 @@ public partial class App : Application, IDisposable
             zone,
             friendships,
             cars,
-            brands,
             rivals,
-            rarity,
             telemetry,
             shifts,
             shiftStandings,
@@ -394,8 +397,7 @@ public partial class App : Application, IDisposable
             poiDirectory, poiStore,
             poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops, hud, poiHandlers,
-            requests, requestTable, police,
+            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops, taxi, hud, poiHandlers,
             saveResets, restarter, storeCatalog);
 
         MainWindow = new MainWindow(vm, _log);

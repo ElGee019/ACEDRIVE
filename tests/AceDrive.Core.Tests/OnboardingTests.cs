@@ -81,9 +81,13 @@ public sealed class OnboardingTests
             city, deliveryFares, meter, fares, taxiRules, beat, null, logger);
         var shops = new ShopInteriors(
             wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
+        var proposals = TaxiTestData.Proposer();
+        var taxi = new TaxiJobFlow(
+            proposals, AddressMap.Default, carBrands, cars, null,
+            CustomerRequestTable.Empty, null, taxiRules, fares, garage, wallet,
+            friendships, fleet, game, clock, beat, meter, saver, rivals, null, logger);
         return new MainViewModel(new FakeTelemetry(), clock, game, shift, shiftStore,
             new FakeStore(), logger, fares,
-            TaxiTestData.Proposer(),
             store, contentSource,
             profiles ?? new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
@@ -93,8 +97,8 @@ public sealed class OnboardingTests
             city, cityStore,
             roads, roadTestStore,
             clockStore, 1, beat, wallet, driverStore,
-            streak, zone, friendships, cars, brandMileage, rivals,
-            rarity, playerTelemetry, shifts,
+            streak, zone, friendships, cars, rivals,
+            playerTelemetry, shifts,
             new OfflineShiftStandings(),
             hunger, hungerStore,
             garage, garageStore, InsuranceRules.Default,
@@ -107,7 +111,7 @@ public sealed class OnboardingTests
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops);
+            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops, taxi);
     }
 
     // The first-run page (unit + language) sits before the name form; its
