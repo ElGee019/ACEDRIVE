@@ -80,28 +80,44 @@ public sealed class VoiceTests
         var shifts = new ShiftRecord(null);
         var jobs = new JobLedger();
         var trunk = new Trunk();
+        var beat = new VoiceBeat(clock);
+        var fares = FareTable.Default;
+        var taxiRules = TaxiRules.Default;
+        var catalog = DeliveryCatalog.Default;
+        var career = HubCareerShell();
+        var deliveryFares = DeliveryFareTable.Default;
+        var friendships = new FakeFriendshipStore();
+        var brandMileage = new FakeBrandMileageStore();
+        var rivals = new FakeRivals();
+        var rarity = new OfflineCarRarity();
+        var playerTelemetry = new OfflinePlayerTelemetry();
         var saver = new GameStateSaver(
             clock, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
             garage, city, hunger, roads, shift, shifts, jobs);
         var fleet = new FleetService(
             garage, cars, game, wallet, InsuranceRules.Default, logger, car, contentSource);
+        var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        var settlement = new JobSettlement(
+            wallet, garage, shift, zone, jobs, streak, clock, fleet, rarity,
+            friendships, brandMileage, playerTelemetry, rivals, catalog, career,
+            city, deliveryFares, meter, fares, taxiRules, beat, null, logger);
         var vm = new MainViewModel(telemetry ?? new FakeTelemetry(), clock, game, shift, shiftStore,
-            new FakeStore(), logger, FareTable.Default,
+            new FakeStore(), logger, fares,
             TaxiTestData.Proposer(),
             onboarding, contentSource,
             new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             mic, car, TodoTable.Default,
-            DeliveryCatalog.Default, HubCareerShell(),
-            DeliveryFareTable.Default,
+            catalog, career,
+            deliveryFares,
             city, cityStore,
             roads,
-            roadTestStore, clockStore, 1, new VoiceBeat(clock), wallet,
+            roadTestStore, clockStore, 1, beat, wallet,
             driverStore, streak, zone,
-            new FakeFriendshipStore(), cars,
-            new FakeBrandMileageStore(), new FakeRivals(),
-            new OfflineCarRarity(), new OfflinePlayerTelemetry(), shifts,
+            friendships, cars,
+            brandMileage, rivals,
+            rarity, playerTelemetry, shifts,
             new OfflineShiftStandings(),
             hunger, hungerStore,
             garage, garageStore, InsuranceRules.Default,
@@ -114,7 +130,7 @@ public sealed class VoiceTests
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, TaxiRules.Default, saver, fleet);
+            trunk, taxiRules, saver, fleet, settlement, meter);
         return (vm, clock, mic, car);
     }
 

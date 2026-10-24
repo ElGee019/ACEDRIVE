@@ -321,6 +321,14 @@ public partial class App : Application, IDisposable
         // instances from here (AGENTS.md: this is the only composition point).
         var fleet = new FleetService(
             garage, cars, game, driver, insuranceRules, _log, carBrands, content);
+        var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        // Prices and banks one finished job; the poll feeds the same meter, so
+        // the instance is shared rather than owned by either side.
+        var settlement = new JobSettlement(
+            driver, garage, shift, zone, jobs, streak, wall,
+            fleet, rarity, friendships, brands, telemetry, rivals,
+            deliveryCatalog, deliveryCareer, city, deliveryFares, meter,
+            fares, taxiRules, beat, hud, _log);
         var saver = new GameStateSaver(
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
@@ -381,7 +389,8 @@ public partial class App : Application, IDisposable
             poiDirectory, poiStore,
             poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, saver, fleet, hud, poiHandlers, requests, requestTable, police,
+            trunk, taxiRules, saver, fleet, settlement, meter, hud, poiHandlers,
+            requests, requestTable, police,
             saveResets, restarter, storeCatalog);
 
         MainWindow = new MainWindow(vm, _log);

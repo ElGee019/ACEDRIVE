@@ -141,14 +141,28 @@ public sealed class MainViewModelTests
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
             brands, contentSource);
+        var faresInstance = FareTable.Default;
+        var taxiRulesInstance = taxiRules ?? TaxiRules.Default;
+        var deliveryFaresInstance = deliveryFares ?? DeliveryFareTable.Default;
+        var rarityInstance = rarity ?? new FakeCarRarity();
+        var rivalsInstance = rivals ?? new FakeRivals();
+        var brandMileageInstance = brandMileage ?? new FakeBrandMileageStore();
+        var telemetryInstance = telemetry ?? new FakePlayerTelemetry();
+        var meter = new TaxiDriveMeter(taxiRulesInstance.MaxMeterSpeedKmh);
+        var settlement = new JobSettlement(
+            walletInstance, garageInstance, shiftInstance, zoneInstance, jobsInstance,
+            streakInstance, clock, fleet, rarityInstance, friendsInstance,
+            brandMileageInstance, telemetryInstance, rivalsInstance, board,
+            deliveryCareer, cityInstance, deliveryFaresInstance, meter,
+            faresInstance, taxiRulesInstance, beat, hud, logger);
         var vm = new MainViewModel(tel, clock, game, shiftInstance, shiftStoreInstance, store,
-            logger, FareTable.Default,
+            logger, faresInstance,
             TaxiTestData.Proposer(map: map, seed: 0),
             onboardingStore, contentSource,
             profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
             brands, TodoTable.Default, board, deliveryCareer,
-            deliveryFares ?? DeliveryFareTable.Default,
+            deliveryFaresInstance,
             cityInstance, cityStoreInstance,
             roadsInstance, roadTestStoreInstance,
             clockStoreInstance, startWeek,
@@ -157,9 +171,9 @@ public sealed class MainViewModelTests
             streakInstance,
             zoneInstance,
             friendsInstance, pool,
-            brandMileage ?? new FakeBrandMileageStore(), rivals ?? new FakeRivals(),
-            rarity ?? new FakeCarRarity(),
-            telemetry ?? new FakePlayerTelemetry(),
+            brandMileageInstance, rivalsInstance,
+            rarityInstance,
+            telemetryInstance,
             shiftsInstance,
             shiftStandings ?? new FakeShiftStandings(),
             hungerInstance, hungerStoreInstance,
@@ -177,7 +191,7 @@ public sealed class MainViewModelTests
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRules ?? TaxiRules.Default, saver, fleet, hud, handlers,
+            trunkInstance, taxiRulesInstance, saver, fleet, settlement, meter, hud, handlers,
             requests, requestTable, police, saveResets, restarter,
             storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)
