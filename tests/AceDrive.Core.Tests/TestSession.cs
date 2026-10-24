@@ -145,6 +145,12 @@ internal static class TestSession
             game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
             profiles, rivalsInstance, saver, beat, options.StartWeek, logger);
         var readouts = new TelemetryReadouts();
+        // The session-start catch-up: the starter car and today's login bonus,
+        // wired to the same stores and wallet the assertions read. Production
+        // seeds the streak's skill rolls here, so a test can pin them.
+        var catchUp = new DriverCatchUp(
+            onboardingStore, garageInstance, streakInstance, walletInstance,
+            options.Rng ?? new Random(0), saver, rivalsInstance, logger);
         // The game-clock world: the same instances the saver and the fleet
         // hold, so an insurance charge lands in the driver file the tests read.
         var world = new WorldTicks(
@@ -193,9 +199,9 @@ internal static class TestSession
             tel, clock, world, shiftInstance, store, logger,
             options.Voice ?? new FakeVoiceListener(available: false), brands, map,
             taxiRulesInstance,
-            beat, walletInstance, streakInstance, zoneInstance, pool,
+            beat, walletInstance, zoneInstance, pool,
             rivalsInstance, telemetryInstance, garageInstance,
-            options.Rng ?? new Random(0),
+            catchUp,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
             options.Hud, options.SaveResets, options.Restarter);

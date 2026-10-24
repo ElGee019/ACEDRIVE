@@ -56,8 +56,10 @@ public sealed class MainViewModel
     private readonly IAppRestarter? _restarter;
     private readonly ILog _log;
     private readonly DriverWallet _wallet;
-    private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
+    // The session-start catch-up: the starter car and today's login bonus. It
+    // owns the streak counter and the seeded roll, so neither lives here.
+    private readonly DriverCatchUp _catchUp;
     // XP world standings backend (PORTPLAN 60, Unity RivalsService): the
     // receipt's rivals block reads through it on every settle.
     private readonly IRivalsService _rivals;
@@ -89,10 +91,6 @@ public sealed class MainViewModel
     // its own garage.json: the catalogue row behind each car is the data, the
     // per-car state (odometer, insurance) grows with items 31/32/34.
     private readonly Garage _garage;
-    // The seeded roll behind the streak's random skill gains (PORTPLAN 06/47,
-    // Unity ApplyRandomSkillDelta): the root owns the seed, so a test can pin
-    // the skills a resumed streak lands on.
-    private readonly Random _rng;
     // The 200 px companion: the poll pushes it one snapshot so
     // the HUD never opens its own timer or shared-memory handle.
     private readonly ITelemetryHud? _hud;
@@ -142,10 +140,10 @@ public sealed class MainViewModel
         ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
         ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
         AddressMap addressMap, TaxiRules taxiRules,
-        VoiceBeat beat, DriverWallet wallet, DailyStreak streak, OperatingZone zone,
+        VoiceBeat beat, DriverWallet wallet, OperatingZone zone,
         IReadOnlyList<CarSpec> cars, IRivalsService rivals, IPlayerTelemetry playerTelemetry,
-        Garage garage, Random rng,
-        GameStateSaver saver, FleetService fleet, JobSettlement settlement,
+        Garage garage,
+        DriverCatchUp catchUp, GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
@@ -168,13 +166,11 @@ public sealed class MainViewModel
         _voice = voice;
         _carBrands = carBrands;
         _wallet = wallet;
-        _streak = streak;
         _zone = zone;
         _rivals = rivals;
         _online = playerTelemetry;
         _cars = cars;
         _garage = garage;
-        _rng = rng;
         _hud = hud;
         if (_hud is not null)
         {
@@ -183,14 +179,15 @@ public sealed class MainViewModel
             _hud.JobEnterRequested += (_, _) => OnJobEntered();
         }
         _wallet = wallet;
-        _streak = streak;
         _zone = zone;
         _rivals = rivals;
         _online = playerTelemetry;
         _cars = cars;
-        // The persistence collaborator and the fleet are built by the root: the
-        // shell may not own a stateful service (AGENTS.md), and both are handed
-        // in so the settles and the poll share one instance.
+        // The persistence collaborator, the fleet and the boot catch-up are
+        // built by the root: the shell may not own a stateful service
+        // (AGENTS.md), and all three are handed in so the settles and the poll
+        // share one instance.
+        _catchUp = catchUp;
         _saver = saver;
         _settlement = settlement;
         _fleet = fleet;
@@ -239,39 +236,11 @@ public sealed class MainViewModel
         // the missing doors now. A fresh career is still in onboarding, so the
         // gate keeps the business list empty until the introduction ends.
         _poiWorld.Grow();
-        // Grandma's car is the first OwnedCar (PORTPLAN Career Start item 3 +
-        // item 30): a save whose onboarding already ran but whose garage is
-        // still empty — every save written before this slice — seeds the car
-        // it picked instead of opening on an empty garage. Unity creates the
-        // starter OwnedCar at the pick itself, so this is the same state one
-        // session later; the key resolves through the catalogue for specs.
-        if (OnboardingDone && _garage.Cars.Count == 0 && _story.Progress.GrandmaCarId is { Length: > 0 } starter)
-        {
-            _garage.Add(starter, _day.DisplayWeek);
-            SaveGarage();
-            _log.LogInfo($"garage seeded with grandma's car: {starter}");
-        }
-        // Login streak (PORTPLAN 47, Unity MapScreen.Show): recount from the
-        // saved dates before anything else reads the driver state, then
-        // grant today's bonus once onboarding is behind (Unity's
-        // firstSceneComplete gate at the grant site).
-        _streak.Update();
-        if (OnboardingDone && _streak.BonusDue)
-        {
-            int days = _streak.DaysInARow;
-            int bonus = ConsecutiveDayBonus.ComputeBonus(days);
-            _streak.StampBonus();
-            _wallet.AddBonus(bonus);
-            // Unity's streak tail (Source MapScreen.GrantDailyBonusIfDue): day
-            // N hands N random skill points out, silently, before the save.
-            for (int i = 0; i < days; i++)
-            {
-                _wallet.AddRandomSkill(_rng, 1.0);
-            }
-            SaveDriver(_rivals.LastResult);
-            _log.LogInfo($"[Streak] consecutive-day bonus granted: {bonus} CR (day {days}, " +
-                $"{days} random skill point(s))");
-        }
+        // Driver catch-up (PORTPLAN items 30/47, Unity MapScreen.Show): grandma's
+        // car is seeded into a garage that predates the garage file, and the
+        // login streak is recounted with today's bonus granted once past the
+        // introduction. Both rules and their saves live in the collaborator.
+        _catchUp.Run(_day.DisplayWeek);
         _shell.RecordActivity(_clock.UtcNow);
         _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };

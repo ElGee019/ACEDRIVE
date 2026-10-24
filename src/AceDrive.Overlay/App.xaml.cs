@@ -349,6 +349,16 @@ public partial class App : Application, IDisposable
         var dayCycle = new DayCycle(
             game, shift, shifts, shiftStandings, telemetry, profileStore,
             rivals, saver, beat, startWeek, _log);
+        // The session-start catch-up (PORTPLAN items 30/47): the starter car a
+        // pre-garage save never created, and today's login bonus. It owns the
+        // streak counter and the skill-gain stream, so the coordinator does not
+        // see either; the display week it stamps the seeded car with arrives as
+        // a value at the call site (DayCycle owns it).
+        var catchUp = new DriverCatchUp(
+            onboardingStore, garage, streak, driver,
+            // The streak's random skill gains (PORTPLAN 06/47): its own seeded
+            // stream, offset from the taxi seed like the other draws.
+            new Random(taxiSeed + 5), saver, rivals, _log);
         // The readout formatter the poll applies: the painted strings and their
         // change caches, so no formatting runs on the hot path.
         var readouts = new TelemetryReadouts();
@@ -424,16 +434,12 @@ public partial class App : Application, IDisposable
             taxiRules,
             beat,
             driver,
-            streak,
             zone,
             cars,
             rivals,
             telemetry,
             garage,
-            // The streak's random skill gains (PORTPLAN 06/47): its own seeded
-            // stream, offset from the taxi seed like the other draws.
-            new Random(taxiSeed + 5),
-            saver, fleet, settlement, shell, panel, story, voiceRouter,
+            catchUp, saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
             hud,
             saveResets, restarter);
