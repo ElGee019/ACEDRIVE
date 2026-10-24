@@ -13,7 +13,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// unit-testable with fakes. Knows NOTHING about HWNDs or files.
 /// </summary>
 public sealed class MainViewModel
-    : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost, IDisposable
+    : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost,
+      IDeliveryHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -96,8 +97,12 @@ public sealed class MainViewModel
     // In-memory until the persistent save lands (PORTPLAN 51).
     private readonly DeliveryCareer _career;
     // The delivery board. A placed grocery/coffee store appends its row at
-    // runtime, so this is the live catalogue, not only the JSON snapshot.
-    private DeliveryCatalog _deliveryCatalog;
+    // runtime, so the live catalogue is a holder the board page, the run
+    // planner and the settle all read (S3 moves its growth into PoiWorld).
+    private readonly DeliveryBoard _deliveryBoard;
+    // The delivery run from DELIVER to receipt: owns the live run and the board
+    // page; the panel, the HUD line and the settle arrive through IDeliveryHost.
+    private readonly DeliveryFlow _delivery;
     // The proposal draw behind the taxi page: two map addresses, the
     // persisted resident at each door and the home/residence flip
     // (Data/name_pools.json, Germany pools + Unity suffix list, PORTPLAN
@@ -134,9 +139,6 @@ public sealed class MainViewModel
     // The insurance table (PORTPLAN 34): the nightly charge rate and the broker
     // page's daily-cost math (Data/insurance_rules.json).
     private readonly InsuranceRules _insuranceRules;
-    // The trip-start breakdown roll (PORTPLAN 39): a seeded instance built in
-    // the composition root, never the shared global (AGENTS.md).
-    private readonly BreakdownStrategy _breakdowns;
     // The seeded roll behind the streak's random skill gains (PORTPLAN 06/47,
     // Unity ApplyRandomSkillDelta): the root owns the seed, so a test can pin
     // the skills a resumed streak lands on.
@@ -151,7 +153,6 @@ public sealed class MainViewModel
     // The menu is built once per session so its clock keeps ticking behind
     // another page; the poll refreshes it on the minute guard.
     private MenuScreenViewModel? _menu;
-    private DeliveryJobScreenViewModel? _deliveryScreen;
     private ParameterizedCommand<int>? _openDayAction;
     private int _lastDay = -1;
     // Display week: rolls on the Sunday-midnight crossing, persists across
@@ -202,20 +203,11 @@ public sealed class MainViewModel
     private DateTime _lastTick;
     private bool _disposed;
 
-    // The live delivery run (PORTPLAN 19): ordered hub pickups + store
-    // drop-offs. Null outside a run; the taxi job and this cannot overlap
-    // because a call/board is refused while either is in progress.
-    private DeliveryJob? _deliveryJob;
-    // True once the run reached its first store leg: the meter is reset at
-    // that edge so the hub pickup distance is not charged as delivery km
-    // (Unity stamps jobStartOdometer when the store route starts).
-    private bool _deliveryStoreLegStarted;
     // A job is live from ACCEPT (the drive to the pickup) until the drop-off
     // settles, or from DELIVER until the last store is served. The idle-shift
     // rule and the overlay call both read this one definition, so a new leg
     // cannot mean two different things.
-    private bool JobInProgress => _taxi.InProgress || DeliveryInProgress;
-    private bool DeliveryInProgress => _deliveryJob is { IsComplete: false };
+    private bool JobInProgress => _taxi.InProgress || _delivery.InProgress;
     // The passenger-leg distance. Lives outside the job so a refused pickup or
     // a breakdown can discard the ride without leaving a half-run meter.
     private readonly TaxiDriveMeter _meter;
@@ -244,7 +236,7 @@ public sealed class MainViewModel
         IProfileStore profiles, IPlayerNameRegistry playerNames,
         AddressMap addressMap, string? detectedPlayerName,
         IVoiceListener voice, ICarBrandSource carBrands,
-        TodoTable todos, DeliveryCatalog deliveryCatalog, DeliveryCareer career,
+        TodoTable todos, DeliveryBoard deliveryBoard, DeliveryCareer career,
         DeliveryFareTable deliveryFares,
         CityEconomy city, ICityStore cityStore,
         RoadTestLedger roadTests, IRoadTestStore roadTestStore,
@@ -256,7 +248,6 @@ public sealed class MainViewModel
         IShiftStandings shiftStandings,
         Hunger hunger, IHungerStateStore hungerStore,
         Garage garage, IGarageStore garageStore, InsuranceRules insuranceRules,
-        BreakdownStrategy breakdowns,
         Random rng,
         PoiGenerator pois,
         PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
@@ -266,7 +257,7 @@ public sealed class MainViewModel
         TaxiRules taxiRules,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
-        TaxiJobFlow taxi,
+        TaxiJobFlow taxi, DeliveryFlow delivery,
         ITelemetryHud? hud = null,
         IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
         ISaveDataResetter? saveResets = null,
@@ -295,14 +286,13 @@ public sealed class MainViewModel
         _todos = todos;
         _voice = voice;
         _carBrands = carBrands;
-        _deliveryCatalog = deliveryCatalog;
+        _deliveryBoard = deliveryBoard;
         _deliveryFares = deliveryFares;
         _career = career;
         _city = city;
         _hunger = hunger;
         _garage = garage;
         _insuranceRules = insuranceRules;
-        _breakdowns = breakdowns;
         _rng = rng;
         _hud = hud;
         if (_hud is not null)
@@ -331,9 +321,11 @@ public sealed class MainViewModel
         _shell = shell;
         _shops = shops;
         _taxi = taxi;
-        // The flow is built before the shell it reports to; this is the one
-        // late edge, and it closes here before anything can fire a command.
+        _delivery = delivery;
+        // Both flows are built before the shell they report to; these are the
+        // late edges, and they close here before anything can fire a command.
         _taxi.Attach(this);
+        _delivery.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications, and re-derive the page-shape flags.
         _shell.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
@@ -354,7 +346,7 @@ public sealed class MainViewModel
         _story = new OnboardingFlow(
             onboarding, content, profiles, playerNames, addressMap, detectedPlayerName,
             pois, poiDirectory, poiStore, poiArrivals, trunk,
-            career, deliveryCatalog.StartCredP,
+            career, deliveryBoard.Catalog.StartCredP,
             preferencesStore, preferences,
             culture, beat, hud, garage, () => _displayWeek, SaveGarage,
             () => _carBrand, log, this);
@@ -564,19 +556,13 @@ public sealed class MainViewModel
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
     void IJobSettlementHost.GoToControlPage() => SetScreen(CreateControlScreen());
-    void IJobSettlementHost.RefreshDeliveryBoard() => _deliveryScreen?.Refresh(_deliveryCatalog);
-    void IJobSettlementHost.ClearDeliveryRun()
-    {
-        _deliveryJob = null;
-        _deliveryStoreLegStarted = false;
-        _hud?.SetJobGuidance(null);
-    }
+    void IJobSettlementHost.RefreshDeliveryBoard() => _delivery.RefreshBoard();
+    void IJobSettlementHost.ClearDeliveryRun() => _delivery.Stop();
     void IJobSettlementHost.GoToDeliveryBoard() =>
-        SetScreen(_deliveryScreen ?? (object)CreateControlScreen());
+        SetScreen(_delivery.Board ?? (object)CreateControlScreen());
 
     // The host slice the taxi flow sees: the flow owns the job and the ask; the
-    // shell owns the panel, the breakdown the job shares with delivery, and the
-    // settle that prices the ride.
+    // shell owns the panel and the settle that prices the ride.
     void ITaxiJobHost.ShowPage(object screen) => SetScreen(screen);
     void ITaxiJobHost.RevealPage(object screen) => ShowJobScreen(screen);
     void ITaxiJobHost.HidePanel() => Hide();
@@ -584,10 +570,28 @@ public sealed class MainViewModel
     void ITaxiJobHost.RefreshControlPage() => _control?.Refresh();
     object ITaxiJobHost.ControlPage() => CreateControlScreen();
     AddressLocation? ITaxiJobHost.HomeAddress() => AddressBook.Home(_addressMap, _story.Profile);
-    BreakdownOutcome? ITaxiJobHost.RollTripStart(BreakdownKind kind) => RollTripStart(kind);
-    void ITaxiJobHost.ShowBreakdown(BreakdownOutcome breakdown) => ShowBreakdown(breakdown);
     void ITaxiJobHost.SettleRide(TaxiJobState job) =>
         _settlement.SettleTaxiRide(job, HomeCountry, _carBrand, this);
+
+    // The host slice the delivery run sees: the flow owns the run and the board;
+    // the shell owns the panel, the companion's line, the hub page and the settle.
+    void IDeliveryHost.ShowPage(object screen) => SetScreen(screen);
+    void IDeliveryHost.RevealPage(object screen) => ShowJobScreen(screen);
+    void IDeliveryHost.HidePanel() => Hide();
+    object IDeliveryHost.ControlPage() => CreateControlScreen();
+    void IDeliveryHost.OpenHub() => OpenHub();
+    void IDeliveryHost.ClearGuidance() => _hud?.SetJobGuidance(null);
+    bool IDeliveryHost.PinStop(DeliveryStop leg)
+    {
+        if (DeliveryGuidance(leg) is not { } guidance)
+        {
+            return false;
+        }
+        _hud?.SetJobGuidance(guidance);
+        return true;
+    }
+    void IDeliveryHost.Settle(DeliveryRun run) =>
+        _settlement.SettleDeliveryRun(run, HomeCountry, this);
 
     // Reveal the panel on the requested POI screen. Show() deliberately
     // resets a hidden start to the control page; entering a shop must land
@@ -654,7 +658,7 @@ public sealed class MainViewModel
 
     // Built once and reused: the pickup cart survives leaving the page, like
     // Unity's player.pickupCart. Back lands on the control page. The run
-    // button carries the whole cart run to the host, which drives the hub
+    // button carries the whole cart run to the flow, which drives the hub
     // pickups and store drop-offs on the companion before it settles the
     // receipt. The hub button opens the real OPEN NEW CAREER page (item 18).
     private void OpenDelivery()
@@ -662,14 +666,7 @@ public sealed class MainViewModel
         // A hub bought on the previous visit may have opened store doors; the
         // board must include them before the cached page paints.
         GrowPois();
-        _deliveryScreen ??= new DeliveryJobScreenViewModel(
-            _deliveryCatalog, _career, _city, _log,
-            new RelayCommand(() => SetScreen(CreateControlScreen())),
-            new ParameterizedCommand<DeliveryRun>(StartDeliveryRun),
-            new RelayCommand(OpenHub),
-            _beat);
-        _deliveryScreen.Refresh(_deliveryCatalog);
-        SetScreen(_deliveryScreen);
+        SetScreen(_delivery.OpenBoard());
     }
 
     // Car-hauling contracts (PORTPLAN 20): today the tap settles the haul
@@ -731,7 +728,7 @@ public sealed class MainViewModel
     // the spent CredP and the newly connected stores.
     private void OpenHub() =>
         SetScreen(new DeliveryHubScreenViewModel(
-            _career, _deliveryCatalog, _city, _log,
+            _career, _deliveryBoard.Catalog, _city, _log,
             new RelayCommand(CloseHub),
             _beat,
             PlaceHubDoor));
@@ -741,8 +738,8 @@ public sealed class MainViewModel
         // Unity's backfill runs when the career opens: the newly owned
         // category places its first store before the board is shown again.
         GrowPois();
-        _deliveryScreen?.Refresh(_deliveryCatalog);
-        SetScreen(_deliveryScreen);
+        _delivery.RefreshBoard();
+        SetScreen(_delivery.Board ?? (object)CreateControlScreen());
     }
 
     private void SetScreen(object? screen)
@@ -914,11 +911,11 @@ public sealed class MainViewModel
             // The log reports the town that gets banked (every cell), not the
             // career-gated header the pages show: a fresh career sees 0 on
             // screen while its stores are still drifting behind it.
-            _log.LogInfo($"city: {_city.TotalCitizens(_deliveryCatalog.Stores)} citizens, " +
-                $"{_city.TotalGrowthPerHour(_deliveryCatalog.Stores)}/hr");
+            _log.LogInfo($"city: {_city.TotalCitizens(_deliveryBoard.Catalog.Stores)} citizens, " +
+                $"{_city.TotalGrowthPerHour(_deliveryBoard.Catalog.Stores)}/hr");
             // Unity repaints the board from OnCitizensChanged; only the cached
             // page needs the push, the hub page is rebuilt on every visit.
-            _deliveryScreen?.Refresh();
+            _delivery.RefreshBoard();
         }
 
         // Hunger meter (PORTPLAN 26, Unity GameClockManager.UpdateHunger): +1
@@ -1020,9 +1017,11 @@ public sealed class MainViewModel
             // The flow owns the leg: meter, distance, fare and the patrols.
             _taxi.AdvanceLeg(s, dt);
         }
-        else if (DeliveryInProgress)
+        else if (_delivery.InProgress)
         {
-            _meter.Add(s.SpeedKmh, dt);
+            // The delivery twin: the same shared accumulator, reset by the flow
+            // at the first store leg.
+            _delivery.Advance(s, dt);
         }
     }
 
@@ -1320,9 +1319,9 @@ public sealed class MainViewModel
 
     private void OnJobEntered()
     {
-        if (DeliveryInProgress)
+        if (_delivery.InProgress)
         {
-            DeliverStop();
+            _delivery.Deliver();
         }
         else if (PickupCommand.CanExecute(null))
         {
@@ -1366,61 +1365,6 @@ public sealed class MainViewModel
         SaveDriver(standings);
         LogStandingsMove(standings);
         return standings;
-    }
-
-    // One trip-start roll (PORTPLAN 39, Unity DrivingManager.BeginTripSession):
-    // a stranded engine always fires the engine-failure variant; otherwise the
-    // roll runs against the wear-derived chance. Past onboarding and with a car
-    // only (Unity's firstSceneComplete + mechanic gates).
-    private BreakdownOutcome? RollTripStart(BreakdownKind kind)
-    {
-        if (!OnboardingDone || _garage.Current is not { } car)
-        {
-            return null;
-        }
-        double fee = _garage.MaintenanceRules.PickupFee;
-        if (car.Engine.Broken)
-        {
-            return new BreakdownOutcome(kind, Fraction: 0.0, fee, EngineFailure: true);
-        }
-        double? fraction = _breakdowns.TryTrigger(car.Condition.BreakdownChance(car.Odometer));
-        return fraction is { } hit ? new BreakdownOutcome(kind, hit, fee, EngineFailure: false) : null;
-    }
-
-    // The mechanic tows the car in: the pickup fee is charged (Unity
-    // BreakdownFlow.PickupFee), the driver save banks it, and the page reports
-    // the interrupted trip. The per-kind consequences are applied by the caller,
-    // which holds the job context.
-    private void ShowBreakdown(BreakdownOutcome breakdown)
-    {
-        double fee = _wallet.ChargeUnavoidable(breakdown.PickupFee);
-        SaveDriver(_rivals.LastResult);
-        _log.LogWarning($"[Breakdown] {breakdown.Kind}" +
-            $"{(breakdown.EngineFailure ? " engine failure" : $" at {breakdown.Fraction:0.00} of the route")}," +
-            $" tow fee {fee:0.00} CR (cash {_wallet.Cash:0.00})");
-        ShowJobScreen(new BreakdownScreenViewModel(
-            breakdown, _beat,
-            new RelayCommand(() => SetScreen(CreateControlScreen()))));
-    }
-
-    // The distinct hub owners a run would have befriended, resolved read-only
-    // (a failed trip must not credit the ramp). Used by the breakdown hook.
-    private List<string> SourceOwners(DeliveryRun run)
-    {
-        List<string> owners = [];
-        foreach (string key in run.StoreKeys)
-        {
-            if (_deliveryCatalog.Find(key) is not { } store)
-            {
-                continue;
-            }
-            string owner = _career.OwnerFor(store.Category);
-            if (owner.Length > 0 && !owners.Contains(owner))
-            {
-                owners.Add(owner);
-            }
-        }
-        return owners;
     }
 
     // Zone expansion at the settle hooks (PORTPLAN 58, Unity
@@ -1485,7 +1429,7 @@ public sealed class MainViewModel
         // built at boot.
         if (AdoptShopDoors() || banked)
         {
-            _deliveryScreen?.Refresh(_deliveryCatalog);
+            _delivery.RefreshBoard();
         }
     }
 
@@ -1504,13 +1448,13 @@ public sealed class MainViewModel
             }
 
             bool newCell = _city.AddStore(store);
-            if (_deliveryCatalog.Find(store.Key) is not null)
+            if (_deliveryBoard.Catalog.Find(store.Key) is not null)
             {
                 changed |= newCell;
                 continue;
             }
 
-            _deliveryCatalog = _deliveryCatalog.WithStore(store);
+            _deliveryBoard.Add(store);
             _log.LogInfo($"delivery board connected: {store.Name} " +
                 $"({store.Category}) at {AddressFormatter.Format(poi.Address)}");
             changed = true;
@@ -1683,115 +1627,26 @@ public sealed class MainViewModel
         }
     }
 
-    // DELIVER hands the frozen cart run to the host: the breakdown roll and
-    // the route happen here, then the companion drives every hub pickup and
-    // store drop-off (Unity DeliveryJobHandler's pickup/delivery phases). The
-    // cart order is the route, so the destination-setting wizard has no step.
-    private void StartDeliveryRun(DeliveryRun? run)
+    // The map side of one stop: a hub's pickup door (placed at purchase) or the
+    // shop's own address. The flow asks for the pin; the door lives here until
+    // PoiWorld owns it in S3.
+    private HudJobGuidance? DeliveryGuidance(DeliveryStop leg)
     {
-        if (run is null || run.StoreKeys.Count == 0 || DeliveryInProgress)
-        {
-            return;
-        }
-        // Breakdown roll at the delivery trip start (PORTPLAN 39, Unity
-        // DeliveryJobHandler's BeginTripSession): the cargo is lost (no settle,
-        // no credit) and every producing hub's owner loses 1 familiarity. The
-        // Delivery Insurance Shield refund waits for the reward catalog (item 61).
-        if (RollTripStart(BreakdownKind.Delivery) is { } breakdown)
-        {
-            foreach (string owner in SourceOwners(run))
-            {
-                _friends.AddFamiliarity(owner, -1);
-            }
-            _log.LogInfo($"delivery cut by breakdown: {run.StoreKeys.Count} stores lost");
-            ShowBreakdown(breakdown);
-            return;
-        }
-
-        IReadOnlyList<DeliveryStop> stops =
-            DeliveryJobPlanner.Plan(_deliveryCatalog, _career, run.StoreKeys);
-        _deliveryJob = new DeliveryJob(stops, run);
-        _deliveryStoreLegStarted = false;
-        _meter.Reset();
-        _log.LogInfo($"delivery started: {stops.Count} stops, " +
-            $"{run.StoreKeys.Count} stores, goods €{run.PaidForGoods:0.00}");
-        Hide();
-        ShowDeliveryStop();
-    }
-
-    // Pins the current leg on the companion, or skips a leg whose content
-    // lost its address (a hand-edited catalogue) so the run can never stall
-    // on an unreachable stop. The first store leg resets the meter: the
-    // pickup drive is not part of the delivery distance charge.
-    private void ShowDeliveryStop()
-    {
-        while (_deliveryJob?.Current is { } stop)
-        {
-            if (!_deliveryStoreLegStarted && stop.Kind == DeliveryStopKind.Store)
-            {
-                _meter.Reset();
-                _deliveryStoreLegStarted = true;
-            }
-
-            if (DeliveryGuidance(stop) is { } guidance)
-            {
-                _hud?.SetJobGuidance(guidance);
-                return;
-            }
-
-            _log.LogWarning(
-                $"delivery stop skipped, no address: {stop.Name} ({stop.Key})");
-            _deliveryJob.Advance();
-        }
-
-        if (_deliveryJob is { } run)
-        {
-            _settlement.SettleDeliveryRun(run.Run, HomeCountry, this);
-        }
-    }
-
-    // The one ENTER action: at a hub it loads the freight, at a store it fills
-    // the shelves for that stop and advances. The receipt waits for the last
-    // stop, unlike Unity's per-stop page, so the run settles as one job.
-    private void DeliverStop()
-    {
-        if (_deliveryJob is not { } job || job.Current is not { } stop)
-        {
-            return;
-        }
-
-        if (stop.Kind == DeliveryStopKind.Store)
-        {
-            bool moved = _city.Restock([stop.Key]);
-            _log.LogInfo($"delivery stop served: {stop.Name}" +
-                (moved ? "" : " (already full)"));
-        }
-        else
-        {
-            _log.LogInfo($"delivery pickup: {stop.Name}");
-        }
-
-        job.Advance();
-        ShowDeliveryStop();
-    }
-
-    private HudJobGuidance? DeliveryGuidance(DeliveryStop stop)
-    {
-        AddressLocation? door = stop.Kind == DeliveryStopKind.Hub
-            ? OwnedHubDoor(stop.Key)?.Address
-            : _deliveryCatalog.Find(stop.Key)?.Address;
+        AddressLocation? door = leg.Kind == DeliveryStopKind.Hub
+            ? OwnedHubDoor(leg.Key)?.Address
+            : _deliveryBoard.Catalog.Find(leg.Key)?.Address;
         if (door is not { } target)
         {
             return null;
         }
 
-        return stop.Kind == DeliveryStopKind.Hub
+        return leg.Kind == DeliveryStopKind.Hub
             ? new HudJobGuidance(
-                stop.Name, target,
+                leg.Name, target,
                 "HudDeliveryHubDrive", "HudDeliveryHubArrived", "HudDeliveryHubAction",
                 _taxiRules.ArrivalRadiusMeters)
             : new HudJobGuidance(
-                stop.Name, target,
+                leg.Name, target,
                 "HudDeliveryStoreDrive", "HudDeliveryStoreArrived", "HudDeliveryStoreAction",
                 _taxiRules.ArrivalRadiusMeters);
     }

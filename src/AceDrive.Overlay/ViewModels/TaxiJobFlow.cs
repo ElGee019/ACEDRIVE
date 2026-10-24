@@ -11,9 +11,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// drop-off moments (Unity's JobSelectionScreen + TaxiJobLifecycleHandler).
 ///
 /// Owns the job state and the pages the job puts up. The shell's half — the
-/// panel, the saves, the breakdown and the settle — arrives through
-/// <see cref="ITaxiJobHost"/>. The shift itself (start, timeout, end) stays with
-/// the shell: it outlives one job.
+/// panel, the saves and the settle — arrives through
+/// <see cref="ITaxiJobHost"/>; the trip-start breakdown is the shared
+/// <see cref="TripBreakdowns"/> roll. The shift itself (start, timeout, end)
+/// stays with the shell: it outlives one job.
 /// </summary>
 public sealed class TaxiJobFlow
 {
@@ -36,6 +37,7 @@ public sealed class TaxiJobFlow
     private readonly TaxiDriveMeter _meter;
     private readonly GameStateSaver _saver;
     private readonly IRivalsService _rivals;
+    private readonly TripBreakdowns _breakdowns;
     private readonly ITelemetryHud? _hud;
     private readonly ILog _log;
 
@@ -61,7 +63,7 @@ public sealed class TaxiJobFlow
         TaxiRules taxiRules, FareTable fares, Garage garage, DriverWallet wallet,
         IFriendshipStore friends, FleetService fleet, GameClock game, IClock clock,
         VoiceBeat beat, TaxiDriveMeter meter, GameStateSaver saver, IRivalsService rivals,
-        ITelemetryHud? hud, ILog log)
+        TripBreakdowns breakdowns, ITelemetryHud? hud, ILog log)
     {
         _proposals = proposals;
         _addressMap = addressMap;
@@ -82,6 +84,7 @@ public sealed class TaxiJobFlow
         _meter = meter;
         _saver = saver;
         _rivals = rivals;
+        _breakdowns = breakdowns;
         _hud = hud;
         _log = log;
         PickupCommand = new RelayCommand(ConfirmPickup, () => _job.Phase == JobPhase.ToPickup);
@@ -208,13 +211,14 @@ public sealed class TaxiJobFlow
         // never becomes active, the customer loses 1 familiarity, the
         // mechanic's tow fee is charged, and the breakdown page replaces the
         // proposal.
-        if (_host.RollTripStart(BreakdownKind.Taxi) is { } breakdown)
+        if (_breakdowns.Roll(BreakdownKind.Taxi) is { } breakdown)
         {
             _friends.AddFamiliarity(_job.Customer.BaseName, -1);
             _log.LogInfo($"taxi job cut by breakdown: {_job.Customer.Full} " +
                 $"{_job.PickupName} -> {_job.DropoffName}");
             AbandonJob();
-            _host.ShowBreakdown(breakdown);
+            _host.RevealPage(_breakdowns.Interrupt(
+                breakdown, new RelayCommand(() => _host.ShowPage(_host.ControlPage()))));
             return;
         }
 

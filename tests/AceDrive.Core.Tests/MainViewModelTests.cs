@@ -83,6 +83,7 @@ public sealed class MainViewModelTests
         }
         var board = catalog ?? DeliveryCatalog.Default;
         var deliveryCareer = career ?? new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
+        var deliveryBoard = new DeliveryBoard(board);
         CarIdentity? announced = carKsId is null ? null : new CarIdentity(carKsId, carPreset);
         var brands = new FakeCarBrandSource { CurrentIdentity = announced };
         var profiles = profileStore ?? new FakeProfileStore(profile);
@@ -149,10 +150,13 @@ public sealed class MainViewModelTests
         var brandMileageInstance = brandMileage ?? new FakeBrandMileageStore();
         var telemetryInstance = telemetry ?? new FakePlayerTelemetry();
         var meter = new TaxiDriveMeter(taxiRulesInstance.MaxMeterSpeedKmh);
+        var breakdownsInstance = new TripBreakdowns(
+            breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            garageInstance, onboardingStore, walletInstance, rivalsInstance, saver, beat, logger);
         var settlement = new JobSettlement(
             walletInstance, garageInstance, shiftInstance, zoneInstance, jobsInstance,
             streakInstance, clock, fleet, rarityInstance, friendsInstance,
-            brandMileageInstance, telemetryInstance, rivalsInstance, board,
+            brandMileageInstance, telemetryInstance, rivalsInstance, deliveryBoard,
             deliveryCareer, cityInstance, deliveryFaresInstance, meter,
             faresInstance, taxiRulesInstance, beat, hud, logger);
         var shops = new ShopInteriors(
@@ -162,13 +166,17 @@ public sealed class MainViewModelTests
             proposalsInstance, map, brands, pool, requests,
             requestTable ?? CustomerRequestTable.Empty, police,
             taxiRulesInstance, faresInstance, garageInstance, walletInstance,
-            friendsInstance, fleet, game, clock, beat, meter, saver, rivalsInstance, hud, logger);
+            friendsInstance, fleet, game, clock, beat, meter, saver, rivalsInstance,
+            breakdownsInstance, hud, logger);
+        var delivery = new DeliveryFlow(
+            deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
+            breakdownsInstance, beat, logger);
         var vm = new MainViewModel(tel, clock, game, shiftInstance, shiftStoreInstance, store,
             logger, faresInstance,
             onboardingStore, contentSource,
             profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
-            brands, TodoTable.Default, board, deliveryCareer,
+            brands, TodoTable.Default, deliveryBoard, deliveryCareer,
             deliveryFaresInstance,
             cityInstance, cityStoreInstance,
             roadsInstance, roadTestStoreInstance,
@@ -186,8 +194,6 @@ public sealed class MainViewModelTests
             hungerInstance, hungerStoreInstance,
             garageInstance, garageStoreInstance,
             InsuranceRules.Default,
-            // Seeded so a test can force a breakdown or keep every trip clean.
-            breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             rng ?? new Random(0),
             pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
             directory, directoryStore,
@@ -198,7 +204,8 @@ public sealed class MainViewModelTests
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(), meter, shops, taxi, hud, handlers,
+            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(),
+            meter, shops, taxi, delivery, hud, handlers,
             saveResets, restarter,
             storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)

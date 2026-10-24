@@ -75,9 +75,13 @@ public sealed class OnboardingTests
         var fleet = new FleetService(
             garage, cars, game, wallet, InsuranceRules.Default, logger, carBrands, contentSource);
         var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        var deliveryBoard = new DeliveryBoard(catalog);
+        var breakdowns = new TripBreakdowns(
+            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            garage, store, wallet, rivals, saver, beat, logger);
         var settlement = new JobSettlement(
             wallet, garage, shift, zone, jobs, streak, clock, fleet, rarity,
-            friendships, brandMileage, playerTelemetry, rivals, catalog, career,
+            friendships, brandMileage, playerTelemetry, rivals, deliveryBoard, career,
             city, deliveryFares, meter, fares, taxiRules, beat, null, logger);
         var shops = new ShopInteriors(
             wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
@@ -85,14 +89,17 @@ public sealed class OnboardingTests
         var taxi = new TaxiJobFlow(
             proposals, AddressMap.Default, carBrands, cars, null,
             CustomerRequestTable.Empty, null, taxiRules, fares, garage, wallet,
-            friendships, fleet, game, clock, beat, meter, saver, rivals, null, logger);
+            friendships, fleet, game, clock, beat, meter, saver, rivals, breakdowns,
+            null, logger);
+        var delivery = new DeliveryFlow(
+            deliveryBoard, career, city, friendships, meter, breakdowns, beat, logger);
         return new MainViewModel(new FakeTelemetry(), clock, game, shift, shiftStore,
             new FakeStore(), logger, fares,
             store, contentSource,
             profiles ?? new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
-            carBrands, TodoTable.Default, catalog, career,
+            carBrands, TodoTable.Default, deliveryBoard, career,
             deliveryFares,
             city, cityStore,
             roads, roadTestStore,
@@ -102,7 +109,6 @@ public sealed class OnboardingTests
             new OfflineShiftStandings(),
             hunger, hungerStore,
             garage, garageStore, InsuranceRules.Default,
-            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             new PoiDirectory(), new FakePoiDirectoryStore(),
@@ -111,7 +117,8 @@ public sealed class OnboardingTests
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops, taxi);
+            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops,
+            taxi, delivery);
     }
 
     // The first-run page (unit + language) sits before the name form; its

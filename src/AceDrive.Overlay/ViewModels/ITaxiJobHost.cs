@@ -4,11 +4,12 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The slice of the shell a running taxi job needs: put a page up, refresh the
-/// job line, run the trip-start breakdown the job shares with delivery, and
-/// settle the ride through the receipt host.
+/// job line, and settle the ride through the receipt host.
 ///
 /// The flow owns the job, its request and its speed challenge; the shell owns
 /// the panel and the saves, so those arrive here rather than being reached for.
+/// The trip-start breakdown is not here: both job flows take the same
+/// <see cref="TripBreakdowns"/> roll.
 /// </summary>
 public interface ITaxiJobHost
 {
@@ -32,12 +33,6 @@ public interface ITaxiJobHost
 
     /// <summary>The player's home address, or null before the profile exists.</summary>
     AddressLocation? HomeAddress();
-
-    /// <summary>One trip-start roll (PORTPLAN 39); shared with the delivery flow.</summary>
-    BreakdownOutcome? RollTripStart(BreakdownKind kind);
-
-    /// <summary>Charges the tow and shows the breakdown page.</summary>
-    void ShowBreakdown(BreakdownOutcome breakdown);
 
     /// <summary>Prices and banks the finished ride, then shows its receipt.</summary>
     void SettleRide(TaxiJobState job);

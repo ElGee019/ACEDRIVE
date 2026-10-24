@@ -322,12 +322,16 @@ public partial class App : Application, IDisposable
         var fleet = new FleetService(
             garage, cars, game, driver, insuranceRules, _log, carBrands, content);
         var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        // The live board (a shop that connects while the overlay runs appends a
+        // row) and the one instance the board page, the run planner and the
+        // settle all read. S3 moves the growth that fills it into PoiWorld.
+        var deliveryBoard = new DeliveryBoard(deliveryCatalog);
         // Prices and banks one finished job; the poll feeds the same meter, so
         // the instance is shared rather than owned by either side.
         var settlement = new JobSettlement(
             driver, garage, shift, zone, jobs, streak, wall,
             fleet, rarity, friendships, brands, telemetry, rivals,
-            deliveryCatalog, deliveryCareer, city, deliveryFares, meter,
+            deliveryBoard, deliveryCareer, city, deliveryFares, meter,
             fares, taxiRules, beat, hud, _log);
         var saver = new GameStateSaver(
             wall, game, clockStore, driverStore, garageStore, cityStore,
@@ -338,12 +342,21 @@ public partial class App : Application, IDisposable
         var shell = new OverlayShell();
         var shops = new ShopInteriors(
             driver, garage, game, insuranceRules, cars, saver, beat, _log);
+        // The trip-start breakdown roll (PORTPLAN 39): one seeded instance,
+        // never the shared global (AGENTS.md), read by both job flows.
+        var breakdowns = new TripBreakdowns(
+            new BreakdownStrategy(maintenanceRules, Environment.TickCount),
+            garage, onboardingStore, driver, rivals, saver, beat, _log);
         // The taxi job from proposal to receipt; the shell attaches itself as
         // its host right after construction.
         var taxi = new TaxiJobFlow(
             taxiProposals, addressMap, carBrands, cars, requests, requestTable,
             police, taxiRules, fares, garage, driver, friendships, fleet, game, wall,
-            beat, meter, saver, rivals, hud, _log);
+            beat, meter, saver, rivals, breakdowns, hud, _log);
+        // The delivery run from DELIVER to receipt, with its own board page.
+        var delivery = new DeliveryFlow(
+            deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,
+            beat, _log);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -362,7 +375,7 @@ public partial class App : Application, IDisposable
             CreateVoice(_log),
             carBrands,
             todos,
-            deliveryCatalog,
+            deliveryBoard,
             deliveryCareer,
             deliveryFares,
             city,
@@ -387,9 +400,6 @@ public partial class App : Application, IDisposable
             garage,
             garageStore,
             insuranceRules,
-            // The trip-start breakdown roll (PORTPLAN 39): a seeded instance,
-            // never the shared global (AGENTS.md).
-            new BreakdownStrategy(maintenanceRules, Environment.TickCount),
             // The streak's random skill gains (PORTPLAN 06/47): its own seeded
             // stream, offset from the taxi seed like the other draws.
             new Random(taxiSeed + 5),
@@ -397,7 +407,8 @@ public partial class App : Application, IDisposable
             poiDirectory, poiStore,
             poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops, taxi, hud, poiHandlers,
+            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops, taxi, delivery,
+            hud, poiHandlers,
             saveResets, restarter, storeCatalog);
 
         MainWindow = new MainWindow(vm, _log);

@@ -36,7 +36,9 @@ public sealed class JobSettlement
     private readonly IBrandMileageStore _brands;
     private readonly IPlayerTelemetry _online;
     private readonly IRivalsService _rivals;
-    private readonly DeliveryCatalog _deliveryCatalog;
+    // WHY the holder, not a catalogue snapshot: a shop that connected while the
+    // overlay ran must be priced by the run that delivered to it.
+    private readonly DeliveryBoard _deliveryBoard;
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
     private readonly DeliveryFareTable _deliveryFares;
@@ -52,7 +54,7 @@ public sealed class JobSettlement
         JobLedger jobs, DailyStreak streak, IClock clock,
         FleetService fleet, ICarRaritySource rarity, IFriendshipStore friends,
         IBrandMileageStore brands, IPlayerTelemetry online, IRivalsService rivals,
-        DeliveryCatalog deliveryCatalog, DeliveryCareer career, CityEconomy city,
+        DeliveryBoard deliveryBoard, DeliveryCareer career, CityEconomy city,
         DeliveryFareTable deliveryFares, TaxiDriveMeter meter,
         FareTable fares, TaxiRules taxiRules,
         VoiceBeat beat, ITelemetryHud? hud, ILog log)
@@ -70,7 +72,7 @@ public sealed class JobSettlement
         _brands = brands;
         _online = online;
         _rivals = rivals;
-        _deliveryCatalog = deliveryCatalog;
+        _deliveryBoard = deliveryBoard;
         _career = career;
         _city = city;
         _deliveryFares = deliveryFares;
@@ -239,7 +241,7 @@ public sealed class JobSettlement
         int credPEarned = 0;
         foreach (string key in run.StoreKeys)
         {
-            if (_deliveryCatalog.Find(key) is not { } store)
+            if (_deliveryBoard.Catalog.Find(key) is not { } store)
             {
                 continue;
             }

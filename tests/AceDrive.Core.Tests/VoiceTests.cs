@@ -98,9 +98,13 @@ public sealed class VoiceTests
         var fleet = new FleetService(
             garage, cars, game, wallet, InsuranceRules.Default, logger, car, contentSource);
         var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        var deliveryBoard = new DeliveryBoard(catalog);
+        var breakdowns = new TripBreakdowns(
+            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
+            garage, onboarding, wallet, rivals, saver, beat, logger);
         var settlement = new JobSettlement(
             wallet, garage, shift, zone, jobs, streak, clock, fleet, rarity,
-            friendships, brandMileage, playerTelemetry, rivals, catalog, career,
+            friendships, brandMileage, playerTelemetry, rivals, deliveryBoard, career,
             city, deliveryFares, meter, fares, taxiRules, beat, null, logger);
         var shops = new ShopInteriors(
             wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
@@ -108,14 +112,17 @@ public sealed class VoiceTests
         var taxi = new TaxiJobFlow(
             proposals, AddressMap.Default, car, cars, null,
             CustomerRequestTable.Empty, null, taxiRules, fares, garage, wallet,
-            friendships, fleet, game, clock, beat, meter, saver, rivals, null, logger);
+            friendships, fleet, game, clock, beat, meter, saver, rivals, breakdowns,
+            null, logger);
+        var delivery = new DeliveryFlow(
+            deliveryBoard, career, city, friendships, meter, breakdowns, beat, logger);
         var vm = new MainViewModel(telemetry ?? new FakeTelemetry(), clock, game, shift, shiftStore,
             new FakeStore(), logger, fares,
             onboarding, contentSource,
             new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             mic, car, TodoTable.Default,
-            catalog, career,
+            deliveryBoard, career,
             deliveryFares,
             city, cityStore,
             roads,
@@ -127,7 +134,6 @@ public sealed class VoiceTests
             new OfflineShiftStandings(),
             hunger, hungerStore,
             garage, garageStore, InsuranceRules.Default,
-            new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             new PoiDirectory(), new FakePoiDirectoryStore(),
@@ -136,7 +142,8 @@ public sealed class VoiceTests
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops, taxi);
+            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops,
+            taxi, delivery);
         return (vm, clock, mic, car);
     }
 
