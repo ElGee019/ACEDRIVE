@@ -239,3 +239,35 @@ in S1, when the gate moves.
 - The coordinator's line count and field list both shrink; if a slice only moves
   code without shrinking either, it is not a slice — stop and reconsider.
 - The commit message names what unblocked, not only what moved.
+
+## 11. Resume here
+
+State: S1 pushed as `4d4c0e2`. `MainViewModel` 1887 lines, 60 constructor
+parameters, 1659 tests green.
+
+Next: **S2 — `DeliveryFlow`** (~150 lines: `StartDeliveryRun`,
+`ShowDeliveryStop`, `DeliverStop`, `DeliveryGuidance`, `SourceOwners`). It owns
+`_deliveryJob`, `_deliveryStoreLegStarted`, `_deliveryScreen` and the run's
+meter reset. `Start` rolls the breakdown; `Stop` settles through
+`JobSettlement`.
+
+Settle open decision 1 before cutting: `RollTripStart`/`ShowBreakdown` are
+`ITaxiJobHost` members today and delivery needs the same two, so extract them
+into a small `TripBreakdowns` collaborator (roll, tow fee, page) that both flows
+take — not a duplicate pair on a second host.
+
+Watch: the run shares `TaxiDriveMeter` with the taxi leg and the two cannot
+overlap; `Poll` still feeds the delivery leg itself, and S2 moves that into the
+flow.
+
+Working agreements earned so far:
+
+- The coordinator implements the host; a flow attaches with `Attach(this)` in
+  the coordinator's constructor — the one late edge, closed before any command
+  can fire.
+- Collaborators take the saver, watcher and rivals directly; the host only
+  reports (page, saves, readouts).
+- Tests: one instance per service graph; builders hoist their locals.
+- Never round-trip UTF-8 through `Get-Content`/`Set-Content` (PowerShell 5.1
+  decodes as ANSI and re-encodes, silently mangling `—` and `€`); use
+  `[IO.File]::ReadAllText/WriteAllText`.
