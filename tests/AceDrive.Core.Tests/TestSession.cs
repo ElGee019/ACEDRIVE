@@ -175,6 +175,10 @@ internal static class TestSession
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
             breakdownsInstance, beat, logger);
+        // The haul settle: the same watcher, pool and wallet the assertions
+        // read, and the calendar whose week its checkpoint banks.
+        var haul = new CarHaulFlow(
+            brands, pool, walletInstance, dayCycle, saver, beat, logger);
         // The page graph shares the one shell the VM binds: the tests assert
         // vm.CurrentScreen, so both must report the same panel.
         var shell = new OverlayShell();
@@ -182,7 +186,7 @@ internal static class TestSession
             shell, beat, game, clock, shiftInstance, TodoTable.Default, roadsInstance,
             saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
-            deliveryCareer, cityInstance, taxi, delivery, poiWorld, dayCycle, logger);
+            deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle, logger);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(shell, navigation, taxi, delivery, clock, logger);
@@ -203,7 +207,7 @@ internal static class TestSession
             tel, clock, world, shiftInstance, store, logger,
             options.Voice ?? new FakeVoiceListener(available: false), brands, map,
             taxiRulesInstance,
-            beat, walletInstance, pool,
+            beat, walletInstance,
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,

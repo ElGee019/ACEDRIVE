@@ -81,10 +81,11 @@ public sealed class NavigationTests
                 brands, new FakeContentSource(TestSession.EmptyContent)),
             game, clock, beat, meter, saver, rivals, breakdowns, null, log);
         var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
+        var haul = new CarHaulFlow(brands, poolCars, wallet, day, saver, beat, log);
         var nav = new Navigation(
             shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
             wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
-            directory, null, board, career, city, taxi, delivery, world, day, log);
+            directory, null, board, career, city, taxi, delivery, haul, world, day, log);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The proposal page asks the job's host for the player's door on every
@@ -241,17 +242,33 @@ public sealed class NavigationTests
     }
 
     [Fact]
-    public void SettingsTile_AndHaulDoor_TravelThroughTheCoordinator()
+    public void SettingsTile_TravelsThroughTheCoordinator()
     {
+        // RESET GAME is the story flow's and the session's plumbing, so the
+        // menu's tile is a report rather than a page the navigator builds.
         var (nav, shell, host, _, _, _, _, _, _, _, _) = Create();
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
 
         menu.SettingsCommand.Execute(null);
+
         Assert.Equal(1, host.Settings);
+    }
+
+    [Fact]
+    public void HaulDoor_SettlesTheFlowAndItsReceipt_WithoutTheCoordinator()
+    {
+        // The haul is a job type, not a report: the control page's tap prices
+        // the placeholder run, banks it through the flow and puts the flow's
+        // own receipt up. CONTINUE is the control page the tap came from.
+        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
 
         nav.ControlPage().HaulCommand.Execute(null);
-        Assert.Equal(1, host.Hauls);
+
+        var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(shell.CurrentScreen);
+        Assert.NotEmpty(receipt.CarLine);
+        receipt.ContinueCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(shell.CurrentScreen);
     }
 
     private static string RoadTestButton(CalendarScreenViewModel calendar) =>

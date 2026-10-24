@@ -4,8 +4,8 @@ namespace AceDrive.Core.Tests;
 
 /// <summary>
 /// The coordinator a navigator reports to: records the shift that timed out,
-/// how often the readouts were re-read, and which of the two non-page entries
-/// (settings, haul) the menu asked for.
+/// how often the readouts were re-read, and whether the menu asked for the
+/// settings page. The haul needs no report: its receipt is the flow's page.
 /// </summary>
 internal sealed class FakeNavigationHost : INavigationHost
 {
@@ -17,13 +17,9 @@ internal sealed class FakeNavigationHost : INavigationHost
 
     public int Settings { get; private set; }
 
-    public int Hauls { get; private set; }
-
     public void ShiftTimedOut(TimeSpan idle) => Idle = idle;
 
     public void ReadoutsChanged() => Readouts++;
 
     public void ShowSettings() => Settings++;
-
-    public void SettleHaul() => Hauls++;
 }

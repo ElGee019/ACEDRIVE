@@ -16,10 +16,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// also drops a pending voice tap so an old beat can never fire after the
 /// player moved on.
 ///
-/// Pages take commands and data, never policy: the entries whose domain lives
-/// elsewhere (the settings page with RESET GAME, the haul settle) and the
-/// outcomes the coordinator banks (a timed-out shift, the readouts) travel
-/// through <see cref="INavigationHost"/>. The display week is read from
+/// Pages take commands and data, never policy: the entry whose domain lives
+/// elsewhere (the settings page with RESET GAME) and the outcomes the
+/// coordinator banks (a timed-out shift, the readouts) travel through
+/// <see cref="INavigationHost"/>. The display week is read from
 /// <see cref="DayCycle"/>, which owns the day flip that rolls it (S5).
 /// </summary>
 public sealed class Navigation
@@ -47,9 +47,11 @@ public sealed class Navigation
     private readonly CityEconomy _city;
 
     // The collaborators these pages belong to: the proposal page and the board
-    // are theirs, and the doors behind a delivery stop are the world's.
+    // are theirs, the doors behind a delivery stop are the world's, and the
+    // haul receipt is the haul's.
     private readonly TaxiJobFlow _taxi;
     private readonly DeliveryFlow _delivery;
+    private readonly CarHaulFlow _haul;
     private readonly PoiWorld _world;
 
     // The session's calendar: the display week every page stamps is read from
@@ -86,7 +88,7 @@ public sealed class Navigation
         Trunk trunk, Hunger hunger, StoreCatalog stores,
         PoiDirectory directory, ITelemetryHud? hud,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
-        TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld world,
+        TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, ILog log)
     {
         _shell = shell;
@@ -110,6 +112,7 @@ public sealed class Navigation
         _city = city;
         _taxi = taxi;
         _delivery = delivery;
+        _haul = haul;
         _world = world;
         _day = day;
         _log = log;
@@ -154,7 +157,8 @@ public sealed class Navigation
 
     // Built once and reused. The taxi entry opens the job proposal page (port
     // of Unity TaxiJobProposalScreen); delivery opens the career page (port
-    // of Unity DeliveryJobScreen). The weekly strip lives on its own page
+    // of Unity DeliveryJobScreen); the haul settles its placeholder run and
+    // shows the flow's receipt. The weekly strip lives on its own page
     // (see CalendarPage).
     public MainControlScreenViewModel ControlPage()
     {
@@ -162,7 +166,7 @@ public sealed class Navigation
             _beat, _todos, _shift,
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
-                new RelayCommand(_host.SettleHaul)),
+                new RelayCommand(SettleHaul)),
             MenuCommand);
         return _control;
     }
@@ -215,6 +219,11 @@ public sealed class Navigation
         _world.Grow();
         ShowScreen(_delivery.OpenBoard());
     }
+
+    // The haul tap settles the placeholder run and puts the flow's own receipt
+    // up; CONTINUE is the control page it was opened from. Nothing banks here:
+    // the flow owns its wallet, calendar checkpoint and receipt.
+    private void SettleHaul() => ShowScreen(_haul.Settle(ControlCommand));
 
     /// <summary>Opens the hub page (Unity's OPEN NEW CAREER, PORTPLAN 18).</summary>
     public void ShowHub() =>

@@ -1,11 +1,12 @@
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The slice of the coordinator the navigator reports to: the four entries
+/// The slice of the coordinator the navigator reports to: the three entries
 /// whose work is not a page — closing a shift that already timed out (the
 /// coordinator owns the shift record and its summary page), re-reading the
-/// readouts after a shift starts, and the settings and haul pages, which belong
-/// to the story flow and the job settle rather than to navigation.
+/// readouts after a shift starts, and the settings page, which belongs to the
+/// story flow rather than to navigation. The haul settle is the haul flow's
+/// page, so it takes no report at all.
 /// </summary>
 public interface INavigationHost
 {
@@ -20,7 +21,4 @@ public interface INavigationHost
 
     /// <summary>Opens the settings page (the story flow's preferences writer).</summary>
     void ShowSettings();
-
-    /// <summary>Settles a car haul (PORTPLAN 20) and opens its receipt.</summary>
-    void SettleHaul();
 }

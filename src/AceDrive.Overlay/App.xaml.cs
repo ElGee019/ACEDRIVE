@@ -397,17 +397,19 @@ public partial class App : Application, IDisposable
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,
             beat, _log);
+        // The car haul (PORTPLAN 20): settle-only today, so the tap prices the
+        // placeholder leg, banks it and hands back the flow's own receipt.
+        var haul = new CarHaulFlow(carBrands, cars, driver, dayCycle, saver, beat, _log);
         // The page graph: the control page, the menu and every tile behind
         // them, with their own caches. It takes the flows (their pages are
         // theirs) and the session's data; the coordinator attaches as its host
         // inside the VM's constructor, which is the one late edge for the
-        // entries that are not pages (a timed-out shift, the settings page,
-        // the haul settle).
+        // entries that are not pages (a timed-out shift, the settings page).
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todos, roadTests, saver,
             driver, garage, rivals, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
-            taxi, delivery, poiWorld, dayCycle, _log);
+            taxi, delivery, haul, poiWorld, dayCycle, _log);
         // The panel's reveal policy: what a call opens, what revealing a POI
         // or a job page does, and hiding. The story flow, the voice router and
         // the coordinator share this one instance, so the root can build the
@@ -440,7 +442,6 @@ public partial class App : Application, IDisposable
             taxiRules,
             beat,
             driver,
-            cars,
             rivals,
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,

@@ -66,9 +66,6 @@ public sealed class MainViewModel
     // XP world standings backend (PORTPLAN 60, Unity RivalsService): the
     // receipt's rivals block reads through it on every settle.
     private readonly IRivalsService _rivals;
-    // The car pool behind the road-test ledger, reused for the receipt's
-    // passenger lookup (the driven car's ks id resolves against it).
-    private readonly IReadOnlyList<CarSpec> _cars;
     // The driven car's brand: the watcher owns it (the story flow and the
     // voice router read it there), so only its lifecycle stays here.
     private readonly ICarBrandSource _carBrands;
@@ -140,7 +137,7 @@ public sealed class MainViewModel
         ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
         AddressMap addressMap, TaxiRules taxiRules,
         VoiceBeat beat, DriverWallet wallet,
-        IReadOnlyList<CarSpec> cars, IRivalsService rivals,
+        IRivalsService rivals,
         Garage garage,
         DriverCatchUp catchUp, ZoneGrowth zoneGrowth,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
@@ -167,7 +164,6 @@ public sealed class MainViewModel
         _carBrands = carBrands;
         _wallet = wallet;
         _rivals = rivals;
-        _cars = cars;
         _garage = garage;
         _hud = hud;
         if (_hud is not null)
@@ -421,7 +417,6 @@ public sealed class MainViewModel
     void INavigationHost.ShiftTimedOut(TimeSpan idle) => _day.EndShift(idle);
     void INavigationHost.ReadoutsChanged() => RefreshJob();
     void INavigationHost.ShowSettings() => OpenSettings();
-    void INavigationHost.SettleHaul() => OnCarHaul();
 
     // The host slice the day cycle sees: the week roll repaints the cached
     // pages, the countdown forces a readout, and the shift-end page arrives
@@ -430,59 +425,6 @@ public sealed class MainViewModel
     void IDayCycleHost.ReadoutsChanged() => RefreshJob();
     void IDayCycleHost.ShowShiftEnded(object page) => _panel.PresentJob(page);
     void IDayCycleHost.GoToControlPage() => _nav.ShowControl();
-
-    // Car-hauling contracts (PORTPLAN 20): today the tap settles the haul
-    // straight into its receipt — the taxi ACCEPT skip's third use. With no
-    // driving slice the dealer-pickup/borrowed-leg/customer flow has no
-    // inputs, so the placeholder haul (30-minute delivery leg, driver
-    // rating until item 06) settles here and the receipt shows at once.
-    // The settle is shared by the driving slice's DELIVER THE CAR later.
-    private void OnCarHaul()
-    {
-        // Unity's receipt names the hauled car (a brand-new customer order
-        // waiting at a dealer). With no dealer/offers yet the customer's
-        // car is the one the player is driving now: the pool row resolves
-        // its display name and real class band via the watcher's identity
-        // (exact variant -> folder -> sole row), unknown falls through.
-        CarSpec? car = _carBrands.CurrentIdentity?.FindIn(_cars);
-        string carName = car is not null
-            ? $"{car.Brand} {car.Model}".ToUpperInvariant()
-            : Strings.Get("HaulReceiptCarUnknown");
-        int carClass = car is { Class: > 0 } ? car.Class : JobSettlement.FallbackCarClass;
-        if (car is { Class: > 0 })
-        {
-            _log.LogInfo($"haul car: {carName} class {carClass}");
-        }
-        else
-        {
-            // Class comes from the cars.json column; a row without one (or
-            // an unknown car) keeps the placeholder band and says so.
-            _log.LogInfo($"haul car: {carName} class {carClass} (placeholder, no pool class)");
-        }
-        CarHaulReceipt receipt = CarHaulReceiptBuilder.Build(
-            carName, carClass, DriverRatingPercent, PlaceholderHaulMinutes);
-        _wallet.AddHaul(receipt);
-        // Checkpoint bank, same rule as the paid jobs: settled cash is
-        // progress the player can see, so it goes to disk now.
-        SaveClock();
-        _log.LogInfo($"haul settled: {carName} minutes={receipt.DriveMinutes} " +
-            $"tier={receipt.Tier} rate={receipt.RatePerMin:0.00}/min " +
-            $"earned={receipt.TotalEarned:0.00} wallet={_wallet.Cash:0.00}");
-        _nav.ShowScreen(new CarHaulReceiptScreenViewModel(
-            receipt, _wallet, _beat, _nav.ControlCommand));
-    }
-
-    // Car-haul placeholders until the drive slice feeds the legs: a
-    // 30-minute delivery leg (Unity stamps both leg ends in in-game
-    // minutes; the settle prices the difference). The pay formula reads the
-    // wallet's persisted rating — rate = 0.83 * (rating * tier / 100).
-    private const int PlaceholderHaulMinutes = 30;
-
-    // The persisted skills average, rounded to the whole percent the haul
-    // receipt and the fleet's insurance math take (Unity uses the float
-    // overall directly; the receipt model is an int).
-    private int DriverRatingPercent =>
-        (int)Math.Round(_wallet.Rating.Overall, MidpointRounding.AwayFromZero);
 
     // ---- lifecycle (called by the view) ----------------------------------
 

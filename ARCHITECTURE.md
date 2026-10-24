@@ -23,8 +23,8 @@ route intent into them. Only then can `App.OnStartup` build everything.
 
 ## 2. Where the split stands
 
-Extracted, each verified (build 0 warnings, 1718 tests, format clean); S1–S4 are
-pushed, S5–S9 are green locally:
+Extracted, each verified (build 0 warnings, 1723 tests, format clean); S1–S4 are
+pushed, S5–S10 are green locally:
 
 | Slice | Result |
 |---|---|
@@ -43,14 +43,15 @@ pushed, S5–S9 are green locally:
 | S7 | The game-clock world → `WorldTicks` (town drift, appetite, nightly premium); the hunger-block latch leaves the coordinator, −52 lines and four constructor parameters |
 | S8 | The boot catch-up → `DriverCatchUp` (grandma's-car seed, login streak recount + grant); `DailyStreak` and the streak's seeded `Random` leave the coordinator, −31 lines |
 | S9 | The settle-hook zone expansion → `ZoneGrowth` (onboarding gate, interim street id, log line, world push); `OperatingZone` and `IPlayerTelemetry` leave the coordinator, which keeps the one call, −27 lines and two constructor parameters |
+| S10 | The car haul → `CarHaulFlow` (the tap's settle, the receipt it builds and its calendar checkpoint); the coordinator loses the job, its placeholder constants and the car pool, −58 lines and one constructor parameter |
 
-`MainViewModel`: 2658 → 857 lines. `Poll` is 40 code lines (150 with its
+`MainViewModel`: 2658 → 799 lines. `Poll` is 40 code lines (150 with its
 rationale): what is left is the idle-hide policy, the wall-clock bank and the
 telemetry feed — the world rules answer one question per tick. The coordinator
-now takes 33 named parameters (30 required, 3 optional), all of them finished
+now takes 32 named parameters (29 required, 3 optional), all of them finished
 services: the root does every `new`. What still keeps the list long is not the
-ticks but the two leftovers §11 names (the haul's settle path and the
-onboarding forwarding), not a constructor rewrite.
+ticks but the one leftover §11 names (the onboarding forwarding), not a
+constructor rewrite.
 
 ## 3. Target shape
 
@@ -69,6 +70,7 @@ onboarding forwarding), not a constructor rewrite.
    │   TaxiJobFlow  DeliveryFlow   PoiWorld    DayCycle   WorldTicks│
    │   DriverCatchUp (boot only: starter car, login bonus)          │
    │   ZoneGrowth (settle hook: next street, world push)            │
+   │   CarHaulFlow (haul tap: settle, receipt, calendar)            │
    │        │              │              │                         │
    │        └──────┬───────┴──────┬───────┘                         │
    │               │              │                                 │
@@ -91,10 +93,11 @@ coordinator. Pages take commands from the domain that owns them.
 |---|---|---|---|
 | `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (8 members) |
 | `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
+| `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
 | `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
 | `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, bought-car page |
-| `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay` | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (4 members) |
+| `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay` | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (3 members) |
 | `TelemetryReadouts` ✅ | the seven painted strings' caches (`_lastPacketId`, speed, gear, rpm/throttle/brake, the waiting key) | `Paint(sample, gameRunning)`, `PaintWaiting(gameRunning)`, `PaintJob(job, shift, now)` → `ReadoutPaint` | none: the coordinator's `Apply` copies the record |
 | `DayCycle` ✅ | `_lastDay`, `_lastShiftSecs`, the display week | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `GoToControlPage` |
 | `WorldTicks` ✅ | the hunger-block latch | `Tick(onboardingDone)` → whether the town moved | none: the movement returns to the coordinator, which owns the cached board page |
@@ -124,12 +127,12 @@ After the split `MainViewModel` is a coordinator, not an owner:
   reset, app restart, HUD wiring, `SkipShutdownSave`;
 - the bindable readout properties (the target of `ReadoutPaint`).
 
-Constructor: 33 parameters (30 required, 3 optional), all of them finished
+Constructor: 32 parameters (29 required, 3 optional), all of them finished
 services — the root does every `new`. No `MainViewModelDependencies` god record:
 each collaborator takes its own dependencies, which is what makes it testable.
-The game-clock world left in S7, the boot catch-up in S8 and the zone expansion
-in S9, so the list now grows only with the two leftovers §11 names: one follow-up
-slice each, not a constructor rewrite.
+The game-clock world left in S7, the boot catch-up in S8, the zone expansion in
+S9 and the haul in S10, so the list now grows only with the one leftover §11
+names: a follow-up slice, not a constructor rewrite.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -149,6 +152,7 @@ stores + saved state
       └ ZoneGrowth (zone, map, onboarding store, profile store, online, log)
       └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
       └ DeliveryFlow (board, career, city, meter, breakdowns)
+      └ CarHaulFlow (watcher, pool, wallet, DayCycle, saver; the legs come later)
       └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
           └ Navigation (flows' pages, page data, saver, DayCycle's week)
               └ PanelPresenter (shell, pages, the two flows' InProgress)
@@ -162,7 +166,9 @@ stores + saved state
 `PoiWorld.Handlers(...)`; the store handler still comes in from the root.
 `Navigation` reports back to `MainViewModel` through `INavigationHost`, the
 same late `Attach` the four flows use, and reads the display week off
-`DayCycle` instead of keeping a mirror of it. The story flow and the voice
+`DayCycle` instead of keeping a mirror of it. `CarHaulFlow` takes no host at
+all: the control page's tap calls `Settle`, and the navigator puts the
+returned receipt up with its own `ControlCommand`. The story flow and the voice
 router are root-built too: they take `PanelPresenter`/`StoryHost` instead of
 the coordinator, so nothing but `MainViewModel`'s own late `Attach`s remains
 coordinator-assembled.
@@ -371,7 +377,30 @@ push went with the collaborator.
   `PoiWorld.Grow()`. The zone's counters and km are banked by the settle's own
   driver save, so the collaborator has nothing to report.
 
-### Host implementations after S9
+**S10 — `CarHaulFlow`.** ✅ (−58 lines in the coordinator, one net constructor
+parameter): the haul the control page's tap settled inline is its own job
+collaborator, the third job type. It takes `ICarBrandSource`, the car pool,
+`DriverWallet`, `DayCycle` (the week its checkpoint banks), `GameStateSaver`,
+`VoiceBeat` and the log.
+*Unblocked:* the last job type left the coordinator's control-page path, so the
+coordinator now knows nothing about a haul at all: `INavigationHost` lost
+`SettleHaul` (down to 3 members), the placeholder constants left with the job,
+and the car pool left the constructor. `Navigation` consumed one report fewer
+and one page more.
+*Deviations:*
+- `Settle(backCommand)` returns the receipt, the shape `TripBreakdowns.Interrupt`
+  already uses: the caller's own host puts it up with its own BACK command, so
+  the flow takes no host, no late `Attach` and no `Navigation` handle. The
+  control page's tap stays a page-open command (like `ShowDelivery`), not a
+  `CarHaulFlow` command: nothing else ever settles a haul.
+- The calendar arrives as the `DayCycle` instance instead of a `Func<int>`: the
+  flow is built after the calendar and only reads `DisplayWeek`, the same way
+  `Navigation` stamps its pages.
+- The rating is still the wallet's persisted average and the 30-minute
+  placeholder leg is still the pre-driving-slice stand-in; both moved with the
+  job, and the legs arrive here when the driving slice feeds them.
+
+### Host implementations after S10
 
 The reads now live with their owners:
 
@@ -379,8 +408,8 @@ The reads now live with their owners:
   (reveal/hide), `GameStateSaver` + `IRivalsService` (the shared driver save).
 - `IVoiceHost` — deleted; `VoiceRouter` takes its six collaborators directly
   (panel, brand source, content, HUD, clock, log).
-- `INavigationHost` — unchanged (settings page, haul settle, readout refresh,
-  timed-out shift into `DayCycle.EndShift`).
+- `INavigationHost` — three members: settings page, readout refresh, timed-out
+  shift into `DayCycle.EndShift`. The haul left it in S10 (the flow's page).
 - `IDayCycleHost` — unchanged; its four members are the coordinator's panel
   call sites and page routing.
 - `WorldTicks` takes no host at all: its one report is the `bool` the tick
@@ -389,6 +418,8 @@ The reads now live with their owners:
   banks through `GameStateSaver` and has nothing to show.
 - `ZoneGrowth` takes no host either: the settle hook calls it and the zone's
   counters are banked by the saver at that same settle.
+- `CarHaulFlow` takes no host either: `Settle` returns its receipt and the
+  navigator shows it with its own BACK command.
 
 ## 7. Rules for every slice
 
@@ -447,14 +478,19 @@ The reads now live with their owners:
   answered, and the log line. The coordinator-level
   `ZoneJobCount_GrowsAtTheSettles_AndExpandsOnTheCurve` test stays as the
   regression net for the call site.
+- `CarHaulFlow` landed with its own suite in S10: the driven car's band against
+  the placeholder one, the wallet's cash-only bank, the calendar checkpoint's
+  week and the caller's own CONTINUE. The navigator-level
+  `HaulDoor_SettlesTheFlowAndItsReceipt_WithoutTheCoordinator` and the
+  coordinator-level `CarHaulTap_*` / `HaulSettle_NeverCountsTheZone` tests stay
+  as the regression net for the tap.
 
 ## 9. Open decisions
 
 1. **`RollTripStart` / `ShowBreakdown`** — settled in S2: `TripBreakdowns`
    (roll, tow fee, page) is taken by both flows; neither host carries them.
-2. **`OnCarHaul`** (PORTPLAN 20) is a third job type in disguise: settle-only
-   today. Keep it in `TaxiJobFlow` for S1 and split it when it grows legs, or
-   make it its own flow now.
+2. **`OnCarHaul`** (PORTPLAN 20) — settled in S10: its own `CarHaulFlow`, a
+   leaf that returns its receipt. The driving slice grows the legs there.
 3. **Readouts** — settled in S5: `TelemetryReadouts` returns a `ReadoutPaint`
    record and the coordinator's `Apply` copies it onto the bindable properties.
    The caches stayed in the formatter, so the poll formats only changed values
@@ -476,26 +512,27 @@ The reads now live with their owners:
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S9 are green locally.
-`MainViewModel` 857 lines (was 884 after S8), −27 lines: the settle-hook zone
-expansion (gate, street id, log, world push) left for `ZoneGrowth`. The injected
-field list is 33, the constructor 33 parameters (30 required, 3 optional). 1718
-tests green (+5: `ZoneGrowthTests`).
+State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S10 are green locally.
+`MainViewModel` 799 lines (was 857 after S9), −58 lines: the car haul (the tap's
+settle, its receipt, its calendar checkpoint and the car pool behind it) left
+for `CarHaulFlow`, and `INavigationHost` lost its haul report. The injected
+field list is 32, the constructor 32 parameters (29 required, 3 optional). 1723
+tests green (+5: four `CarHaulFlowTests` and the navigator's haul tap).
 
-Next: the candidates the slices left behind, in the order they unblock each
-other:
-- **`OnCarHaul`** (open decision 2) is the last job type still living in the
-  coordinator's control-page path.
+Next: the one candidate the slices left behind:
+
 - `MainViewModel`'s onboarding forwarding (`ChooseBrand`/`ChooseCar`/
   `ShowDialogue`/`FinishDialogue` + the three flags) exists for the tests now
-  that the view binds only `CurrentScreen`; it can move behind `_story`.
+  that the view binds only `CurrentScreen`; it can move behind `_story`. The
+  view's two remaining reads (`App`'s tour gate, the window's placement gate)
+  take the story from the root, which builds it.
 
 Working agreements earned so far:
 
 - The coordinator implements the host; a flow attaches with `Attach(this)` in
   the coordinator's constructor — the one late edge, closed before any command
   can fire. `PoiWorld` joins that list: its arrival delegates only read the
-  host when a door is entered. `Navigation` joins it too, for the four entries
+  host when a door is entered. `Navigation` joins it too, for the three entries
   that are not pages. `DayCycle` joins it for the shift-end page it builds.
   The story flow and the voice router are the exception: their host reads are
   root-built objects (`StoryHost`, `PanelPresenter`), so they take no late
@@ -505,6 +542,8 @@ Working agreements earned so far:
   caller's own host puts it up with its own BACK command. The opposite case
   (`DayCycle`'s shift-ended page) takes one report for its CONTINUE instead, so
   the page stays the cycle's and the panel policy stays the presenter's.
+  `CarHaulFlow.Settle(back)` is the same shape: the receipt it just priced goes
+  back to the navigator, which shows it with its own control command.
 - Collaborators take the saver, watcher and rivals directly; the host only
   reports (page, saves, readouts). A stop's door is asked as
   `bool PinStop(leg)` — reporting plus a degrade signal, never a host getter.
@@ -513,8 +552,9 @@ Working agreements earned so far:
   mid-job call gate and which page a call opens) and routes its own page swaps
   through `Navigation.ShowScreen`, the one beat-cancelling seam.
 - A page whose domain belongs elsewhere is a report on the host, not a builder
-  in the navigator: the settings page (story flow + RESET GAME), the haul
-  settle (a job) and a shift that already timed out (`DayCycle.EndShift`).
+  in the navigator: the settings page (story flow + RESET GAME) and a shift that
+  already timed out (`DayCycle.EndShift`). A page a collaborator already returns
+  (the haul receipt) is not even that: the navigator shows it.
 - A value that a collaborator needs now but another collaborator will own later
   crosses the host explicitly and moves with its new owner. `DisplayWeek` made
   that trip: coordinator → `DayCycle` in S5, with the navigator's mirror and
