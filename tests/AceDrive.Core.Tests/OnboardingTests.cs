@@ -17,6 +17,7 @@ public sealed class OnboardingTests
         [new DialogueLine("GRANDMA", "Happy birthday!"),
          new DialogueLine("YOU", "Thanks!")],
         [new DialogueLine("GRANDMA", "Pancakes!")],
+        [],
         []);
 
     // Test-shell career: no hub content, just Max's gift balance.
@@ -412,6 +413,8 @@ public sealed class OnboardingTests
                 """[{"speaker":"GRANDMA","text":"Pancakes!"}]""");
             File.WriteAllText(Path.Combine(dir, "community_centre_dialogue.json"),
                 """[{"speaker":"SIGNORE MORO","text":"Welcome!"}]""");
+            File.WriteAllText(Path.Combine(dir, "max_dialogue.json"),
+                """[{"speaker":"MAX","text":"Easy job."}]""");
             File.WriteAllText(Path.Combine(dir, "voice_confusions.json"),
                 """{"Your":"NEW","dear":"tier","two words":"x","y":"y","":"z"}""");
             var log = new TestLog();
@@ -423,6 +426,7 @@ public sealed class OnboardingTests
             Assert.Single(loaded.Dialogue);
             Assert.Single(loaded.PancakeDialogue);
             Assert.Single(loaded.CommunityCentreDialogue);
+            Assert.Single(loaded.MaxDialogue);
             // "Your"/"NEW" normalized; multi-word, self-map and empty halves dropped.
             Assert.Equal(2, loaded.Confusions!.Count);
             Assert.Equal("new", loaded.Confusions["your"]);
@@ -455,6 +459,7 @@ public sealed class OnboardingTests
         Assert.Contains("henderson", loaded.Aliases["datsun"]); // live 17:17:36 Datsun fused-word garble
         Assert.NotEmpty(loaded.PancakeDialogue); // home leg's dialogue ships with the build
         Assert.NotEmpty(loaded.CommunityCentreDialogue); // post-pancake leg's dialogue ships too
+        Assert.NotEmpty(loaded.MaxDialogue); // first post-intro Max visit ships its offer
         Assert.Empty(log.Warnings);
     }
 
@@ -469,8 +474,9 @@ public sealed class OnboardingTests
         Assert.Empty(loaded.Dialogue);
         Assert.Empty(loaded.PancakeDialogue);
         Assert.Empty(loaded.CommunityCentreDialogue);
+        Assert.Empty(loaded.MaxDialogue);
         Assert.Empty(loaded.Confusions!); // loader always passes a (possibly empty) table
-        Assert.Equal(7, log.Warnings.Count);
+        Assert.Equal(8, log.Warnings.Count);
     }
 
     [Fact]

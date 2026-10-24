@@ -26,6 +26,9 @@ public sealed class OnboardingFlow : IScreenController
     private readonly IPoiDirectoryStore _poiStore;
     private readonly PoiArrivalRouter? _poiArrivals;
     private readonly Trunk _trunk;
+    private readonly DeliveryCareer _career;
+    // The first-store CredP gift (Data/delivery_catalog.json StartCredP).
+    private readonly int _introCredP;
     private readonly IPreferencesStore _preferencesStore;
     private readonly ICultureService _culture;
     private readonly VoiceBeat _beat;
@@ -51,6 +54,11 @@ public sealed class OnboardingFlow : IScreenController
     private OnboardingState _progress;
     private PlayerProfile? _profile;
     private PlayerPreferences _preferences;
+    // The final "how to call the panel" page opens after CommunityCentreDone
+    // is banked, so this in-memory flag is what keeps that page inside the
+    // introduction for the rest of the session. A relaunch past the tour
+    // never shows it again and starts with the introduction already closed.
+    private bool _introClosed;
     // The live leg's door: the birthday errand first, then the friends'
     // houses (PORTPLAN 5/24/27). Pinned on the HUD and used by ENTER.
     private PointOfInterest? _poi;
@@ -86,6 +94,7 @@ public sealed class OnboardingFlow : IScreenController
         AddressMap addressMap, string? detectedPlayerName,
         PoiGenerator pois, PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
         PoiArrivalRouter? poiArrivals, Trunk trunk,
+        DeliveryCareer career, int introCredP,
         IPreferencesStore preferencesStore, PlayerPreferences preferences,
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
         Garage garage, Func<int> displayWeek, Action saveGarage,
@@ -102,6 +111,8 @@ public sealed class OnboardingFlow : IScreenController
         _poiStore = poiStore;
         _poiArrivals = poiArrivals;
         _trunk = trunk;
+        _career = career;
+        _introCredP = introCredP;
         _preferencesStore = preferencesStore;
         _preferences = preferences;
         _culture = culture;
@@ -120,6 +131,7 @@ public sealed class OnboardingFlow : IScreenController
             [PoiTypes.CommunityCentre] = _ => EnterCommunityCentre(),
         };
         _progress = _onboarding.Load();
+        _introClosed = _progress.CommunityCentreDone;
         _profile = _profiles.Load();
         RestoreSavedPois();
         if (_hud is not null)
@@ -136,6 +148,14 @@ public sealed class OnboardingFlow : IScreenController
 
     /// <summary>True once the birthday dialogue is done on disk.</summary>
     public bool Done => _progress.IsComplete;
+
+    /// <summary>
+    /// True from the first walk page until the closing "how to call the panel"
+    /// page is dismissed: the walk, the birthday, the guided tour and that
+    /// last page. The shell suppresses the idle auto-hide for all of it, so a
+    /// first-time reader can never lose an introduction page to the countdown.
+    /// </summary>
+    public bool IntroInProgress => !_introClosed;
 
     /// <summary>
     /// True from the birthday hand-over until the guided tour's last stop
@@ -461,6 +481,7 @@ public sealed class OnboardingFlow : IScreenController
         // The tour is over: this is the first time the main panel opens on the
         // menu of its own accord. Leave it up so the player lands on the page
         // every later call returns to.
+        _introClosed = true;
         _host.ShowMenu();
     }
 
@@ -474,12 +495,14 @@ public sealed class OnboardingFlow : IScreenController
                 lines, destination.Name, AddressFormatter.Format(destination.Address))
             : lines;
 
-    // The pancake and community-centre tables address the player by name
-    // ([YOU]); the errand tokens do not appear there.
+    // The pancake, community-centre and Max tables address the player by name
+    // ([YOU]) and may name the car ([CAR]); the errand tokens do not appear
+    // there.
     private IReadOnlyList<DialogueLine> FillPlayerDialogue(
         IReadOnlyList<DialogueLine> lines) =>
         DialogueText.Fill(
-            lines, string.Empty, string.Empty, _profile?.DisplayName ?? string.Empty);
+            lines, string.Empty, string.Empty,
+            _profile?.DisplayName ?? string.Empty, _carBrand());
 
     // Pins the errand until this tour's store visit is banked. The trunk can
     // already hold maple syrup from an earlier run (the inventory persists),
@@ -539,6 +562,21 @@ public sealed class OnboardingFlow : IScreenController
             return;
         }
 
+        // Max's shop stays a plain interior during the birthday errand; the
+        // delivery-career hand-over waits for the first visit after the tour
+        // (Unity MapScreen: firstSceneComplete && !hasSeenMaxJobIntro).
+        if (ShowMaxDeliveryIntro(poi))
+        {
+            return;
+        }
+
+        OpenInterior(poi);
+    }
+
+    // The typed interior behind the destination. Story legs have already been
+    // answered above; this is the one path a shop or business page opens from.
+    private void OpenInterior(PointOfInterest poi)
+    {
         object? screen = _poiArrivals?.Open(
             poi, new RelayCommand(() => LeavePoi(poi)), OnPoiChanged);
         _errandStockAtEntry = StockOf(poi);
@@ -547,6 +585,61 @@ public sealed class OnboardingFlow : IScreenController
         {
             _host.Present(screen);
         }
+    }
+
+    // Unity's MaxDialogueScreen (02MaxDialogue): the first post-intro visit to
+    // Max's store shows the delivery offer, and its Continue pays the intro
+    // CredP before the shop opens (ScreenManager.OnMaxDialogueComplete).
+    // Returns true when this ENTER was the dialogue (or its already-open
+    // page); false lets the caller open the interior as usual.
+    private bool ShowMaxDeliveryIntro(PointOfInterest poi)
+    {
+        if (poi.Id != PoiCatalog.MaxGroceryId
+            || !_progress.CommunityCentreDone
+            || _progress.MaxDeliveryIntroSeen)
+        {
+            return false;
+        }
+
+        // A second ENTER while the offer is up only revives a hidden panel,
+        // like the POI interior guard above.
+        if (_host.CurrentScreen is DialogueScreenViewModel openDialogue)
+        {
+            if (!_host.IsShown)
+            {
+                _host.Present(openDialogue);
+            }
+            return true;
+        }
+
+        if (Content.MaxDialogue.Count == 0)
+        {
+            // Missing content must not trap the career: pay the seed and open
+            // the shop like the dialogue's Continue would.
+            _log.LogWarning("Max's delivery intro dialogue missing; granting the gift directly");
+            FinishMaxDeliveryIntro(poi);
+            return true;
+        }
+
+        _log.LogInfo("Max's delivery intro shown");
+        _host.Present(new DialogueScreenViewModel(
+            FillPlayerDialogue(Content.MaxDialogue),
+            Strings.Get("MaxDialogueTitle"),
+            _beat,
+            () => FinishMaxDeliveryIntro(poi)));
+        return true;
+    }
+
+    // Unity awards the intro CredP in Max's dialogue and then opens the shop
+    // (OnMaxDialogueComplete). The visit is banked on its own: backing out
+    // without buying still counts, and a relaunch never pays twice.
+    private void FinishMaxDeliveryIntro(PointOfInterest poi)
+    {
+        _progress = _progress with { MaxDeliveryIntroSeen = true };
+        _onboarding.Save(_progress);
+        _career.AddCredP(_introCredP);
+        _log.LogInfo($"Max's delivery intro: {_introCredP} CredP");
+        OpenInterior(poi);
     }
 
     // The pickup is banked: the walk replays on every launch and a returning

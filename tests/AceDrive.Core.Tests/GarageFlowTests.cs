@@ -24,7 +24,7 @@ public sealed class GarageFlowTests
         new Dictionary<string, string[]>(),
         [new GrandmaCar(Mx5.Id, "Mazda MX-5 NA", 1990, 12000, null),
          new GrandmaCar(Junior.Id, "Alfa Romeo Junior", 2024, 47500, null)],
-        [], [], []);
+        [], [], [], []);
 
     [Fact]
     public void Boot_SeedsGrandmasCarIntoAnEmptyGarage()

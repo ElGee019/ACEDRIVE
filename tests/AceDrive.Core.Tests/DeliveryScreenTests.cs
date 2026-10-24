@@ -36,14 +36,15 @@ public sealed class DeliveryScreenTests
         DeliveryCareer Career,
         List<DeliveryRun> Runs)
         Create(DeliveryCatalog? catalog = null, HubCatalog? hubs = null,
-            FakeClock? clock = null, VoiceBeat? beat = null)
+            FakeClock? clock = null, VoiceBeat? beat = null,
+            double? startCredP = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var log = new TestLog();
         var fired = new bool[3];
         List<DeliveryRun> runs = [];
         var board = catalog ?? Catalog;
-        var career = new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
+        var career = new DeliveryCareer(hubs ?? HubCatalog.Default, startCredP ?? board.StartCredP);
         var city = new CityEconomy(board.Stores, CityRules.Default);
         // Tests that assert the deferred voice navigation own the clock and
         // the beat, so they can advance past the beat and drain it.
@@ -243,6 +244,32 @@ public sealed class DeliveryScreenTests
         Assert.Empty(vm.Rows);
         Assert.Equal("Credibility Points: 100", vm.CredPLine);
         Assert.Equal("City growth: ▬ 0 / hr", vm.CityGrowthLine);
+    }
+
+    [Fact]
+    public void FirstCredPHint_ShowsOnlyForAFreshCareer()
+    {
+        // No CredP and no hub: OPEN NEW CAREER cannot buy anything, so the
+        // board points at Max's intro gift (App seeds exactly this state).
+        var (vm, _, _, career, _) = Create(startCredP: 0);
+        Assert.True(vm.ShowFirstCredPHint);
+
+        career.AddCredP(100); // Max's first store visit
+        vm.Refresh();
+        Assert.False(vm.ShowFirstCredPHint);
+    }
+
+    [Fact]
+    public void FirstCredPHint_StaysHiddenOnceACareerIsOpen()
+    {
+        var (vm, _, _, career, _) = Create(catalog: Catalog, hubs: GrocersAndSonsHubs);
+        Assert.False(vm.ShowFirstCredPHint);
+
+        Assert.True(career.TryOpenCareer(tierId: 1, careerIndex: 0, levelIndex: 0));
+        vm.Refresh(); // Unity re-shows the board after the hub page closes.
+
+        Assert.Equal("Credibility Points: 0", vm.CredPLine);
+        Assert.False(vm.ShowFirstCredPHint);
     }
 
     [Fact]

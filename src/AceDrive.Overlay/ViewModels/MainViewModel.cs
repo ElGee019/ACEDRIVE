@@ -367,6 +367,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         _story = new OnboardingFlow(
             onboarding, content, profiles, playerNames, addressMap, detectedPlayerName,
             pois, poiDirectory, poiStore, poiArrivals, trunk,
+            career, deliveryCatalog.StartCredP,
             preferencesStore, preferences,
             culture, beat, hud, garage, () => _displayWeek, SaveGarage,
             () => _carBrand, log, this);
@@ -539,6 +540,14 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
     /// the companion HUD carries the driving instructions instead.
     /// </summary>
     public bool IntroTourInProgress => _story.IntroTourInProgress;
+
+    /// <summary>
+    /// True for the whole introduction: the walk pages, the birthday, the
+    /// guided tour and its closing "how to call the panel" page. The shell
+    /// suppresses the idle countdown for all of it, because hiding a walk page
+    /// would skip the introduction instead of parking the overlay.
+    /// </summary>
+    public bool IntroInProgress => _story.IntroInProgress;
 
     /// <summary>
     /// True once RESET GAME wiped the save files: the window's close path must
@@ -820,7 +829,11 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         // mid-read would lose it (customer request, shift summary, receipts),
         // so they opt out like a POI page.
         bool keepOpen = CurrentScreen is IKeepPanelOpen;
-        if (IsShown && !_resizing && !dialogueOpen && !poiOpen && !keepOpen
+        // The introduction owns the panel until its closing page is dismissed:
+        // hiding a walk page would skip the introduction (a later call opens
+        // the menu, not the page), so its 15 s countdown never starts.
+        bool introOpen = IntroInProgress;
+        if (IsShown && !introOpen && !_resizing && !dialogueOpen && !poiOpen && !keepOpen
             && (now - _lastActivity).TotalSeconds >= IdleHideSec)
         {
             Hide();

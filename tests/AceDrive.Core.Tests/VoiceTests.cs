@@ -24,6 +24,7 @@ public sealed class VoiceTests
          new DialogueLine("YOU", "Thanks!")],
         [],
         [],
+        [],
         new Dictionary<string, string>
         {
             ["your"] = "new",
@@ -42,16 +43,21 @@ public sealed class VoiceTests
         new(HubCatalog.Default, DeliveryCatalog.Default.StartCredP);
 
     private static (MainViewModel Vm, FakeClock Clock, FakeVoiceListener Voice, FakeCarBrandSource Car)
-        Create(bool voice = true, ILog? log = null)
+        Create(bool voice = true, ILog? log = null, OnboardingState? progress = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var clock = new FakeClock();
         var mic = new FakeVoiceListener(voice);
         var car = new FakeCarBrandSource();
+        var onboarding = new FakeOnboardingStore();
+        if (progress is not null)
+        {
+            onboarding.Save(progress);
+        }
         var vm = new MainViewModel(new FakeTelemetry(), clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
             new FakeStore(), log ?? new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(),
-            new FakeOnboardingStore(), new FakeContentSource(Content),
+            onboarding, new FakeContentSource(Content),
             new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             mic, car, TodoTable.Default,
@@ -80,6 +86,30 @@ public sealed class VoiceTests
         return (vm, clock, mic, car);
     }
 
+    // A player who finished the whole introduction: the walk and the guided
+    // tour are banked, so the idle countdown runs on every page again.
+    private static readonly OnboardingState Introduced = OnboardingState.Fresh with
+    {
+        BirthdayDone = true,
+        MaxErrandDone = true,
+        JustinPickedUp = true,
+        AnnabellaPickedUp = true,
+        PancakesDone = true,
+        CommunityCentreDone = true,
+    };
+
+    private static (MainViewModel Vm, FakeClock Clock, FakeVoiceListener Voice, FakeCarBrandSource Car)
+        CreateIntroduced(bool voice = true, ILog? log = null) =>
+        Create(voice, log, Introduced);
+
+    // A post-introduction control page: the call opens the menu, Jobs leads in.
+    private static MainControlScreenViewModel ShowControl(MainViewModel vm)
+    {
+        vm.Show();
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
+        return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
     // Brand page -> grandma's car -> voice info -> birthday dialogue, the
     // spoken route onto the main page (shared by the tests below).
     // The last tap lands on the menu and leaves the panel up, so its Jobs tile
@@ -99,15 +129,6 @@ public sealed class VoiceTests
         Assert.Same(menu, vm.CurrentScreen);
         menu.JobsCommand.Execute(null);
         return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-    }
-
-    // The calendar page's route: finish the walk to the career page, hide the
-    // panel, then call it back and tap the menu's Calendar tile.
-    private static CalendarScreenViewModel ToCalendarPage(MainViewModel vm)
-    {
-        ToControlPage(vm);
-        vm.ToggleShowCommand.Execute(null); // hide
-        return ShowCalendar(vm);
     }
 
     // A call lands on the menu page; its Calendar tile opens the cached
@@ -159,7 +180,7 @@ public sealed class VoiceTests
     {
         // Regression: showing via hotkey must reset the idle timer (Show()
         // records activity), else the window vanishes on the next poll.
-        var (vm, clock, _, _) = Create();
+        var (vm, clock, _, _) = CreateIntroduced();
         vm.ToggleShowCommand.Execute(null);
         clock.Advance(TimeSpan.FromSeconds(14.9));
         vm.Poll();
@@ -205,7 +226,7 @@ public sealed class VoiceTests
     [Fact]
     public void Idle_HidesAfterFifteenSeconds()
     {
-        var (vm, clock, _, _) = Create();
+        var (vm, clock, _, _) = CreateIntroduced();
         vm.Show();
         clock.Advance(TimeSpan.FromSeconds(14.9));
         vm.Poll();
@@ -216,9 +237,42 @@ public sealed class VoiceTests
     }
 
     [Fact]
+    public void IntroWalk_IgnoresTheIdleCountdown()
+    {
+        // Hiding a walk page would skip the introduction (the next call opens
+        // the menu, not that page), so the countdown never starts before the
+        // birthday hand-over.
+        var (vm, clock, _, _) = Create(voice: false);
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+
+        clock.Advance(TimeSpan.FromMinutes(2));
+        vm.Poll();
+
+        Assert.True(vm.IsShown);
+        Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void IntroTour_IgnoresTheIdleCountdown()
+    {
+        // The guided tour is still the introduction: a panel the player calls
+        // up mid-tour waits for them instead of counting itself away.
+        var (vm, clock, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true });
+        vm.Show();
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+
+        clock.Advance(TimeSpan.FromSeconds(30));
+        vm.Poll();
+
+        Assert.True(vm.IsShown);
+        Assert.Same(menu, vm.CurrentScreen);
+    }
+
+    [Fact]
     public void Activity_ResetsIdleTimer()
     {
-        var (vm, clock, _, _) = Create();
+        var (vm, clock, _, _) = CreateIntroduced();
         vm.Show();
         clock.Advance(TimeSpan.FromSeconds(14));
         vm.RecordActivity();
@@ -232,7 +286,7 @@ public sealed class VoiceTests
     {
         // Holding a resize drag (even motionless) is activity: the 15 s
         // auto-hide must not fire mid-drag, and the window restarts on drop.
-        var (vm, clock, _, _) = Create();
+        var (vm, clock, _, _) = CreateIntroduced();
         vm.Show();
         vm.SetResizing(true);
         clock.Advance(TimeSpan.FromSeconds(20));
@@ -252,22 +306,8 @@ public sealed class VoiceTests
     {
         // Voice control is user input: a fired command restarts the 15 s
         // auto-hide window, exactly like a click.
-        var (vm, clock, mic, _) = Create();
-        mic.Fire("hey mazda"); // wake, activity at t=0
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
-        var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
-        dialogue.ContinueCommand.Execute(null); // page 2
-        dialogue.ContinueCommand.Execute(null); // finishes
-        Assert.True(dialogue.IsComplete);
-        // The birthday hand-over closes the panel: the tour is driven on the
-        // HUD. Calling the app back opens the menu; Jobs is the career page.
-        Assert.False(vm.IsShown);
-        vm.Show();
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var (vm, clock, mic, _) = CreateIntroduced();
+        ShowControl(vm); // a call lands on the menu, Jobs on the career page
 
         clock.Advance(TimeSpan.FromSeconds(14));
         mic.Fire("start taxi shift"); // control-page voice button fires -> activity at t=14
@@ -287,9 +327,9 @@ public sealed class VoiceTests
         // repeating a button command never hides the window mid-use. The day
         // event label is used because it never changes: the taxi button's
         // START/CONTINUE flip would re-target the next utterance anyway.
-        var (vm, clock, mic, _) = Create();
+        var (vm, clock, mic, _) = CreateIntroduced();
         mic.Fire("hey mazda");
-        var calendar = ToCalendarPage(vm);
+        var calendar = ShowCalendar(vm);
 
         clock.Advance(TimeSpan.FromSeconds(8));
         mic.Fire("market valuation"); // fires: activity at t=8
@@ -312,9 +352,9 @@ public sealed class VoiceTests
         // 2026-10-13 session hid mid-retry and the next phrase woke to home
         // instead of pressing the button. Unmatched finals restart the 15 s
         // window; the window then hides normally after silence.
-        var (vm, clock, mic, _) = Create();
+        var (vm, clock, mic, _) = CreateIntroduced();
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ShowControl(vm);
         clock.Advance(TimeSpan.FromSeconds(8));
         mic.Fire("purple octopus", isFinal: true); // heard, matches nothing
         clock.Advance(TimeSpan.FromSeconds(8)); // 8 s since the attempt, < 15 s
@@ -330,9 +370,9 @@ public sealed class VoiceTests
     {
         // Only final transcripts count as presence, so background chatter
         // that never finalizes cannot keep the overlay up forever.
-        var (vm, clock, mic, _) = Create();
+        var (vm, clock, mic, _) = CreateIntroduced();
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ShowControl(vm);
         clock.Advance(TimeSpan.FromSeconds(14));
         mic.Fire("purple octop"); // partial: in-flight hearing, no presence stamp
         clock.Advance(TimeSpan.FromSeconds(1.1)); // 15.1 s since wake
@@ -580,8 +620,10 @@ public sealed class VoiceTests
     }
 
     [Fact]
-    public void FinishedDialogue_ResumesIdleHide()
+    public void FinishedDialogue_LeavesThePanelClosedForTheTour()
     {
+        // The hand-over hides the panel and leaves the tour on the HUD; no
+        // later poll may pop it back open.
         var (vm, clock, _, _) = Create();
         vm.Show();
         vm.ChooseBrand("Honda");
@@ -592,6 +634,7 @@ public sealed class VoiceTests
         dialogue.ContinueCommand.Execute(null); // page 2
         dialogue.ContinueCommand.Execute(null); // finishes
         Assert.True(dialogue.IsComplete);
+        Assert.False(vm.IsShown);
         clock.Advance(TimeSpan.FromSeconds(16));
         vm.Poll();
         Assert.False(vm.IsShown);
@@ -604,10 +647,12 @@ public sealed class VoiceTests
         // early-return, so auto-hide works outside a live EVO session.
         var clock = new FakeClock();
         var tel = new FakeTelemetry { PhysicsPresent = false };
+        var onboarding = new FakeOnboardingStore();
+        onboarding.Save(Introduced);
         var vm = new MainViewModel(tel, clock, new GameClock(clock, clock.UtcNow), new TaxiShift(), new FakeShiftStore(),
             new FakeStore(), new NullLogger(), FareTable.Default,
             TaxiTestData.Proposer(),
-            new FakeOnboardingStore(), new FakeContentSource(Content),
+            onboarding, new FakeContentSource(Content),
             new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             new FakeVoiceListener(),
@@ -725,8 +770,9 @@ public sealed class VoiceTests
     {
         // Calling the app with the wake word opens the intro the first time;
         // the birthday hand-over closes the panel for the guided tour, and
-        // the next wake opens the menu page, where it stays until idle-hide
-        // parks it and the wake after that returns on the same menu page.
+        // the next wake opens the menu page. The tour is still the
+        // introduction, so that page waits there instead of counting itself
+        // away; the wake after the player hides it returns on the same page.
         var (vm, clock, mic, _) = Create();
         mic.Fire("hey mazda");
         Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
@@ -744,7 +790,9 @@ public sealed class VoiceTests
         Assert.True(vm.IsShown);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         clock.Advance(TimeSpan.FromSeconds(16));
-        vm.Poll(); // idle-hide closes the menu
+        vm.Poll(); // the tour still owns the intro: no idle-hide
+        Assert.True(vm.IsShown);
+        vm.ToggleShowCommand.Execute(null); // the player parks it
         Assert.False(vm.IsShown);
         clock.Advance(TimeSpan.FromSeconds(4)); // wake cooldown over
         mic.Fire("hey mazda");
@@ -843,9 +891,9 @@ public sealed class VoiceTests
         // English model logged for "Cento Miglia" / "Where is Willy". Each
         // answers on its own game morning; every row is triggerable, so the
         // flash lands on the named row whichever day is highlighted.
-        var (vm, clock, mic, _) = Create();
+        var (vm, clock, mic, _) = CreateIntroduced();
         mic.Fire("hey mazda");
-        var calendar = ToCalendarPage(vm);
+        var calendar = ShowCalendar(vm);
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
@@ -979,9 +1027,9 @@ public sealed class VoiceTests
         // label. The shared action delegate keeps it a single tap on
         // Wednesday morning, when Willy's gate is open.
         var log = new TestLog();
-        var (vm, clock, mic, _) = Create(log: log);
+        var (vm, clock, mic, _) = CreateIntroduced(log: log);
         mic.Fire("hey mazda");
-        ToCalendarPage(vm);
+        ShowCalendar(vm);
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();

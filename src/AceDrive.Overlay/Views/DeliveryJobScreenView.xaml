@@ -121,6 +121,23 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
+            <!-- Fresh career nudge (no CredP, no hub yet): Max's first visit
+                 banks the intro gift, so OPEN NEW CAREER has something to
+                 spend. Lives beside the empty state, which shows for the same
+                 gated career at boot. -->
+            <TextBlock Text="{loc:Loc Key=DeliveryNeedCredP}" Foreground="#FF97EAD2"
+                       FontSize="13" TextWrapping="Wrap" Margin="4,0,4,10">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShowFirstCredPHint}" Value="True">
+                                <Setter Property="Visibility" Value="Visible"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
         </StackPanel>
         <!-- Button bar: own bottom band so the last button ends flush with
              the panel edge; the 6 px between them keeps the list rhythm.

@@ -5,11 +5,11 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// Balance/content table for the delivery page. The rates and starting CredP
-/// load from Data/delivery_catalog.json at startup; <see cref="Stores"/>
-/// carries the real shop rows the host derives from POIs (normally empty in
-/// the data file). This Default is the test-shell fallback (empty board), not
-/// the source of truth.
+/// Balance/content table for the delivery page. The rates and the CredP
+/// Max's first store visit hands over load from Data/delivery_catalog.json at
+/// startup; <see cref="Stores"/> carries the real shop rows the host derives
+/// from POIs (normally empty in the data file). This Default is the test-shell
+/// fallback (empty board), not the source of truth.
 /// </summary>
 public sealed record DeliveryCatalog(
     IReadOnlyList<DeliveryStore> Stores,

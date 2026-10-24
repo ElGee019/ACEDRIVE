@@ -15,4 +15,5 @@ public sealed record OnboardingContent(
     IReadOnlyList<DialogueLine> Dialogue,
     IReadOnlyList<DialogueLine> PancakeDialogue,
     IReadOnlyList<DialogueLine> CommunityCentreDialogue,
+    IReadOnlyList<DialogueLine> MaxDialogue,
     IReadOnlyDictionary<string, string>? Confusions = null);

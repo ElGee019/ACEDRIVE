@@ -61,6 +61,7 @@ public sealed class StoreScreenViewModelTests
         Assert.Equal("CR45.99", Row(vm, "MAPLE SYRUP").PriceLine);
         Assert.Equal("0", vm.QuantityText);
         Assert.Equal("", vm.SelectionText);
+        Assert.False(vm.BuyVisible);
         Assert.False(vm.BuyCommand.CanExecute(null));
     }
 
@@ -77,6 +78,7 @@ public sealed class StoreScreenViewModelTests
         Assert.Equal("VOLUME: 0.40L", vm.VolumeText);
         Assert.Equal("PRICE: CR45.99", vm.PriceText);
         Assert.Equal("TRUNK: 59.60L free", vm.TrunkText);
+        Assert.True(vm.BuyVisible);
         Assert.True(vm.BuyCommand.CanExecute(null));
     }
 
@@ -124,7 +126,28 @@ public sealed class StoreScreenViewModelTests
         Assert.Contains("purchase", events);
         Assert.Equal("0", vm.QuantityText);
         Assert.Equal("", vm.SelectionText);
+        Assert.False(vm.BuyVisible);
         Assert.False(vm.BuyCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void Buy_HidesTheButtonUntilTheNextSelection()
+    {
+        var (vm, _, _, _, _, _) = Create();
+        Row(vm, "MAPLE SYRUP").SelectCommand.Execute(null);
+        Assert.True(vm.BuyVisible);
+
+        vm.BuyCommand.Execute(null);
+
+        // The purchase clears the selection, so the button that would quote
+        // nothing leaves the page until another row is picked.
+        Assert.False(vm.BuyVisible);
+        Assert.False(vm.BuyCommand.CanExecute(null));
+
+        Row(vm, "BANANA").SelectCommand.Execute(null);
+
+        Assert.True(vm.BuyVisible);
+        Assert.True(vm.BuyCommand.CanExecute(null));
     }
 
     [Fact]
@@ -181,6 +204,7 @@ public sealed class StoreScreenViewModelTests
 
         Assert.False(row.IsSelected);
         Assert.Equal("", vm.SelectionText);
+        Assert.False(vm.BuyVisible);
         Assert.False(vm.BuyCommand.CanExecute(null));
     }
 

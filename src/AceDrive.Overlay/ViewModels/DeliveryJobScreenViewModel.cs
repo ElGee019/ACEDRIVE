@@ -71,6 +71,11 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
     public bool HasStores { get => _hasStores; private set => SetField(ref _hasStores, value); }
     private bool _hasStores;
 
+    /// <summary>Points a fresh career at Max's grocery: no CredP and no hub
+    /// bought, so OPEN NEW CAREER has nothing to spend.</summary>
+    public bool ShowFirstCredPHint { get => _showFirstCredPHint; private set => SetField(ref _showFirstCredPHint, value); }
+    private bool _showFirstCredPHint;
+
     public string MainButtonLabel { get => _mainButtonLabel; private set => SetField(ref _mainButtonLabel, value); }
     private string _mainButtonLabel = "";
 
@@ -234,6 +239,7 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJ
         }
         Rows = rows;
         HasStores = rows.Count > 0;
+        ShowFirstCredPHint = _career.NeedsIntroCredP;
         bool deliver = _cart.Phase == DeliveryPhase.Deliver;
         MainButtonLabel = Strings.Get(deliver ? "DeliveryDeliver" : "DeliveryOpenCareer");
         BackButtonLabel = Strings.Get(deliver ? "DeliveryCancelOrder" : "DeliveryBack");

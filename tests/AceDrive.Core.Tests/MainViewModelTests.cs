@@ -9,11 +9,14 @@ namespace AceDrive.Core.Tests;
 /// <summary>ViewModel flows run headless against fakes (LSP in action).</summary>
 public sealed class MainViewModelTests
 {
-    internal static readonly OnboardingContent EmptyContent = new([], new Dictionary<string, string[]>(), [], [], [], []);
+    internal static readonly OnboardingContent EmptyContent = new(
+        [], new Dictionary<string, string[]>(), [], [], [], [], []);
     // The birthday walk's minimum: one line, so the dialogue can be finished
-    // without depending on Data/dialogue.json content.
+    // without depending on Data/dialogue.json content. Max's post-intro
+    // delivery offer rides along for the career hand-over tests.
     internal static readonly OnboardingContent OneLineDialogue = new(
-        [], new Dictionary<string, string[]>(), [], [new DialogueLine("GRANDMA", "Go.")], [], []);
+        [], new Dictionary<string, string[]>(), [], [new DialogueLine("GRANDMA", "Go.")],
+        [], [], [new DialogueLine("MAX", "Easy job, fast cash.")]);
     // A returning tour whose Max visit is already banked: later-leg tests can
     // skip the store without relying on a persistent maple-syrup item.
     private static OnboardingState ErrandDone =>
@@ -22,6 +25,7 @@ public sealed class MainViewModelTests
         Create(
             float speedKmh = 90f, OnboardingState? progress = null,
             DeliveryCatalog? catalog = null, HubCatalog? hubs = null, ILog? log = null,
+            DeliveryCareer? career = null,
             RoadTestLedger? roads = null, IGameClockStore? clocks = null, int startWeek = 1,
             DateTime? gameStart = null, IRoadTestStore? roadTestStore = null,
             CityEconomy? city = null, ICityStore? cityStore = null,
@@ -78,7 +82,7 @@ public sealed class MainViewModelTests
             onboardingStore.Save(progress);
         }
         var board = catalog ?? DeliveryCatalog.Default;
-        var career = new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
+        var deliveryCareer = career ?? new DeliveryCareer(hubs ?? HubCatalog.Default, board.StartCredP);
         CarIdentity? announced = carKsId is null ? null : new CarIdentity(carKsId, carPreset);
         var brands = new FakeCarBrandSource { CurrentIdentity = announced };
         var profiles = profileStore ?? new FakeProfileStore(profile);
@@ -111,7 +115,7 @@ public sealed class MainViewModelTests
             onboardingStore, new FakeContentSource(content ?? EmptyContent),
             profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
-            brands, TodoTable.Default, board, career,
+            brands, TodoTable.Default, board, deliveryCareer,
             deliveryFares ?? DeliveryFareTable.Default,
             city ?? new CityEconomy(board.Stores, CityRules.Default), cityStore ?? new FakeCityStore(),
             roads ?? TestRoadCars.Ledger(), roadTestStore ?? new FakeRoadTestStore(),
@@ -1752,7 +1756,7 @@ public sealed class MainViewModelTests
     {
         var content = new OnboardingContent(
             [], new Dictionary<string, string[]>(), [],
-            [new DialogueLine("GRANDMA", "Stop by [POI] on [STREET].")], [], []);
+            [new DialogueLine("GRANDMA", "Stop by [POI] on [STREET].")], [], [], []);
         PointOfInterest expected =
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
                 .Spawn(PoiCatalog.MaxGroceryId)!;
@@ -1863,6 +1867,105 @@ public sealed class MainViewModelTests
         Assert.Contains(
             log.Infos,
             line => line.Contains($"entered {expected.Name}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void BirthdayErrandVisit_DoesNotGrantTheIntroCredP()
+    {
+        // Unity only hands the delivery gift over on the first visit AFTER
+        // firstSceneComplete (hasSeenMaxJobIntro); the birthday errand that
+        // starts the tour must leave the career at zero.
+        var career = new DeliveryCareer(HubCatalog.Default, 0);
+        var onboarding = new FakeOnboardingStore();
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(
+            content: OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud, onboarding: onboarding, career: career);
+
+        vm.ShowDialogue();
+        Assert.Equal(0, career.CredP);
+
+        hud.RaiseEnter();
+        Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(0, career.CredP);
+        Assert.False(onboarding.State.MaxDeliveryIntroSeen);
+    }
+
+    [Fact]
+    public void FirstPostIntroMaxVisit_ShowsTheDeliveryOfferThenGrantsTheCredP()
+    {
+        // Unity: firstSceneComplete && !hasSeenMaxJobIntro shows
+        // MaxDialogueScreen; its Continue pays the 100 CredP and opens the
+        // shop. The delivery page must read 0 until that visit.
+        var career = new DeliveryCareer(HubCatalog.Default, 0);
+        var onboarding = new FakeOnboardingStore();
+        var hud = new FakeTelemetryHud();
+        var progress = new OnboardingState(
+            null, null, BirthdayDone: true,
+            JustinPickedUp: true, AnnabellaPickedUp: true, PancakesDone: true,
+            MaxErrandDone: true, CommunityCentreDone: true);
+        var (vm, _, _, _) = Create(
+            content: OneLineDialogue, progress: progress,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud, onboarding: onboarding, career: career);
+
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(0, career.CredP);
+
+        hud.SetDestination(
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
+                .Spawn(PoiCatalog.MaxGroceryId));
+        hud.RaiseEnter();
+
+        var offer = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("A NEW TURN", offer.Title);
+        Assert.Equal(0, career.CredP);
+        Assert.False(onboarding.State.MaxDeliveryIntroSeen);
+
+        offer.ContinueCommand.Execute(null);
+
+        Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(DeliveryCatalog.Default.StartCredP, career.CredP);
+        Assert.True(onboarding.State.MaxDeliveryIntroSeen);
+
+        // Backing out and entering again is a plain store visit now: the
+        // offer and its gift are one-shot.
+        Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen).BackCommand.Execute(null);
+        hud.RaiseEnter();
+        Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(DeliveryCatalog.Default.StartCredP, career.CredP);
+    }
+
+    [Fact]
+    public void ReturnVisitToMaxStore_DoesNotGrantTheIntroCredPAgain()
+    {
+        // A banked first visit restores the gift from App's career seed; the
+        // entering screen must not add a second copy.
+        var career = new DeliveryCareer(HubCatalog.Default, DeliveryCatalog.Default.StartCredP);
+        var onboarding = new FakeOnboardingStore();
+        onboarding.Save(OnboardingState.Fresh with
+        {
+            BirthdayDone = true,
+            MaxDeliveryIntroSeen = true,
+            MaxErrandDone = true,
+            CommunityCentreDone = true,
+        });
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = Create(
+            content: OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud, onboarding: onboarding, career: career,
+            progress: onboarding.State);
+
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        hud.SetDestination(
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
+                .Spawn(PoiCatalog.MaxGroceryId));
+        hud.RaiseEnter();
+
+        Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(DeliveryCatalog.Default.StartCredP, career.CredP);
     }
 
     [Fact]
@@ -2199,21 +2302,26 @@ public sealed class MainViewModelTests
         centreDialogue.ContinueCommand.Execute(null);
 
         Assert.True(onboarding.State.CommunityCentreDone);
+        // The closing "how to call the panel" page is still the introduction
+        // even though the tour is banked; its CONTINUE is what ends it.
+        Assert.True(vm.IntroInProgress);
         Assert.Null(hud.Destination);
         var voiceInfo = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         Assert.True(vm.IsShown);
         Assert.Contains("HEY MAZDA", voiceInfo.LeadText, StringComparison.Ordinal);
         Assert.DoesNotContain("{0}", voiceInfo.LeadText, StringComparison.Ordinal);
+        Assert.Contains("\"HEY {BRAND}\"", voiceInfo.LeadText, StringComparison.Ordinal);
         Assert.Contains("CTRL+Shift+C", voiceInfo.DetailText, StringComparison.Ordinal);
         string hint = Assert.IsType<string>(voiceInfo.HintText);
-        Assert.Contains("Say \"CONTINUE\"", hint, StringComparison.Ordinal);
-        Assert.Contains("job centre", hint, StringComparison.Ordinal);
-        Assert.Contains("first taxi job", hint, StringComparison.Ordinal);
+        Assert.Contains("Click \"CONTINUE\"", hint, StringComparison.Ordinal);
+        Assert.Contains("select \"JOBS\"", hint, StringComparison.Ordinal);
+        Assert.Contains("first taxi shift", hint, StringComparison.Ordinal);
 
         voiceInfo.ContinueCommand.Execute(null);
 
         // The tour is over: the panel opens on the menu by itself for the
         // first time since the introduction started.
+        Assert.False(vm.IntroInProgress);
         Assert.True(vm.IsShown);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }

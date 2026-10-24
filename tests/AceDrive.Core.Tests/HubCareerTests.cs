@@ -40,6 +40,22 @@ public sealed class HubCareerTests
     }
 
     [Fact]
+    public void NeedsIntroCredP_OnlyWhileNothingIsBankedOrOpened()
+    {
+        var broke = Fresh(0);
+        Assert.True(broke.NeedsIntroCredP);
+
+        broke.AddCredP(100); // Max's first store visit
+        Assert.False(broke.NeedsIntroCredP);
+
+        // A hub bought earlier is progress even when the balance is back to 0.
+        var opened = Fresh(100);
+        Assert.True(opened.TryOpenCareer(1, 0, 0));
+        Assert.Equal(0, opened.CredP);
+        Assert.False(opened.NeedsIntroCredP);
+    }
+
+    [Fact]
     public void TryOpenCareer_SpendsCredPAndRecordsHub()
     {
         var career = Fresh(250);

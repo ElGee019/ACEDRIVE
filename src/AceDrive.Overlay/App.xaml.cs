@@ -129,10 +129,17 @@ public partial class App : Application, IDisposable
         // The delivery distance-charge table rides beside the taxi fares:
         // one file each, so balance edits never collide.
         var deliveryFares = new JsonFareStore(_log).LoadDelivery();
-        // The career state is the delivery side's wallet + hub list; Max's
-        // intro gift seeds it (PORTPLAN 5/51: the only CredP that exists
-        // until the persistent save lands).
-        var deliveryCareer = new DeliveryCareer(new JsonHubCatalog(_log).Load(), deliveryCatalog.StartCredP);
+        // The career state is the delivery side's wallet + hub list. A new
+        // driver starts with nothing; only Max's first store visit after the
+        // introduction hands over the intro CredP (Unity firstSceneComplete +
+        // hasSeenMaxJobIntro, PORTPLAN 5/51). The banked visit restores that
+        // gift on relaunch until the persistent career save lands.
+        var onboardingStore = new JsonOnboardingStore();
+        OnboardingState onboardingProgress = onboardingStore.Load();
+        bool introGiftClaimed = onboardingProgress.MaxDeliveryIntroSeen;
+        var deliveryCareer = new DeliveryCareer(
+            new JsonHubCatalog(_log).Load(),
+            introGiftClaimed ? deliveryCatalog.StartCredP : 0);
 
         // The town (PORTPLAN 25): each store starts at the rules' citizen
         // value, its people drift with how full the shelves are and demand
@@ -302,7 +309,6 @@ public partial class App : Application, IDisposable
         var policeRules = new JsonPoliceRulesStore(_log).Load();
         var police = new PolicePatrolPlanner(addressMap, policeRules, taxiSeed + 3);
         var hud = new HudViewModel(addressMap, preferences, beat, wall, taxiRules);
-        var onboardingStore = new JsonOnboardingStore();
         // RESET GAME (settings): wipe every career file, then replace the
         // process so no in-memory store survives into the fresh introduction.
         var saveResets = new FileSaveDataResetter(_log);

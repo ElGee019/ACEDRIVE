@@ -26,6 +26,13 @@ public sealed record OnboardingState(
     AddressLocation? CommunityCentreAddress = null,
     bool CommunityCentreDone = false,
     bool MaxErrandDone = false,
+    // Max's first store visit after the introduction shows the delivery offer
+    // and pays the intro CredP once (Unity hasSeenMaxJobIntro). Kept apart
+    // from MaxErrandDone: the birthday errand visit happens before the tour
+    // ends and must not pay the gift. A new field, not the old
+    // MaxCredPGranted: saves stamped by the errand-time grant stay unaccepted,
+    // so those players still see the offer on their next Max visit.
+    bool MaxDeliveryIntroSeen = false,
     // Last argument so saves written before the stage existed deserialize
     // with the fresh default (Preferences) instead of failing.
     OnboardingStage Stage = OnboardingStage.Preferences)

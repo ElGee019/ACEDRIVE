@@ -110,6 +110,7 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
             "ANNABELLA" => Strings.Get("SpeakerAnnabella"),
             "JUSTIN" => Strings.Get("SpeakerJustin"),
             "SIGNORE MORO" => Strings.Get("SpeakerSignoreMoro"),
+            "MAX" => Strings.Get("SpeakerMax"),
             _ => line.Speaker,
         };
         Body = line.Text;

@@ -5,11 +5,11 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// The player's delivery career: the CredP balance (seeded by Max's intro
-/// gift, PORTPLAN Career Start item 5) plus the hubs bought with it.
-/// Unity: player.credP + player.ownedWholesaleHubs, in memory until the
-/// save lands (PORTPLAN 51). Buying spends it; a delivered store earns it
-/// back through <see cref="RegisterDelivery"/>'s ramp.
+/// The player's delivery career: the CredP balance (starts empty; Max's
+/// first store visit hands over the intro gift, PORTPLAN Career Start item 5)
+/// plus the hubs bought with it. Unity: player.credP + player.ownedWholesaleHubs,
+/// in memory until the save lands (PORTPLAN 51). Buying spends it; a delivered
+/// store earns it back through <see cref="RegisterDelivery"/>'s ramp.
 /// </summary>
 public sealed class DeliveryCareer
 {
@@ -30,7 +30,26 @@ public sealed class DeliveryCareer
 
     public double CredP { get; private set; }
 
+    /// <summary>
+    /// Banks CredP earned outside the delivery ramp. Max's first-store visit
+    /// uses it for the intro gift (Unity ScreenManager.OnMaxDialogueComplete:
+    /// credP += 100 before the shop opens); the balance itself stays private so
+    /// only gameplay rules move it.
+    /// </summary>
+    public void AddCredP(double amount)
+    {
+        if (amount <= 0) return;
+        CredP += amount;
+    }
+
     public IReadOnlyList<OwnedHub> Owned => _owned;
+
+    /// <summary>
+    /// A career that cannot buy anything yet: no CredP banked and no hub
+    /// opened. Max's first store visit is the only way out (PORTPLAN Career
+    /// Start item 5), so the delivery page points the player there.
+    /// </summary>
+    public bool NeedsIntroCredP => CredP <= 0 && _owned.Count == 0;
 
     // Unity DeliveryHubScreen.IsHubOwned: hubs are tracked by name across
     // the whole catalog, not per tier or category.

@@ -32,6 +32,21 @@ public sealed class DialogueTextTests
     }
 
     [Fact]
+    public void Fill_ReplacesTheCarToken_WithTheBrandOrMachine()
+    {
+        // Unity's MaxDialogueScreen swaps "machine" for the current car brand;
+        // a save without an announced car keeps the authored noun.
+        DialogueLine[] lines = [new("MAX", "That fine [CAR] of yours.")];
+
+        Assert.Equal(
+            "That fine Mazda of yours.",
+            Assert.Single(DialogueText.Fill(lines, "", "", "", "Mazda")).Text);
+        Assert.Equal(
+            "That fine machine of yours.",
+            Assert.Single(DialogueText.Fill(lines, "", "", "")).Text);
+    }
+
+    [Fact]
     public void Fill_KeepsLinesWithoutTokens()
     {
         DialogueLine page = new("YOU", "Thanks!");

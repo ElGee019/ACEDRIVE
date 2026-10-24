@@ -99,15 +99,17 @@
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
   <data name="PancakeTitle" xml:space="preserve"><value>PANNEKOEKEN EN EEN AMERIKAANSE AUTO</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>BUURTHUIS</value></data>
+  <data name="MaxDialogueTitle" xml:space="preserve"><value>EEN NIEUWE WENDING</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="SpeakerGrandma" xml:space="preserve"><value>Oma</value></data>
   <data name="SpeakerYou" xml:space="preserve"><value>Jij</value></data>
   <data name="SpeakerSignoreMoro" xml:space="preserve"><value>Signore Moro</value></data>
+  <data name="SpeakerMax" xml:space="preserve"><value>Max</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>SPRAAKBEDIENING</value></data>
   <data name="VoiceInfoIntro" xml:space="preserve"><value>Bedien de navigatie met je stem.</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {0}" om de app te activeren. Bijvoorbeeld "HEY {0}".</value></data>
+  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {{BRAND}}" om de app te activeren. Bijvoorbeeld "HEY {0}".</value></data>
   <data name="VoiceInfoHotkey" xml:space="preserve"><value>Je kunt ook CTRL+Shift+C indrukken.</value></data>
-  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Zeg "{0}" om het banencentrum te openen en je eerste taxiopdracht aan te nemen.</value></data>
+  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Klik op "{0}" en kies "JOBS" om je eerste taxidienst te starten.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Spreek de tekst van een knop uit om op die knop te drukken.
 Bijvoorbeeld "{0}".</value></data>
   <data name="ControlTaxi" xml:space="preserve"><value>START TAXIDIENST</value></data>
@@ -160,6 +162,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DeliveryBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="DeliveryCancelOrder" xml:space="preserve"><value>BESTELLING ANNULEREN</value></data>
   <data name="DeliveryEmpty" xml:space="preserve"><value>Nog geen winkels beschikbaar voor bezorging. Gebruik je Vertrouwenspunten om je eerste bezorgcarrière te starten met HIERONDER NIEUW CARRIERE OPENEN.</value></data>
+  <data name="DeliveryNeedCredP" xml:space="preserve"><value>Je hebt vertrouwenspunten nodig om een bezorgcarrière te starten. Bezoek Max' kruidenier.</value></data>
   <data name="DeliverySelectHint" xml:space="preserve"><value>Kies een of meer winkels om een bezorgklus voor hen te starten.</value></data>
   <data name="DeliveryNumber1" xml:space="preserve"><value>EEN</value></data>
   <data name="DeliveryNumber2" xml:space="preserve"><value>TWEE</value></data>

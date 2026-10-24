@@ -141,6 +141,18 @@ public sealed class StoreScreenViewModel :
     }
     private string _trunkText = "";
 
+    /// <summary>
+    /// True while a row is selected and BUY is offered. Hidden after a
+    /// purchase (which clears the selection) until the player picks an item
+    /// again, so the button can never quote nothing.
+    /// </summary>
+    public bool BuyVisible
+    {
+        get => _buyVisible;
+        private set => SetField(ref _buyVisible, value);
+    }
+    private bool _buyVisible;
+
     public bool VolumeWarn
     {
         get => _volumeWarn;
@@ -294,12 +306,14 @@ public sealed class StoreScreenViewModel :
     }
 
     // One repaint path for "no selection", a quantity change and a purchase,
-    // so the panel numbers and the BUY gate always describe the same quote.
+    // so the panel numbers, BUY's visibility and the BUY gate always describe
+    // the same quote.
     private void RepaintSelection()
     {
         double capacity = TrunkCapacity;
         if (_selected is not { } row)
         {
+            BuyVisible = false;
             SelectionText = string.Empty;
             QuantityText = 0.ToString(CultureInfo.CurrentCulture);
             VolumeText = Strings.Format("StoreVolumeLine", 0.0);
@@ -312,6 +326,7 @@ public sealed class StoreScreenViewModel :
             return;
         }
 
+        BuyVisible = true;
         StorePurchaseQuote quote = StoreCheckout.Quote(
             _inventory, _trunk, _wallet, row.Item, _quantity, capacity);
         SelectionText = Strings.Format(
