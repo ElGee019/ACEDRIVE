@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -11,18 +9,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonHungerStateStore : IHungerStateStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonHungerStateStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "hunger.json"), log)
+        : this(DataPaths.UserSave("hunger.json"), log)
     { }
 
     public JsonHungerStateStore(string file, ILog log)
@@ -33,40 +24,30 @@ public sealed class JsonHungerStateStore : IHungerStateStore
 
     public HungerState? Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out HungerState? state, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file)) return null;
-            HungerState? state = JsonSerializer.Deserialize<HungerState>(
-                File.ReadAllText(_file), JsonOptions);
-            if (state is null || state.Hunger < 0)
-            {
-                _log.LogWarning($"hunger.json invalid at {_file}; starting fed");
-                return null;
-            }
-
-            _log.LogInfo($"hunger loaded: {state.Hunger} ({(state.ThresholdTriggered ? "pancake event fired" : "pancake event armed")})");
-            return state;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Corrupt or locked save just means a fed driver: the meter
-            // re-seeds at 0 instead of blocking startup.
-            _log.LogWarning($"hunger.json unreadable at {_file} ({ex.GetType().Name}); starting fed");
             return null;
         }
+
+        // Corrupt or locked save just means a fed driver: the meter re-seeds
+        // at 0 instead of blocking startup.
+        if (state is null || state.Hunger < 0)
+        {
+            _log.LogWarning($"hunger.json {JsonFile.Describe(error)} at {_file}; starting fed");
+            return null;
+        }
+
+        _log.LogInfo($"hunger loaded: {state.Hunger} ({(state.ThresholdTriggered ? "pancake event fired" : "pancake event armed")})");
+        return state;
     }
 
     public void Save(HungerState state)
     {
-        try
+        // never break gameplay or shutdown for persistence
+        if (!JsonFile.TryWrite(_file, state, out string? error))
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
-            File.WriteAllText(_file, JsonSerializer.Serialize(state, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // never break gameplay or shutdown for persistence
-            _log.LogWarning($"hunger.json unwritable at {_file} ({ex.GetType().Name})");
+            _log.LogWarning($"hunger.json unwritable at {_file} ({error})");
         }
     }
 }

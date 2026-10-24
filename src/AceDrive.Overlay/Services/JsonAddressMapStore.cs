@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -12,16 +10,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonAddressMapStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonAddressMapStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "address_map.json"), log)
+        : this(DataPaths.GameData("address_map.json"), log)
     { }
 
     public JsonAddressMapStore(string file, ILog log)
@@ -32,34 +25,16 @@ public sealed class JsonAddressMapStore
 
     public AddressMap Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "address_map.json", "using built-in Brands Hatch map",
+                IsValid, out AddressMap? map))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"address_map.json missing at {_file}; using built-in Brands Hatch map");
-                return AddressMap.Default;
-            }
-
-            AddressMap? map = JsonSerializer.Deserialize<AddressMap>(
-                File.ReadAllText(_file), JsonOptions);
-            if (map is null || !IsValid(map))
-            {
-                _log.LogWarning($"address_map.json invalid at {_file}; using built-in Brands Hatch map");
-                return AddressMap.Default;
-            }
-
-            _log.LogInfo($"address map loaded: {map.Country}, {map.City}, " +
-                $"{map.TrackLengthMeters:0} m, {map.Streets.Count} streets");
-            return map;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"address_map.json unreadable at {_file} ({ex.GetType().Name}); using built-in Brands Hatch map");
             return AddressMap.Default;
         }
+
+        _log.LogInfo($"address map loaded: {map.Country}, {map.City}, " +
+            $"{map.TrackLengthMeters:0} m, {map.Streets.Count} streets");
+        return map;
     }
 
     private static bool IsValid(AddressMap map)

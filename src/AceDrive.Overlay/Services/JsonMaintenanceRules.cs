@@ -12,16 +12,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonMaintenanceRules
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonMaintenanceRules(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "maintenance_rules.json"), log)
+        : this(DataPaths.GameData("maintenance_rules.json"), log)
     { }
 
     public JsonMaintenanceRules(string file, ILog log)
@@ -32,32 +27,16 @@ public sealed class JsonMaintenanceRules
 
     public MaintenanceRules Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "maintenance_rules.json", "using built-in defaults",
+                IsValid, out MaintenanceRules? rules))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"maintenance_rules.json missing at {_file}; using built-in defaults");
-                return MaintenanceRules.Default;
-            }
-            MaintenanceRules? rules = JsonSerializer.Deserialize<MaintenanceRules>(
-                File.ReadAllText(_file), JsonOptions);
-            if (rules is null || !IsValid(rules))
-            {
-                _log.LogWarning($"maintenance_rules.json invalid at {_file}; using built-in defaults");
-                return MaintenanceRules.Default;
-            }
-            _log.LogInfo($"maintenance rules loaded: {rules.Parts.Count} parts, " +
-                $"breakdown cap {rules.MaxBreakdownChance:0.00}, pickup CR{rules.PickupFee:0}");
-            return rules;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"maintenance_rules.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return MaintenanceRules.Default;
         }
+
+        _log.LogInfo($"maintenance rules loaded: {rules.Parts.Count} parts, " +
+            $"breakdown cap {rules.MaxBreakdownChance:0.00}, pickup CR{rules.PickupFee:0}");
+        return rules;
     }
 
     // Every guard rejects a table that would misbehave at use: a part that can

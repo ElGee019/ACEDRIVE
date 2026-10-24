@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -13,18 +11,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonGarageStore : IGarageStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonGarageStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "garage.json"), log)
+        : this(DataPaths.UserSave("garage.json"), log)
     { }
 
     public JsonGarageStore(string file, ILog log)
@@ -35,46 +26,34 @@ public sealed class JsonGarageStore : IGarageStore
 
     public GarageState? Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out GarageState? state, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file)) return null;
-            GarageState? state = JsonSerializer.Deserialize<GarageState>(
-                File.ReadAllText(_file), JsonOptions);
-            if (state is null)
-            {
-                _log.LogWarning($"garage.json invalid at {_file}; starting with an empty garage");
-                return null;
-            }
-            GarageState cleaned = Sanitize(state);
-            _log.LogInfo($"garage loaded: {cleaned.Cars?.Count ?? 0} cars, current {cleaned.CurrentKey ?? "none"}");
-            return cleaned;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt save must degrade to an
-            // empty garage, never take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"garage.json unreadable at {_file} ({ex.GetType().Name}); starting with an empty garage");
             return null;
         }
+
+        // A corrupt save must degrade to an empty garage, never take the
+        // overlay down (AGENTS.md: Try* at every external boundary).
+        if (state is null)
+        {
+            _log.LogWarning(
+                $"garage.json {JsonFile.Describe(error)} at {_file}; starting with an empty garage");
+            return null;
+        }
+
+        GarageState cleaned = Sanitize(state);
+        _log.LogInfo($"garage loaded: {cleaned.Cars?.Count ?? 0} cars, current {cleaned.CurrentKey ?? "none"}");
+        return cleaned;
     }
 
     public void Save(GarageState state)
     {
-        try
+        // A failed bank must never break gameplay or shutdown; the next
+        // purchase or switch retries with fresher numbers.
+        if (!JsonFile.TryWrite(_file, state, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllText(_file, JsonSerializer.Serialize(state, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed bank must never break gameplay or shutdown; the next
-            // purchase or switch retries with fresher numbers.
-            _log.LogWarning($"garage.json unwritable at {_file} ({ex.GetType().Name}); progress kept in memory");
+            _log.LogWarning(
+                $"garage.json unwritable at {_file} ({error}); progress kept in memory");
         }
     }
 

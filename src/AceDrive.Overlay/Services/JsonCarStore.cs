@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -14,16 +12,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonCarStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonCarStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "cars.json"), log)
+        : this(DataPaths.GameData("cars.json"), log)
     { }
 
     public JsonCarStore(string file, ILog log)
@@ -34,50 +27,39 @@ public sealed class JsonCarStore
 
     public IReadOnlyList<CarSpec> Load()
     {
-        try
+        // An empty array is as unusable as a missing file: the row cleaner
+        // below still needs something to walk.
+        if (!JsonTable.TryLoad(
+                _log, _file, "cars.json", "road test runs without a pool",
+                cars => cars.Count > 0, out List<CarSpec>? cars))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"cars.json missing at {_file}; road test runs without a pool");
-                return [];
-            }
-            List<CarSpec>? cars = JsonSerializer.Deserialize<List<CarSpec>>(
-                File.ReadAllText(_file), JsonOptions);
-            if (cars is null || cars.Count == 0)
-            {
-                _log.LogWarning($"cars.json invalid at {_file}; road test runs without a pool");
-                return [];
-            }
-            List<CarSpec> valid = [];
-            var keys = new HashSet<string>(StringComparer.Ordinal);
-            foreach (CarSpec car in cars)
-            {
-                CarSpec row = car.Preset is { Length: 0 } ? car with { Preset = null } : car;
-                if (IsUsable(row) && keys.Add(row.Key))
-                {
-                    valid.Add(row);
-                }
-            }
-            if (valid.Count == 0)
-            {
-                _log.LogWarning($"cars.json has no usable rows at {_file}; road test runs without a pool");
-                return [];
-            }
-            if (valid.Count != cars.Count)
-            {
-                _log.LogWarning($"cars.json dropped {cars.Count - valid.Count} unusable rows at {_file}");
-            }
-            _log.LogInfo($"cars loaded: {valid.Count} road-test candidates");
-            return valid;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"cars.json unreadable at {_file} ({ex.GetType().Name}); road test runs without a pool");
             return [];
         }
+
+        List<CarSpec> valid = [];
+        var keys = new HashSet<string>(StringComparer.Ordinal);
+        foreach (CarSpec car in cars)
+        {
+            CarSpec row = car.Preset is { Length: 0 } ? car with { Preset = null } : car;
+            if (IsUsable(row) && keys.Add(row.Key))
+            {
+                valid.Add(row);
+            }
+        }
+
+        if (valid.Count == 0)
+        {
+            _log.LogWarning($"cars.json has no usable rows at {_file}; road test runs without a pool");
+            return [];
+        }
+
+        if (valid.Count != cars.Count)
+        {
+            _log.LogWarning($"cars.json dropped {cars.Count - valid.Count} unusable rows at {_file}");
+        }
+
+        _log.LogInfo($"cars loaded: {valid.Count} road-test candidates");
+        return valid;
     }
 
     // A row is usable when it can be displayed, road-tested and sold: identity

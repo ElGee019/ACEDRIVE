@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -16,11 +15,6 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonOnboardingContent : IContentSource
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _dir;
     private readonly ILog _log;
     private OnboardingContent? _snapshot;
@@ -86,15 +80,17 @@ public sealed class JsonOnboardingContent : IContentSource
 
     public OnboardingContent Load()
     {
-        var brands = Read("brands.json", () => Array.Empty<string>()) ?? [];
-        var aliases = Read("brand_aliases.json", () => new Dictionary<string, string[]>()) ?? new();
-        var cars = Read("grandma_cars.json", () => new List<RawCar>()) ?? new();
-        var dialogue = Read("grandma_dialogue.json", () => new List<RawLine>()) ?? new();
-        var pancakes = Read("pancake_dialogue.json", () => new List<RawLine>()) ?? new();
-        var communityCentre = Read(
-            "community_centre_dialogue.json", () => new List<RawLine>()) ?? new();
-        var confusions = CleanConfusions(
-            Read("voice_confusions.json", () => new Dictionary<string, string>()) ?? new());
+        string[] brands = Read("brands.json", Array.Empty<string>());
+        Dictionary<string, string[]> aliases =
+            Read("brand_aliases.json", new Dictionary<string, string[]>());
+        List<RawCar> cars = Read("grandma_cars.json", new List<RawCar>());
+        List<RawLine> dialogue = Read("grandma_dialogue.json", new List<RawLine>());
+        List<RawLine> pancakes = Read("pancake_dialogue.json", new List<RawLine>());
+        List<RawLine> communityCentre =
+            Read("community_centre_dialogue.json", new List<RawLine>());
+        List<RawLine> maxDialogue = Read("max_dialogue.json", new List<RawLine>());
+        Dictionary<string, string> confusions = CleanConfusions(
+            Read("voice_confusions.json", new Dictionary<string, string>()));
 
         Array.Sort(brands, StringComparer.Ordinal);
         var content = new OnboardingContent(
@@ -113,12 +109,16 @@ public sealed class JsonOnboardingContent : IContentSource
             communityCentre.Where(l => !string.IsNullOrWhiteSpace(l.Text))
                 .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
                 .ToArray(),
+            maxDialogue.Where(l => !string.IsNullOrWhiteSpace(l.Text))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .ToArray(),
             confusions);
         _log.LogInfo($"content: {content.Brands.Count} brands, {content.Cars.Count} cars " +
             $"({content.Cars.Count(c => c.ImagePath is not null)} with thumbs), " +
             $"{content.Dialogue.Count} dialogue lines, " +
             $"{content.PancakeDialogue.Count} pancake lines, " +
             $"{content.CommunityCentreDialogue.Count} community centre lines, " +
+            $"{content.MaxDialogue.Count} Max delivery-intro lines, " +
             $"{confusions.Count} transcript aliases");
         return content;
     }
@@ -153,26 +153,29 @@ public sealed class JsonOnboardingContent : IContentSource
         return File.Exists(png) ? png : null;
     }
 
-    private T? Read<T>(string name, Func<T> fallback)
+    // One section of the bundle; a missing or corrupt file leaves that section
+    // empty and the rest of the onboarding still loads.
+    private T Read<T>(string name, T fallback)
+        where T : class
     {
         string file = Path.Combine(_dir, name);
-        try
+        JsonReadStatus status = JsonFile.TryRead(file, out T? value, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(file))
-            {
-                _log.LogWarning($"{name} missing in {_dir}; onboarding section empty");
-                return fallback();
-            }
-            return JsonSerializer.Deserialize<T>(File.ReadAllText(file), JsonOptions);
+            _log.LogWarning($"{name} missing in {_dir}; onboarding section empty");
+            return fallback;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+
+        // A corrupt or locked data file must not take the overlay down
+        // (AGENTS.md: Try* at every external boundary).
+        if (value is null)
         {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"{name} unreadable in {_dir} ({ex.GetType().Name}); onboarding section empty");
-            return fallback();
+            _log.LogWarning(
+                $"{name} unreadable in {_dir} ({error}); onboarding section empty");
+            return fallback;
         }
+
+        return value;
     }
 
     // Deserialization DTOs: tolerant (missing fields default), validated on map.

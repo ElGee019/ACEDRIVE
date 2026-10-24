@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -12,19 +10,12 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonBrandMileageStore : IBrandMileageStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
     private readonly Dictionary<string, double> _km;
 
     public JsonBrandMileageStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "brand_mileage.json"), log)
+        : this(DataPaths.UserSave("brand_mileage.json"), log)
     { }
 
     public JsonBrandMileageStore(string file, ILog log)
@@ -56,55 +47,43 @@ public sealed class JsonBrandMileageStore : IBrandMileageStore
 
     private void Save()
     {
-        try
+        // A failed bank must never break gameplay or shutdown; the next ride
+        // retries with fresher numbers.
+        if (!JsonFile.TryWrite(_file, _km, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllText(_file, JsonSerializer.Serialize(_km, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed bank must never break gameplay or shutdown; the next
-            // ride retries with fresher numbers.
-            _log.LogWarning($"brand_mileage.json unwritable at {_file} ({ex.GetType().Name}); progress kept in memory");
+            _log.LogWarning(
+                $"brand_mileage.json unwritable at {_file} ({error}); progress kept in memory");
         }
     }
 
     private static Dictionary<string, double> LoadKm(string file, ILog log)
     {
-        try
+        var km = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        JsonReadStatus status = JsonFile.TryRead(
+            file, out Dictionary<string, double>? raw, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(file))
-            {
-                return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-            }
-            var raw = JsonSerializer.Deserialize<Dictionary<string, double>>(
-                File.ReadAllText(file), JsonOptions);
-            var km = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-            if (raw is null)
-            {
-                return km;
-            }
-            foreach (var (brand, distance) in raw)
-            {
-                string key = (brand ?? "").Trim();
-                if (key.Length > 0 && distance >= 0.0 && !double.IsNaN(distance) && !double.IsInfinity(distance))
-                {
-                    km[key] = distance;
-                }
-            }
             return km;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+
+        // A corrupt save degrades to zero mileage everywhere, never takes the
+        // overlay down.
+        if (raw is null)
         {
-            // Read/deserialize boundary only: a corrupt save degrades to
-            // zero mileage everywhere, never takes the overlay down.
-            log.LogWarning($"brand_mileage.json unreadable at {file} ({ex.GetType().Name}); starting at zero mileage");
-            return new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+            log.LogWarning(
+                $"brand_mileage.json unreadable at {file} ({error}); starting at zero mileage");
+            return km;
         }
+
+        foreach (var (brand, distance) in raw)
+        {
+            string key = (brand ?? "").Trim();
+            if (key.Length > 0 && distance >= 0.0 && !double.IsNaN(distance) && !double.IsInfinity(distance))
+            {
+                km[key] = distance;
+            }
+        }
+        return km;
     }
 
     private static string Normalize(string? brand) => (brand ?? "").Trim();

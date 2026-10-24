@@ -11,16 +11,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonTaxiRulesStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonTaxiRulesStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "taxi_rules.json"), log)
+        : this(DataPaths.GameData("taxi_rules.json"), log)
     { }
 
     public JsonTaxiRulesStore(string file, ILog log)
@@ -31,52 +26,41 @@ public sealed class JsonTaxiRulesStore
 
     public TaxiRules Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out TaxiRules? rules, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"taxi_rules.json missing at {_file}; using built-in defaults");
-                return TaxiRules.Default;
-            }
-
-            TaxiRules? rules = JsonSerializer.Deserialize<TaxiRules>(
-                File.ReadAllText(_file), JsonOptions);
-            if (rules is null)
-            {
-                _log.LogWarning($"taxi_rules.json invalid at {_file}; using built-in defaults");
-                return TaxiRules.Default;
-            }
-
-            // A file written before the speed challenge existed has no block:
-            // that is a sane default, not an invalid file.
-            if (rules.SpeedChallenge is null)
-            {
-                rules = rules with { SpeedChallenge = SpeedChallengeRules.Default };
-            }
-
-            if (!IsValid(rules))
-            {
-                _log.LogWarning($"taxi_rules.json invalid at {_file}; using built-in defaults");
-                return TaxiRules.Default;
-            }
-
-            _log.LogInfo($"taxi rules loaded: arrival={rules.ArrivalRadiusMeters:0} m, " +
-                $"meter cap={rules.MaxMeterSpeedKmh:0} km/h, " +
-                $"distance step={rules.DisplayDistanceStepMeters:0} m, " +
-                $"notice={rules.NoticeSeconds:0.#} s, " +
-                $"request delay={rules.RequestDelaySeconds:0.#} s, " +
-                $"speed challenge avg={rules.SpeedChallenge.MinAverageKmh:0}-" +
-                $"{rules.SpeedChallenge.MaxAverageKmh:0} km/h");
-            return rules;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"taxi_rules.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
+            _log.LogWarning($"taxi_rules.json missing at {_file}; using built-in defaults");
             return TaxiRules.Default;
         }
+
+        if (rules is null)
+        {
+            _log.LogWarning(
+                $"taxi_rules.json {JsonFile.Describe(error)} at {_file}; using built-in defaults");
+            return TaxiRules.Default;
+        }
+
+        // A file written before the speed challenge existed has no block:
+        // that is a sane default, not an invalid file.
+        if (rules.SpeedChallenge is null)
+        {
+            rules = rules with { SpeedChallenge = SpeedChallengeRules.Default };
+        }
+
+        if (!IsValid(rules))
+        {
+            _log.LogWarning($"taxi_rules.json invalid at {_file}; using built-in defaults");
+            return TaxiRules.Default;
+        }
+
+        _log.LogInfo($"taxi rules loaded: arrival={rules.ArrivalRadiusMeters:0} m, " +
+            $"meter cap={rules.MaxMeterSpeedKmh:0} km/h, " +
+            $"distance step={rules.DisplayDistanceStepMeters:0} m, " +
+            $"notice={rules.NoticeSeconds:0.#} s, " +
+            $"request delay={rules.RequestDelaySeconds:0.#} s, " +
+            $"speed challenge avg={rules.SpeedChallenge.MinAverageKmh:0}-" +
+            $"{rules.SpeedChallenge.MaxAverageKmh:0} km/h");
+        return rules;
     }
 
     private static bool IsValid(TaxiRules rules) =>

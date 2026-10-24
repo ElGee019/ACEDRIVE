@@ -13,11 +13,13 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonPoiStore
 {
+    // The one table whose enums are authored as names (spawn pacing:
+    // "streets", "either", …), never a bare ordinal a hand edit could shift,
+    // so it cannot share the default options; the boundary still comes from
+    // JsonFile.
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
-        // The spawn pacing is a readable name in the data file ("streets",
-        // "either", …), never a bare enum ordinal a hand edit could shift.
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) },
     };
 
@@ -25,7 +27,7 @@ public sealed class JsonPoiStore
     private readonly ILog _log;
 
     public JsonPoiStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "pois.json"), log)
+        : this(DataPaths.GameData("pois.json"), log)
     { }
 
     public JsonPoiStore(string file, ILog log)
@@ -36,33 +38,15 @@ public sealed class JsonPoiStore
 
     public IReadOnlyList<PoiDefinition> Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "pois.json", "using built-in POI table",
+                IsValid, out PoiDefinition[]? pois, JsonOptions))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"pois.json missing at {_file}; using built-in POI table");
-                return PoiCatalog.Default;
-            }
-
-            PoiDefinition[]? pois = JsonSerializer.Deserialize<PoiDefinition[]>(
-                File.ReadAllText(_file), JsonOptions);
-            if (pois is null || !IsValid(pois))
-            {
-                _log.LogWarning($"pois.json invalid at {_file}; using built-in POI table");
-                return PoiCatalog.Default;
-            }
-
-            _log.LogInfo($"POI table loaded: {pois.Length} point(s) of interest");
-            return pois;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS: Try* at every external
-            // boundary). Anything else stays a crash.
-            _log.LogWarning($"pois.json unreadable at {_file} ({ex.GetType().Name}); using built-in POI table");
             return PoiCatalog.Default;
         }
+
+        _log.LogInfo($"POI table loaded: {pois.Length} point(s) of interest");
+        return pois;
     }
 
     private static bool IsValid(PoiDefinition[] pois)

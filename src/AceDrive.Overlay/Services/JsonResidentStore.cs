@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -12,18 +10,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonResidentStore : IResidentStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonResidentStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "residents.json"), log)
+        : this(DataPaths.UserSave("residents.json"), log)
     { }
 
     public JsonResidentStore(string file, ILog log)
@@ -34,45 +25,26 @@ public sealed class JsonResidentStore : IResidentStore
 
     public IReadOnlyList<Resident> Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out List<Resident>? residents, out string? error);
+        if (status == JsonReadStatus.Unreadable)
         {
-            if (!File.Exists(_file))
-            {
-                return [];
-            }
-
-            List<Resident>? residents = JsonSerializer.Deserialize<List<Resident>>(
-                File.ReadAllText(_file), JsonOptions);
-            return residents ?? [];
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt save degrades to a
-            // fresh resident table, never takes the overlay down.
+            // A corrupt save degrades to a fresh resident table, never takes
+            // the overlay down.
             _log.LogWarning(
-                $"residents.json unreadable at {_file} ({ex.GetType().Name}); starting empty");
-            return [];
+                $"residents.json unreadable at {_file} ({error}); starting empty");
         }
+
+        return residents ?? [];
     }
 
     public void Save(IReadOnlyList<Resident> residents)
     {
-        try
+        // A failed bank must never break gameplay; the book keeps the
+        // resident in memory and the next creation retries the write.
+        if (!JsonFile.TryWrite(_file, residents, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-
-            File.WriteAllText(_file, JsonSerializer.Serialize(residents, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed bank must never break gameplay; the book keeps the
-            // resident in memory and the next creation retries the write.
             _log.LogWarning(
-                $"residents.json unwritable at {_file} ({ex.GetType().Name}); residents kept in memory");
+                $"residents.json unwritable at {_file} ({error}); residents kept in memory");
         }
     }
 }

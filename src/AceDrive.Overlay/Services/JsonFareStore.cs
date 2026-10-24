@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -12,16 +11,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonFareStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonFareStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "fares.json"), log)
+        : this(DataPaths.GameData("fares.json"), log)
     { }
 
     public JsonFareStore(string file, ILog log)
@@ -32,31 +26,24 @@ public sealed class JsonFareStore
 
     public FareTable Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out FareTable? table, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"fares.json missing at {_file}; using built-in defaults");
-                return FareTable.Default;
-            }
-            var table = JsonSerializer.Deserialize<FareTable>(
-                File.ReadAllText(_file), JsonOptions);
-            if (table is null || !IsValid(table))
-            {
-                _log.LogWarning($"fares.json invalid at {_file}; using built-in defaults");
-                return FareTable.Default;
-            }
-            _log.LogInfo($"fares loaded: forfait={table.Forfait} tip={table.TipRate} fine={table.FineAmount} tiers={table.Tiers.Count}");
-            return table;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"fares.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
+            _log.LogWarning($"fares.json missing at {_file}; using built-in defaults");
             return FareTable.Default;
         }
+
+        // A corrupt or locked data file must not take the overlay down
+        // (AGENTS.md: Try* at every external boundary).
+        if (table is null || !IsValid(table))
+        {
+            _log.LogWarning(
+                $"fares.json {JsonFile.Describe(error)} at {_file}; using built-in defaults");
+            return FareTable.Default;
+        }
+
+        _log.LogInfo($"fares loaded: forfait={table.Forfait} tip={table.TipRate} fine={table.FineAmount} tiers={table.Tiers.Count}");
+        return table;
     }
 
     /// <summary>
@@ -68,28 +55,22 @@ public sealed class JsonFareStore
     {
         string file = Path.Combine(
             Path.GetDirectoryName(_file)!, "delivery_fares.json");
-        try
+        JsonReadStatus status = JsonFile.TryRead(file, out DeliveryFareTable? table, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(file))
-            {
-                _log.LogWarning($"delivery_fares.json missing at {file}; using built-in defaults");
-                return DeliveryFareTable.Default;
-            }
-            var table = JsonSerializer.Deserialize<DeliveryFareTable>(
-                File.ReadAllText(file), JsonOptions);
-            if (table is null || !FareTierRules.Valid(table.Tiers))
-            {
-                _log.LogWarning($"delivery_fares.json invalid at {file}; using built-in defaults");
-                return DeliveryFareTable.Default;
-            }
-            _log.LogInfo($"delivery fares loaded: tiers={table.Tiers.Count}");
-            return table;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            _log.LogWarning($"delivery_fares.json unreadable at {file} ({ex.GetType().Name}); using built-in defaults");
+            _log.LogWarning($"delivery_fares.json missing at {file}; using built-in defaults");
             return DeliveryFareTable.Default;
         }
+
+        if (table is null || !FareTierRules.Valid(table.Tiers))
+        {
+            _log.LogWarning(
+                $"delivery_fares.json {JsonFile.Describe(error)} at {file}; using built-in defaults");
+            return DeliveryFareTable.Default;
+        }
+
+        _log.LogInfo($"delivery fares loaded: tiers={table.Tiers.Count}");
+        return table;
     }
 
     // A table needs a non-negative forfait, a 0-100% tip rate, a

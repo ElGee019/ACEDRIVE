@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -12,16 +10,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonCityRules
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonCityRules(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "city_rules.json"), log)
+        : this(DataPaths.GameData("city_rules.json"), log)
     { }
 
     public JsonCityRules(string file, ILog log)
@@ -32,32 +25,16 @@ public sealed class JsonCityRules
 
     public CityRules Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "city_rules.json", "using built-in defaults",
+                IsValid, out CityRules? rules))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"city_rules.json missing at {_file}; using built-in defaults");
-                return CityRules.Default;
-            }
-            CityRules? rules = JsonSerializer.Deserialize<CityRules>(
-                File.ReadAllText(_file), JsonOptions);
-            if (rules is null || !IsValid(rules))
-            {
-                _log.LogWarning($"city_rules.json invalid at {_file}; using built-in defaults");
-                return CityRules.Default;
-            }
-            _log.LogInfo($"city rules loaded: {rules.CitizenTickMinutes} min citizens, " +
-                $"{rules.DepletionTickMinutes} min demand");
-            return rules;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"city_rules.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return CityRules.Default;
         }
+
+        _log.LogInfo($"city rules loaded: {rules.CitizenTickMinutes} min citizens, " +
+            $"{rules.DepletionTickMinutes} min demand");
+        return rules;
     }
 
     // Intervals must be real minutes or the tick never pays out; the band

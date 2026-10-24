@@ -1,5 +1,4 @@
 using System.IO;
-using System.Text.Json;
 
 namespace AceDrive.Overlay.Services;
 
@@ -13,40 +12,22 @@ public sealed class JsonFirebaseSessionStore : IFirebaseSessionStore
     private readonly string _file;
 
     public JsonFirebaseSessionStore()
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "AceDrive", "firebase_session.json"))
+        : this(DataPaths.LocalSave("firebase_session.json"))
     { }
 
     internal JsonFirebaseSessionStore(string file) => _file = file;
 
     public FirebaseSessionState? Load()
     {
-        try
-        {
-            if (!File.Exists(_file)) return null;
-            FirebaseSessionState? state =
-                JsonSerializer.Deserialize<FirebaseSessionState>(File.ReadAllText(_file));
-            return state is { Uid.Length: > 0, RefreshToken.Length: > 0 } ? state : null;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            return null;
-        }
+        JsonFile.TryRead(_file, out FirebaseSessionState? state, out _);
+        return state is { Uid.Length: > 0, RefreshToken.Length: > 0 } ? state : null;
     }
 
     public void Save(FirebaseSessionState session)
     {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
-            File.WriteAllText(_file, JsonSerializer.Serialize(session));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A read-only profile still plays offline; the next launch mints a
-            // fresh anonymous uid, which is a harmless board entry.
-        }
+        // A read-only profile still plays offline; the next launch mints a
+        // fresh anonymous uid, which is a harmless board entry.
+        JsonFile.TryWrite(_file, session, out _);
     }
 
     public void Clear()

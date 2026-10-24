@@ -12,16 +12,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonHungerRules
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonHungerRules(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "hunger_rules.json"), log)
+        : this(DataPaths.GameData("hunger_rules.json"), log)
     { }
 
     public JsonHungerRules(string file, ILog log)
@@ -32,32 +27,16 @@ public sealed class JsonHungerRules
 
     public HungerRules Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "hunger_rules.json", "using built-in defaults",
+                IsValid, out HungerRules? rules))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"hunger_rules.json missing at {_file}; using built-in defaults");
-                return HungerRules.Default;
-            }
-            HungerRules? rules = JsonSerializer.Deserialize<HungerRules>(
-                File.ReadAllText(_file), JsonOptions);
-            if (rules is null || !IsValid(rules))
-            {
-                _log.LogWarning($"hunger_rules.json invalid at {_file}; using built-in defaults");
-                return HungerRules.Default;
-            }
-            _log.LogInfo($"hunger rules loaded: +{rules.PerHour} per game hour, " +
-                $"cap {rules.MaxHunger}, pancake threshold {rules.PancakeThreshold}");
-            return rules;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"hunger_rules.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return HungerRules.Default;
         }
+
+        _log.LogInfo($"hunger rules loaded: +{rules.PerHour} per game hour, " +
+            $"cap {rules.MaxHunger}, pancake threshold {rules.PancakeThreshold}");
+        return rules;
     }
 
     // The increment must be real or the meter never moves; the cap must be

@@ -1,11 +1,9 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// Loads the delivery balance (rates, starting CredP) from
+/// Loads the delivery balance (rates, Max's intro CredP) from
 /// Data/delivery_catalog.json next to the exe. The optional Stores array is
 /// only hand-authored content; real board rows come from the shop POIs
 /// (<see cref="PlacedStore"/>). Missing or invalid files degrade to
@@ -15,16 +13,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonDeliveryCatalog
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonDeliveryCatalog(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "delivery_catalog.json"), log)
+        : this(DataPaths.GameData("delivery_catalog.json"), log)
     { }
 
     public JsonDeliveryCatalog(string file, ILog log)
@@ -35,31 +28,15 @@ public sealed class JsonDeliveryCatalog
 
     public DeliveryCatalog Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "delivery_catalog.json", "using built-in defaults",
+                IsValid, out DeliveryCatalog? catalog))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"delivery_catalog.json missing at {_file}; using built-in defaults");
-                return DeliveryCatalog.Default;
-            }
-            var catalog = JsonSerializer.Deserialize<DeliveryCatalog>(
-                File.ReadAllText(_file), JsonOptions);
-            if (catalog is null || !IsValid(catalog))
-            {
-                _log.LogWarning($"delivery_catalog.json invalid at {_file}; using built-in defaults");
-                return DeliveryCatalog.Default;
-            }
-            _log.LogInfo($"delivery catalog loaded: {catalog.Stores.Count} stores");
-            return catalog;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"delivery_catalog.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return DeliveryCatalog.Default;
         }
+
+        _log.LogInfo($"delivery catalog loaded: {catalog.Stores.Count} stores");
+        return catalog;
     }
 
     // Wholesale rate must be a real discount cut and the payout rate a real

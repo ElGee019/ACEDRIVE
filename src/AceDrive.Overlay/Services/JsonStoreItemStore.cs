@@ -12,16 +12,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonStoreItemStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonStoreItemStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "store_items.json"), log)
+        : this(DataPaths.GameData("store_items.json"), log)
     { }
 
     public JsonStoreItemStore(string file, ILog log)
@@ -32,33 +27,15 @@ public sealed class JsonStoreItemStore
 
     public StoreCatalog Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "store_items.json", "using built-in store catalog",
+                IsValid, out StoreCatalog? catalog))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"store_items.json missing at {_file}; using built-in store catalog");
-                return StoreCatalog.Default;
-            }
-
-            StoreCatalog? catalog = JsonSerializer.Deserialize<StoreCatalog>(
-                File.ReadAllText(_file), JsonOptions);
-            if (catalog is null || !IsValid(catalog))
-            {
-                _log.LogWarning($"store_items.json invalid at {_file}; using built-in store catalog");
-                return StoreCatalog.Default;
-            }
-
-            _log.LogInfo($"store catalog loaded: {catalog.Items.Count} item(s)");
-            return catalog;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked content
-            // file must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"store_items.json unreadable at {_file} ({ex.GetType().Name}); using built-in store catalog");
             return StoreCatalog.Default;
         }
+
+        _log.LogInfo($"store catalog loaded: {catalog.Items.Count} item(s)");
+        return catalog;
     }
 
     private static bool IsValid(StoreCatalog catalog)

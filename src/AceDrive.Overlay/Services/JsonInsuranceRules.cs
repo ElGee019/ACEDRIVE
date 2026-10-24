@@ -12,16 +12,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonInsuranceRules
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonInsuranceRules(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "insurance_rules.json"), log)
+        : this(DataPaths.GameData("insurance_rules.json"), log)
     { }
 
     public JsonInsuranceRules(string file, ILog log)
@@ -32,32 +27,16 @@ public sealed class JsonInsuranceRules
 
     public InsuranceRules Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "insurance_rules.json", "using built-in defaults",
+                IsValid, out InsuranceRules? rules))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"insurance_rules.json missing at {_file}; using built-in defaults");
-                return InsuranceRules.Default;
-            }
-            InsuranceRules? rules = JsonSerializer.Deserialize<InsuranceRules>(
-                File.ReadAllText(_file), JsonOptions);
-            if (rules is null || !IsValid(rules))
-            {
-                _log.LogWarning($"insurance_rules.json invalid at {_file}; using built-in defaults");
-                return InsuranceRules.Default;
-            }
-            _log.LogInfo($"insurance rules loaded: rate {rules.PremiumRate}, " +
-                $"+{(rules.BaseIncreaseFactor - 1.0) * 100.0:0}%, floor CR{rules.MinimumDailyCost:0}");
-            return rules;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"insurance_rules.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return InsuranceRules.Default;
         }
+
+        _log.LogInfo($"insurance rules loaded: rate {rules.PremiumRate}, " +
+            $"+{(rules.BaseIncreaseFactor - 1.0) * 100.0:0}%, floor CR{rules.MinimumDailyCost:0}");
+        return rules;
     }
 
     // A free or negative rate would hand out free cover; an increase below 1

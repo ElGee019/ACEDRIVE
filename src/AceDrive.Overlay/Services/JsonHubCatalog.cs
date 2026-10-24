@@ -12,16 +12,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonHubCatalog
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonHubCatalog(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "delivery_hubs.json"), log)
+        : this(DataPaths.GameData("delivery_hubs.json"), log)
     { }
 
     public JsonHubCatalog(string file, ILog log)
@@ -32,31 +27,15 @@ public sealed class JsonHubCatalog
 
     public HubCatalog Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "delivery_hubs.json", "using built-in defaults",
+                IsValid, out HubCatalog? catalog))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"delivery_hubs.json missing at {_file}; using built-in defaults");
-                return HubCatalog.Default;
-            }
-            var catalog = JsonSerializer.Deserialize<HubCatalog>(
-                File.ReadAllText(_file), JsonOptions);
-            if (catalog is null || !IsValid(catalog))
-            {
-                _log.LogWarning($"delivery_hubs.json invalid at {_file}; using built-in defaults");
-                return HubCatalog.Default;
-            }
-            _log.LogInfo($"hub catalog loaded: {catalog.Tiers.Count} tiers");
-            return catalog;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning($"delivery_hubs.json unreadable at {_file} ({ex.GetType().Name}); using built-in defaults");
             return HubCatalog.Default;
         }
+
+        _log.LogInfo($"hub catalog loaded: {catalog.Tiers.Count} tiers");
+        return catalog;
     }
 
     // Unity tracks hubs by name across the whole catalog, so names must be

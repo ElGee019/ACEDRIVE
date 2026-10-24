@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -11,18 +9,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonDriverStore : IDriverStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonDriverStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "driver.json"), log)
+        : this(DataPaths.UserSave("driver.json"), log)
     { }
 
     public JsonDriverStore(string file, ILog log)
@@ -33,45 +24,33 @@ public sealed class JsonDriverStore : IDriverStore
 
     public DriverState? Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out DriverState? state, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file)) return null;
-            DriverState? state = JsonSerializer.Deserialize<DriverState>(
-                File.ReadAllText(_file), JsonOptions);
-            if (state is null || state.Cash < 0 || state.Xp < 0 || state.Bank < 0)
-            {
-                _log.LogWarning($"driver.json invalid at {_file}; starting a fresh driver");
-                return null;
-            }
-            _log.LogInfo($"driver loaded: cash={state.Cash:0.00} xp={state.Xp:0.00} bank={state.Bank:0.00}");
-            return state;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt save must degrade to
-            // a fresh driver, never take the overlay down (AGENTS.md: Try*
-            // at every external boundary). Anything else stays a crash.
-            _log.LogWarning($"driver.json unreadable at {_file} ({ex.GetType().Name}); starting a fresh driver");
             return null;
         }
+
+        // A corrupt save degrades to a fresh driver, never takes the overlay
+        // down (AGENTS.md: Try* at every external boundary).
+        if (state is null || state.Cash < 0 || state.Xp < 0 || state.Bank < 0)
+        {
+            _log.LogWarning(
+                $"driver.json {JsonFile.Describe(error)} at {_file}; starting a fresh driver");
+            return null;
+        }
+
+        _log.LogInfo($"driver loaded: cash={state.Cash:0.00} xp={state.Xp:0.00} bank={state.Bank:0.00}");
+        return state;
     }
 
     public void Save(DriverState state)
     {
-        try
+        // A failed bank must never break gameplay or shutdown; the next bank
+        // retries with fresher numbers.
+        if (!JsonFile.TryWrite(_file, state, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllText(_file, JsonSerializer.Serialize(state, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed bank must never break gameplay or shutdown; the next
-            // bank retries with fresher numbers.
-            _log.LogWarning($"driver.json unwritable at {_file} ({ex.GetType().Name}); progress kept in memory");
+            _log.LogWarning(
+                $"driver.json unwritable at {_file} ({error}); progress kept in memory");
         }
     }
 }

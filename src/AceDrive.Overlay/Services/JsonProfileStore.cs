@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -11,11 +9,6 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonProfileStore : IProfileStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
     private readonly object _gate = new();
@@ -23,9 +16,7 @@ public sealed class JsonProfileStore : IProfileStore
     private bool _loaded;
 
     public JsonProfileStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "profile.json"), log)
+        : this(DataPaths.UserSave("profile.json"), log)
     { }
 
     public JsonProfileStore(string file, ILog log)
@@ -56,20 +47,12 @@ public sealed class JsonProfileStore : IProfileStore
             return;
         }
 
-        try
+        // A failed write must never break gameplay or shutdown; the opening
+        // screen already holds the values in memory.
+        if (!JsonFile.TryWrite(_file, profile, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllText(_file, JsonSerializer.Serialize(profile, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed write must never break gameplay or shutdown; the
-            // opening screen already holds the values in memory.
-            _log.LogWarning($"profile.json unwritable at {_file} ({ex.GetType().Name}); profile kept in memory");
+            _log.LogWarning(
+                $"profile.json unwritable at {_file} ({error}); profile kept in memory");
         }
 
         lock (_gate)
@@ -81,27 +64,24 @@ public sealed class JsonProfileStore : IProfileStore
 
     private PlayerProfile? Read()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out PlayerProfile? profile, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file)) return null;
-            PlayerProfile? profile = JsonSerializer.Deserialize<PlayerProfile>(
-                File.ReadAllText(_file), JsonOptions);
-            if (profile is null || !profile.IsComplete)
-            {
-                _log.LogWarning($"profile.json incomplete at {_file}; opening screen starts from Steam");
-                return null;
-            }
-
-            _log.LogInfo($"profile loaded: {profile.DisplayName}, " +
-                $"{profile.Country} {profile.City} {profile.StreetId} {profile.HouseNumber}");
-            return profile;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked save must
-            // degrade to a blank opening screen, never take the overlay down.
-            _log.LogWarning($"profile.json unreadable at {_file} ({ex.GetType().Name}); opening screen starts from Steam");
             return null;
         }
+
+        // A corrupt or locked save degrades to a blank opening screen, never
+        // takes the overlay down.
+        if (profile is null || !profile.IsComplete)
+        {
+            _log.LogWarning(
+                $"profile.json {JsonFile.Describe(error)} at {_file}; " +
+                "opening screen starts from Steam");
+            return null;
+        }
+
+        _log.LogInfo($"profile loaded: {profile.DisplayName}, " +
+            $"{profile.Country} {profile.City} {profile.StreetId} {profile.HouseNumber}");
+        return profile;
     }
 }

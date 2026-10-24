@@ -1,4 +1,3 @@
-using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AceDrive.Core;
@@ -14,6 +13,9 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonCustomerRequestStore
 {
+    // The one table whose enums are authored as names (CarStat), so it cannot
+    // share the default options; the file boundary and guard still come from
+    // JsonFile.
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -24,7 +26,7 @@ public sealed class JsonCustomerRequestStore
     private readonly ILog _log;
 
     public JsonCustomerRequestStore(ILog log)
-        : this(Path.Combine(AppContext.BaseDirectory, "Data", "customer_requests.json"), log)
+        : this(DataPaths.GameData("customer_requests.json"), log)
     { }
 
     public JsonCustomerRequestStore(string file, ILog log)
@@ -35,36 +37,17 @@ public sealed class JsonCustomerRequestStore
 
     public CustomerRequestTable Load()
     {
-        try
+        if (!JsonTable.TryLoad(
+                _log, _file, "customer_requests.json", "no customer requests",
+                IsValid, out CustomerRequestTable? table, JsonOptions))
         {
-            if (!File.Exists(_file))
-            {
-                _log.LogWarning($"customer_requests.json missing at {_file}; no customer requests");
-                return CustomerRequestTable.Empty;
-            }
-
-            CustomerRequestTable? table = JsonSerializer.Deserialize<CustomerRequestTable>(
-                File.ReadAllText(_file), JsonOptions);
-            if (table is null || !IsValid(table))
-            {
-                _log.LogWarning($"customer_requests.json invalid at {_file}; no customer requests");
-                return CustomerRequestTable.Empty;
-            }
-
-            _log.LogInfo(
-                $"customer requests loaded: suffixes={table.SuffixRequests.Count} " +
-                $"categories={table.QuestionCategories.Count} timer={table.TimerSeconds}s");
-            return table;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked data file
-            // must not take the overlay down (AGENTS.md: Try* at every
-            // external boundary). Anything else stays a crash.
-            _log.LogWarning(
-                $"customer_requests.json unreadable at {_file} ({ex.GetType().Name}); no customer requests");
             return CustomerRequestTable.Empty;
         }
+
+        _log.LogInfo(
+            $"customer requests loaded: suffixes={table.SuffixRequests.Count} " +
+            $"categories={table.QuestionCategories.Count} timer={table.TimerSeconds}s");
+        return table;
     }
 
     private static bool IsValid(CustomerRequestTable table)

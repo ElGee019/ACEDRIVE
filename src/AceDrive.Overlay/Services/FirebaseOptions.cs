@@ -29,9 +29,7 @@ public sealed record FirebaseOptions(string ProjectId, string ApiKey, string Sto
         string? apiKey = Environment.GetEnvironmentVariable(ApiKeyVariable);
         string? bucket = Environment.GetEnvironmentVariable(BucketVariable);
 
-        string file = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "firebase.json");
+        string file = DataPaths.UserSave("firebase.json");
         if (File.Exists(file))
         {
             try

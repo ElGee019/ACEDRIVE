@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -11,18 +9,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonPreferencesStore : IPreferencesStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonPreferencesStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "preferences.json"), log)
+        : this(DataPaths.UserSave("preferences.json"), log)
     { }
 
     public JsonPreferencesStore(string file, ILog log)
@@ -33,48 +24,33 @@ public sealed class JsonPreferencesStore : IPreferencesStore
 
     public PlayerPreferences Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out PlayerPreferences? preferences, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(_file)) return PlayerPreferences.Default;
-            PlayerPreferences? preferences = JsonSerializer.Deserialize<PlayerPreferences>(
-                File.ReadAllText(_file), JsonOptions);
-            // WHY the enum guard: an unknown unit/language in a hand-edited
-            // file must fall back, not render an undefined option.
-            if (preferences is null
-                || !Enum.IsDefined(preferences.Units)
-                || !Enum.IsDefined(preferences.Language))
-            {
-                _log.LogWarning($"preferences.json invalid at {_file}; using the defaults");
-                return PlayerPreferences.Default;
-            }
-
-            return preferences;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked save must
-            // degrade to the defaults, never take the overlay down.
-            _log.LogWarning($"preferences.json unreadable at {_file} ({ex.GetType().Name}); using the defaults");
             return PlayerPreferences.Default;
         }
+
+        // WHY the enum guard: an unknown unit/language in a hand-edited file
+        // must fall back, not render an undefined option.
+        if (preferences is null
+            || !Enum.IsDefined(preferences.Units)
+            || !Enum.IsDefined(preferences.Language))
+        {
+            _log.LogWarning(
+                $"preferences.json {JsonFile.Describe(error)} at {_file}; using the defaults");
+            return PlayerPreferences.Default;
+        }
+
+        return preferences;
     }
 
     public void Save(PlayerPreferences preferences)
     {
-        try
+        // A failed write must never break gameplay or shutdown; the
+        // preferences screen already holds the values in memory.
+        if (!JsonFile.TryWrite(_file, preferences, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllText(_file, JsonSerializer.Serialize(preferences, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed write must never break gameplay or shutdown; the
-            // preferences screen already holds the values in memory.
-            _log.LogWarning($"preferences.json unwritable at {_file} ({ex.GetType().Name}); kept in memory");
+            _log.LogWarning($"preferences.json unwritable at {_file} ({error}); kept in memory");
         }
     }
 }

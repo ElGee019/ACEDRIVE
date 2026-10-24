@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -10,39 +8,22 @@ public sealed class JsonOnboardingStore : IOnboardingStore
     private readonly string _file;
 
     public JsonOnboardingStore()
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "onboarding.json"))
+        : this(DataPaths.UserSave("onboarding.json"))
     { }
 
     public JsonOnboardingStore(string file) => _file = file;
 
     public OnboardingState Load()
     {
-        try
-        {
-            if (!File.Exists(_file)) return OnboardingState.Fresh;
-            var state = JsonSerializer.Deserialize<OnboardingState>(File.ReadAllText(_file));
-            return state ?? OnboardingState.Fresh;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Corrupt or locked progress just means "start onboarding fresh":
-            // the first-run flow re-opens instead of blocking startup.
-            return OnboardingState.Fresh;
-        }
+        // Corrupt, locked or absent progress just means "start onboarding
+        // fresh": the first-run flow re-opens instead of blocking startup.
+        JsonFile.TryRead(_file, out OnboardingState? state, out _);
+        return state ?? OnboardingState.Fresh;
     }
 
     public void Save(OnboardingState state)
     {
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
-            File.WriteAllText(_file, JsonSerializer.Serialize(state));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // never break shutdown for persistence
-        }
+        // never break shutdown for persistence
+        JsonFile.TryWrite(_file, state, out _);
     }
 }

@@ -37,9 +37,7 @@ public sealed class FileSaveDataResetter : ISaveDataResetter
     private readonly ILog _log;
 
     public FileSaveDataResetter(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive"), log)
+        : this(DataPaths.UserDirectory, log)
     { }
 
     public FileSaveDataResetter(string directory, ILog log)

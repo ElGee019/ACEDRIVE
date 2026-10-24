@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -11,18 +9,11 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonPoiDirectoryStore : IPoiDirectoryStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
 
     public JsonPoiDirectoryStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "addresses.json"), log)
+        : this(DataPaths.UserSave("addresses.json"), log)
     { }
 
     public JsonPoiDirectoryStore(string file, ILog log)
@@ -33,25 +24,15 @@ public sealed class JsonPoiDirectoryStore : IPoiDirectoryStore
 
     public IReadOnlyList<PointOfInterest> Load()
     {
-        try
+        JsonReadStatus status = JsonFile.TryRead(_file, out PointOfInterest[]? pois, out string? error);
+        if (status == JsonReadStatus.Unreadable)
         {
-            if (!File.Exists(_file))
-            {
-                return [];
-            }
+            // A corrupt or locked file must not take the overlay down; the
+            // boot seeder rebuilds the at-start doors.
+            _log.LogWarning($"addresses.json unreadable at {_file} ({error})");
+        }
 
-            PointOfInterest[]? pois = JsonSerializer.Deserialize<PointOfInterest[]>(
-                File.ReadAllText(_file), JsonOptions);
-            return Valid(pois);
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
-        {
-            // Read/deserialize boundary only: a corrupt or locked file must
-            // not take the overlay down (AGENTS: Try* at every external
-            // boundary). The boot seeder rebuilds the at-start doors.
-            _log.LogWarning($"addresses.json unreadable at {_file} ({ex.GetType().Name})");
-            return [];
-        }
+        return Valid(pois);
     }
 
     public void Save(IReadOnlyList<PointOfInterest> pois)
@@ -61,16 +42,11 @@ public sealed class JsonPoiDirectoryStore : IPoiDirectoryStore
             return;
         }
 
-        try
+        // Discovery is flavour, not paid progress: a locked save must not
+        // break the session that just found a door.
+        if (!JsonFile.TryWrite(_file, pois, out string? error))
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(_file)!);
-            File.WriteAllText(_file, JsonSerializer.Serialize(pois, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // Discovery is flavour, not paid progress: a locked save must not
-            // break the session that just found a door.
-            _log.LogWarning($"addresses.json unwritable at {_file} ({ex.GetType().Name})");
+            _log.LogWarning($"addresses.json unwritable at {_file} ({error})");
         }
     }
 

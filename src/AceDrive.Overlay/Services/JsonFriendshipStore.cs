@@ -1,5 +1,3 @@
-using System.IO;
-using System.Text.Json;
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.Services;
@@ -12,19 +10,12 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class JsonFriendshipStore : IFriendshipStore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     private readonly string _file;
     private readonly ILog _log;
     private readonly Dictionary<string, int> _levels;
 
     public JsonFriendshipStore(ILog log)
-        : this(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "friendship.json"), log)
+        : this(DataPaths.UserSave("friendship.json"), log)
     { }
 
     public JsonFriendshipStore(string file, ILog log)
@@ -63,55 +54,42 @@ public sealed class JsonFriendshipStore : IFriendshipStore
 
     private void Save()
     {
-        try
+        // A failed bank must never break gameplay or shutdown; the next ride
+        // retries with fresher numbers.
+        if (!JsonFile.TryWrite(_file, _levels, out string? error))
         {
-            string? dir = Path.GetDirectoryName(_file);
-            if (dir is not null)
-            {
-                Directory.CreateDirectory(dir);
-            }
-            File.WriteAllText(_file, JsonSerializer.Serialize(_levels, JsonOptions));
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            // A failed bank must never break gameplay or shutdown; the next
-            // ride retries with fresher numbers.
-            _log.LogWarning($"friendship.json unwritable at {_file} ({ex.GetType().Name}); progress kept in memory");
+            _log.LogWarning(
+                $"friendship.json unwritable at {_file} ({error}); progress kept in memory");
         }
     }
 
     private static Dictionary<string, int> LoadLevels(string file, ILog log)
     {
-        try
+        var levels = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        JsonReadStatus status = JsonFile.TryRead(file, out Dictionary<string, int>? raw, out string? error);
+        if (status == JsonReadStatus.Missing)
         {
-            if (!File.Exists(file))
-            {
-                return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            }
-            var raw = JsonSerializer.Deserialize<Dictionary<string, int>>(
-                File.ReadAllText(file), JsonOptions);
-            var levels = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            if (raw is null)
-            {
-                return levels;
-            }
-            foreach (var (name, level) in raw)
-            {
-                string key = (name ?? "").Trim();
-                if (key.Length > 0 && level >= 0)
-                {
-                    levels[key] = level;
-                }
-            }
             return levels;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+
+        // A corrupt save degrades to strangers everywhere, never takes the
+        // overlay down.
+        if (raw is null)
         {
-            // Read/deserialize boundary only: a corrupt save degrades to
-            // strangers everywhere, never takes the overlay down.
-            log.LogWarning($"friendship.json unreadable at {file} ({ex.GetType().Name}); starting strangers");
-            return new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            log.LogWarning(
+                $"friendship.json unreadable at {file} ({error}); starting strangers");
+            return levels;
         }
+
+        foreach (var (name, level) in raw)
+        {
+            string key = (name ?? "").Trim();
+            if (key.Length > 0 && level >= 0)
+            {
+                levels[key] = level;
+            }
+        }
+        return levels;
     }
 
     private static string Normalize(string? ownerName) => (ownerName ?? "").Trim();
