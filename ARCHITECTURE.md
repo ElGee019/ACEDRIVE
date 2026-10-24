@@ -34,8 +34,9 @@ Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean)
 | `231be1f` | Panel/page/activity → `OverlayShell` |
 | `c5bd948` | Five shop interiors → `ShopInteriors`, −83 lines |
 | `4d4c0e2` | Taxi job → `TaxiJobFlow` + `ITaxiJobHost`, −397 lines and six constructor parameters |
+| S2 | Delivery run → `DeliveryFlow` + `IDeliveryHost`; `TripBreakdowns` and the `DeliveryBoard` holder, −145 lines |
 
-`MainViewModel`: 2658 → 1887 lines. Over 1,300 of the remaining lines are
+`MainViewModel`: 2658 → 1742 lines. Over 1,200 of the remaining lines are
 domain work that belongs to someone else; the target coordinator is roughly
 500.
 
@@ -73,9 +74,11 @@ coordinator. Pages take commands from the domain that owns them.
 
 | Collaborator | Owns (state) | Public surface | Reporting host |
 |---|---|---|---|
-| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (10 members) |
-| `DeliveryFlow` | `_deliveryJob`, `_deliveryStoreLegStarted`, `_deliveryScreen` | `Start(run)`, `Stop`, `Deliver`, `Guidance` | `IDeliveryHost`: show board, settle, HUD |
-| `PoiWorld` | `DeliveryBoard` (mutable holder for `_deliveryCatalog`) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `OwnedHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: refresh board page |
+| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (8 members) |
+| `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
+| `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
+| `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
+| `PoiWorld` | the board growth (`Grow`, `AdoptShopDoors`, hub doors) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `OwnedHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: refresh board page |
 | `Navigation` | `_control`, `_menu`, `_calendar`, `_openDayAction`, `_roadTestDay` | `Control()`, `Menu()`, `Calendar()`, `Home()`, `Wallet()`, `Garage()`, `Addresses()`, `Trunk()`, `Settings()`, `Delivery()`, `Hub()` | `OverlayShell` (page swap) + `GameStateSaver` |
 | `TelemetryReadouts` | the seven painted strings + their caches | `Paint(sample)`, `PaintWaiting()`, `RefreshJob(job, shift)` | `IReadoutSink` (or returns a record) |
 | `DayCycle` | `_displayWeek`, `_lastDay`, `_lastShiftSecs` | `Tick(today)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: pages' `DisplayWeek`, shift-ended page, `SaveClock` |
@@ -113,11 +116,13 @@ The DAG, top to bottom; each row may only use rows above it.
 stores + saved state
   └ FleetService (watcher, content)      TaxiDriveMeter (taxiRules)
   └ GameStateSaver                        OverlayShell
-      └ JobSettlement (state owners + meter; the host supplies the saves)
+  └ DeliveryBoard (the live catalogue)
+  └ TripBreakdowns (breakdowns, garage, onboarding progress, wallet, saver)
+      └ JobSettlement (state owners + board + meter; the host supplies the saves)
       └ ShopInteriors (saver)
-          └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, …)
-          └ DeliveryFlow (meter, career, city, board)
-          └ PoiWorld (growth, directory, career, shops)
+          └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
+          └ DeliveryFlow (board, career, city, meter, breakdowns)
+          └ PoiWorld (growth, directory, career, shops, board)
               └ Navigation (flows' commands, shop pages, saver)
                   └ OnboardingFlow (Navigation, saver)
                   └ VoiceRouter (shell, brand, content, TaxiJobFlow)
@@ -142,10 +147,19 @@ constructor parameters left with the flow.
 *Deviation:* no `TripMeter` wrapper — it would have had no behaviour of its own,
 so both flows take `TaxiDriveMeter` directly.
 
-**S2 — `DeliveryFlow`** (~150 lines incl. `SourceOwners`). Owns the run and the
-board page; `Start` calls the breakdown roll, `Stop` settles.
-*Unblocks:* `JobSettlement.SettleDeliveryRun` has one caller, and the shared
-meter has exactly two consumers.
+**S2 — `DeliveryFlow`** ✅ (~150 lines incl. `SourceOwners`). Owns the run, the
+meter edge and the board page; `Start` rolls the breakdown, `Stop` drops the run
+so the settle can bank it.
+*Unblocked:* `JobSettlement.SettleDeliveryRun` has one caller, the shared meter
+has exactly two consumers, and `ITaxiJobHost` lost the two breakdown members it
+was only forwarding.
+*Deviations:* decision 1 settled as the small `TripBreakdowns` collaborator
+(roll, tow fee, page) that both flows take, so neither host knows about the
+breakdown. `DeliveryBoard` (rule 1's holder) arrived here rather than in S3: the
+board page, the run planner and the settle all read it, and `JobSettlement` now
+takes the holder instead of a boot-time snapshot. The flow's `Guidance` moved to
+the host as `PinStop(leg)` returning false: the stop's door (catalogue row or hub
+POI) is still the shell's map knowledge until `PoiWorld` owns it in S3.
 
 **S3 — `PoiWorld`** (~200 lines: `GrowPois`, `AdoptShopDoors`, doors,
 `BuildPoiHandlers`). Introduces the `DeliveryBoard` holder so the catalog can be
@@ -210,15 +224,14 @@ in S1, when the gate moves.
 - Each new collaborator gets a fake host and its own tests; the flows'
   money-adjacent paths (settle, ratings, shift records) keep their existing
   flow tests untouched as the regression net.
-- `JobSettlement` is now testable without a session: add the two missing direct
-  tests ("unowned car pays but banks no progress", "delivery run sums per-store
-  CredP") when S2 lands.
+- `JobSettlement` is now testable without a session: the two direct tests ("an
+  unowned car pays but banks no progress", "the run sums per-store CredP")
+  landed with S2.
 
 ## 9. Open decisions
 
-1. **`RollTripStart` / `ShowBreakdown`** are shared by both flows. Either a
-   small `TripBreakdowns` collaborator (preferred) or duplicate the roll in each
-   flow — decide in S1.
+1. **`RollTripStart` / `ShowBreakdown`** — settled in S2: `TripBreakdowns`
+   (roll, tow fee, page) is taken by both flows; neither host carries them.
 2. **`OnCarHaul`** (PORTPLAN 20) is a third job type in disguise: settle-only
    today. Keep it in `TaxiJobFlow` for S1 and split it when it grows legs, or
    make it its own flow now.
@@ -242,31 +255,28 @@ in S1, when the gate moves.
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`. `MainViewModel` 1887 lines, 60 constructor
-parameters, 1659 tests green.
+State: S1 pushed as `4d4c0e2`; S2 (this commit) is green locally.
+`MainViewModel` 1742 lines (was 1887), fields down by three (the run, its meter
+edge and the page are the flow's; the catalogue is a holder), 1670 tests green
+(+11: `DeliveryFlowTests`, `TripBreakdownsTests`, `JobSettlementTests`).
 
-Next: **S2 — `DeliveryFlow`** (~150 lines: `StartDeliveryRun`,
-`ShowDeliveryStop`, `DeliverStop`, `DeliveryGuidance`, `SourceOwners`). It owns
-`_deliveryJob`, `_deliveryStoreLegStarted`, `_deliveryScreen` and the run's
-meter reset. `Start` rolls the breakdown; `Stop` settles through
-`JobSettlement`.
-
-Settle open decision 1 before cutting: `RollTripStart`/`ShowBreakdown` are
-`ITaxiJobHost` members today and delivery needs the same two, so extract them
-into a small `TripBreakdowns` collaborator (roll, tow fee, page) that both flows
-take — not a duplicate pair on a second host.
-
-Watch: the run shares `TaxiDriveMeter` with the taxi leg and the two cannot
-overlap; `Poll` still feeds the delivery leg itself, and S2 moves that into the
-flow.
+Next: **S3 — `PoiWorld`** (~200 lines: `GrowPois`, `AdoptShopDoors`, hub doors,
+`BuildPoiHandlers`). It takes the `DeliveryBoard` holder S2 introduced and owns
+its growth; `DeliveryGuidance`'s hub lookup and `PlaceHubDoor` move with the
+doors.
+*Unblocks:* `PoiArrivalRouter` becomes constructible in the root.
 
 Working agreements earned so far:
 
 - The coordinator implements the host; a flow attaches with `Attach(this)` in
   the coordinator's constructor — the one late edge, closed before any command
   can fire.
+- A collaborator that only *produces* a page takes no host at all:
+  `TripBreakdowns.Interrupt` charges the tow and returns the page, and the
+  caller's own host puts it up with its own BACK command.
 - Collaborators take the saver, watcher and rivals directly; the host only
-  reports (page, saves, readouts).
+  reports (page, saves, readouts). A stop's door is asked as
+  `bool PinStop(leg)` — reporting plus a degrade signal, never a host getter.
 - Tests: one instance per service graph; builders hoist their locals.
 - Never round-trip UTF-8 through `Get-Content`/`Set-Content` (PowerShell 5.1
   decodes as ANSI and re-encodes, silently mangling `—` and `€`); use
