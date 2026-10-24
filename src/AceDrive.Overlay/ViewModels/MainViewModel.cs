@@ -45,6 +45,10 @@ public sealed class MainViewModel
     private readonly DeliveryFlow _delivery;
     // The POI world: the business/store/hub doors and the arrival handlers.
     private readonly PoiWorld _poiWorld;
+    // The zone growth at the settle hooks: the introduction gate, the street it
+    // registers and the world push. The zone state itself belongs to the
+    // services that draw and bank it.
+    private readonly ZoneGrowth _zoneGrowth;
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
@@ -56,17 +60,12 @@ public sealed class MainViewModel
     private readonly IAppRestarter? _restarter;
     private readonly ILog _log;
     private readonly DriverWallet _wallet;
-    private readonly OperatingZone _zone;
     // The session-start catch-up: the starter car and today's login bonus. It
     // owns the streak counter and the seeded roll, so neither lives here.
     private readonly DriverCatchUp _catchUp;
     // XP world standings backend (PORTPLAN 60, Unity RivalsService): the
     // receipt's rivals block reads through it on every settle.
     private readonly IRivalsService _rivals;
-    // The dynamic car-rarity board behind the XP multiplier (PORTPLAN 35,
-    // Unity CarRarityService): reads are cached, the km write is fire-and-forget.
-    // Zone, best-shift and country pushes (Unity FirestoreService + CountryKm).
-    private readonly IPlayerTelemetry _online;
     // The car pool behind the road-test ledger, reused for the receipt's
     // passenger lookup (the driven car's ks id resolves against it).
     private readonly IReadOnlyList<CarSpec> _cars;
@@ -140,10 +139,11 @@ public sealed class MainViewModel
         ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
         ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
         AddressMap addressMap, TaxiRules taxiRules,
-        VoiceBeat beat, DriverWallet wallet, OperatingZone zone,
-        IReadOnlyList<CarSpec> cars, IRivalsService rivals, IPlayerTelemetry playerTelemetry,
+        VoiceBeat beat, DriverWallet wallet,
+        IReadOnlyList<CarSpec> cars, IRivalsService rivals,
         Garage garage,
-        DriverCatchUp catchUp, GameStateSaver saver, FleetService fleet, JobSettlement settlement,
+        DriverCatchUp catchUp, ZoneGrowth zoneGrowth,
+        GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
@@ -166,9 +166,7 @@ public sealed class MainViewModel
         _voice = voice;
         _carBrands = carBrands;
         _wallet = wallet;
-        _zone = zone;
         _rivals = rivals;
-        _online = playerTelemetry;
         _cars = cars;
         _garage = garage;
         _hud = hud;
@@ -178,11 +176,6 @@ public sealed class MainViewModel
             // phase decides whether that confirms the pickup or the drop-off.
             _hud.JobEnterRequested += (_, _) => OnJobEntered();
         }
-        _wallet = wallet;
-        _zone = zone;
-        _rivals = rivals;
-        _online = playerTelemetry;
-        _cars = cars;
         // The persistence collaborator, the fleet and the boot catch-up are
         // built by the root: the shell may not own a stateful service
         // (AGENTS.md), and all three are handed in so the settles and the poll
@@ -196,6 +189,7 @@ public sealed class MainViewModel
         _taxi = taxi;
         _delivery = delivery;
         _poiWorld = poiWorld;
+        _zoneGrowth = zoneGrowth;
         // The readout formatter and the session calendar are built by the root
         // too; neither reaches back, so the day cycle is the fourth late edge
         // (it shows the shift-ended page the poll's timeout opens).
@@ -375,7 +369,7 @@ public sealed class MainViewModel
     void IJobSettlementHost.SaveGarage() => SaveGarage();
     void IJobSettlementHost.OnProgressBanked()
     {
-        TryExpandZone();
+        _zoneGrowth.Expand();
         _poiWorld.Grow();
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
@@ -795,27 +789,6 @@ public sealed class MainViewModel
         SaveDriver(standings);
         LogStandingsMove(standings);
         return standings;
-    }
-
-    // Zone expansion at the settle hooks (PORTPLAN 58, Unity
-    // ExpandOperatingZone): past onboarding (the firstSceneComplete gate)
-    // and past the threshold curve, one more abstract street joins the
-    // zone. Unity expands at the receipt CONTINUE with preloaded real
-    // streets — the interim registers placeholder ids right away, since
-    // the concrete Eifel street table (PORTPLAN Step 1) is still pending.
-    private void TryExpandZone()
-    {
-        if (!OnboardingDone || !_zone.ExpansionDue) return;
-        string streetId = $"s{_zone.ExpansionCount + 1}";
-        // Interim length: the placeholder map's mean street, so the zone km
-        // (and the starter bonus) keeps decaying until real street metadata
-        // arrives (PORTPLAN 58).
-        if (_zone.TryExpand(streetId, AddressBook.AverageStreetLengthKm(_addressMap)))
-        {
-            _log.LogInfo($"[Zone] expanded: {streetId} joins " +
-                $"(zone {_zone.StreetIds.Count} streets, {_zone.Km:0.0} km)");
-            _online.PushZoneKm(_zone.Km, PlayerName());
-        }
     }
 
     private string PlayerName() => _story.Profile?.DisplayName ?? string.Empty;

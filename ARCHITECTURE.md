@@ -23,8 +23,8 @@ route intent into them. Only then can `App.OnStartup` build everything.
 
 ## 2. Where the split stands
 
-Extracted, each verified (build 0 warnings, 1713 tests, format clean); S1–S4 are
-pushed, S5–S8 are green locally:
+Extracted, each verified (build 0 warnings, 1718 tests, format clean); S1–S4 are
+pushed, S5–S9 are green locally:
 
 | Slice | Result |
 |---|---|
@@ -42,14 +42,15 @@ pushed, S5–S8 are green locally:
 | S6 | The composition root builds the whole DAG: `PanelPresenter` + `StoryHost`, `OnboardingFlow` and `VoiceRouter` (which loses `IVoiceHost`) are root-built; `MainViewModel` takes the finished graph, −184 lines |
 | S7 | The game-clock world → `WorldTicks` (town drift, appetite, nightly premium); the hunger-block latch leaves the coordinator, −52 lines and four constructor parameters |
 | S8 | The boot catch-up → `DriverCatchUp` (grandma's-car seed, login streak recount + grant); `DailyStreak` and the streak's seeded `Random` leave the coordinator, −31 lines |
+| S9 | The settle-hook zone expansion → `ZoneGrowth` (onboarding gate, interim street id, log line, world push); `OperatingZone` and `IPlayerTelemetry` leave the coordinator, which keeps the one call, −27 lines and two constructor parameters |
 
-`MainViewModel`: 2658 → 884 lines. `Poll` is 40 code lines (150 with its
+`MainViewModel`: 2658 → 857 lines. `Poll` is 40 code lines (150 with its
 rationale): what is left is the idle-hide policy, the wall-clock bank and the
 telemetry feed — the world rules answer one question per tick. The coordinator
-now takes 34 named parameters (31 required, 3 optional), all of them finished
+now takes 33 named parameters (30 required, 3 optional), all of them finished
 services: the root does every `new`. What still keeps the list long is not the
-ticks but the zone expansion (`OperatingZone`, `IPlayerTelemetry`); that is the
-next slice, not a constructor rewrite.
+ticks but the two leftovers §11 names (the haul's settle path and the
+onboarding forwarding), not a constructor rewrite.
 
 ## 3. Target shape
 
@@ -67,6 +68,7 @@ next slice, not a constructor rewrite.
    │        │              │              │                         │
    │   TaxiJobFlow  DeliveryFlow   PoiWorld    DayCycle   WorldTicks│
    │   DriverCatchUp (boot only: starter car, login bonus)          │
+   │   ZoneGrowth (settle hook: next street, world push)            │
    │        │              │              │                         │
    │        └──────┬───────┴──────┬───────┘                         │
    │               │              │                                 │
@@ -97,6 +99,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `DayCycle` ✅ | `_lastDay`, `_lastShiftSecs`, the display week | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `GoToControlPage` |
 | `WorldTicks` ✅ | the hunger-block latch | `Tick(onboardingDone)` → whether the town moved | none: the movement returns to the coordinator, which owns the cached board page |
 | `DriverCatchUp` ✅ | none: the streak counter and the garage are the services' state; it runs once and exits | `Run(displayWeek)` | none: it banks through `GameStateSaver` and never reaches back into the panel |
+| `ZoneGrowth` ✅ | none: the zone's counters are the services' state | `Expand()` | none: the settle hook calls it, then `PoiWorld.Grow` |
 | `JobSettlement` ✅ | — | `SettleTaxiRide`, `SettleDeliveryRun` | `IJobSettlementHost` |
 | `ShopInteriors` ✅ | — | `Bank`, `Dealer`, `CarWash`, `Mechanic`, `Insurance` | none |
 | `FleetService` ✅, `GameStateSaver` ✅ | their own | — | none |
@@ -121,12 +124,12 @@ After the split `MainViewModel` is a coordinator, not an owner:
   reset, app restart, HUD wiring, `SkipShutdownSave`;
 - the bindable readout properties (the target of `ReadoutPaint`).
 
-Constructor: 34 parameters (31 required, 3 optional), all of them finished
+Constructor: 33 parameters (30 required, 3 optional), all of them finished
 services — the root does every `new`. No `MainViewModelDependencies` god record:
 each collaborator takes its own dependencies, which is what makes it testable.
-The game-clock world left in S7 and the boot catch-up in S8, so the list now
-grows only with the zone expansion (`OperatingZone`, `IPlayerTelemetry`); that is
-one follow-up slice, not a constructor rewrite.
+The game-clock world left in S7, the boot catch-up in S8 and the zone expansion
+in S9, so the list now grows only with the two leftovers §11 names: one follow-up
+slice each, not a constructor rewrite.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -143,6 +146,7 @@ stores + saved state
       └ DayCycle (game clock, shift, records, shift board, telemetry, saver)
       └ WorldTicks (game clock, city, hunger, fleet, board, career, saver, rivals)
       └ DriverCatchUp (onboarding store, garage, streak, wallet, rng, saver, rivals)
+      └ ZoneGrowth (zone, map, onboarding store, profile store, online, log)
       └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
       └ DeliveryFlow (board, career, city, meter, breakdowns)
       └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
@@ -345,7 +349,29 @@ them. Nothing else on the coordinator reads the streak, so no host was needed.
   `firstSceneComplete`, and `StreakGrant_BeforeOnboarding_HoldsBack` asserts
   exactly that split.
 
-### Host implementations after S8
+**S9 — `ZoneGrowth`.** ✅ (−27 lines in the coordinator, two net constructor
+parameters): the zone expansion the settle hook used to inline is one
+collaborator with one `Expand()` entry point. It takes `OperatingZone`, the
+`AddressMap`, `IOnboardingStore`, `IProfileStore`, `IPlayerTelemetry` and the
+log.
+*Unblocked:* `OperatingZone` and `IPlayerTelemetry` left the coordinator's
+surface, so the only thing it still knows about the zone is that a settle grows
+it. The introduction gate, the interim street id, the log line and the world
+push went with the collaborator.
+*Deviations:*
+- The gate reads `IOnboardingStore` instead of the coordinator's live
+  `OnboardingDone`: this runs from the settle, never from the poll, so it is the
+  same cold-path contract `PoiWorld.Grow` (called one line later) and
+  `TripBreakdowns` already use.
+- The pushed name comes off `IProfileStore` like `DayCycle`'s shift push, not
+  the story flow's in-memory profile: the opening screen banks the profile
+  before any job can settle, so the two answers agree and the collaborator stays
+  a leaf.
+- No host at all: `OnProgressBanked` calls `Expand()` and the next line is
+  `PoiWorld.Grow()`. The zone's counters and km are banked by the settle's own
+  driver save, so the collaborator has nothing to report.
+
+### Host implementations after S9
 
 The reads now live with their owners:
 
@@ -361,6 +387,8 @@ The reads now live with their owners:
   returns.
 - `DriverCatchUp` takes no host either: it runs once from the constructor,
   banks through `GameStateSaver` and has nothing to show.
+- `ZoneGrowth` takes no host either: the settle hook calls it and the zone's
+  counters are banked by the saver at that same settle.
 
 ## 7. Rules for every slice
 
@@ -413,6 +441,12 @@ The reads now live with their owners:
   skill points in one driver save, and the quiet launch that writes nothing.
   The coordinator-level `StreakGrant_*` and `Boot_SeedsGrandmasCar*` tests stay
   as the regression net for the call site.
+- `ZoneGrowth` landed with its own suite in S9: the first and the second
+  expansion through the street list, the introduction gate and the below-curve
+  case through the absent push, the nameless push before the opening screen is
+  answered, and the log line. The coordinator-level
+  `ZoneJobCount_GrowsAtTheSettles_AndExpandsOnTheCurve` test stays as the
+  regression net for the call site.
 
 ## 9. Open decisions
 
@@ -442,19 +476,16 @@ The reads now live with their owners:
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S8 are green locally.
-`MainViewModel` 884 lines (was 915 after S7), −31 lines: the boot catch-up
-(starter seed, streak grant) left for `DriverCatchUp`. The injected field list
-is 34, the constructor 34 parameters (31 required, 3 optional). 1713 tests green
-(+6: `DriverCatchUpTests`).
+State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S9 are green locally.
+`MainViewModel` 857 lines (was 884 after S8), −27 lines: the settle-hook zone
+expansion (gate, street id, log, world push) left for `ZoneGrowth`. The injected
+field list is 33, the constructor 33 parameters (30 required, 3 optional). 1718
+tests green (+5: `ZoneGrowthTests`).
 
 Next: the candidates the slices left behind, in the order they unblock each
 other:
-- **`ZoneGrowth`** — `TryExpandZone` + `IPlayerTelemetry.PushZoneKm`: one
-  settle-hook collaborator with its own onboarding gate and name read, which is
-  what still keeps `OperatingZone` and `IPlayerTelemetry` on the coordinator.
 - **`OnCarHaul`** (open decision 2) is the last job type still living in the
-  coordinator.
+  coordinator's control-page path.
 - `MainViewModel`'s onboarding forwarding (`ChooseBrand`/`ChooseCar`/
   `ShowDialogue`/`FinishDialogue` + the three flags) exists for the tests now
   that the view binds only `CurrentScreen`; it can move behind `_story`.
@@ -498,6 +529,10 @@ Working agreements earned so far:
 - A `bool` is a host when it is the whole report: `WorldTicks.Tick` answers
   "did the town move?" and the coordinator repaints its own cached page. No
   interface for one transition that only one caller consumes.
+- A settle-hook collaborator needs no host either: `ZoneGrowth.Expand()` is
+  called by `OnProgressBanked`, the state it changed is banked by the settle's
+  driver save on the next line, and `PoiWorld.Grow()` follows. The coordinator
+  keeps the one call and nothing else about the zone.
 - Tests: one instance per service graph; builders hoist their locals. A
   collaborator test wires the *same* store fakes its assertions read, and a
   culture-sensitive one pins `en-US` in its constructor (the suite shares one

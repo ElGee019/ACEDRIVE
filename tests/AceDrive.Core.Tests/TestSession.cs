@@ -151,6 +151,10 @@ internal static class TestSession
         var catchUp = new DriverCatchUp(
             onboardingStore, garageInstance, streakInstance, walletInstance,
             options.Rng ?? new Random(0), saver, rivalsInstance, logger);
+        // The zone growth the settle hook triggers: the same zone instance the
+        // saver, the settle and the POI world hold.
+        var zoneGrowth = new ZoneGrowth(
+            zoneInstance, map, onboardingStore, profiles, telemetryInstance, logger);
         // The game-clock world: the same instances the saver and the fleet
         // hold, so an insurance charge lands in the driver file the tests read.
         var world = new WorldTicks(
@@ -199,9 +203,9 @@ internal static class TestSession
             tel, clock, world, shiftInstance, store, logger,
             options.Voice ?? new FakeVoiceListener(available: false), brands, map,
             taxiRulesInstance,
-            beat, walletInstance, zoneInstance, pool,
-            rivalsInstance, telemetryInstance, garageInstance,
-            catchUp,
+            beat, walletInstance, pool,
+            rivalsInstance, garageInstance,
+            catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
             options.Hud, options.SaveResets, options.Restarter);

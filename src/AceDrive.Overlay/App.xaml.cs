@@ -359,6 +359,12 @@ public partial class App : Application, IDisposable
             // The streak's random skill gains (PORTPLAN 06/47): its own seeded
             // stream, offset from the taxi seed like the other draws.
             new Random(taxiSeed + 5), saver, rivals, _log);
+        // The zone growth the settle triggers (PORTPLAN 58): the introduction
+        // gate, the interim street length and the world push. The zone state
+        // itself is shared with the saver, the settle and the world, so it
+        // stays a service; this collaborator only decides when it grows.
+        var zoneGrowth = new ZoneGrowth(
+            zone, addressMap, onboardingStore, profileStore, telemetry, _log);
         // The readout formatter the poll applies: the painted strings and their
         // change caches, so no formatting runs on the hot path.
         var readouts = new TelemetryReadouts();
@@ -434,12 +440,10 @@ public partial class App : Application, IDisposable
             taxiRules,
             beat,
             driver,
-            zone,
             cars,
             rivals,
-            telemetry,
             garage,
-            catchUp, saver, fleet, settlement, shell, panel, story, voiceRouter,
+            catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
             hud,
             saveResets, restarter);
