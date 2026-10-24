@@ -28,6 +28,8 @@ public sealed class MainViewModel
     private readonly JobSettlement _settlement;
     // The panel, the page it shows and the activity stamp.
     private readonly OverlayShell _shell;
+    // The five shop interiors: assembly only, the banking callbacks included.
+    private readonly ShopInteriors _shops;
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
@@ -283,7 +285,7 @@ public sealed class MainViewModel
         Trunk trunk,
         TaxiRules taxiRules,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
-        OverlayShell shell, TaxiDriveMeter meter,
+        OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
         ITelemetryHud? hud = null,
         IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
         ICustomerRequestRoller? requests = null,
@@ -355,6 +357,7 @@ public sealed class MainViewModel
         _settlement = settlement;
         _fleet = fleet;
         _shell = shell;
+        _shops = shops;
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications, and re-derive the page-shape flags.
         _shell.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
@@ -1992,15 +1995,15 @@ public sealed class MainViewModel
         }
 
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Bank, (_, back, changed) => BuildBankScreen(back, changed)));
+            PoiTypes.Bank, (_, back, changed) => _shops.Bank(back, changed)));
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Dealer, (_, back, _) => BuildDealerScreen(back)));
+            PoiTypes.Dealer, (_, back, _) => _shops.Dealer(back, _displayWeek, OnCarBought)));
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.CarWash, (_, back, changed) => BuildCarWashScreen(back, changed)));
+            PoiTypes.CarWash, (_, back, changed) => _shops.CarWash(back, changed)));
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Mechanic, (_, back, changed) => BuildMechanicScreen(back, changed)));
+            PoiTypes.Mechanic, (_, back, changed) => _shops.Mechanic(back, changed)));
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Insurance, (_, back, changed) => BuildInsuranceScreen(back, changed)));
+            PoiTypes.Insurance, (_, back, changed) => _shops.Insurance(back, changed)));
         return handlers;
     }
 
@@ -2021,92 +2024,6 @@ public sealed class MainViewModel
             },
             _beat));
     }
-
-    // The bank interior (PORTPLAN 48, Unity BankScript.Show): the VM stamps
-    // hasEnteredBank (VisitBank todo once item 51 lands) and opens the saldo
-    // live. The page never writes; a withdraw routes through the host save so
-    // the saldo never forks.
-    private BankScreenViewModel BuildBankScreen(ICommand back, Action onChanged) =>
-        new BankScreenViewModel(
-            _wallet, back,
-            moved =>
-            {
-                onChanged();
-                _log.LogInfo($"[Bank] withdrew {moved:0.00} CR " +
-                    $"(cash {_wallet.Cash:0.00}, bank {_wallet.BankBalance:0.00})");
-            },
-            _beat);
-
-    // The dealer's weekly floor (PORTPLAN 29, Unity CarDealerScreen). The week
-    // rides in from the display week, so the floor turns over with the calendar
-    // and a re-opened page inside one week shows the same cars (DealerStock).
-    // The bought-car choice is the host's page (OnCarBought).
-    private DealerScreenViewModel BuildDealerScreen(ICommand back)
-    {
-        return new DealerScreenViewModel(
-            _cars, _garage, _wallet, _displayWeek, back, OnCarBought, _beat);
-    }
-
-    // The car wash (PORTPLAN 33, Unity CarWashScreen): a fresh page per visit,
-    // so the car driven now and its reading are live. A wash spends the flat
-    // price and clears the car's filth; both are banked here (the driver save
-    // through onChanged for the cash, garage.json for the reading) and logged —
-    // the page never writes (SRP).
-    private CarWashScreenViewModel BuildCarWashScreen(ICommand back, Action onChanged) =>
-        new CarWashScreenViewModel(
-            _garage, _wallet, _beat, back,
-            (removed, paid) =>
-            {
-                onChanged();
-                SaveGarage();
-                _log.LogInfo($"[CarWash] removed {removed} filth for {paid:0.00} CR " +
-                    $"(cash {_wallet.Cash:0.00}, {_garage.CurrentKey ?? "no car"})");
-            });
-
-    // The car mechanic (PORTPLAN items 31/32, Unity CarMechanicScreen): a fresh
-    // page per visit, so the car driven now, its wear deck and its engine are
-    // live. Parts are replaced, the engine repaired or swapped; every action
-    // moves cash and mutates the car's condition, so both are banked here (the
-    // driver save through onChanged for the cash, garage.json for the
-    // condition) and logged — the page never writes (SRP).
-    private MechanicScreenViewModel BuildMechanicScreen(ICommand back, Action onChanged) =>
-        new MechanicScreenViewModel(
-            _garage, _wallet, _game, _beat, back,
-            repair =>
-            {
-                // A covered car's repair pays 90% into the escrow the broker
-                // collects (Unity RepairScreen's insurance tail, repurposed to
-                // the mechanic since ACE owns accidents). The page never
-                // writes; the host banks the cash and the condition.
-                if (_garage.Current is { HasInsurance: true } insured && repair.Cost > 0.0)
-                {
-                    _wallet.AddInsurancePayout(repair.Cost * 0.9);
-                }
-                onChanged();
-                SaveGarage();
-                _log.LogInfo($"[Mechanic] {repair.Kind} cost {repair.Cost:0.00} CR " +
-                    $"(parts {repair.PartsReplaced}, engine replaced {repair.EngineReplaced}, " +
-                    $"cash {_wallet.Cash:0.00}, {_garage.CurrentKey ?? "no car"})");
-            });
-
-    // Insurance broker (PORTPLAN 34, Unity InsuranceScreen): a fresh page per
-    // visit, so the cover flags and the escrow are live. A toggle and a
-    // collection are banked here (the garage for the flag, the driver through
-    // onChanged for the cash + escrow) and logged — the page never writes (SRP).
-    private InsuranceScreenViewModel BuildInsuranceScreen(ICommand back, Action onChanged) =>
-        new InsuranceScreenViewModel(
-            _garage, _wallet, _insuranceRules, _wallet.Rating.Overall, _beat, back,
-            (key, insured) =>
-            {
-                SaveGarage();
-                _log.LogInfo($"[Insurance] {key} {(insured ? "insured" : "uninsured")} " +
-                    $"(cash {_wallet.Cash:0.00})");
-            },
-            moved =>
-            {
-                onChanged();
-                _log.LogInfo($"[Insurance] collected {moved:0.00} CR (cash {_wallet.Cash:0.00})");
-            });
 
     // Unity CarDealerScreen.OnBuyClicked's tail: the car is already in the
     // garage (the page added it after the cash moved), the purchase is banked,

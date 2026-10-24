@@ -155,6 +155,8 @@ public sealed class MainViewModelTests
             brandMileageInstance, telemetryInstance, rivalsInstance, board,
             deliveryCareer, cityInstance, deliveryFaresInstance, meter,
             faresInstance, taxiRulesInstance, beat, hud, logger);
+        var shops = new ShopInteriors(
+            walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver, beat, logger);
         var vm = new MainViewModel(tel, clock, game, shiftInstance, shiftStoreInstance, store,
             logger, faresInstance,
             TaxiTestData.Proposer(map: map, seed: 0),
@@ -191,7 +193,7 @@ public sealed class MainViewModelTests
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(), meter, hud, handlers,
+            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(), meter, shops, hud, handlers,
             requests, requestTable, police, saveResets, restarter,
             storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)
