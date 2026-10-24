@@ -130,7 +130,7 @@ public sealed class VoiceTests
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, meter);
+            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter);
         return (vm, clock, mic, car);
     }
 

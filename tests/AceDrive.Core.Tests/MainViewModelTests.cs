@@ -191,7 +191,7 @@ public sealed class MainViewModelTests
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRulesInstance, saver, fleet, settlement, meter, hud, handlers,
+            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(), meter, hud, handlers,
             requests, requestTable, police, saveResets, restarter,
             storeCatalog ?? StoreCatalog.Default);
         if (carKsId is not null)

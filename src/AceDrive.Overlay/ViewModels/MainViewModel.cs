@@ -26,6 +26,8 @@ public sealed class MainViewModel
     // Prices and banks one finished job: the taxi receipt and the delivery run
     // (Unity's effect order lives there, not here).
     private readonly JobSettlement _settlement;
+    // The panel, the page it shows and the activity stamp.
+    private readonly OverlayShell _shell;
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
@@ -192,7 +194,7 @@ public sealed class MainViewModel
     private const double IdleHideSec = 15.0;
     private const string DefaultBrand = "mazda";
 
-    private DateTime _lastActivity;
+
     // The intro (opening screen) is the constructor's first paint; the first
     // hidden -> shown edge must reveal it instead of jumping to control. Every
     // later call keeps the existing "open control" rule.
@@ -281,7 +283,7 @@ public sealed class MainViewModel
         Trunk trunk,
         TaxiRules taxiRules,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
-        TaxiDriveMeter meter,
+        OverlayShell shell, TaxiDriveMeter meter,
         ITelemetryHud? hud = null,
         IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
         ICustomerRequestRoller? requests = null,
@@ -352,6 +354,15 @@ public sealed class MainViewModel
         _saver = saver;
         _settlement = settlement;
         _fleet = fleet;
+        _shell = shell;
+        // The view binds IsShown/CurrentScreen on this VM, but the shell owns
+        // them: forward its notifications, and re-derive the page-shape flags.
+        _shell.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
+        _shell.ScreenChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(IsOnboarding));
+            OnPropertyChanged(nameof(JobsVisible));
+        };
         // The meter is shared with the settle: the poll feeds it and the
         // receipt reads (and resets) the same accumulator.
         _meter = meter;
@@ -410,7 +421,7 @@ public sealed class MainViewModel
         // The day-flip detector starts on the session's opening day, so the
         // first poll does not report a transition.
         _lastDay = _game.Today;
-        _lastActivity = _clock.UtcNow;
+        _shell.RecordActivity(_clock.UtcNow);
         // The router's warn-free reads go through IVoiceHost (see the explicit
         // implementations below), so the host surface stays small.
         _voiceRouter = new VoiceRouter(this, clock, log, hud);
@@ -453,7 +464,7 @@ public sealed class MainViewModel
         // the tour is driven on the HUD, and the panel only opens once it is
         // finished. The app root calls Show() at launch for the other starts,
         // so a real start opens on the intro either way.
-        IsShown = !voice.IsAvailable && !IntroTourInProgress;
+        _shell.SetShown(!voice.IsAvailable && !IntroTourInProgress);
         // A visible start has already shown the intro; a hidden start keeps
         // the intro on the first wake (see Show).
         _introShown = IsShown;
@@ -461,12 +472,9 @@ public sealed class MainViewModel
 
     // ---- bindable state -------------------------------------------------
 
-    private bool _isShown;
-    public bool IsShown
-    {
-        get => _isShown;
-        private set => SetField(ref _isShown, value);
-    }
+    // Panel + page live in the shell; these forward so the view keeps binding
+    // the same names. The shell raises the change notifications.
+    public bool IsShown => _shell.IsShown;
 
     private string _statusText = "";
     public string StatusText { get => _statusText; private set => SetField(ref _statusText, value); }
@@ -504,21 +512,8 @@ public sealed class MainViewModel
 
     // ---- onboarding navigation -----------------------------------------------
 
-    private object? _currentScreen;
-
     /// <summary>Active screen: an onboarding page, a jobs page or null.</summary>
-    public object? CurrentScreen
-    {
-        get => _currentScreen;
-        private set
-        {
-            if (SetField(ref _currentScreen, value))
-            {
-                OnPropertyChanged(nameof(IsOnboarding));
-                OnPropertyChanged(nameof(JobsVisible));
-            }
-        }
-    }
+    public object? CurrentScreen => _shell.CurrentScreen;
 
     public bool IsOnboarding => CurrentScreen is not null && CurrentScreen is not IJobsScreen;
     public bool JobsVisible => CurrentScreen is null;
@@ -609,8 +604,7 @@ public sealed class MainViewModel
     {
         RecordActivity();
         _introShown = true;
-        SetScreen(screen);
-        IsShown = true;
+        _shell.Reveal(screen);
         _log.LogInfo("overlay shown (POI)");
     }
 
@@ -764,7 +758,7 @@ public sealed class MainViewModel
         // WHY a real screen change supersedes a pending voice tap (wake-word
         // re-home, mouse navigation): the old beat must never fire afterwards.
         _beat.Cancel();
-        CurrentScreen = screen;
+        _shell.ShowScreen(screen);
     }
 
     // ---- lifecycle (called by the view) ----------------------------------
@@ -856,7 +850,7 @@ public sealed class MainViewModel
         // the menu, not the page), so its 15 s countdown never starts.
         bool introOpen = IntroInProgress;
         if (IsShown && !introOpen && !_resizing && !dialogueOpen && !poiOpen && !keepOpen
-            && (now - _lastActivity).TotalSeconds >= IdleHideSec)
+            && (now - _shell.LastActivity).TotalSeconds >= IdleHideSec)
         {
             Hide();
         }
@@ -1123,7 +1117,7 @@ public sealed class MainViewModel
     public IReadOnlyList<string> Brands => Content.Brands;
 
     /// <summary>Called by the view on any mouse/key activity.</summary>
-    public void RecordActivity() => _lastActivity = _clock.UtcNow;
+    public void RecordActivity() => _shell.RecordActivity(_clock.UtcNow);
 
     /// <summary>
     /// Called by the view when a window resize drag starts/stops.
@@ -1150,7 +1144,7 @@ public sealed class MainViewModel
 
         RecordActivity();
         if (IsShown) return;
-        IsShown = true;
+        _shell.SetShown(true);
         // The single "the app was called" seam: the Ctrl+Shift+C hotkey and
         // the wake word both land here. The first show of a hidden start
         // reveals the page already built in the constructor (the resumed walk
@@ -1264,7 +1258,7 @@ public sealed class MainViewModel
     private void Hide()
     {
         if (!IsShown) return;
-        IsShown = false;
+        _shell.SetShown(false);
         _voiceRouter.ResetMute();
         _log.LogInfo("overlay hidden");
     }
@@ -1744,8 +1738,7 @@ public sealed class MainViewModel
     {
         RecordActivity();
         _introShown = true;
-        SetScreen(screen);
-        IsShown = true;
+        _shell.Reveal(screen);
         _log.LogInfo("overlay shown (job)");
     }
 

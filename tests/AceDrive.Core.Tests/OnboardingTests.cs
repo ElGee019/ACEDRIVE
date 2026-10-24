@@ -105,7 +105,7 @@ public sealed class OnboardingTests
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             jobs,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, meter);
+            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter);
     }
 
     // The first-run page (unit + language) sits before the name form; its

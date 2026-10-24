@@ -333,6 +333,9 @@ public partial class App : Application, IDisposable
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
             garage, city, hunger, roadTests, shift, shifts, jobs);
+        // The panel, its page and the activity stamp: view state with an owner
+        // the view binds through the shell, not state the coordinator holds.
+        var shell = new OverlayShell();
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -389,7 +392,7 @@ public partial class App : Application, IDisposable
             poiDirectory, poiStore,
             poiSpawner, jobs,
             preferencesStore, preferences, culture,
-            trunk, taxiRules, saver, fleet, settlement, meter, hud, poiHandlers,
+            trunk, taxiRules, saver, fleet, settlement, shell, meter, hud, poiHandlers,
             requests, requestTable, police,
             saveResets, restarter, storeCatalog);
 
