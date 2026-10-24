@@ -352,6 +352,12 @@ public partial class App : Application, IDisposable
         // The readout formatter the poll applies: the painted strings and their
         // change caches, so no formatting runs on the hot path.
         var readouts = new TelemetryReadouts();
+        // The game-clock world (PORTPLAN items 25/26/34): the town's drift, the
+        // appetite and the nightly premium. One collaborator owns the three
+        // rules so the poll only asks whether the town moved; the introduction
+        // gate arrives as the coordinator's live value.
+        var world = new WorldTicks(
+            game, city, hunger, fleet, deliveryBoard, deliveryCareer, saver, rivals, _log);
         // The POI world and its arrival router: the store handler rides in from
         // here, the business interiors are appended by the world. The world
         // attaches to the coordinator as its host inside the VM's constructor;
@@ -408,7 +414,7 @@ public partial class App : Application, IDisposable
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
-            game,
+            world,
             shift,
             new JsonSettingsStore(),
             _log,
@@ -416,9 +422,6 @@ public partial class App : Application, IDisposable
             carBrands,
             addressMap,
             taxiRules,
-            deliveryBoard,
-            deliveryCareer,
-            city,
             beat,
             driver,
             streak,
@@ -426,7 +429,6 @@ public partial class App : Application, IDisposable
             cars,
             rivals,
             telemetry,
-            hunger,
             garage,
             // The streak's random skill gains (PORTPLAN 06/47): its own seeded
             // stream, offset from the taxi seed like the other draws.

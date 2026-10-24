@@ -22,7 +22,10 @@ public sealed class MainViewModel
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
-    private readonly GameClock _game;
+    // The game-clock world (PORTPLAN items 25/26/34): the town's citizens, the
+    // appetite and the nightly premium. Poll only asks whether the town moved,
+    // so the cached board page is repainted.
+    private readonly WorldTicks _world;
     // The single writer of every save file: the stores, the snapshot assembly
     // and the write throttles live there, never in this class (SRP).
     private readonly GameStateSaver _saver;
@@ -75,13 +78,6 @@ public sealed class MainViewModel
     // The view-owned mic: this class owns its lifecycle (start, dispose) and
     // the UI-thread marshalling of its fragments; the router dispatches them.
     private readonly IVoiceListener _voice;
-    // CredP balance + owned hubs, shared by the board and the hub page.
-    // In-memory until the persistent save lands (PORTPLAN 51).
-    private readonly DeliveryCareer _career;
-    // The delivery board. A placed grocery/coffee store appends its row at
-    // runtime, so the live catalogue is a holder the board page, the run
-    // planner and the settle all read.
-    private readonly DeliveryBoard _deliveryBoard;
 
     // The placeholder free-roam map: the HUD, the onboarding home and the
     // taxi draw all read the same streets and lap geometry (PORTPLAN Step 1).
@@ -89,12 +85,6 @@ public sealed class MainViewModel
     // The driving-slice balance the meter, the HUD radius and the distance
     // line share (Data/taxi_rules.json).
     private readonly TaxiRules _taxiRules;
-    // The town itself: citizens drift with the shelves, demand empties them,
-    // and the size is banked on exit (PORTPLAN 25).
-    private readonly CityEconomy _city;
-    // The appetite: +1 per crossed game hour, banked with the reading for the
-    // next session (PORTPLAN 26).
-    private readonly Hunger _hunger;
     // The owned cars + the car driven now (PORTPLAN item 30). The garage banks
     // its own garage.json: the catalogue row behind each car is the data, the
     // per-car state (odometer, insurance) grows with items 31/32/34.
@@ -130,10 +120,6 @@ public sealed class MainViewModel
     // it too, so a kill costs at most this window of kilometres.
     private const double OdometerSaveSec = 60.0;
 
-    // The warning fires on the transition into the blocked band (Unity's
-    // TOO HUNGRY edge), not per poll and not per hour.
-    private bool _hungerBlocked;
-
     // Companion parity: hidden until "hey {brand}", idle hides after 15 s,
     // one utterance fires one button (muted until the final fragment).
     private const double IdleHideSec = 15.0;
@@ -153,13 +139,12 @@ public sealed class MainViewModel
     private bool JobInProgress => _taxi.InProgress || _delivery.InProgress;
 
     public MainViewModel(
-        ITelemetrySource telemetry, IClock clock, GameClock game, TaxiShift shift,
+        ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
         ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
         AddressMap addressMap, TaxiRules taxiRules,
-        DeliveryBoard deliveryBoard, DeliveryCareer career, CityEconomy city,
         VoiceBeat beat, DriverWallet wallet, DailyStreak streak, OperatingZone zone,
         IReadOnlyList<CarSpec> cars, IRivalsService rivals, IPlayerTelemetry playerTelemetry,
-        Hunger hunger, Garage garage, Random rng,
+        Garage garage, Random rng,
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
         VoiceRouter voiceRouter,
@@ -171,8 +156,8 @@ public sealed class MainViewModel
     {
         _telemetry = telemetry;
         _clock = clock;
+        _world = world;
         _beat = beat;
-        _game = game;
         _shift = shift;
         _store = store;
         _saveResets = saveResets;
@@ -182,10 +167,12 @@ public sealed class MainViewModel
         _taxiRules = taxiRules;
         _voice = voice;
         _carBrands = carBrands;
-        _deliveryBoard = deliveryBoard;
-        _career = career;
-        _city = city;
-        _hunger = hunger;
+        _wallet = wallet;
+        _streak = streak;
+        _zone = zone;
+        _rivals = rivals;
+        _online = playerTelemetry;
+        _cars = cars;
         _garage = garage;
         _rng = rng;
         _hud = hud;
@@ -643,52 +630,13 @@ public sealed class MainViewModel
         _beat.Poll();
         _nav.Tick();
 
-        // The town ticks on game minutes, whether or not a page is open: one
-        // DateTime subtraction per poll, all work on a whole-minute boundary
-        // (hot-path discipline). Demand needs an owned hub, like Unity's gate.
-        if (_city.AdvanceTo(_game.GameNow, _career.Owned.Count > 0))
+        // The town, the appetite and the nightly premium advance on the game
+        // clock, whether or not a page is open and whether or not EVO is
+        // attached. The tick reports the town's movement: only the cached
+        // board page holds cells, so that is the one repaint it owes.
+        if (_world.Tick(OnboardingDone))
         {
-            // The log reports the town that gets banked (every cell), not the
-            // career-gated header the pages show: a fresh career sees 0 on
-            // screen while its stores are still drifting behind it.
-            _log.LogInfo($"city: {_city.TotalCitizens(_deliveryBoard.Catalog.Stores)} citizens, " +
-                $"{_city.TotalGrowthPerHour(_deliveryBoard.Catalog.Stores)}/hr");
-            // Unity repaints the board from OnCitizensChanged; only the cached
-            // page needs the push, the hub page is rebuilt on every visit.
             _delivery.RefreshBoard();
-        }
-
-        // Hunger meter (PORTPLAN 26, Unity GameClockManager.UpdateHunger): +1
-        // once per crossed game hour and only past onboarding (Unity's
-        // firstSceneComplete gate), capped at the rules' max, work only on a
-        // whole-hour boundary (hot-path discipline). Unity blocks the job
-        // centre at maxHunger - 1 (HungerBlockPopup); the block is disabled
-        // for now — no trunk or grocery store exists yet (items 51 / 26 map
-        // POI), so the gate would be a one-way valve. hasPancakes stays false
-        // until a trunk lands; the one-shot event then fires exactly the way
-        // Unity fires it.
-        HungerReport report = _hunger.AdvanceTo(_game.GameNow, OnboardingDone, hasPancakes: false);
-        if (report.Changed)
-        {
-            _log.LogInfo($"[Hunger] {_hunger.Value}/{_hunger.Max}");
-        }
-        if (_hunger.Blocks != _hungerBlocked)
-        {
-            _hungerBlocked = _hunger.Blocks;
-            if (_hungerBlocked)
-            {
-                _log.LogWarning("[Hunger] job gate reached (" +
-                    $"{_hunger.Value}/{_hunger.Max}) — the TOO HUNGRY block is disabled until a food source lands");
-            }
-        }
-
-        // Nightly insurance charge (PORTPLAN 34, Unity GameClockManager.
-        // UpdateInsurance): once per game date, in the charge hour. Runs on the
-        // game clock, so it lands whether or not EVO is attached. A charged
-        // premium is progress the player loses on a kill, so it banks now.
-        if (_fleet.ChargeDailyInsurance())
-        {
-            SaveDriver(_rivals.LastResult);
         }
 
         // Wall-clock bank: runs before the telemetry read so it also holds

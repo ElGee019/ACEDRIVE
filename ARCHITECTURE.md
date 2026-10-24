@@ -23,7 +23,8 @@ route intent into them. Only then can `App.OnStartup` build everything.
 
 ## 2. Where the split stands
 
-Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean):
+Extracted, each verified (build 0 warnings, 1707 tests, format clean); S1–S4 are
+pushed, S5–S7 are green locally:
 
 | Slice | Result |
 |---|---|
@@ -39,15 +40,15 @@ Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean)
 | S4 | Pages → `Navigation` + `INavigationHost`; the control/menu/calendar caches and the bought-car choice, −291 lines |
 | S5 | Readouts → `TelemetryReadouts` + `ReadoutPaint`; day flip, week and shift timeout → `DayCycle` + `IDayCycleHost`; the week's mirror in `Navigation` and the host getter in `PoiWorld` go with it, −155 lines |
 | S6 | The composition root builds the whole DAG: `PanelPresenter` + `StoryHost`, `OnboardingFlow` and `VoiceRouter` (which loses `IVoiceHost`) are root-built; `MainViewModel` takes the finished graph, −184 lines |
+| S7 | The game-clock world → `WorldTicks` (town drift, appetite, nightly premium); the hunger-block latch leaves the coordinator, −52 lines and four constructor parameters |
 
-`MainViewModel`: 2658 → 967 lines. `Poll` is 46 code lines (160 with its
-rationale): what is left is the idle-hide policy, the world ticks (city,
-hunger, insurance), the wall-clock bank and the telemetry feed. The coordinator
-weighs more than the 500 the split targeted: the world ticks need their own
-state (`GameClock`, `CityEconomy`, `Hunger`, `Garage`, `DeliveryBoard`,
-`DeliveryCareer`, `DriverWallet`, `DailyStreak`, `OperatingZone`, `Random`), so
-the constructor landed at 39 named parameters rather than 20. Moving those
-would be a `WorldTicks` slice of its own, not a rewrite of this one.
+`MainViewModel`: 2658 → 915 lines. `Poll` is 40 code lines (150 with its
+rationale): what is left is the idle-hide policy, the wall-clock bank and the
+telemetry feed — the world rules answer one question per tick. The coordinator
+now takes 35 named parameters (32 required, 3 optional), all of them finished
+services: the root does every `new`. What still keeps the list long is not the
+ticks but the boot catch-up (`DailyStreak`'s grant, grandma's-car seed) and the
+zone expansion; both are follow-up slices, not a constructor rewrite.
 
 ## 3. Target shape
 
@@ -63,7 +64,7 @@ would be a `WorldTicks` slice of its own, not a rewrite of this one.
    │               │                                │               │
    │        ┌──────┴───────┬──────────────┬─────────┘               │
    │        │              │              │                         │
-   │   TaxiJobFlow   DeliveryFlow     PoiWorld                 DayCycle
+   │   TaxiJobFlow  DeliveryFlow   PoiWorld    DayCycle   WorldTicks│
    │        │              │              │                         │
    │        └──────┬───────┴──────┬───────┘                         │
    │               │              │                                 │
@@ -92,6 +93,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay` | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (4 members) |
 | `TelemetryReadouts` ✅ | the seven painted strings' caches (`_lastPacketId`, speed, gear, rpm/throttle/brake, the waiting key) | `Paint(sample, gameRunning)`, `PaintWaiting(gameRunning)`, `PaintJob(job, shift, now)` → `ReadoutPaint` | none: the coordinator's `Apply` copies the record |
 | `DayCycle` ✅ | `_lastDay`, `_lastShiftSecs`, the display week | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `GoToControlPage` |
+| `WorldTicks` ✅ | the hunger-block latch | `Tick(onboardingDone)` → whether the town moved | none: the movement returns to the coordinator, which owns the cached board page |
 | `JobSettlement` ✅ | — | `SettleTaxiRide`, `SettleDeliveryRun` | `IJobSettlementHost` |
 | `ShopInteriors` ✅ | — | `Bank`, `Dealer`, `CarWash`, `Mechanic`, `Insurance` | none |
 | `FleetService` ✅, `GameStateSaver` ✅ | their own | — | none |
@@ -105,8 +107,8 @@ coordinator. Pages take commands from the domain that owns them.
 After the split `MainViewModel` is a coordinator, not an owner:
 
 - lifecycle: `Start`, `Poll`, `Dispose`, the timer;
-- the 10 Hz loop: feed the meter, tick `TaxiJobFlow`, tick `DayCycle`, apply
-  `ReadoutPaint` — 46 code lines, not 229;
+- the 10 Hz loop: feed the meter, tick `TaxiJobFlow`, tick `DayCycle`, tick
+  `WorldTicks`, apply `ReadoutPaint` — 40 code lines, not 229;
 - intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
 - the panel policy's *call sites*: the navigator's page reports route into
   `PanelPresenter`, which owns the mid-job call gate, which page a call opens
@@ -116,13 +118,12 @@ After the split `MainViewModel` is a coordinator, not an owner:
   reset, app restart, HUD wiring, `SkipShutdownSave`;
 - the bindable readout properties (the target of `ReadoutPaint`).
 
-Constructor: 39 parameters (36 required, 3 optional), all of them finished services — the root does
-every `new`. No `MainViewModelDependencies` god record: each collaborator takes
-its own dependencies, which is what makes it testable. The number stayed above
-the original ~20 estimate because §4's world ticks read their own state
-(`GameClock`, `CityEconomy`, `Hunger`, `Garage`, `DeliveryBoard`,
-`DeliveryCareer`, `DriverWallet`, `DailyStreak`, `OperatingZone`, `Random`);
-grouping those is a `WorldTicks` slice, not a constructor rewrite.
+Constructor: 35 parameters (32 required, 3 optional), all of them finished
+services — the root does every `new`. No `MainViewModelDependencies` god record:
+each collaborator takes its own dependencies, which is what makes it testable.
+The game-clock world left in S7, so the list now grows only with the boot
+catch-up (`DailyStreak`, `Random`) and the zone expansion (`OperatingZone`,
+`IPlayerTelemetry`); those are two follow-up slices, not a constructor rewrite.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -137,15 +138,16 @@ stores + saved state
       └ JobSettlement (state owners + board + meter; the host supplies the saves)
       └ ShopInteriors (saver)
       └ DayCycle (game clock, shift, records, shift board, telemetry, saver)
-          └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
-          └ DeliveryFlow (board, career, city, meter, breakdowns)
-          └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
-              └ Navigation (flows' pages, page data, saver, DayCycle's week)
-                  └ PanelPresenter (shell, pages, the two flows' InProgress)
-                      └ StoryHost (panel, pages, saver, standings)
-                          └ OnboardingFlow (story host, pages, brand, week)
-                          └ VoiceRouter (panel, brand source, content, HUD)
-                              └ MainViewModel (all of the above)
+      └ WorldTicks (game clock, city, hunger, fleet, board, career, saver, rivals)
+      └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
+      └ DeliveryFlow (board, career, city, meter, breakdowns)
+      └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
+          └ Navigation (flows' pages, page data, saver, DayCycle's week)
+              └ PanelPresenter (shell, pages, the two flows' InProgress)
+                  └ StoryHost (panel, pages, saver, standings)
+                      └ OnboardingFlow (story host, pages, brand, week)
+                      └ VoiceRouter (panel, brand source, content, HUD)
+                          └ MainViewModel (all of the above)
 ```
 
 `PoiArrivalRouter` is built in the root right after `PoiWorld`, from
@@ -281,13 +283,40 @@ culture, `FareTable`, `InsuranceRules`, `IFriendshipStore`, delivery fares,
 - The panel stays a coordinator *call site* only: `Show`/`Hide`/
   `RecordActivity`/`IsShown`/`CurrentScreen` forward to the presenter; the idle
   countdown still lives in `Poll` and reads `OverlayShell.LastActivity`.
-- 39 constructor parameters, not 15-20: the world ticks (§4) keep their own
-  state. See §2 for the `WorldTicks` note.
+- 39 constructor parameters, not 15-20: the world ticks (§4) kept their own
+  state at the time. S7 answered that; the boot catch-up and the zone expansion
+  are the two remainders.
 - `RoadTestDayOfWeek` was dead on the coordinator; `Brands` only fed the
   deleted host, and `CarBrand`/`CarIdentity` were mirrors of the watcher, which
   the flow, the voice router and the haul now read directly.
 
-### Host implementations after S6
+**S7 — `WorldTicks`.** ✅ (−52 lines in the coordinator, five injected fields
+and four net constructor parameters): the town's drift, the appetite and the
+nightly
+premium now share one collaborator that reads the game clock. `Poll` asks one
+question — did the town move? — and repaints the cached board page only when it
+did.
+*Unblocked:* the game moment is read in exactly one place for the world rules
+(`GameClock` still feeds the calendar and the fleet), and `CityEconomy`,
+`Hunger`, `DeliveryBoard` and `DeliveryCareer` left the coordinator's surface.
+The hunger-block latch, the last non-readonly piece of world state, left with
+them.
+*Deviations:*
+- The introduction gate arrives as a value (`Tick(bool onboardingDone)`) instead
+  of the store: `IOnboardingStore.Load()` is a file read, and the 10 Hz poll
+  must never touch the disk. The coordinator's live `Story.Done` is the value —
+  the same shape `DayCycle.Tick` already uses for the two job reads.
+- The town's movement returns from `Tick` instead of going through a host: the
+  coordinator is the only object that knows the cached board page, and a `bool`
+  beats a one-method host that nothing else implements.
+- The premium banks through `GameStateSaver` + `IRivalsService` directly (the
+  services the settles already take), so the save report stays off the host.
+- The boot catch-up (streak grant, grandma's-car seed) and the zone expansion
+  did **not** move: they are session-start and progress work, not ticks.
+  Grouping them here would have given one collaborator three triggers; they are
+  the next two slices.
+
+### Host implementations after S7
 
 The reads now live with their owners:
 
@@ -299,6 +328,8 @@ The reads now live with their owners:
   timed-out shift into `DayCycle.EndShift`).
 - `IDayCycleHost` — unchanged; its four members are the coordinator's panel
   call sites and page routing.
+- `WorldTicks` takes no host at all: its one report is the `bool` the tick
+  returns.
 
 ## 7. Rules for every slice
 
@@ -340,6 +371,11 @@ The reads now live with their owners:
   `FakeCarBrandSource` owns the primed brand the watcher would publish, and the
   builder primes it (`Start` does that in production) so voice tests can speak
   the wake word without a lifecycle call.
+- `WorldTicks` landed with its own suite in S7: the town anchor and the
+  30-minute boundary through the returned flag, the appetite's introduction
+  gate and its one-shot block warning, and the premium's once-per-game-date
+  charge with the driver save it runs. The quiet charge hour is the test that
+  proves the poll writes nothing per tick.
 
 ## 9. Open decisions
 
@@ -369,21 +405,23 @@ The reads now live with their owners:
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5 and S6 are green
-locally. `MainViewModel` 967 lines (was 1151 after S5), −184 lines: the story
-flow's 20-odd construction parameters, the voice router construction, the panel
-policy and the brand mirror left. The flow and the router stay as collaborators
-— nothing in the class builds one. The injected field list shrank 46 → 40
-(`_fares`, `_friends`, `_meter`, `_shops`, `_content`, `_deliveryFares` and
-`_insuranceRules` left; `_panel` arrived), and the constructor lost 19
-parameters. 1701 tests green (count unchanged: S6 is a composition slice, and
-the three duplicated test graphs collapsed into `TestSession`).
+State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5, S6 and S7 are green
+locally. `MainViewModel` 915 lines (was 967 after S6), −52 lines: the three
+game-clock world rules and the hunger-block latch left for `WorldTicks`. The
+injected field list is 35, the constructor 35 parameters (32 required, 3
+optional). 1707 tests green (+6: `WorldTicksTests`).
 
-Next: the split plan is complete. Candidates the slices left behind:
-- **`WorldTicks`** (§4): the city/hunger/insurance ticks plus their state
-  (`GameClock`, `CityEconomy`, `Hunger`, `Garage`, `DeliveryBoard`,
-  `DeliveryCareer`, `DriverWallet`, `DailyStreak`, `OperatingZone`, `Random`)
-  would take the constructor from 39 to ~22 and `Poll` to the meter edge.
+Next: the candidates the slices left behind, in the order they unblock each
+other:
+- **`DriverCatchUp`** — the boot block still in the constructor: the garage seed
+  (`OnboardingState.GrandmaCarId` + the display week) and the login streak's
+  recount/bonus grant (`DailyStreak`, `ConsecutiveDayBonus`, the random skill
+  points). It would take `IOnboardingStore`, `DayCycle`, `Garage`,
+  `DailyStreak`, `DriverWallet`, `Random`, the saver and the log, and leaves
+  `DailyStreak`/`Random` (and the grandma-car read) off the coordinator.
+- **`ZoneGrowth`** — `TryExpandZone` + `IPlayerTelemetry.PushZoneKm`: one
+  settle-hook collaborator with its own onboarding gate and name read, which is
+  what still keeps `OperatingZone` and `IPlayerTelemetry` on the coordinator.
 - **`OnCarHaul`** (open decision 2) is the last job type still living in the
   coordinator.
 - `MainViewModel`'s onboarding forwarding (`ChooseBrand`/`ChooseCar`/
@@ -419,6 +457,13 @@ Working agreements earned so far:
   crosses the host explicitly and moves with its new owner. `DisplayWeek` made
   that trip: coordinator → `DayCycle` in S5, with the navigator's mirror and
   the world's host getter both deleted rather than kept in sync.
+- A per-tick gate that lives behind a store is a value, not a read: the world
+  ticks take `onboardingDone` because `IOnboardingStore.Load()` is a file read
+  and the 10 Hz poll must never touch the disk. The same rule keeps
+  `DayCycle.Tick`'s two job reads as parameters.
+- A `bool` is a host when it is the whole report: `WorldTicks.Tick` answers
+  "did the town move?" and the coordinator repaints its own cached page. No
+  interface for one transition that only one caller consumes.
 - Tests: one instance per service graph; builders hoist their locals. A
   collaborator test wires the *same* store fakes its assertions read, and a
   culture-sensitive one pins `en-US` in its constructor (the suite shares one

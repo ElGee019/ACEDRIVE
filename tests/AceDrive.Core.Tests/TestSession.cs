@@ -145,6 +145,11 @@ internal static class TestSession
             game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
             profiles, rivalsInstance, saver, beat, options.StartWeek, logger);
         var readouts = new TelemetryReadouts();
+        // The game-clock world: the same instances the saver and the fleet
+        // hold, so an insurance charge lands in the driver file the tests read.
+        var world = new WorldTicks(
+            game, cityInstance, hungerInstance, fleet, deliveryBoard, deliveryCareer,
+            saver, rivalsInstance, logger);
         var poiWorld = new PoiWorld(
             spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
@@ -185,11 +190,11 @@ internal static class TestSession
         var voiceRouter = new VoiceRouter(
             panel, brands, contentSource, clock, logger, options.Hud);
         var vm = new MainViewModel(
-            tel, clock, game, shiftInstance, store, logger,
+            tel, clock, world, shiftInstance, store, logger,
             options.Voice ?? new FakeVoiceListener(available: false), brands, map,
-            taxiRulesInstance, deliveryBoard, deliveryCareer, cityInstance,
+            taxiRulesInstance,
             beat, walletInstance, streakInstance, zoneInstance, pool,
-            rivalsInstance, telemetryInstance, hungerInstance, garageInstance,
+            rivalsInstance, telemetryInstance, garageInstance,
             options.Rng ?? new Random(0),
             saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
