@@ -8,6 +8,10 @@ namespace AceDrive.Overlay.Services;
 /// insurance charge. One home for every path that mutates an
 /// <see cref="OwnedCar"/>, so the poll, the settles and the garage doors all
 /// go through the same rules instead of duplicating them.
+///
+/// Reads the driven car from the watcher and the canonical brand spellings
+/// from the content source, so it depends on two narrow interfaces instead of
+/// the shell that happens to own them.
 /// </summary>
 public sealed class FleetService
 {
@@ -22,12 +26,13 @@ public sealed class FleetService
     private readonly DriverWallet _wallet;
     private readonly InsuranceRules _insurance;
     private readonly ILog _log;
-    private readonly IFleetHost _host;
+    private readonly ICarBrandSource _driven;
+    private readonly IContentSource _content;
 
     public FleetService(
         Garage garage, IReadOnlyList<CarSpec> cars, GameClock game,
         DriverWallet wallet, InsuranceRules insurance, ILog log,
-        IFleetHost host)
+        ICarBrandSource driven, IContentSource content)
     {
         _garage = garage;
         _cars = cars;
@@ -35,7 +40,8 @@ public sealed class FleetService
         _wallet = wallet;
         _insurance = insurance;
         _log = log;
-        _host = host;
+        _driven = driven;
+        _content = content;
     }
 
     /// <summary>
@@ -46,7 +52,7 @@ public sealed class FleetService
     /// clamps too.
     /// </summary>
     public int PassengerCapacity() =>
-        _host.CarIdentity?.FindIn(_cars) is { } car ? Math.Max(1, car.Passengers) : 1;
+        _driven.CurrentIdentity?.FindIn(_cars) is { } car ? Math.Max(1, car.Passengers) : 1;
 
     /// <summary>
     /// The car that earns class/rarity XP and the global km increment: the
@@ -58,7 +64,7 @@ public sealed class FleetService
     /// </summary>
     public CarSpec? XpCar()
     {
-        if (_host.CarIdentity is { } live)
+        if (_driven.CurrentIdentity is { } live)
         {
             return FindOwned(live) is { } owned ? _garage.SpecOf(owned) : null;
         }
@@ -75,18 +81,20 @@ public sealed class FleetService
     /// country km, no zone job and no global car km.
     /// </summary>
     public bool IsDrivingUnownedCar() =>
-        _host.CarIdentity is { } live && FindOwned(live) is null;
+        _driven.CurrentIdentity is { } live && FindOwned(live) is null;
 
     /// <summary>
     /// Display brand for the receipt's sponsorship lines: the watcher's spoken
     /// brand ("mazda") canonicalized to the onboarding spelling ("Mazda") so
     /// the receipt reads like the brand page. Unknown brands ride through
-    /// untouched; the mileage store matches case-insensitively.
+    /// untouched; the mileage store matches case-insensitively. The spoken
+    /// brand is a parameter because it is the shell's wake word, not the
+    /// content's list: the fleet only owns the canonicalization.
     /// </summary>
-    public string SponsorBrand()
+    public string SponsorBrand(string spokenBrand)
     {
-        string spoken = _host.CarBrand.Trim();
-        foreach (string known in _host.Brands)
+        string spoken = spokenBrand.Trim();
+        foreach (string known in _content.Content.Brands)
         {
             if (string.Equals(known, spoken, StringComparison.OrdinalIgnoreCase))
             {
@@ -103,7 +111,7 @@ public sealed class FleetService
     /// would flag every fresh session.
     /// </summary>
     public bool IsDrivingWrongCar() =>
-        _host.CarIdentity is { } identity
+        _driven.CurrentIdentity is { } identity
         && _garage.Current is { } current
         && !identity.Matches(current.Key);
 
@@ -112,9 +120,12 @@ public sealed class FleetService
     /// integration): bank this tick's distance into the car driven now, then run
     /// the engine inspections. The same dt guard as the fare meter keeps a
     /// stalled, torn or teleported poll out of the ledger; the speed clamp keeps
-    /// a one-frame glitch out of it too.
+    /// a one-frame glitch out of it too. <paramref name="onboardingDone"/> is a
+    /// parameter rather than a dependency because the intro gate belongs to the
+    /// story flow, which the fleet deliberately does not know (it used to reach
+    /// it through the whole shell).
     /// </summary>
-    public void IntegrateOdometer(TelemetrySample sample, double dt)
+    public void IntegrateOdometer(TelemetrySample sample, double dt, bool onboardingDone)
     {
         if (_garage.Current is not { } car)
         {
@@ -136,7 +147,7 @@ public sealed class FleetService
         }
         // Unity runs the inspections only while driving and only past the intro
         // (firstSceneComplete); the whole engine system is dormant before it.
-        if (_host.OnboardingDone)
+        if (onboardingDone)
         {
             RunEngineChecks(car);
         }

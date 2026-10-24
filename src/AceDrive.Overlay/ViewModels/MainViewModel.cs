@@ -12,7 +12,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// time, telemetry, logging and fares are abstracted so every flow is
 /// unit-testable with fakes. Knows NOTHING about HWNDs or files.
 /// </summary>
-public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStoryHost, IDisposable
+public sealed class MainViewModel : ViewModelBase, IVoiceHost, IStoryHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -357,7 +357,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
             hungerStore, roadTestStore, shiftStore, wallet, streak, zone, trunk,
             garage, city, hunger, roadTests, shift, shifts, jobs);
         _fleet = new FleetService(
-            garage, cars, game, wallet, insuranceRules, log, this);
+            garage, cars, game, wallet, insuranceRules, log, carBrands, content);
         // The POI entry router: the store handler rides in from the root, the
         // business interiors are built here because they bank through this host
         // and change the page themselves (dealer -> bought-car choice).
@@ -1001,7 +1001,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         // covered into the wear deck's input, and the engine inspections ride
         // the drive. The garage file is banked on the same wall-time throttle
         // as the clock, so a kill costs at most the window.
-        _fleet.IntegrateOdometer(s, dt);
+        _fleet.IntegrateOdometer(s, dt, OnboardingDone);
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
         if ((now - _saver.LastGarageSave).TotalSeconds >= OdometerSaveSec)
@@ -1807,7 +1807,7 @@ public sealed class MainViewModel : ViewModelBase, IVoiceHost, IFleetHost, IStor
         FriendshipOutcome friendship = _friends.RegisterRide(baseName);
         // Unity banks the trip km into the driven brand before pricing, so
         // the current ride already counts toward its own sponsorship rate.
-        string brandName = _fleet.SponsorBrand();
+        string brandName = _fleet.SponsorBrand(_carBrand);
         double brandKm = _brands.RegisterRide(brandName, _job.DistanceKm);
         TaxiReceipt receipt = TaxiReceiptBuilder.Build(
             _job.DistanceKm, capacity, carClass,
