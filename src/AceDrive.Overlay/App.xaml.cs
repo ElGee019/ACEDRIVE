@@ -342,13 +342,23 @@ public partial class App : Application, IDisposable
         var shell = new OverlayShell();
         var shops = new ShopInteriors(
             driver, garage, game, insuranceRules, cars, saver, beat, _log);
+        int startWeek = saved?.Week ?? CalendarStamp.Default.Week;
+        // The session's calendar: the day flip, the week it rolls and the idle
+        // shift timeout with its ended page. The pages and the dealer's floor
+        // read the week from here, so no mirror of it lives anywhere else.
+        var dayCycle = new DayCycle(
+            game, shift, shifts, shiftStandings, telemetry, profileStore,
+            rivals, saver, beat, startWeek, _log);
+        // The readout formatter the poll applies: the painted strings and their
+        // change caches, so no formatting runs on the hot path.
+        var readouts = new TelemetryReadouts();
         // The POI world and its arrival router: the store handler rides in from
         // here, the business interiors are appended by the world. The world
         // attaches to the coordinator as its host inside the VM's constructor;
         // its arrival delegates only read the host when a door is entered.
         var poiWorld = new PoiWorld(
             poiSpawner, poiDirectory, poiStore, deliveryBoard, deliveryCareer,
-            city, storeCatalog, zone, jobs, onboardingStore, shops, _log);
+            city, storeCatalog, zone, jobs, onboardingStore, shops, dayCycle, _log);
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(poiHandlers));
         // The trip-start breakdown roll (PORTPLAN 39): one seeded instance,
         // never the shared global (AGENTS.md), read by both job flows.
@@ -371,12 +381,11 @@ public partial class App : Application, IDisposable
         // inside the VM's constructor, which is the one late edge for the
         // entries that are not pages (a timed-out shift, the settings page,
         // the haul settle).
-        int startWeek = saved?.Week ?? CalendarStamp.Default.Week;
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todos, roadTests, saver,
             driver, garage, rivals, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
-            taxi, delivery, poiWorld, startWeek, _log);
+            taxi, delivery, poiWorld, dayCycle, _log);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -397,7 +406,6 @@ public partial class App : Application, IDisposable
             deliveryCareer,
             deliveryFares,
             city,
-            startWeek,
             beat,
             driver,
             streak,
@@ -406,8 +414,6 @@ public partial class App : Application, IDisposable
             cars,
             rivals,
             telemetry,
-            shifts,
-            shiftStandings,
             hunger,
             garage,
             insuranceRules,
@@ -419,6 +425,7 @@ public partial class App : Application, IDisposable
             preferencesStore, preferences, culture,
             trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
             taxi, delivery, poiWorld, poiArrivals, navigation,
+            readouts, dayCycle,
             hud,
             saveResets, restarter);
 

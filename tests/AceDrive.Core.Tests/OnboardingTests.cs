@@ -87,12 +87,15 @@ public sealed class OnboardingTests
             wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
         var poiDirectory = new PoiDirectory();
         var poiStore = new FakePoiDirectoryStore();
+        var dayCycle = new DayCycle(
+            game, shift, shifts, new OfflineShiftStandings(), playerTelemetry,
+            profiles ?? new FakeProfileStore(), rivals, saver, beat, 1, logger);
         var poiWorld = new PoiWorld(
             new PoiSpawner(
                 AddressMap.Default, PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             poiDirectory, poiStore, deliveryBoard, career, city, StoreCatalog.Default,
-            zone, jobs, store, shops, logger);
+            zone, jobs, store, shops, dayCycle, logger);
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers());
         var proposals = TaxiTestData.Proposer();
         var taxi = new TaxiJobFlow(
@@ -107,7 +110,7 @@ public sealed class OnboardingTests
             shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
             wallet, garage, rivals, trunk, hunger, StoreCatalog.Default,
             poiDirectory, null, deliveryBoard, career, city,
-            taxi, delivery, poiWorld, 1, logger);
+            taxi, delivery, poiWorld, dayCycle, logger);
         return new MainViewModel(new FakeTelemetry(), clock, game, shift,
             new FakeStore(), logger, fares,
             store, contentSource,
@@ -116,12 +119,11 @@ public sealed class OnboardingTests
             new FakeVoiceListener(available: false),
             carBrands, deliveryBoard, career,
             deliveryFares,
-            city, 1, beat, wallet,
+            city, beat, wallet,
             streak, zone,
             friendships, cars,
             rivals,
-            playerTelemetry, shifts,
-            new OfflineShiftStandings(),
+            playerTelemetry,
             hunger,
             garage, InsuranceRules.Default,
             new Random(0),
@@ -129,7 +131,8 @@ public sealed class OnboardingTests
             poiDirectory, poiStore,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
             trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
-            taxi, delivery, poiWorld, poiArrivals, navigation);
+            taxi, delivery, poiWorld, poiArrivals, navigation,
+            new TelemetryReadouts(), dayCycle);
     }
 
     // The first-run page (unit + language) sits before the name form; its

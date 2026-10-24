@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Windows.Input;
 using System.Windows.Threading;
 using AceDrive.Core;
@@ -14,7 +13,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class MainViewModel
     : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost,
-      IDeliveryHost, IPoiWorldHost, INavigationHost, IDisposable
+      IDeliveryHost, IPoiWorldHost, INavigationHost, IDayCycleHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -55,12 +54,6 @@ public sealed class MainViewModel
     // Unity CarRarityService): reads are cached, the km write is fire-and-forget.
     // Zone, best-shift and country pushes (Unity FirestoreService + CountryKm).
     private readonly IPlayerTelemetry _online;
-    // The persisted best single shift (PORTPLAN 12): the settle path banks it
-    // and the online board receives it at the shift end.
-    private readonly ShiftRecord _shifts;
-    // Best-single-shift world standings (Unity ShiftStandingsService): the
-    // shift-ended page reads it and the board updates arrive live.
-    private readonly IShiftStandings _shiftBoard;
     // Lifetime km per driven brand behind the receipt's sponsorship rate
     // (PORTPLAN 35, Unity PlayerData.brandDistanceDriven).
     // The car pool behind the road-test ledger, reused for the receipt's
@@ -132,10 +125,13 @@ public sealed class MainViewModel
     // The page graph: the control page, the menu and every tile behind it. It
     // owns the page caches, so this class keeps only panel policy.
     private readonly Navigation _nav;
-    private int _lastDay = -1;
-    // Display week: rolls on the Sunday-midnight crossing, persists across
-    // restarts via the clock store (seeded from the save at startup).
-    private int _displayWeek;
+    // The readout formatter: the painted strings and their change caches. The
+    // poll hands it the sample and copies back what changed, so no formatting
+    // lives on the hot path (S5).
+    private readonly TelemetryReadouts _readouts;
+    // The session's calendar: the day flip, the display week and the idle shift
+    // timeout with its ended page. The pages read the week from it.
+    private readonly DayCycle _day;
 
     // WHY a throttle at all: a rebuild/Stop-Debugging kills the process, and
     // a killed process never raises Window.Closed — so the shutdown save
@@ -186,22 +182,6 @@ public sealed class MainViewModel
     // The passenger-leg distance. Lives outside the job so a refused pickup or
     // a breakdown can discard the ride without leaving a half-run meter.
     private readonly TaxiDriveMeter _meter;
-    private int _lastShiftSecs = -1;
-
-    // The last painted telemetry readouts. The 10 Hz poll re-formats only when
-    // the shown (quantised) value changes, so a parked car or a paused game
-    // costs no string work per tick (AGENTS.md hot-path discipline). The
-    // sentinels force the first paint.
-    private const int Unpainted = -1;
-    private int _lastPacketId = Unpainted;
-    private int _lastSpeedKmh = Unpainted;
-    private int _lastGear = int.MinValue;
-    private int _lastRpm = Unpainted;
-    private int _lastThrottlePct = Unpainted;
-    private int _lastBrakePct = Unpainted;
-    // Which "no physics yet" line is painted, so the waiting state also costs
-    // one lookup on its first tick instead of one per tick.
-    private string? _lastWaitingKey;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, GameClock game,
@@ -213,12 +193,11 @@ public sealed class MainViewModel
         IVoiceListener voice, ICarBrandSource carBrands,
         DeliveryBoard deliveryBoard, DeliveryCareer career,
         DeliveryFareTable deliveryFares,
-        CityEconomy city, int startWeek,
+        CityEconomy city,
         VoiceBeat beat, DriverWallet wallet,
         DailyStreak streak, OperatingZone zone, IFriendshipStore friendships, IReadOnlyList<CarSpec> cars,
         IRivalsService rivals,
-        IPlayerTelemetry playerTelemetry, ShiftRecord shifts,
-        IShiftStandings shiftStandings,
+        IPlayerTelemetry playerTelemetry,
         Hunger hunger,
         Garage garage, InsuranceRules insuranceRules,
         Random rng,
@@ -231,6 +210,7 @@ public sealed class MainViewModel
         OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
         PoiArrivalRouter poiArrivals, Navigation navigation,
+        TelemetryReadouts readouts, DayCycle day,
         ITelemetryHud? hud = null,
         ISaveDataResetter? saveResets = null,
         IAppRestarter? restarter = null)
@@ -239,7 +219,6 @@ public sealed class MainViewModel
         _clock = clock;
         _beat = beat;
         _game = game;
-        _displayWeek = startWeek;
         _shift = shift;
         _store = store;
         _saveResets = saveResets;
@@ -272,8 +251,6 @@ public sealed class MainViewModel
         _friends = friendships;
         _rivals = rivals;
         _online = playerTelemetry;
-        _shifts = shifts;
-        _shiftBoard = shiftStandings;
         _cars = cars;
         // The persistence collaborator and the fleet are built by the root: the
         // shell may not own a stateful service (AGENTS.md), and both are handed
@@ -286,6 +263,12 @@ public sealed class MainViewModel
         _taxi = taxi;
         _delivery = delivery;
         _poiWorld = poiWorld;
+        // The readout formatter and the session calendar are built by the root
+        // too; neither reaches back, so the day cycle is the fourth late edge
+        // (it shows the shift-ended page the poll's timeout opens).
+        _readouts = readouts;
+        _day = day;
+        _day.Attach(this);
         // The page graph is built by the root; the navigator only reaches back
         // for the entries whose domain is not a page (shift close, readouts,
         // settings, haul), so the attach closes before any page command can
@@ -317,7 +300,7 @@ public sealed class MainViewModel
             pois, poiDirectory, poiStore, poiArrivals, trunk,
             career, deliveryBoard.Catalog.StartCredP,
             preferencesStore, preferences,
-            culture, beat, hud, garage, () => _displayWeek, SaveGarage,
+            culture, beat, hud, garage, () => _day.DisplayWeek, SaveGarage,
             () => _carBrand, log, this);
         _carBrands.BrandChanged += (_, e) => OnCarBrand(e.Brand, e.Identity);
         // Business catch-up at boot (Unity MapScreen.Show's generator checks):
@@ -333,7 +316,7 @@ public sealed class MainViewModel
         // session later; the key resolves through the catalogue for specs.
         if (OnboardingDone && _garage.Cars.Count == 0 && _story.Progress.GrandmaCarId is { Length: > 0 } starter)
         {
-            _garage.Add(starter, _displayWeek);
+            _garage.Add(starter, _day.DisplayWeek);
             SaveGarage();
             _log.LogInfo($"garage seeded with grandma's car: {starter}");
         }
@@ -358,9 +341,6 @@ public sealed class MainViewModel
             _log.LogInfo($"[Streak] consecutive-day bonus granted: {bonus} CR (day {days}, " +
                 $"{days} random skill point(s))");
         }
-        // The day-flip detector starts on the session's opening day, so the
-        // first poll does not report a transition.
-        _lastDay = _game.Today;
         _shell.RecordActivity(_clock.UtcNow);
         // The router's warn-free reads go through IVoiceHost (see the explicit
         // implementations below), so the host surface stays small.
@@ -376,8 +356,10 @@ public sealed class MainViewModel
         });
 
         RefreshJob();
-        StatusText = Strings.Get("WaitingForEvo");
-        SpeedText = Strings.Format("SpeedKmh", 0);
+        // The first paint of the session: no physics has been read yet, so the
+        // waiting line is the honest one; the gear and detail lines keep their
+        // unknown placeholders until the first tick lands.
+        Apply(_readouts.PaintWaiting(gameRunning: false));
         GearText = Strings.Get("GearUnknown");
         DetailText = string.Empty;
 
@@ -559,22 +541,23 @@ public sealed class MainViewModel
     // The host slice the POI world sees: the world owns the doors and the
     // board growth; the navigator owns the board page and the dealer's follow-up.
     void IPoiWorldHost.RefreshBoard() => _delivery.RefreshBoard();
-    int IPoiWorldHost.DisplayWeek => _displayWeek;
     void IPoiWorldHost.CarBought(CarSpec car) => _nav.CarBought(car);
 
     // The host slice the navigator sees: the entries whose work is not a page.
-    // A shift that already timed out is this class's to close (it owns the
+    // A shift that already timed out is the day cycle's to close (it owns the
     // record and its summary page), and the settings page is the story flow's.
-    void INavigationHost.ShiftTimedOut(TimeSpan idle) => EndShift(idle);
-    void INavigationHost.ReadoutsChanged()
-    {
-        // The shift button flipped: the second-guarded countdown would only
-        // repaint on its next tick, so force the readout now.
-        _lastShiftSecs = -1;
-        RefreshJob();
-    }
+    void INavigationHost.ShiftTimedOut(TimeSpan idle) => _day.EndShift(idle);
+    void INavigationHost.ReadoutsChanged() => RefreshJob();
     void INavigationHost.ShowSettings() => OpenSettings();
     void INavigationHost.SettleHaul() => OnCarHaul();
+
+    // The host slice the day cycle sees: the week roll repaints the cached
+    // pages, the countdown forces a readout, and the shift-end page arrives
+    // here to be revealed (the panel policy stays in this class).
+    void IDayCycleHost.DisplayWeekChanged(int week) => _nav.DisplayWeekChanged(week);
+    void IDayCycleHost.ReadoutsChanged() => RefreshJob();
+    void IDayCycleHost.ShowShiftEnded(object page) => ShowJobScreen(page);
+    void IDayCycleHost.GoToControlPage() => _nav.ShowControl();
 
     // Reveal the panel on the requested POI screen. Show() deliberately
     // resets a hidden start to the control page; entering a shop must land
@@ -665,7 +648,7 @@ public sealed class MainViewModel
     /// so every bank path (day flip, checkpoint, interval, window close) keeps
     /// the interval honest. Never throws (the store swallows IO).
     /// </summary>
-    public void SaveClock() => _saver.SaveClock(_displayWeek);
+    public void SaveClock() => _saver.SaveClock(_day.DisplayWeek);
 
     /// <summary>
     /// Banks the town for the next session (PORTPLAN 25): the city size plus
@@ -733,45 +716,22 @@ public sealed class MainViewModel
         // show first rides the same call.
         _taxi.Tick(now);
 
-        // The control page date stays live whether or not EVO is attached.
-        // Refresh self-guards on the minute: no per-tick allocations.
-        // A timed-out shift ends here (Unity 30-min idle rule) so the taxi
-        // button flips back to START even when the player never taps it.
-        // WHY the job guard: an accepted job is work in progress, and a long
-        // drive to a far door must not idle the shift out mid-ride.
-        if (!JobInProgress && _shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
-        {
-            EndShift(idle);
-        }
+        // The session clock's own work: the idle shift timeout (Unity's 30-min
+        // rule) so the taxi button flips back to START even when the player
+        // never taps it, the game-day flip with the week it completes, and the
+        // second-guarded shift countdown. Both job reads arrive as values: an
+        // accepted job must not idle the shift out mid-ride, and a live leg
+        // repaints the readouts by itself.
+        _day.Tick(now, JobInProgress, _taxi.LegActive);
+
         // Voice acknowledgment: the beat drains first so a due tap acts at
         // its end, then flash expiry runs on the clock, not the minute
         // guard: a half-second teal glow must clear inside the same minute
         // it started. The cached pages' own minute guards live with them.
+        // The control page date stays live whether or not EVO is attached;
+        // its refresh self-guards on the minute: no per-tick allocations.
         _beat.Poll();
         _nav.Tick();
-
-        // Game-day flip: the calendar highlight moved. One int compare per
-        // tick, work only on transitions (hot-path discipline).
-        int today = _game.Today;
-        if (today != _lastDay)
-        {
-            int prev = _lastDay;
-            _log.LogInfo($"calendar day changed: {prev} -> {today}");
-            _lastDay = today;
-            // Sunday-midnight crossing completes the week: the display week
-            // rolls and the moment persists. The road-test pick deliberately
-            // does NOT rotate here — an untested car stays on offer until it
-            // is actually driven (PORTPLAN 49).
-            if (prev == ControlCalendar.Sunday && today == ControlCalendar.Monday)
-            {
-                _displayWeek++;
-                // The pages repaint now instead of on the next tick: a week
-                // opening is the one transition the poll already ran its
-                // refresh before.
-                _nav.DisplayWeekChanged(_displayWeek);
-            }
-            SaveClock();
-        }
 
         // The town ticks on game minutes, whether or not a page is open: one
         // DateTime subtraction per poll, all work on a whole-minute boundary
@@ -822,46 +782,30 @@ public sealed class MainViewModel
         }
 
         // Wall-clock bank: runs before the telemetry read so it also holds
-        // while EVO is closed, and before the shift paths because a banked
-        // moment is exactly what a kill between sessions would otherwise
-        // lose. SaveClock restamps, so this costs one write per ClockSaveSec.
+        // while EVO is closed, and after the session clock's own saves because
+        // a banked moment is exactly what a kill between sessions would
+        // otherwise lose. SaveClock restamps, so this costs one write per
+        // ClockSaveSec.
         if ((now - _saver.LastClockSave).TotalSeconds >= ClockSaveSec)
         {
             SaveClock();
         }
 
-        // Shift countdown: second-guarded so an open-but-idle shift costs one
-        // string per second, never per 10 Hz tick. While EnRoute the meter
-        // below already repaints every tick, so this path skips it.
-        if (_shift.IsStarted && !_taxi.LegActive)
-        {
-            int secs = (int)_shift.Remaining(now).TotalSeconds;
-            if (secs != _lastShiftSecs)
-            {
-                _lastShiftSecs = secs;
-                RefreshJob();
-            }
-        }
-        else if (!_shift.IsStarted)
-        {
-            _lastShiftSecs = -1;
-        }
-
+        // One read per tick: the formatter decides what the shown values say,
+        // and hands back only the strings that changed (no per-tick work on a
+        // parked car or a paused game).
         var s = _telemetry.TryRead();
+        Apply(_readouts.Paint(s, _telemetry.GameRunning));
         if (s is null)
         {
-            IsLive = false;
-            ShowWaitingReadouts();
             _hud?.Update(null, _garage.Current?.Odometer, _telemetry.GameRunning);
             return;
         }
 
-        IsLive = true;
         if (s.Track is { LengthMeters: > 0.0 } track && double.IsFinite(track.LengthMeters))
         {
             _taxi.SetTrackLength(track.LengthMeters);
         }
-        ShowLiveReadouts(s);
 
         // Odometer feed (PORTPLAN items 31/32, Unity DrivingManager's odometer
         // integration): every live tick banks the distance the current car
@@ -895,60 +839,18 @@ public sealed class MainViewModel
         }
     }
 
-    // Live readouts: one format per changed value, never one per tick. Each
-    // guard quantises to what the resx actually prints, so the cache can
-    // never hold a stale-looking value.
-    private void ShowLiveReadouts(TelemetrySample sample)
+    // Copies the paint the readout formatter returned: a null member means the
+    // shown value did not change, so nothing is formatted or notified twice.
+    private void Apply(ReadoutPaint paint)
     {
-        _lastWaitingKey = null;
-        if (sample.PacketId != _lastPacketId)
-        {
-            _lastPacketId = sample.PacketId;
-            StatusText = Strings.Format("EvoLive", sample.PacketId);
-        }
-        int speed = (int)Math.Round(sample.SpeedKmh);
-        if (speed != _lastSpeedKmh)
-        {
-            _lastSpeedKmh = speed;
-            SpeedText = Strings.Format("SpeedKmh", sample.SpeedKmh);
-        }
-        if (sample.Gear != _lastGear)
-        {
-            _lastGear = sample.Gear;
-            GearText = TelemetryConventions.GearDisplay(sample.Gear);
-        }
-        int rpm = sample.Rpm;
-        int throttle = (int)Math.Round(sample.Gas * 100.0f);
-        int brake = (int)Math.Round(sample.Brake * 100.0f);
-        if (rpm != _lastRpm || throttle != _lastThrottlePct || brake != _lastBrakePct)
-        {
-            _lastRpm = rpm;
-            _lastThrottlePct = throttle;
-            _lastBrakePct = brake;
-            DetailText = Strings.Format("EvoDetail", sample.Rpm, sample.Gas, sample.Brake);
-        }
-    }
-
-    // The "no physics yet" state paints once per entering it, then stays put
-    // (the string never changes while EVO is absent, so re-formatting it per
-    // tick would be pure waste).
-    private void ShowWaitingReadouts()
-    {
-        _lastPacketId = Unpainted;
-        _lastSpeedKmh = Unpainted;
-        _lastGear = int.MinValue;
-        _lastRpm = Unpainted;
-        _lastThrottlePct = Unpainted;
-        _lastBrakePct = Unpainted;
-        string key = _telemetry.GameRunning ? "EvoNoShm" : "WaitingForEvo";
-        if (key == _lastWaitingKey)
-        {
-            return;
-        }
-
-        _lastWaitingKey = key;
-        StatusText = Strings.Get(key);
-        SpeedText = Strings.Format("SpeedKmh", 0);
+        if (paint.Live is { } live) IsLive = live;
+        if (paint.Status is { } status) StatusText = status;
+        if (paint.Speed is { } speed) SpeedText = speed;
+        if (paint.Gear is { } gear) GearText = gear;
+        if (paint.Detail is { } detail) DetailText = detail;
+        if (paint.Job is { } job) JobLine = job;
+        if (paint.Fare is { } fare) FareText = fare;
+        if (paint.Shift is { } shift) ShiftText = shift;
     }
 
     // ---- visibility + voice --------------------------------------------------
@@ -1168,48 +1070,6 @@ public sealed class MainViewModel
         }
     }
 
-    // One shift ends at both timeout sites (the poll and the START tap);
-    // bank the record once and push the best to the world board. Pushing on
-    // every end (not only an improvement) also syncs a best restored from a
-    // local save whose earlier push never reached Firestore. The shift-ended
-    // page opens from here, so the timeout is never silent (Unity chains the
-    // same page before the map).
-    private void EndShift(TimeSpan idle)
-    {
-        ShiftSummary summary = _shift.Summary();
-        _log.LogInfo($"shift ended (timeout after {idle.TotalMinutes:0}m idle): " +
-            $"{summary.Jobs} jobs / {summary.Earnings:0.00}");
-        _lastShiftSecs = -1;
-        // The closed state goes to disk before the record push: a shift that
-        // timed out between sessions is already over and must never reopen.
-        SaveShift();
-        // The record is stamped when the idle window closed, not when the
-        // process noticed: an expiry discovered at the next launch can be
-        // days later, and the world board breaks earnings ties by this stamp.
-        DateTime endedAt = _shift.LastJobEnd + TimeSpan.FromMinutes(TaxiShift.TimeoutMinutes);
-        _shifts.Complete(summary.Jobs, summary.Earnings, endedAt.Ticks);
-        // Refresh before the page reads it, exactly like the receipt's XP
-        // block: LastResult then answers with the fresh rank or the restored
-        // snapshot, and the page follows the board's event if it is still
-        // loading.
-        if (_shiftBoard.Refresh(_shifts.BestEarnings, _shifts.BestFirstEarnedTicks)
-            is { } standings)
-        {
-            _shifts.RestoreStandings(standings.CurrentRank, standings.TotalCompetitors);
-        }
-        if (_shifts.BestEarnings > 0.0)
-        {
-            _online.PushShiftEarnings(
-                _shifts.BestEarnings, _shifts.BestFirstEarnedTicks, PlayerName());
-        }
-        // The lifetime counters ride the driver save, so bank even a shift
-        // that earned nothing.
-        SaveDriver(_rivals.LastResult);
-        RefreshJob();
-        ShowJobScreen(new ShiftEndedScreenViewModel(
-            summary, _shifts, _shiftBoard, _beat, _nav.ControlCommand));
-    }
-
     private string PlayerName() => _story.Profile?.DisplayName ?? string.Empty;
 
     private string HomeCountry => _story.Profile?.Country ?? _addressMap.Country;
@@ -1254,31 +1114,15 @@ public sealed class MainViewModel
                 _taxiRules.ArrivalRadiusMeters);
     }
 
+    // The job, fare and shift lines the formatter paints, plus the two job
+    // commands: their can-execute reads the flow's phase, so the same edge that
+    // repaints the line re-arms the buttons.
     private void RefreshJob()
     {
-        // The readouts read the flow's job; they take it as a parameter once
-        // they move into their own collaborator (S5).
-        TaxiJobState job = _taxi.Job;
-        JobLine = job.Phase switch
-        {
-            JobPhase.None => Strings.Get("NoJob"),
-            JobPhase.Proposed => Strings.Format("JobProposed", job.PickupName, job.DropoffName),
-            JobPhase.ToPickup => Strings.Format("JobToPickup", job.PickupName, job.DropoffName),
-            JobPhase.EnRoute => Strings.Format("JobEnRoute", job.PickupName, job.DropoffName, job.DistanceKm),
-            JobPhase.Complete => Strings.Format("JobComplete", job.PickupName, job.DropoffName, job.Tip),
-            _ => string.Empty,
-        };
-        FareText = Strings.Format("FareTotal", job.Total);
-        ShiftText = _shift.IsStarted
-            ? Strings.Format("ShiftSummaryActive",
-                _shift.JobsDone, _shift.Earned, FormatRemaining(_shift.Remaining(_clock.UtcNow)))
-            : Strings.Format("ShiftSummary", _shift.JobsDone, _shift.Earned);
+        Apply(TelemetryReadouts.PaintJob(_taxi.Job, _shift, _clock.UtcNow));
         ((RelayCommand)PickupCommand).RaiseCanExecuteChanged();
         ((RelayCommand)DropoffCommand).RaiseCanExecuteChanged();
     }
-
-    private static string FormatRemaining(TimeSpan remaining) =>
-        remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
 
     // Road-test weekday number, read off the calendar data (no Unity-day
     // literal here: the strip owns which weekday hosts the event).

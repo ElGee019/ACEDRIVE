@@ -110,12 +110,15 @@ public sealed class VoiceTests
             wallet, garage, game, InsuranceRules.Default, cars, saver, beat, logger);
         var poiDirectory = new PoiDirectory();
         var poiStore = new FakePoiDirectoryStore();
+        var dayCycle = new DayCycle(
+            game, shift, shifts, new OfflineShiftStandings(), playerTelemetry,
+            new FakeProfileStore(), rivals, saver, beat, 1, logger);
         var poiWorld = new PoiWorld(
             new PoiSpawner(
                 AddressMap.Default, PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             poiDirectory, poiStore, deliveryBoard, career, city, StoreCatalog.Default,
-            zone, jobs, onboarding, shops, logger);
+            zone, jobs, onboarding, shops, dayCycle, logger);
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers());
         var proposals = TaxiTestData.Proposer();
         var taxi = new TaxiJobFlow(
@@ -130,7 +133,7 @@ public sealed class VoiceTests
             shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
             wallet, garage, rivals, trunk, hunger, StoreCatalog.Default,
             poiDirectory, null, deliveryBoard, career, city,
-            taxi, delivery, poiWorld, 1, logger);
+            taxi, delivery, poiWorld, dayCycle, logger);
         var vm = new MainViewModel(telemetry ?? new FakeTelemetry(), clock, game, shift,
             new FakeStore(), logger, fares,
             onboarding, contentSource,
@@ -139,13 +142,12 @@ public sealed class VoiceTests
             mic, car,
             deliveryBoard, career,
             deliveryFares,
-            city, 1,
+            city,
             beat, wallet,
             streak, zone,
             friendships, cars,
             rivals,
-            playerTelemetry, shifts,
-            new OfflineShiftStandings(),
+            playerTelemetry,
             hunger,
             garage, InsuranceRules.Default,
             new Random(0),
@@ -153,7 +155,8 @@ public sealed class VoiceTests
             poiDirectory, poiStore,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
             trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
-            taxi, delivery, poiWorld, poiArrivals, navigation);
+            taxi, delivery, poiWorld, poiArrivals, navigation,
+            new TelemetryReadouts(), dayCycle);
         return (vm, clock, mic, car);
     }
 

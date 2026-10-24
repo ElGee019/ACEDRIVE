@@ -165,10 +165,18 @@ public sealed class MainViewModelTests
         var spawnerInstance = poiSpawner ?? new PoiSpawner(
             map, PoiCatalog.Default,
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0);
+        // The session calendar and the readout formatter: the week the pages
+        // stamp, the shift timeout that opens its page and the painted strings.
+        // One board instance for the cycle and the assertions, like the stores.
+        IShiftStandings shiftBoard = shiftStandings ?? new FakeShiftStandings();
+        var dayCycle = new DayCycle(
+            game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
+            profiles, rivalsInstance, saver, beat, startWeek, logger);
+        var readouts = new TelemetryReadouts();
         var poiWorld = new PoiWorld(
             spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
-            onboardingStore, shops, logger);
+            onboardingStore, shops, dayCycle, logger);
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(handlers));
         var proposalsInstance = TaxiTestData.Proposer(map: map, seed: 0);
         var taxi = new TaxiJobFlow(
@@ -187,7 +195,7 @@ public sealed class MainViewModelTests
             shell, beat, game, clock, shiftInstance, TodoTable.Default, roadsInstance,
             saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
             hungerInstance, storeCatalogInstance, directory, hud, deliveryBoard,
-            deliveryCareer, cityInstance, taxi, delivery, poiWorld, startWeek, logger);
+            deliveryCareer, cityInstance, taxi, delivery, poiWorld, dayCycle, logger);
         var vm = new MainViewModel(tel, clock, game, shiftInstance, store,
             logger, faresInstance,
             onboardingStore, contentSource,
@@ -195,7 +203,7 @@ public sealed class MainViewModelTests
             voice ?? new FakeVoiceListener(available: false),
             brands, deliveryBoard, deliveryCareer,
             deliveryFaresInstance,
-            cityInstance, startWeek,
+            cityInstance,
             beat, walletInstance,
             streakInstance,
             zoneInstance,
@@ -203,8 +211,6 @@ public sealed class MainViewModelTests
             rivalsInstance,
 
             telemetryInstance,
-            shiftsInstance,
-            shiftStandings ?? new FakeShiftStandings(),
             hungerInstance,
             garageInstance,
             InsuranceRules.Default,
@@ -215,7 +221,8 @@ public sealed class MainViewModelTests
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
             trunkInstance, taxiRulesInstance, saver, fleet, settlement, shell,
-            meter, shops, taxi, delivery, poiWorld, poiArrivals, navigation, hud,
+            meter, shops, taxi, delivery, poiWorld, poiArrivals, navigation,
+            readouts, dayCycle, hud,
             saveResets, restarter);
         if (carKsId is not null)
         {

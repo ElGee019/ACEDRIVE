@@ -19,9 +19,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// Pages take commands and data, never policy: the entries whose domain lives
 /// elsewhere (the settings page with RESET GAME, the haul settle) and the
 /// outcomes the coordinator banks (a timed-out shift, the readouts) travel
-/// through <see cref="INavigationHost"/>. The display week mirrors the value
-/// the coordinator owns (the day flip rolls it) until <c>DayCycle</c> takes it
-/// over (S5).
+/// through <see cref="INavigationHost"/>. The display week is read from
+/// <see cref="DayCycle"/>, which owns the day flip that rolls it (S5).
 /// </summary>
 public sealed class Navigation
 {
@@ -53,14 +52,14 @@ public sealed class Navigation
     private readonly DeliveryFlow _delivery;
     private readonly PoiWorld _world;
 
+    // The session's calendar: the display week every page stamps is read from
+    // it, and a stale tap closes through it, so no mirror of the week lives
+    // here.
+    private readonly DayCycle _day;
+
     // The pages' banks: the garage file, the road-test pick, the shift start and
     // the trunk's driver save all go through the one saver the root built.
     private readonly GameStateSaver _saver;
-
-    // The display week mirrors the coordinator's (it owns the day flip and so
-    // the roll) so a page built after a roll still stamps the right week. The
-    // mirror moves with its owner once DayCycle exists (S5).
-    private int _week;
 
     // Built once and reused: the control page flips its shift button, the menu
     // keeps its clock ticking behind another page, and the calendar keeps its
@@ -88,7 +87,7 @@ public sealed class Navigation
         PoiDirectory directory, ITelemetryHud? hud,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld world,
-        int startWeek, ILog log)
+        DayCycle day, ILog log)
     {
         _shell = shell;
         _beat = beat;
@@ -112,7 +111,7 @@ public sealed class Navigation
         _taxi = taxi;
         _delivery = delivery;
         _world = world;
-        _week = startWeek;
+        _day = day;
         _log = log;
 
         ControlCommand = new RelayCommand(ShowControl);
@@ -193,7 +192,7 @@ public sealed class Navigation
             // progress, so the calendar never rewinds past it when the process
             // dies before the next throttled write. The shift itself is banked
             // too: an empty shift must still idle out across a restart.
-            _saver.SaveClock(_week);
+            _saver.SaveClock(_day.DisplayWeek);
             _saver.SaveShift();
         }
 
@@ -249,14 +248,13 @@ public sealed class Navigation
     }
 
     /// <summary>
-    /// The coordinator's display week (it owns the day flip, and with it the
-    /// roll): the mirror moves, the calendar strip and the menu header repaint
-    /// now instead of on the next tick, and the road-test pick is named in the
-    /// log. Reported rather than read, so the week has one owner.
+    /// The day cycle's week roll: the calendar strip and the menu header
+    /// repaint now instead of on the next tick, and the road-test pick is named
+    /// in the log. The week itself stays with its owner, so only the cached
+    /// pages take it as a parameter.
     /// </summary>
     public void DisplayWeekChanged(int week)
     {
-        _week = week;
         if (_calendar is not null)
         {
             _calendar.DisplayWeek = week;
@@ -303,7 +301,7 @@ public sealed class Navigation
         _openDay ??= new ParameterizedCommand<int>(OnDay);
         _calendar ??= new CalendarScreenViewModel(
             _beat, _game, _clock, _roads,
-            CalendarStamp.Default with { Week = _week },
+            CalendarStamp.Default with { Week = _day.DisplayWeek },
             _openDay, MenuCommand);
         return _calendar;
     }
@@ -343,7 +341,7 @@ public sealed class Navigation
             _beat,
             _game,
             _clock,
-            _week);
+            _day.DisplayWeek);
 
     // The home page (Unity YouScreen): the player's own doors, starting with
     // the garage. A fresh page per visit like the wallet, so nothing stale

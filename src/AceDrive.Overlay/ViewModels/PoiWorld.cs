@@ -15,7 +15,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// story flow (the introduction's errand doors) and the addresses page, so it
 /// arrives as a store rather than being owned here; the shell only reports the
 /// board refresh and the dealer's page outcome through
-/// <see cref="IPoiWorldHost"/>.
+/// <see cref="IPoiWorldHost"/>. The calendar week the dealer's floor is drawn
+/// from is the day cycle's value, read at the door.
 /// </summary>
 public sealed class PoiWorld
 {
@@ -30,6 +31,7 @@ public sealed class PoiWorld
     private readonly JobLedger _jobs;
     private readonly IOnboardingStore _onboarding;
     private readonly ShopInteriors _shops;
+    private readonly DayCycle _day;
     private readonly ILog _log;
 
     // WHY late: the host is the coordinator, which is built after this world.
@@ -41,7 +43,7 @@ public sealed class PoiWorld
         PoiSpawner growth, PoiDirectory directory, IPoiDirectoryStore store,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         StoreCatalog stores, OperatingZone zone, JobLedger jobs,
-        IOnboardingStore onboarding, ShopInteriors shops, ILog log)
+        IOnboardingStore onboarding, ShopInteriors shops, DayCycle day, ILog log)
     {
         _growth = growth;
         _directory = directory;
@@ -54,6 +56,7 @@ public sealed class PoiWorld
         _jobs = jobs;
         _onboarding = onboarding;
         _shops = shops;
+        _day = day;
         _log = log;
     }
 
@@ -159,7 +162,7 @@ public sealed class PoiWorld
             PoiTypes.Bank, (_, back, changed) => _shops.Bank(back, changed)));
         handlers.Add(new DelegatePoiHandler(
             PoiTypes.Dealer, (_, back, _) =>
-                _shops.Dealer(back, _host.DisplayWeek, _host.CarBought)));
+                _shops.Dealer(back, _day.DisplayWeek, _host.CarBought)));
         handlers.Add(new DelegatePoiHandler(
             PoiTypes.CarWash, (_, back, changed) => _shops.CarWash(back, changed)));
         handlers.Add(new DelegatePoiHandler(

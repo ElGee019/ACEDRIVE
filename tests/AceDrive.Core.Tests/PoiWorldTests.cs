@@ -40,7 +40,8 @@ public sealed class PoiWorldTests
         DeliveryCareer? career = null,
         PoiDirectory? directory = null,
         DriverState? saved = null,
-        StoreCatalog? stores = null)
+        StoreCatalog? stores = null,
+        int week = 1)
     {
         var clock = new FakeClock();
         var wallet = new DriverWallet();
@@ -48,9 +49,10 @@ public sealed class PoiWorldTests
         var garage = new Garage(cars);
         var beat = new VoiceBeat(clock);
         var logger = new NullLogger();
+        var saver = TestSaveState.Saver(clock, wallet, garage);
         var shops = new ShopInteriors(
             wallet, garage, new GameClock(clock, clock.UtcNow), InsuranceRules.Default,
-            cars, TestSaveState.Saver(clock, wallet, garage), beat, logger);
+            cars, saver, beat, logger);
         var onboarding = new FakeOnboardingStore();
         if (progress is not null)
         {
@@ -63,12 +65,16 @@ public sealed class PoiWorldTests
         var city = new CityEconomy(BoardCatalog.Stores, CityRules.Default);
         PoiDirectory doors = directory ?? new PoiDirectory();
         var store = new FakePoiDirectoryStore();
+        var day = new DayCycle(
+            new GameClock(clock, clock.UtcNow), new TaxiShift(), new ShiftRecord(null),
+            new FakeShiftStandings(), new FakePlayerTelemetry(),
+            new FakeProfileStore(), new FakeRivals(), saver, beat, week, logger);
         var world = new PoiWorld(
             new PoiSpawner(
                 AddressMap.Default, PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             doors, store, board, deliveryCareer, city, stores ?? StoreCatalog.Default,
-            zone, jobs, onboarding, shops, logger);
+            zone, jobs, onboarding, shops, day, logger);
         var host = new FakePoiWorldHost();
         world.Attach(host);
         return new Fixture(world, host, doors, store, board, city, wallet, garage, cars);
@@ -202,13 +208,12 @@ public sealed class PoiWorldTests
     }
 
     [Fact]
-    public void DealerHandler_UsesTheHostsWeekAndReportsThePurchase()
+    public void DealerHandler_UsesTheDayCyclesWeekAndReportsThePurchase()
     {
-        // The floor is drawn from the calendar week and the bought car is the
-        // shell's follow-up page: both arrive through IPoiWorldHost, so the
-        // dealer handler can be built before the coordinator exists.
-        var fixture = Build();
-        fixture.Host.Week = 3;
+        // The floor is drawn from the calendar week the day cycle owns and the
+        // bought car is the shell's follow-up page, so the dealer handler can be
+        // built before the coordinator exists.
+        var fixture = Build(week: 3);
         var router = new PoiArrivalRouter(fixture.World.Handlers());
         var poi = new PointOfInterest(
             "dealer_0", "Test Dealer", new AddressLocation("Street 1", 2, HouseSide.Left),
@@ -218,7 +223,7 @@ public sealed class PoiWorldTests
             router.Open(poi, new RelayCommand(() => { }), () => { }));
 
         IReadOnlyList<CarSpec> floor = DealerStock.Build(
-            fixture.Cars, fixture.Garage.Keys, fixture.Host.Week);
+            fixture.Cars, fixture.Garage.Keys, 3);
         Assert.Equal(floor.Count, page.Rows.Count);
         Assert.Equal(floor[0].Key, page.Rows[0].Key);
     }

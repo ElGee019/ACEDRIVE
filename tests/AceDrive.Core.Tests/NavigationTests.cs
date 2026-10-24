@@ -52,6 +52,10 @@ public sealed class NavigationTests
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var directory = new PoiDirectory();
         IReadOnlyList<CarSpec> poolCars = pool;
+        var day = new DayCycle(
+            game, shift, new ShiftRecord(null), new FakeShiftStandings(),
+            new FakePlayerTelemetry(), new FakeProfileStore(), rivals, saver, beat,
+            startWeek, log);
         var world = new PoiWorld(
             new PoiSpawner(
                 AddressMap.Default, PoiCatalog.Default,
@@ -62,7 +66,7 @@ public sealed class NavigationTests
             new ShopInteriors(
                 wallet, garageInstance, game, InsuranceRules.Default, poolCars,
                 saver, beat, log),
-            log);
+            day, log);
         var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);
         var breakdowns = new TripBreakdowns(
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
@@ -80,7 +84,7 @@ public sealed class NavigationTests
         var nav = new Navigation(
             shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
             wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
-            directory, null, board, career, city, taxi, delivery, world, startWeek, log);
+            directory, null, board, career, city, taxi, delivery, world, day, log);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The proposal page asks the job's host for the player's door on every
@@ -160,8 +164,9 @@ public sealed class NavigationTests
     [Fact]
     public void Calendar_BuiltAfterARoll_StampsTheCurrentWeek()
     {
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create(startWeek: 1);
-        nav.DisplayWeekChanged(4);
+        // S5: the week lives in the day cycle, so a page built after a roll
+        // reads it from the owner instead of a mirror the navigator kept.
+        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create(startWeek: 4);
 
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
