@@ -12,7 +12,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// place can be entered. The page writes nothing itself — the HUD owns the
 /// destination and the host owns navigation.
 /// </summary>
-public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly PoiDirectory _directory;
     private readonly ITelemetryHud? _hud;

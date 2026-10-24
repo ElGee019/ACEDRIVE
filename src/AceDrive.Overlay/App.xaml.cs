@@ -449,7 +449,7 @@ public partial class App : Application, IDisposable
             hud,
             saveResets, restarter);
 
-        MainWindow = new MainWindow(vm, _log);
+        MainWindow = new MainWindow(vm, _log, story.Done);
         // The 200 px companion: own placement file, width follows the main
         // panel, and it outlives the main window's hide/show because it is a
         // separate top-level window. Its VM keeps it hidden through the
@@ -483,8 +483,9 @@ public partial class App : Application, IDisposable
         // reveals it (a save past the birthday reveals it at startup).
         // A save that resumes mid-tour stays hidden: the tour is still the
         // introduction and is driven on the HUD, so opening the menu here
-        // would put the panel up before the intro is finished.
-        if (!vm.IntroTourInProgress)
+        // would put the panel up before the intro is finished. The gate is the
+        // story flow's live value, like the window's placement gate.
+        if (!story.IntroTourInProgress)
         {
             vm.Show();
         }

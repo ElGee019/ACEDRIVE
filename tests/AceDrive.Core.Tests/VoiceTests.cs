@@ -37,8 +37,7 @@ public sealed class VoiceTests
             ["him"] = "mazda",
         });
 
-    private static (MainViewModel Vm, FakeClock Clock, FakeVoiceListener Voice, FakeCarBrandSource Car)
-        Create(
+    private static VoiceSession Create(
             bool voice = true, ILog? log = null, OnboardingState? progress = null,
             FakeTelemetry? telemetry = null)
     {
@@ -46,8 +45,9 @@ public sealed class VoiceTests
         var mic = new FakeVoiceListener(voice);
         var car = new FakeCarBrandSource();
         // The voice suite's session: an empty career (no cars, no town) with
-        // its own mic and car watcher, driven through the shared builder.
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        // its own mic and car watcher, driven through the shared builder. The
+        // walk itself is the story flow's, so the suite keeps the session.
+        TestSessionResult session = MainViewModelTests.Create(
             clock: clock, voice: mic, carBrands: car, physics: telemetry,
             log: log, progress: progress, content: Content,
             cars: [], garage: new Garage([]),
@@ -56,7 +56,7 @@ public sealed class VoiceTests
             shiftStandings: new OfflineShiftStandings(),
             rarity: new OfflineCarRarity(),
             telemetry: new OfflinePlayerTelemetry());
-        return (vm, clock, mic, car);
+        return new VoiceSession(session, clock, mic, car);
     }
 
     // A player who finished the whole introduction: the walk and the guided
@@ -71,8 +71,7 @@ public sealed class VoiceTests
         CommunityCentreDone = true,
     };
 
-    private static (MainViewModel Vm, FakeClock Clock, FakeVoiceListener Voice, FakeCarBrandSource Car)
-        CreateIntroduced(bool voice = true, ILog? log = null) =>
+    private static VoiceSession CreateIntroduced(bool voice = true, ILog? log = null) =>
         Create(voice, log, Introduced);
 
     // A post-introduction control page: the call opens the menu, Jobs leads in.
@@ -88,10 +87,12 @@ public sealed class VoiceTests
     // The last tap lands on the menu and leaves the panel up, so its Jobs tile
     // takes the test onto the control page whose voice buttons these tests
     // exercise.
-    private static MainControlScreenViewModel ToControlPage(MainViewModel vm)
+    private static MainControlScreenViewModel ToControlPage(VoiceSession session)
     {
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        OnboardingFlow story = session.Story;
+        MainViewModel vm = session.Vm;
+        story.ChooseBrand("Honda");
+        story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -360,9 +361,10 @@ public sealed class VoiceTests
         // app as "open your career"; the data table must still press the
         // OPEN NEW CAREER button on the delivery job page. Both taps wait
         // out the half-second acknowledgment beat before the page flips.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ToControlPage(session);
         mic.Fire("delivery job");
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen); // glow not yet drained
         DrainBeat(vm, clock);
@@ -380,9 +382,10 @@ public sealed class VoiceTests
         // reached the app as "start taxes shift" and went unanswered ("voice
         // heard" with no "voice button"). The table's swap must resolve the
         // mishearing and still tap the taxi entry.
-        var (vm, _, mic, _) = Create();
+        var session = Create();
+        var mic = session.Voice;
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        var control = ToControlPage(session);
         mic.Fire("start taxes shift");
         Assert.True(control.TaxiFlash);
     }
@@ -401,9 +404,10 @@ public sealed class VoiceTests
     [InlineData("start decks shift")]                  // 2026-10-18 20:01:06
     public void Voice_LoggedStartTaxiGarbles_TapTheShift(string transcript)
     {
-        var (vm, _, mic, _) = Create();
+        var session = Create();
+        var mic = session.Voice;
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        var control = ToControlPage(session);
 
         mic.Fire(transcript);
 
@@ -418,9 +422,10 @@ public sealed class VoiceTests
         // went unanswered ("voice heard" with no "voice button"); only the
         // one clean "accept" pressed the button. The table's swap must
         // resolve the mishearing and tap ACCEPT on the first retry.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ToControlPage(session);
         mic.Fire("continue");
         var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
 
@@ -580,10 +585,11 @@ public sealed class VoiceTests
     [Fact]
     public void OpenDialogue_SuspendsIdleHide()
     {
-        var (vm, clock, _, _) = Create();
+        var session = Create();
+        var (vm, clock, _, _) = session;
         vm.Show();
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -597,10 +603,11 @@ public sealed class VoiceTests
     {
         // The hand-over hides the panel and leaves the tour on the HUD; no
         // later poll may pop it back open.
-        var (vm, clock, _, _) = Create();
+        var session = Create();
+        var (vm, clock, _, _) = session;
         vm.Show();
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -629,10 +636,11 @@ public sealed class VoiceTests
     [Fact]
     public void VoiceButton_FiresOncePerUtterance()
     {
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -672,10 +680,11 @@ public sealed class VoiceTests
     [Fact]
     public void WakeWord_IgnoresFavoriteBrand()
     {
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda"); // default brand (no watcher prime in tests)
         Assert.True(vm.IsShown);
-        vm.ChooseBrand("Honda"); // saved favorite must not drive the wake word
+        session.Story.ChooseBrand("Honda"); // saved favorite must not drive the wake word
         vm.ToggleShowCommand.Execute(null); // hide
         clock.Advance(TimeSpan.FromSeconds(4)); // cooldown elapsed
         mic.Fire("hey honda");
@@ -717,11 +726,12 @@ public sealed class VoiceTests
         // the next wake opens the menu page. The tour is still the
         // introduction, so that page waits there instead of counting itself
         // away; the wake after the player hides it returns on the same page.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
         Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -750,9 +760,10 @@ public sealed class VoiceTests
         // The menu's Jobs tile answers the mic like a click, after the shared
         // teal acknowledgment: the tile glows for the beat, then the control
         // page with every job door opens.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        var control = ToControlPage(session);
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back: the menu page
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
@@ -771,9 +782,10 @@ public sealed class VoiceTests
         // Settings reuses the first-run preferences page, but its action is
         // BACK and both the button and the mic return to the menu instead of
         // advancing the walk.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ToControlPage(session);
         vm.ToggleShowCommand.Execute(null); // hide
         vm.ToggleShowCommand.Execute(null); // call it back: the menu page
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
@@ -795,9 +807,10 @@ public sealed class VoiceTests
         // The half-second acknowledgment glows on "START TAXI SHIFT"; the
         // button earns the CONTINUE name only when the glow is gone (the
         // shift itself starts immediately, behind the held-back label).
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        var control = ToControlPage(session);
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
 
         mic.Fire("start taxi shift");
@@ -814,9 +827,10 @@ public sealed class VoiceTests
     public void Voice_ContinueTaxiShift_OpensShiftWhileStartShown()
     {
         // Either shift name answers, whichever one the button displays.
-        var (vm, _, mic, _) = Create();
+        var session = Create();
+        var (vm, _, mic, _) = session;
         mic.Fire("hey mazda");
-        var control = ToControlPage(vm);
+        var control = ToControlPage(session);
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
 
         mic.Fire("continue taxi shift");
@@ -858,9 +872,10 @@ public sealed class VoiceTests
     [Fact]
     public void Voice_ContinueOneWord_TapsTaxiButton()
     {
-        var (vm, _, mic, _) = Create();
+        var session = Create();
+        var (vm, _, mic, _) = session;
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ToControlPage(session);
 
         mic.Fire("continue"); // the shortcut, not the full label
         Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
@@ -874,10 +889,11 @@ public sealed class VoiceTests
         // the player ever asking. The last tap now lands on the menu, whose
         // words do not include "continue", so the utterance's FINAL tail
         // cannot touch the control page's bare "continue" taxi keyword.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -914,10 +930,11 @@ public sealed class VoiceTests
         // word - after the page had changed. The hand-over now lands on the
         // menu, so that tail cannot reach the control page's bare "continue"
         // taxi keyword.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -953,9 +970,10 @@ public sealed class VoiceTests
         // proposal page it answers to nothing, and the same text would be
         // muted anyway. One "voice button:" log, not two.
         var log = new TestLog();
-        var (vm, _, mic, _) = Create(log: log);
+        var session = Create(log: log);
+        var mic = session.Voice;
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ToControlPage(session);
 
         mic.Fire("continue"); // partial: shortcut fires
         mic.Fire("continue taxi shift", isFinal: true); // final: same utterance
@@ -991,9 +1009,10 @@ public sealed class VoiceTests
         // words answer too, anywhere in the sentence. Firing it lands on
         // the hub page (the real OPEN NEW CAREER screen, PORTPLAN 18) once
         // the half-second acknowledgment beat drains.
-        var (vm, clock, mic, _) = Create();
+        var session = Create();
+        var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        ToControlPage(vm);
+        ToControlPage(session);
         mic.Fire("delivery job");
         DrainBeat(vm, clock);
         Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);

@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// teal first and the page waits out the shared beat. EAT has no voice entry —
 /// several rows answer the same label, so there is no unambiguous target.
 /// </summary>
-public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly Trunk _trunk;
     private readonly Hunger _hunger;

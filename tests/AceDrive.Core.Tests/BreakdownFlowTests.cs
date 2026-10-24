@@ -94,11 +94,12 @@ public sealed class BreakdownFlowTests
         MaintenanceRules rules = CertainBreakdown;
         Garage garage = WornGarage(rules);
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        var session = MainViewModelTests.Create(
             speedKmh: 0f, catalog: catalog, garage: garage, wallet: wallet,
             breakdowns: new BreakdownStrategy(rules, seed: 0), progress: Done);
+        var (vm, _, _, _) = session;
 
-        vm.FinishDialogue();
+        session.Story.FinishDialogue();
         // The intro lands on the menu; Jobs opens the career page.
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         menu.JobsCommand.Execute(null);

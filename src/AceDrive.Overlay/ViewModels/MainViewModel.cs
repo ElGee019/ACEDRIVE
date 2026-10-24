@@ -194,8 +194,8 @@ public sealed class MainViewModel
         _day.Attach(this);
         // The page graph is built by the root; the navigator only reaches back
         // for the entries whose domain is not a page (shift close, readouts,
-        // settings, haul), so the attach closes before any page command can
-        // fire — the same late edge the three flows use.
+        // settings), so the attach closes before any page command can fire —
+        // the same late edge the three flows use.
         _nav = navigation;
         _nav.Attach(this);
         // All three collaborators are built before the shell they report to;
@@ -205,13 +205,8 @@ public sealed class MainViewModel
         _delivery.Attach(this);
         _poiWorld.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
-        // them: forward its notifications, and re-derive the page-shape flags.
+        // them: forward its notifications so the bindings stay live.
         _shell.PropertyChanged += (_, e) => OnPropertyChanged(e.PropertyName);
-        _shell.ScreenChanged += (_, _) =>
-        {
-            OnPropertyChanged(nameof(IsOnboarding));
-            OnPropertyChanged(nameof(JobsVisible));
-        };
         // The story flow owns the persisted walk + profile + errand POI; the
         // root built it (and the voice router, which reads the same panel) once
         // the navigator and the calendar existed.
@@ -257,11 +252,11 @@ public sealed class MainViewModel
         // destination after the relaunch, and the companion is revealed
         // because the birthday hand-over that used to do it no longer replays.
         _story.ResumeTour();
-        if (OnboardingDone)
+        if (_story.Done)
         {
             _hud?.Reveal();
         }
-        _nav.ShowScreen(OnboardingDone ? _nav.MenuPage() : _story.StartPage());
+        _nav.ShowScreen(_story.Done ? _nav.MenuPage() : _story.StartPage());
 
         // The VM's default: hidden until called when a mic is present, visible
         // otherwise so the shell stays usable (and testable). A save that is
@@ -269,7 +264,7 @@ public sealed class MainViewModel
         // the tour is driven on the HUD, and the panel only opens once it is
         // finished. The app root calls Show() at launch for the other starts,
         // so a real start opens on the intro either way.
-        _shell.SetShown(!voice.IsAvailable && !IntroTourInProgress);
+        _shell.SetShown(!voice.IsAvailable && !_story.IntroTourInProgress);
     }
 
     // ---- bindable state -------------------------------------------------
@@ -309,36 +304,14 @@ public sealed class MainViewModel
     /// <summary>The control page's START/CONTINUE TAXI entry (the navigator builds it).</summary>
     public ICommand TaxiShiftCommand => _nav.TaxiShiftCommand;
 
-    // ---- onboarding navigation -----------------------------------------------
+    // ---- panel state the view binds ------------------------------------------
 
-    /// <summary>Active screen: an onboarding page, a jobs page or null.</summary>
+    /// <summary>
+    /// Active screen: an onboarding page, a jobs page or null. The introduction
+    /// itself (the walk, the flags the pages gate on) belongs to the story flow,
+    /// so its pages and its own verbs stay there; the view only reads this.
+    /// </summary>
     public object? CurrentScreen => _shell.CurrentScreen;
-
-    public bool IsOnboarding => CurrentScreen is not null && CurrentScreen is not IJobsScreen;
-    public bool JobsVisible => CurrentScreen is null;
-
-    /// <summary>
-    /// True once the birthday dialogue is done on disk. The view needs this
-    /// instead of <see cref="IsOnboarding"/> to decide whether a saved window
-    /// size may be restored: a finished introduction opens on the menu, while
-    /// an unfinished one resumes a walk page.
-    /// </summary>
-    public bool OnboardingDone => _story.Done;
-
-    /// <summary>
-    /// True while the post-birthday guided tour is still running. The shell
-    /// starts hidden and does not pop the panel open until the tour ends;
-    /// the companion HUD carries the driving instructions instead.
-    /// </summary>
-    public bool IntroTourInProgress => _story.IntroTourInProgress;
-
-    /// <summary>
-    /// True for the whole introduction: the walk pages, the birthday, the
-    /// guided tour and its closing "how to call the panel" page. The shell
-    /// suppresses the idle countdown for all of it, because hiding a walk page
-    /// would skip the introduction instead of parking the overlay.
-    /// </summary>
-    public bool IntroInProgress => _story.IntroInProgress;
 
     /// <summary>
     /// True once RESET GAME wiped the save files: the window's close path must
@@ -346,14 +319,6 @@ public sealed class MainViewModel
     /// starts (or if starting it failed and the player closes this one).
     /// </summary>
     public bool SkipShutdownSave { get; private set; }
-
-    public void ChooseBrand(string brand) => _story.ChooseBrand(brand);
-
-    public void ChooseCar(string carId) => _story.ChooseCar(carId);
-
-    public void ShowDialogue() => _story.ShowDialogue();
-
-    public void FinishDialogue() => _story.FinishDialogue();
 
     // The host slice the settle sees: it prices and banks the job, the shell
     // owns the page, the saves and the career growth the receipt triggers.
@@ -504,7 +469,7 @@ public sealed class MainViewModel
         // The introduction owns the panel until its closing page is dismissed:
         // hiding a walk page would skip the introduction (a later call opens
         // the menu, not the page), so its 15 s countdown never starts.
-        bool introOpen = IntroInProgress;
+        bool introOpen = _story.IntroInProgress;
         if (IsShown && !introOpen && !_resizing && !dialogueOpen && !poiOpen && !keepOpen
             && (now - _shell.LastActivity).TotalSeconds >= IdleHideSec)
         {
@@ -539,7 +504,7 @@ public sealed class MainViewModel
         // clock, whether or not a page is open and whether or not EVO is
         // attached. The tick reports the town's movement: only the cached
         // board page holds cells, so that is the one repaint it owes.
-        if (_world.Tick(OnboardingDone))
+        if (_world.Tick(_story.Done))
         {
             _delivery.RefreshBoard();
         }
@@ -575,7 +540,7 @@ public sealed class MainViewModel
         // covered into the wear deck's input, and the engine inspections ride
         // the drive. The garage file is banked on the same wall-time throttle
         // as the clock, so a kill costs at most the window.
-        _fleet.IntegrateOdometer(s, dt, OnboardingDone);
+        _fleet.IntegrateOdometer(s, dt, _story.Done);
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
         if ((now - _saver.LastGarageSave).TotalSeconds >= OdometerSaveSec)

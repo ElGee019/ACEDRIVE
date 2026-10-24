@@ -24,7 +24,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// seconds, and the poll puts the battery back; a reading past the danger
 /// band paints red.
 /// </summary>
-public sealed class MenuScreenViewModel : ViewModelBase, IJobsScreen, IVoiceScreen
+public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
 {
     // The words are baked into the tile artwork, so the spoken keys are the
     // drawn English labels, not resx copy: a translated page would need new

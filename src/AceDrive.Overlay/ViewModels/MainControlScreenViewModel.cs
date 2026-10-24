@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// The shared <see cref="VoiceBeat"/> times the teal acknowledgment glow on
 /// the injected clock, never tick counts.
 /// </summary>
-public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
 {
     // Spoken shortcuts that re-tap the taxi button. Players say one or two
     // words, not the full three-word label: logged 2026-10-14 sessions show

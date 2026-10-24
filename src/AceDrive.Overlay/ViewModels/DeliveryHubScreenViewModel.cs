@@ -19,7 +19,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// selected.
 /// Voice parity with the board: every button answers to its text.
 /// </summary>
-public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen
 {
     // Unity's hand-built screen pairs careers per tier; the odd one out
     // stays a COMING SOON placeholder. AceDrive stacks the lists

@@ -180,10 +180,11 @@ public sealed class ConditionFlowTests
         var garage = new Garage(TestRoadCars.Pool);
         OwnedCar car = garage.Add(TestRoadCars.Pool[0], week: 1);
         var hud = new FakeTelemetryHud();
-        var (vm, clock, tel, _) = MainViewModelTests.Create(
+        var session = MainViewModelTests.Create(
             catalog: catalog, hubs: hubs, speedKmh: 0f, garage: garage,
             garageStore: new FakeGarageStore(), hud: hud);
-        vm.FinishDialogue();
+        var (vm, clock, tel, _) = session;
+        session.Story.FinishDialogue();
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);

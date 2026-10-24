@@ -15,7 +15,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// opens a fresh shift, like Unity's doorway back to the map.
 /// </summary>
 public sealed class ShiftEndedScreenViewModel :
-    ViewModelBase, IVoiceScreen, IJobsScreen, IKeepPanelOpen
+    ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {
     private readonly VoiceBeat _beat;
     private readonly ICommand _continueCommand;

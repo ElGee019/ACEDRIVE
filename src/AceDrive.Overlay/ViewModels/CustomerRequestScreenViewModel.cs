@@ -16,7 +16,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// private dispatcher timer (AGENTS.md: one loop).
 /// </summary>
 public sealed class CustomerRequestScreenViewModel :
-    ViewModelBase, IVoiceScreen, IJobsScreen, IKeepPanelOpen
+    ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {
     private readonly CustomerRequest _request;
     private readonly VoiceBeat _beat;

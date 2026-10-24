@@ -24,7 +24,7 @@ route intent into them. Only then can `App.OnStartup` build everything.
 ## 2. Where the split stands
 
 Extracted, each verified (build 0 warnings, 1723 tests, format clean); S1–S4 are
-pushed, S5–S10 are green locally:
+pushed, S5–S11 are green locally:
 
 | Slice | Result |
 |---|---|
@@ -44,14 +44,14 @@ pushed, S5–S10 are green locally:
 | S8 | The boot catch-up → `DriverCatchUp` (grandma's-car seed, login streak recount + grant); `DailyStreak` and the streak's seeded `Random` leave the coordinator, −31 lines |
 | S9 | The settle-hook zone expansion → `ZoneGrowth` (onboarding gate, interim street id, log line, world push); `OperatingZone` and `IPlayerTelemetry` leave the coordinator, which keeps the one call, −27 lines and two constructor parameters |
 | S10 | The car haul → `CarHaulFlow` (the tap's settle, the receipt it builds and its calendar checkpoint); the coordinator loses the job, its placeholder constants and the car pool, −58 lines and one constructor parameter |
+| S11 | The onboarding forwarding leaves the coordinator: `ChooseBrand`/`ChooseCar`/`ShowDialogue`/`FinishDialogue` and the five page/tour flags are the story flow's, read where they live; `IJobsScreen` and `OverlayShell.ScreenChanged` were only there for them, −35 lines |
 
-`MainViewModel`: 2658 → 799 lines. `Poll` is 40 code lines (150 with its
+`MainViewModel`: 2658 → 764 lines. `Poll` is 40 code lines (150 with its
 rationale): what is left is the idle-hide policy, the wall-clock bank and the
 telemetry feed — the world rules answer one question per tick. The coordinator
 now takes 32 named parameters (29 required, 3 optional), all of them finished
-services: the root does every `new`. What still keeps the list long is not the
-ticks but the one leftover §11 names (the onboarding forwarding), not a
-constructor rewrite.
+services: the root does every `new`, and nothing on the list is a leftover
+waiting for its own slice.
 
 ## 3. Target shape
 
@@ -108,7 +108,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `FleetService` ✅, `GameStateSaver` ✅ | their own | — | none |
 | `PanelPresenter` ✅ | — (`_introShown` became `OverlayShell.HasBeenShown`) | `Show`, `Hide`, `Present`, `PresentJob`, `ShowMenu`, `RecordActivity`, `IsShown`, `CurrentScreen` | none: it *is* the reporting host for the panel |
 | `StoryHost` ✅ | — | the `IStoryHost` members | `IStoryHost` ← `Navigation` + `PanelPresenter` + `GameStateSaver` |
-| `OnboardingFlow` ✅ | walk progress, profile, errand POI | pages + `Done`/`Intro*` | `IStoryHost` |
+| `OnboardingFlow` ✅ | walk progress, profile, errand POI | pages + `Done`/`Intro*` | `IStoryHost` (read where it lives: the coordinator, the window and the root take the flow's own values) |
 | `VoiceRouter` ✅ | mute state | `Handle`, `ResetMute` | none: `PanelPresenter` + `ICarBrandSource` + `IContentSource` (the `IVoiceHost` interface is deleted) |
 
 ## 4. What the coordinator keeps
@@ -131,8 +131,9 @@ Constructor: 32 parameters (29 required, 3 optional), all of them finished
 services — the root does every `new`. No `MainViewModelDependencies` god record:
 each collaborator takes its own dependencies, which is what makes it testable.
 The game-clock world left in S7, the boot catch-up in S8, the zone expansion in
-S9 and the haul in S10, so the list now grows only with the one leftover §11
-names: a follow-up slice, not a constructor rewrite.
+S9 and the haul in S10; S11 took the last non-service convenience off the
+surface, so the list is now exactly the collaborators and the view plumbing,
+with nothing waiting for its own slice.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -400,7 +401,34 @@ and one page more.
   placeholder leg is still the pre-driving-slice stand-in; both moved with the
   job, and the legs arrive here when the driving slice feeds them.
 
-### Host implementations after S10
+**S11 — the onboarding forwarding.** ✅ (−35 lines in the coordinator, no
+constructor change): `ChooseBrand`, `ChooseCar`, `ShowDialogue`,
+`FinishDialogue`, `IsOnboarding`, `JobsVisible`, `OnboardingDone`,
+`IntroTourInProgress` and `IntroInProgress` were pure forwards to the story
+flow, so they are gone. The coordinator reads `_story` where it needs a value
+(the boot paint, the idle-hide gate, the world and fleet gates); `App.OnStartup`
+builds the story anyway, so its tour gate and the window's placement gate read
+`story` directly.
+*Unblocked:* the last pass-through surface left the coordinator, and two pieces
+that existed only for it went with it — `IJobsScreen` (a marker interface whose
+only reader was `IsOnboarding`) and `OverlayShell.ScreenChanged` (the event the
+removed flags subscribed to).
+*Deviations:*
+- `MainWindow` takes the placement gate as a `bool` in its constructor instead
+  of reading the VM: the gate is the story's fact at window-build time, and the
+  window has no reason to hold the flow. App ends up the only reader of the
+  live tour gate, which is where the root already is.
+- The tests reach the story instead of a coordinator forwarder:
+  `TestSession.Create` now returns `TestSessionResult` (a four-value
+  `Deconstruct` plus `Story`), so the suites that only need the VM read exactly
+  as before; the voice suite wraps it in `VoiceSession` for its own mic and
+  watcher. About 60 test methods now call `session.Story.*` or
+  `FinishIntro(session)`.
+- `IsOnboarding`/`JobsVisible` had no assertion value left (the page type is
+  asserted on the same line), so those assertions are deleted rather than
+  re-spelled.
+
+### Host implementations after S11
 
 The reads now live with their owners:
 
@@ -420,6 +448,9 @@ The reads now live with their owners:
   counters are banked by the saver at that same settle.
 - `CarHaulFlow` takes no host either: `Settle` returns its receipt and the
   navigator shows it with its own BACK command.
+- `IStoryHost` — unchanged by S11; the coordinator reads the flow's `Done`/`Intro*`
+  live instead of forwarding them, and the window takes the placement gate as a
+  value from the root.
 
 ## 7. Rules for every slice
 
@@ -484,6 +515,11 @@ The reads now live with their owners:
   `HaulDoor_SettlesTheFlowAndItsReceipt_WithoutTheCoordinator` and the
   coordinator-level `CarHaulTap_*` / `HaulSettle_NeverCountsTheZone` tests stay
   as the regression net for the tap.
+- S11 changed the builders, not the coverage: `TestSession.Create` returns
+  `TestSessionResult` (four-value `Deconstruct` + `Story`), and the voice suite's
+  own wrapper returns `VoiceSession` (the same four values, with its mic and
+  watcher). A test that walks the introduction drives `session.Story`; every
+  other test is untouched and still reads `var (vm, clock, tel, store) = Create()`.
 
 ## 9. Open decisions
 
@@ -512,20 +548,20 @@ The reads now live with their owners:
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S10 are green locally.
-`MainViewModel` 799 lines (was 857 after S9), −58 lines: the car haul (the tap's
-settle, its receipt, its calendar checkpoint and the car pool behind it) left
-for `CarHaulFlow`, and `INavigationHost` lost its haul report. The injected
+State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S11 are green locally.
+`MainViewModel` 764 lines (was 799 after S10), −35 lines: the onboarding
+forwarding (the four verbs and the five page/tour flags) left for the story
+flow, and `IJobsScreen`/`OverlayShell.ScreenChanged` went with it. The injected
 field list is 32, the constructor 32 parameters (29 required, 3 optional). 1723
-tests green (+5: four `CarHaulFlowTests` and the navigator's haul tap).
+tests green: S11 is a surface slice, so the count is unchanged.
 
-Next: the one candidate the slices left behind:
+Next: no candidate is left from the split plan itself. The open decisions that
+remain are gameplay scope (PORTPLAN), not architecture:
 
-- `MainViewModel`'s onboarding forwarding (`ChooseBrand`/`ChooseCar`/
-  `ShowDialogue`/`FinishDialogue` + the three flags) exists for the tests now
-  that the view binds only `CurrentScreen`; it can move behind `_story`. The
-  view's two remaining reads (`App`'s tour gate, the window's placement gate)
-  take the story from the root, which builds it.
+- `Poll` still owns the idle-hide policy (§9 decision 5): a `SessionLoop` is only
+  worth it if a second host (tests, a headless run) needs the tick.
+- A new job type (a driving slice, `OnCarHaul`'s legs) is a new collaborator by
+  §7 rule 5, and the haul's legs now have their home.
 
 Working agreements earned so far:
 
@@ -573,6 +609,11 @@ Working agreements earned so far:
   called by `OnProgressBanked`, the state it changed is banked by the settle's
   driver save on the next line, and `PoiWorld.Grow()` follows. The coordinator
   keeps the one call and nothing else about the zone.
+- A collaborator's own value is read where it lives, never forwarded: the
+  coordinator reads `_story.Done`/`Intro*` at its three gates, `App` reads the
+  tour gate, and `MainWindow` takes the placement gate as a constructor value.
+  Forwarding verbs or flags through the coordinator exists only for tests and
+  hides which object owns them (S11).
 - Tests: one instance per service graph; builders hoist their locals. A
   collaborator test wires the *same* store fakes its assertions read, and a
   culture-sensitive one pins `en-US` in its constructor (the suite shares one

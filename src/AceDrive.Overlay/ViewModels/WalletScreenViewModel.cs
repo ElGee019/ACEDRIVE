@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// Voice parity with the other pages: BACK navigates, so its voice tap glows
 /// teal first and the page waits out the shared beat.
 /// </summary>
-public sealed class WalletScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class WalletScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly ICommand _backCommand;
     private readonly VoiceBeat _beat;

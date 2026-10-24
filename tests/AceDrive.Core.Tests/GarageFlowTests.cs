@@ -82,18 +82,18 @@ public sealed class GarageFlowTests
     {
         var garage = new Garage(Pool);
         var store = new FakeGarageStore();
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        var session = MainViewModelTests.Create(
             cars: Pool, garage: garage, garageStore: store, content: Content());
 
-        vm.ChooseBrand("Mazda");
-        vm.ChooseCar(Mx5.Key);
+        session.Story.ChooseBrand("Mazda");
+        session.Story.ChooseCar(Mx5.Key);
 
         Assert.True(garage.Owns(Mx5.Key));
         Assert.Equal(Mx5.Key, garage.CurrentKey);
         Assert.Equal(1, store.Saves);
 
         // Walking the introduction again keeps the car that already exists.
-        vm.ChooseCar(Mx5.Key);
+        session.Story.ChooseCar(Mx5.Key);
         Assert.Single(garage.Cars);
         Assert.Equal(1, store.Saves);
     }
@@ -107,11 +107,11 @@ public sealed class GarageFlowTests
         var garage = new Garage(Pool, new GarageState(
             Junior.Key, [new OwnedCarState(Junior.Key, 1, 0.0, false)]));
         var store = new FakeGarageStore();
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        var session = MainViewModelTests.Create(
             cars: Pool, garage: garage, garageStore: store, content: Content());
 
-        vm.ChooseBrand("Mazda");
-        vm.ChooseCar(Mx5.Key);
+        session.Story.ChooseBrand("Mazda");
+        session.Story.ChooseCar(Mx5.Key);
 
         Assert.Equal(Mx5.Key, garage.CurrentKey);
         Assert.Equal(2, garage.Cars.Count);

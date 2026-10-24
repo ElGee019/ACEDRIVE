@@ -13,56 +13,55 @@ public sealed class MainViewModelTests
     // skip the store without relying on a persistent maple-syrup item.
     private static OnboardingState ErrandDone =>
         new(null, null, BirthdayDone: true, MaxErrandDone: true);
-    internal static (MainViewModel Vm, FakeClock Clock, FakeTelemetry Tel, FakeStore Store)
-        Create(
-            float speedKmh = 90f, OnboardingState? progress = null,
-            DeliveryCatalog? catalog = null, HubCatalog? hubs = null, ILog? log = null,
-            DeliveryCareer? career = null,
-            RoadTestLedger? roads = null, IGameClockStore? clocks = null, int startWeek = 1,
-            DateTime? gameStart = null, IRoadTestStore? roadTestStore = null,
-            CityEconomy? city = null, ICityStore? cityStore = null,
-            DriverWallet? wallet = null, IDriverStore? driverStore = null,
-            IFriendshipStore? friendships = null,
-            IReadOnlyList<CarSpec>? cars = null, string? carKsId = null,
-            string? carPreset = null,
-            IBrandMileageStore? brandMileage = null, FakeRivals? rivals = null,
-            DeliveryFareTable? deliveryFares = null,
-            DriverState? savedDriver = null, Hunger? hunger = null,
-            IHungerStateStore? hungerStore = null,
-            Garage? garage = null, IGarageStore? garageStore = null,
-            BreakdownStrategy? breakdowns = null,
-            Random? rng = null,
-            OnboardingContent? content = null,
-            PlayerProfile? profile = null, IProfileStore? profileStore = null,
-            AddressMap? addressMap = null, string? detectedName = "ElGee",
-            IPreferencesStore? preferencesStore = null,
-            PlayerPreferences? preferences = null,
-            ICultureService? culture = null,
-            PoiGenerator? pois = null,
-            ITelemetryHud? hud = null,
-            FakeVoiceListener? voice = null,
-            Trunk? trunk = null,
-            IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
-            PoiDirectory? poiDirectory = null,
-            IPoiDirectoryStore? poiStore = null,
-            PoiSpawner? poiSpawner = null,
-            JobLedger? jobs = null,
-            FakeOnboardingStore? onboarding = null,
-            TaxiRules? taxiRules = null,
-            ICustomerRequestRoller? requests = null,
-            CustomerRequestTable? requestTable = null,
-            PolicePatrolPlanner? police = null,
-            ICarRaritySource? rarity = null,
-            IPlayerTelemetry? telemetry = null,
-            ShiftRecord? shifts = null,
-            IShiftStandings? shiftStandings = null,
-            IPlayerNameRegistry? playerNames = null,
-            TaxiShift? shift = null, IShiftStore? shiftStore = null,
-            FakeSaveDataResetter? saveResets = null,
-            FakeAppRestarter? restarter = null,
-            StoreCatalog? storeCatalog = null,
-            FakeClock? clock = null, FakeCarBrandSource? carBrands = null,
-            FakeTelemetry? physics = null) =>
+    internal static TestSessionResult Create(
+        float speedKmh = 90f, OnboardingState? progress = null,
+        DeliveryCatalog? catalog = null, HubCatalog? hubs = null, ILog? log = null,
+        DeliveryCareer? career = null,
+        RoadTestLedger? roads = null, IGameClockStore? clocks = null, int startWeek = 1,
+        DateTime? gameStart = null, IRoadTestStore? roadTestStore = null,
+        CityEconomy? city = null, ICityStore? cityStore = null,
+        DriverWallet? wallet = null, IDriverStore? driverStore = null,
+        IFriendshipStore? friendships = null,
+        IReadOnlyList<CarSpec>? cars = null, string? carKsId = null,
+        string? carPreset = null,
+        IBrandMileageStore? brandMileage = null, FakeRivals? rivals = null,
+        DeliveryFareTable? deliveryFares = null,
+        DriverState? savedDriver = null, Hunger? hunger = null,
+        IHungerStateStore? hungerStore = null,
+        Garage? garage = null, IGarageStore? garageStore = null,
+        BreakdownStrategy? breakdowns = null,
+        Random? rng = null,
+        OnboardingContent? content = null,
+        PlayerProfile? profile = null, IProfileStore? profileStore = null,
+        AddressMap? addressMap = null, string? detectedName = "ElGee",
+        IPreferencesStore? preferencesStore = null,
+        PlayerPreferences? preferences = null,
+        ICultureService? culture = null,
+        PoiGenerator? pois = null,
+        ITelemetryHud? hud = null,
+        FakeVoiceListener? voice = null,
+        Trunk? trunk = null,
+        IReadOnlyList<IPoiArrivalHandler>? poiHandlers = null,
+        PoiDirectory? poiDirectory = null,
+        IPoiDirectoryStore? poiStore = null,
+        PoiSpawner? poiSpawner = null,
+        JobLedger? jobs = null,
+        FakeOnboardingStore? onboarding = null,
+        TaxiRules? taxiRules = null,
+        ICustomerRequestRoller? requests = null,
+        CustomerRequestTable? requestTable = null,
+        PolicePatrolPlanner? police = null,
+        ICarRaritySource? rarity = null,
+        IPlayerTelemetry? telemetry = null,
+        ShiftRecord? shifts = null,
+        IShiftStandings? shiftStandings = null,
+        IPlayerNameRegistry? playerNames = null,
+        TaxiShift? shift = null, IShiftStore? shiftStore = null,
+        FakeSaveDataResetter? saveResets = null,
+        FakeAppRestarter? restarter = null,
+        StoreCatalog? storeCatalog = null,
+        FakeClock? clock = null, FakeCarBrandSource? carBrands = null,
+        FakeTelemetry? physics = null) =>
         TestSession.Create(new TestSessionOptions
         {
             SpeedKmh = speedKmh,
@@ -562,8 +561,9 @@ public sealed class MainViewModelTests
     [Fact]
     public void TaxiShiftTap_OpensProposalAndStartsShift_AcceptStartsJob()
     {
-        var (vm, _, _, _) = Create(speedKmh: 0f);
-        var control = FinishIntro(vm);
+        var session = Create(speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
         Assert.Equal("START TAXI SHIFT", control.TaxiLabel);
 
         // The tap owns the shift (Unity OnStartTaxiShift stamps it started
@@ -1128,8 +1128,9 @@ public sealed class MainViewModelTests
     {
         // Unity parity: the tap started the shift; walking away from the
         // proposal does not undo it — the 30-minute idle clock now owns it.
-        var (vm, _, _, _) = Create(speedKmh: 0f);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        session.Story.FinishDialogue();
         vm.TaxiShiftCommand.Execute(null);
         var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
 
@@ -1144,8 +1145,9 @@ public sealed class MainViewModelTests
     {
         // The control page (the menu's Jobs tile) is the jobs hub; BACK is its
         // one way out and lands on the menu, the same page a call opens.
-        var (vm, _, _, _) = Create(speedKmh: 0f);
-        var control = FinishIntro(vm);
+        var session = Create(speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.BackCommand.Execute(null);
 
@@ -1183,8 +1185,9 @@ public sealed class MainViewModelTests
     [Fact]
     public void ShiftTimeout_EndsShift_FlipsLabelBack()
     {
-        var (vm, clock, _, _) = Create(speedKmh: 0f);
-        var control = FinishIntro(vm);
+        var session = Create(speedKmh: 0f);
+        var (vm, clock, _, _) = session;
+        var control = FinishIntro(session);
         vm.TaxiShiftCommand.Execute(null);
         Assert.Equal("CONTINUE TAXI SHIFT", control.TaxiLabel);
 
@@ -1274,8 +1277,9 @@ public sealed class MainViewModelTests
     {
         // Unity JobSelectionScreen: the tap that finds a stale shift ends it,
         // shows the stats page and returns without starting a new shift.
-        var (vm, clock, _, _) = Create(speedKmh: 0f);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         vm.TaxiShiftCommand.Execute(null);
         var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
         proposal.BackCommand.Execute(null);
@@ -1304,8 +1308,9 @@ public sealed class MainViewModelTests
         // Half speed: ~53 real minutes carry the game across midnight. The
         // flip moves the teal outline; the gate is re-read on every tap.
         var log = new TestLog();
-        var (vm, clock, _, _) = Create(speedKmh: 0f, log: log);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, log: log);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         Assert.Equal(2, calendar.Today);
 
@@ -1324,8 +1329,9 @@ public sealed class MainViewModelTests
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
         var bank = new FakeRoadTestStore();
-        var (vm, clock, _, _) = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(53)); // across Monday midnight: Tuesday noon
         vm.Poll();
@@ -1352,8 +1358,9 @@ public sealed class MainViewModelTests
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
         var bank = new FakeRoadTestStore();
-        var (vm, clock, _, _) = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(75)); // 2.2 s per game minute: Tuesday 22:0x
         calendar.DayCommand.Execute(3);
@@ -1386,14 +1393,16 @@ public sealed class MainViewModelTests
         // Two sessions, two unrelated seeds, one banked pick: the Tuesday
         // button names the same car in both (PORTPLAN 49).
         var bank = new FakeRoadTestStore();
-        var (vm, _, _, _) = Create(roads: TestRoadCars.Ledger(seed: 7), roadTestStore: bank);
+        var session = Create(roads: TestRoadCars.Ledger(seed: 7), roadTestStore: bank);
+        var (vm, _, _, _) = session;
         vm.Start();
         RoadTestSnapshot saved = Assert.Single(bank.Saved);
 
         var restarted = TestRoadCars.Ledger(seed: 4242, saved: saved);
         CarSpec car = Assert.IsType<CarSpec>(restarted.Current);
-        var (again, _, _, _) = Create(roads: restarted);
-        again.FinishDialogue();
+        var session2 = Create(roads: restarted);
+        var (again, _, _, _) = session2;
+        session2.Story.FinishDialogue();
         var calendar = ShowCalendar(again);
 
         Assert.Equal(saved.CarId, car.Id);
@@ -1405,8 +1414,9 @@ public sealed class MainViewModelTests
     {
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
-        var (vm, _, _, _) = Create(speedKmh: 0f, log: log, roads: roads);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, log: log, roads: roads);
+        var (vm, _, _, _) = session;
+        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         string first = TuesdayButton(calendar);
 
@@ -1423,9 +1433,10 @@ public sealed class MainViewModelTests
         // interval is due. 2.2 real seconds per game minute here.
         var store = new DeliveryStore("full-market", "Full Market", "Schmitz", 40, 40, 4.40);
         var city = new CityEconomy([store], CityRules.Default);
-        var (vm, clock, _, _) = Create(
+        var session = Create(
             speedKmh: 0f, catalog: new DeliveryCatalog([store], 0.7, 100), city: city);
-        vm.FinishDialogue();
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         vm.Poll(); // primes the town at the session's first moment
 
         clock.Advance(TimeSpan.FromSeconds(60)); // 27 game minutes: not yet
@@ -1446,8 +1457,9 @@ public sealed class MainViewModelTests
         var bank = new FakeCityStore();
         var store = new DeliveryStore("full-market", "Full Market", "Schmitz", 40, 40, 4.40);
         var city = new CityEconomy([store], CityRules.Default);
-        var (vm, clock, _, _) = Create(speedKmh: 0f, city: city, cityStore: bank);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, city: city, cityStore: bank);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         vm.Poll(); // primes the town at the session's first moment
 
         clock.Advance(TimeSpan.FromSeconds(70)); // 31 game minutes: one tick
@@ -1471,8 +1483,9 @@ public sealed class MainViewModelTests
         var log = new TestLog();
         var store = new FakeGameClockStore();
         var roads = TestRoadCars.Ledger();
-        var (vm, clock, _, _) = Create(speedKmh: 0f, log: log, roads: roads, clocks: store);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, log: log, roads: roads, clocks: store);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         string first = TuesdayButton(calendar);
 
@@ -1496,17 +1509,19 @@ public sealed class MainViewModelTests
         // The exit path (what MainWindow.Closed runs) persists the moment; a
         // new VM seeded from the save reopens on the same date and week.
         var store = new FakeGameClockStore();
-        var (vm, clock, _, _) = Create(speedKmh: 0f, clocks: store);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, clocks: store);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(53));
         vm.Poll();
         vm.SaveClock();
         GameClockState saved = store.Saved[^1];
 
-        var (restarted, _, _, _) = Create(
+        var session2 = Create(
             progress: OnboardingState.Fresh with { BirthdayDone = true },
             clocks: store, gameStart: saved.GameNow, startWeek: saved.Week);
+        var (restarted, _, _, _) = session2;
         // A finished introduction opens on the menu; its Calendar tile leads
         // to the calendar page whose header we read.
         var menu = Assert.IsType<MenuScreenViewModel>(restarted.CurrentScreen);
@@ -1580,12 +1595,13 @@ public sealed class MainViewModelTests
         Assert.Single(calendar.Days, d => d.DayLabel == "Tuesday").EventLabel;
 
     // The intro's last CONTINUE lands on the menu and leaves the panel up;
-    // these flows take the Jobs tile into the career page they exercise.
-    private static MainControlScreenViewModel FinishIntro(MainViewModel vm)
+    // these flows take the Jobs tile into the career page they exercise. The
+    // dialogue is the story flow's, so the shortcut drives it directly.
+    private static MainControlScreenViewModel FinishIntro(TestSessionResult session)
     {
-        vm.FinishDialogue();
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        return ShowControl(vm);
+        session.Story.FinishDialogue();
+        Assert.IsType<MenuScreenViewModel>(session.Vm.CurrentScreen);
+        return ShowControl(session.Vm);
     }
 
     // A call opens the menu; its Jobs tile is the door into the career page.
@@ -1678,11 +1694,11 @@ public sealed class MainViewModelTests
     [Fact]
     public void FinishDialogue_ClosesThePanelForTheTour()
     {
-        var (vm, _, _, _) = Create();
-        vm.FinishDialogue();
+        var session = Create();
+        var (vm, _, _, _) = session;
+        session.Story.FinishDialogue();
 
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        Assert.False(vm.IsOnboarding);
         // The guided tour still has to be driven (Max, the friends, pancakes,
         // the community centre): the hand-over hides the panel and lets the
         // HUD guide instead of leaving the menu over the road.
@@ -1693,10 +1709,10 @@ public sealed class MainViewModelTests
     public void FinishDialogue_RevealsTheHud()
     {
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(hud: hud);
+        var session = Create(hud: hud);
         Assert.False(hud.Revealed);
 
-        vm.FinishDialogue();
+        session.Story.FinishDialogue();
 
         Assert.True(hud.Revealed);
     }
@@ -1710,11 +1726,12 @@ public sealed class MainViewModelTests
         PointOfInterest expected =
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
                 .Spawn(PoiCatalog.MaxGroceryId)!;
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: content,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5));
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
+        session.Story.ShowDialogue();
 
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(
@@ -1729,13 +1746,13 @@ public sealed class MainViewModelTests
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
                 .Spawn(PoiCatalog.MaxGroceryId)!;
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         Assert.Equal(expected, hud.Destination);
     }
@@ -1745,13 +1762,14 @@ public sealed class MainViewModelTests
     {
         var poiStore = new FakePoiDirectoryStore();
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, poiStore: poiStore);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         menu.HomeCommand.Execute(null);
@@ -1770,12 +1788,12 @@ public sealed class MainViewModelTests
     public void BirthdayErrand_ReusesTheBankedStoreAcrossLaunches()
     {
         var onboarding = new FakeOnboardingStore();
-        var (first, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             onboarding: onboarding);
 
-        first.ShowDialogue();
+        session.Story.ShowDialogue();
         PointOfInterest expected =
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5)
                 .Spawn(PoiCatalog.MaxGroceryId)!;
@@ -1783,13 +1801,13 @@ public sealed class MainViewModelTests
         Assert.Equal(expected.Id, onboarding.State.MaxStoreId);
 
         var hud = new FakeTelemetryHud();
-        var (second, _, _, _) = Create(
+        var session2 = Create(
             content: TestSession.OneLineDialogue,
             // A different seed proves the banked address wins over a fresh draw.
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 99),
             hud: hud, onboarding: onboarding);
-        second.ShowDialogue();
-        second.FinishDialogue();
+        session2.Story.ShowDialogue();
+        session2.Story.FinishDialogue();
 
         Assert.Equal(expected, hud.Destination);
         Assert.Equal(expected.Address, onboarding.State.MaxStoreAddress);
@@ -1803,13 +1821,14 @@ public sealed class MainViewModelTests
                 .Spawn(PoiCatalog.MaxGroceryId)!;
         var log = new TestLog();
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud,
             log: log);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
+        session.Story.ShowDialogue();
         hud.RaiseEnter();
 
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
@@ -1828,12 +1847,13 @@ public sealed class MainViewModelTests
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var onboarding = new FakeOnboardingStore();
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, onboarding: onboarding, career: career);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
+        session.Story.ShowDialogue();
         Assert.Equal(0, career.CredP);
 
         hud.RaiseEnter();
@@ -1922,12 +1942,13 @@ public sealed class MainViewModelTests
     public void EnterRequested_WhenHidden_PopsTheOverlayOnTheStore()
     {
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
+        session.Story.ShowDialogue();
         vm.ToggleShowCommand.Execute(null);
         Assert.False(vm.IsShown);
 
@@ -1951,13 +1972,14 @@ public sealed class MainViewModelTests
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
         var drivers = new FakeDriverStore();
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, wallet: wallet, cars: pool, garage: garage,
             driverStore: drivers);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
+        session.Story.ShowDialogue();
         hud.RaiseEnter();
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
         StoreItemRowViewModel row = store.Items.First(
@@ -1986,11 +2008,12 @@ public sealed class MainViewModelTests
             HungerRules.Default, new HungerState(10, ThresholdTriggered: false));
         var hungerStore = new FakeHungerStore();
         var drivers = new FakeDriverStore();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             cars: pool, garage: garage, trunk: trunk, hunger: hunger,
             hungerStore: hungerStore, driverStore: drivers);
+        var (vm, _, _, _) = session;
 
-        vm.FinishDialogue();
+        session.Story.FinishDialogue();
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         menu.TrunkCommand.Execute(null);
         var page = Assert.IsType<TrunkScreenViewModel>(vm.CurrentScreen);
@@ -2014,13 +2037,14 @@ public sealed class MainViewModelTests
     public void StoreBack_WithoutMaple_KeepsTheArrivalAndThePanel()
     {
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
         PointOfInterest? errand = hud.Destination;
         hud.RaiseEnter();
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
@@ -2041,13 +2065,14 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var onboarding = new FakeOnboardingStore();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, onboarding: onboarding);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
         PointOfInterest? errand = hud.Destination;
         hud.RaiseEnter();
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
@@ -2075,13 +2100,14 @@ public sealed class MainViewModelTests
         var trunk = new Trunk(
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, wallet: wallet, cars: pool, garage: garage, trunk: trunk);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
         hud.RaiseEnter();
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
         StoreItemRowViewModel row = store.Items.First(
@@ -2106,13 +2132,14 @@ public sealed class MainViewModelTests
         garage.Add(car, week: 1);
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, wallet: wallet, cars: pool, garage: garage);
+        var (vm, _, _, _) = session;
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
         hud.RaiseEnter();
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
         StoreItemRowViewModel row = store.Items.First(
@@ -2136,13 +2163,13 @@ public sealed class MainViewModelTests
         var trunk = new Trunk(
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         Assert.Equal("max-grocery", hud.Destination?.Id);
         Assert.Equal(PoiTypes.Grocery, hud.Destination?.Type);
@@ -2156,12 +2183,12 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var onboarding = new FakeOnboardingStore();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, onboarding: onboarding, progress: ErrandDone);
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
         PointOfInterest justin = Assert.IsType<PointOfInterest>(hud.Destination);
 
         hud.RaiseEnter();
@@ -2194,13 +2221,14 @@ public sealed class MainViewModelTests
                 new DialogueLine("YOU", "It's [YOU]."),
             ],
         };
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: content,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, onboarding: onboarding, profile: profile,
             progress: ErrandDone);
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        var (vm, _, _, _) = session;
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         hud.RaiseEnter(); // Justin
         hud.RaiseEnter(); // Annabella: the tour hands over to the home leg
@@ -2254,7 +2282,7 @@ public sealed class MainViewModelTests
         Assert.True(onboarding.State.CommunityCentreDone);
         // The closing "how to call the panel" page is still the introduction
         // even though the tour is banked; its CONTINUE is what ends it.
-        Assert.True(vm.IntroInProgress);
+        Assert.True(session.Story.IntroInProgress);
         Assert.Null(hud.Destination);
         var voiceInfo = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         Assert.True(vm.IsShown);
@@ -2271,7 +2299,7 @@ public sealed class MainViewModelTests
 
         // The tour is over: the panel opens on the menu by itself for the
         // first time since the introduction started.
-        Assert.False(vm.IntroInProgress);
+        Assert.False(session.Story.IntroInProgress);
         Assert.True(vm.IsShown);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
@@ -2328,13 +2356,13 @@ public sealed class MainViewModelTests
         var trunk = new Trunk(
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         Assert.Equal(StoryFriends.Annabella.Id, hud.Destination?.Id);
         Assert.Equal(annabella, hud.Destination?.Address);
@@ -2351,13 +2379,13 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-2", 5);
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress, profile: profile);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         PointOfInterest home = Assert.IsType<PointOfInterest>(hud.Destination);
         Assert.Equal(StoryHome.Definition.Id, home.Id);
@@ -2378,13 +2406,13 @@ public sealed class MainViewModelTests
         var trunk = new Trunk(
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         Assert.Equal(centre, hud.Destination);
         Assert.Equal("HudHintCommunityCentre", hud.HintKey);
@@ -2399,13 +2427,13 @@ public sealed class MainViewModelTests
             [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
         var hud = new FakeTelemetryHud();
         var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-2", 5);
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, profile: profile, progress: ErrandDone);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         PointOfInterest justin = Assert.IsType<PointOfInterest>(hud.Destination);
         Assert.Equal("Street 2", justin.Address.StreetName);
@@ -2421,13 +2449,13 @@ public sealed class MainViewModelTests
         var progress = new OnboardingState(
             null, null, BirthdayDone: true, JustinAddress: stored, MaxErrandDone: true);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
             hud: hud, trunk: trunk, progress: progress);
 
-        vm.ShowDialogue();
-        vm.FinishDialogue();
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
 
         Assert.Equal(stored, hud.Destination?.Address);
     }
@@ -2528,13 +2556,13 @@ public sealed class MainViewModelTests
         var catalog = new DeliveryCatalog(
             [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50)],
             0.7, 100);
-        var (vm, _, _, _) = Create(catalog: catalog);
-        var control = FinishIntro(vm);
+        var session = Create(catalog: catalog);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
         Assert.True(control.DeliveryCommand.CanExecute(null));
 
         control.DeliveryCommand.Execute(null);
         var delivery = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
-        Assert.False(vm.IsOnboarding); // job page, not onboarding
         Assert.Equal("OPEN NEW CAREER", delivery.MainButtonLabel);
 
         delivery.ToggleOrderCommand.Execute(delivery.Rows[0]);
@@ -2562,15 +2590,15 @@ public sealed class MainViewModelTests
             new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)]),
                 new HubCareer("coffee_beans", "COFFEE BEANS", [new HubLevel("CoffeeUs", 100)])])]);
-        var (vm, _, _, _) = Create(catalog: catalog, hubs: hubs);
-        var control = FinishIntro(vm);
+        var session = Create(catalog: catalog, hubs: hubs);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         Assert.False(board.HasStores); // the career gate holds until a hub is bought
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
-        Assert.False(vm.IsOnboarding); // job side, like the board
 
         hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
         hub.OpenCareerCommand.Execute(null);
@@ -2594,9 +2622,10 @@ public sealed class MainViewModelTests
                     [new HubLevel("Grocers and Sons", 100)])])]);
         var catalog = new DeliveryCatalog([], 0.7, 100);
         var directory = new PoiDirectory();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             catalog: catalog, hubs: hubs, poiDirectory: directory);
-        var control = FinishIntro(vm);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
@@ -2637,10 +2666,11 @@ public sealed class MainViewModelTests
             new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES",
                     [new HubLevel("Grocers and Sons", 100)])])]);
-        var (vm, _, _, _) = Create(
+        var session = Create(
             catalog: new DeliveryCatalog([], 0.7, 100), hubs: hubs,
             poiDirectory: directory);
-        var control = FinishIntro(vm);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
@@ -2675,7 +2705,7 @@ public sealed class MainViewModelTests
             new HubTier(1, true, [
                 new HubCareer("coffee_beans", "COFFEE BEANS",
                     [new HubLevel("CoffeeUs", 100)])])]);
-        var (vm, _, _, _) = Create(
+        var session = Create(
             catalog: new DeliveryCatalog([], 0.7, 100), hubs: hubs,
             poiDirectory: directory,
             // The coffee shelf layout derives from the catalogue's items; the
@@ -2683,7 +2713,8 @@ public sealed class MainViewModelTests
             storeCatalog: new StoreCatalog(
                 [new StoreItem("BEANS", 10.0, 0.1, 0, "coffee_beans")],
                 DefaultStock: 20));
-        var control = FinishIntro(vm);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
@@ -2715,10 +2746,11 @@ public sealed class MainViewModelTests
             OwnerNames: ["Elena Marchetti"]);
         var directory = new PoiDirectory();
         var poiStore = new FakePoiDirectoryStore();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             catalog: new DeliveryCatalog([], 0.7, 100), hubs: hubs,
             poiDirectory: directory, poiStore: poiStore);
-        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var (vm, _, _, _) = session;
+        FinishIntro(session).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -2751,9 +2783,10 @@ public sealed class MainViewModelTests
                 new HubCareer("groceries", "GROCERIES",
                     [new HubLevel("Grocers and Sons", 100)])])]);
         var hud = new FakeTelemetryHud();
-        var (vm, clock, tel, _) = Create(
+        var session = Create(
             catalog: catalog, hubs: hubs, city: city, hud: hud);
-        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var (vm, clock, tel, _) = session;
+        FinishIntro(session).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -2797,9 +2830,10 @@ public sealed class MainViewModelTests
                 new HubCareer("groceries", "GROCERIES",
                     [new HubLevel("Grocers and Sons", 100)])])]);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             catalog: catalog, hubs: hubs, city: city, hud: hud);
-        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var (vm, _, _, _) = session;
+        FinishIntro(session).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -2836,10 +2870,11 @@ public sealed class MainViewModelTests
         var wallet = EmptyWallet();
         var friends = new FakeFriendshipStore();
         var hud = new FakeTelemetryHud();
-        var (vm, clock, tel, _) = Create(
+        var session = Create(
             catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
             friendships: friends, hud: hud);
-        var control = FinishIntro(vm);
+        var (vm, clock, tel, _) = session;
+        var control = FinishIntro(session);
         control.DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
 
@@ -2903,11 +2938,12 @@ public sealed class MainViewModelTests
         var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
         var drivers = new FakeDriverStore();
         var hud = new FakeTelemetryHud();
-        var (vm, clock, tel, _) = Create(
+        var session = Create(
             catalog: catalog, hubs: hubs, wallet: wallet, speedKmh: 0f,
             carKsId: "ks_mazda_mx5_na", rarity: rarity,
             telemetry: telemetry, rivals: rivals, driverStore: drivers, hud: hud);
-        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var (vm, clock, tel, _) = session;
+        FinishIntro(session).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -2947,10 +2983,11 @@ public sealed class MainViewModelTests
             new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
         };
         var wallet = EmptyWallet();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             cars: pool, carKsId: "ks_test_hatch", roads: new RoadTestLedger(pool, seed: 0),
             wallet: wallet, speedKmh: 0f);
-        var control = FinishIntro(vm);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.HaulCommand.Execute(null);
         var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
@@ -2973,8 +3010,9 @@ public sealed class MainViewModelTests
         // No announced identity: the receipt names the customer's car
         // instead and prices the lowest band rather than crashing.
         var wallet = EmptyWallet();
-        var (vm, _, _, _) = Create(wallet: wallet, speedKmh: 0f);
-        var control = FinishIntro(vm);
+        var session = Create(wallet: wallet, speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
 
         control.HaulCommand.Execute(null);
         var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
@@ -2996,17 +3034,17 @@ public sealed class MainViewModelTests
         var saved = new DriverState(10.0, 0.0, DaysInARow: 2, LastLoginDate: "2026-10-11");
         var wallet = new DriverWallet(saved);
         var drivers = new FakeDriverStore(saved);
-        var (vm, clock, _, _) = Create(progress: onboarding, wallet: wallet, driverStore: drivers,
+        var session = Create(progress: onboarding, wallet: wallet, driverStore: drivers,
             savedDriver: saved);
         // FakeClock default day = 2026-10-12: yesterday's login continues the
         // streak to day 3, whose bonus is 4 CR.
         Assert.Equal(14.0, wallet.Cash);
         DriverState granted = Assert.Single(drivers.Saved);
         Assert.Equal(3, granted.DaysInARow);
-        Assert.Equal(clock.UtcNow.ToString("yyyy-MM-dd",
+        Assert.Equal(session.Clock.UtcNow.ToString("yyyy-MM-dd",
             System.Globalization.CultureInfo.InvariantCulture), granted.LastLoginDate);
         Assert.Equal("2026-10-12", granted.LastDailyBonusDate);
-        Assert.True(vm.OnboardingDone);
+        Assert.True(session.Story.Done);
         // Unity's streak tail: day 3 hands three random skill points out
         // (PORTPLAN 06), banked with the same grant.
         Assert.Equal(63.0,
@@ -3038,8 +3076,9 @@ public sealed class MainViewModelTests
         // reads exactly this count (item 58 + 48).
         var wallet = new DriverWallet();
         var drivers = new FakeDriverStore();
-        var (vm, clock, tel, _) = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers);
+        var (vm, clock, tel, _) = session;
+        session.Story.FinishDialogue();
         Assert.Empty(drivers.Saved); // FinishDialogue saves onboarding only
 
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
@@ -3067,8 +3106,9 @@ public sealed class MainViewModelTests
         // nothing rides the counters in from the tap.
         var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
-        var (vm, _, _, _) = Create(wallet: wallet, driverStore: drivers, speedKmh: 0f);
-        var control = FinishIntro(vm);
+        var session = Create(wallet: wallet, driverStore: drivers, speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
         int savesBefore = drivers.Saved.Count;
         control.HaulCommand.Execute(null);
         _ = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
@@ -3085,8 +3125,9 @@ public sealed class MainViewModelTests
         // 1000 → 1000.1 while the ride's fare lands in cash.
         var wallet = new DriverWallet();
         var drivers = new FakeDriverStore();
-        var (vm, clock, tel, _) = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers);
+        var (vm, clock, tel, _) = session;
+        session.Story.FinishDialogue();
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         Assert.Equal(1000.1, wallet.BankBalance);
         DriverState saved = drivers.Saved[^1];
@@ -3101,8 +3142,9 @@ public sealed class MainViewModelTests
         // stamps the visit; CONTINUE hands back to the control page.
         var wallet = new DriverWallet();
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(speedKmh: 0f, wallet: wallet, hud: hud);
-        vm.FinishDialogue();
+        var session = Create(speedKmh: 0f, wallet: wallet, hud: hud);
+        var (vm, _, _, _) = session;
+        session.Story.FinishDialogue();
         var bank = OpenPoi<BankScreenViewModel>(vm, hud, "Bank");
         Assert.True(wallet.HasEnteredBank);
         Assert.Equal("Current Bank Saldo: CR1000.00", bank.SaldoLine);
@@ -3119,9 +3161,10 @@ public sealed class MainViewModelTests
         var wallet = new DriverWallet(saved);
         var drivers = new FakeDriverStore(saved);
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers,
+        var session = Create(speedKmh: 0f, wallet: wallet, driverStore: drivers,
             savedDriver: saved, hud: hud);
-        vm.FinishDialogue();
+        var (vm, _, _, _) = session;
+        session.Story.FinishDialogue();
         var bank = OpenPoi<BankScreenViewModel>(vm, hud, "Bank");
         bank.AmountText = "150";
         bank.WithdrawCommand.Execute(null);
@@ -3273,10 +3316,11 @@ public sealed class MainViewModelTests
         garage.Add(TestRoadCars.Pool[0], week: 1);
         var store = new FakeGarageStore();
         var hud = new FakeTelemetryHud();
-        var (vm, clock, tel, _) = Create(
+        var session = Create(
             catalog: catalog, hubs: hubs, speedKmh: 0f,
             garage: garage, garageStore: store, hud: hud);
-        FinishIntro(vm).DeliveryCommand.Execute(null);
+        var (vm, clock, tel, _) = session;
+        FinishIntro(session).DeliveryCommand.Execute(null);
         var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
         board.MainButtonCommand.Execute(null);
         var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
@@ -3306,10 +3350,11 @@ public sealed class MainViewModelTests
         var wallet = new DriverWallet(new DriverState(500.0, 0.0));
         var drivers = new FakeDriverStore(new DriverState(500.0, 0.0));
         var hud = new FakeTelemetryHud();
-        var (vm, _, _, _) = Create(
+        var session = Create(
             speedKmh: 0f, garage: garage, garageStore: garageStore,
             wallet: wallet, driverStore: drivers, hud: hud);
-        vm.FinishDialogue();
+        var (vm, _, _, _) = session;
+        session.Story.FinishDialogue();
 
         var wash = OpenPoi<CarWashScreenViewModel>(vm, hud, "Car Wash");
         wash.WashCommand.Execute(null);

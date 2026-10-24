@@ -16,7 +16,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// from data; all copy lives in the resx files.
 /// </summary>
 public sealed class StoreScreenViewModel :
-    ViewModelBase, IPoiScreen, IJobsScreen, IVoiceScreen
+    ViewModelBase, IPoiScreen, IVoiceScreen
 {
     // Same bands as Unity's MaxsScreen friendship notification. The index
     // is FriendshipLevels.GetTier, so the copy and the receipt tiers cannot

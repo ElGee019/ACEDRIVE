@@ -18,13 +18,7 @@ public sealed class OverlayShell : ViewModelBase
     public object? CurrentScreen
     {
         get => _screen;
-        private set
-        {
-            if (SetField(ref _screen, value))
-            {
-                ScreenChanged?.Invoke(this, EventArgs.Empty);
-            }
-        }
+        private set => SetField(ref _screen, value);
     }
 
     /// <summary>True while the overlay panel is visible.</summary>
@@ -46,9 +40,6 @@ public sealed class OverlayShell : ViewModelBase
     /// later call opens the menu, and this latch is what tells the two apart.
     /// </summary>
     public bool HasBeenShown { get; private set; }
-
-    /// <summary>Raised after the page changed, for the state derived from it.</summary>
-    public event EventHandler? ScreenChanged;
 
     /// <summary>Swaps the visible page without touching visibility.</summary>
     public void ShowScreen(object? screen) => CurrentScreen = screen;

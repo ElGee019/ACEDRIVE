@@ -29,11 +29,16 @@ public partial class MainWindow : Window
 
     private readonly MainViewModel _vm;
     private readonly ILog _log;
+    // The placement gate: a finished introduction may restore its saved window
+    // size. It is the story flow's fact, read by the root at construction, so
+    // the VM does not forward it.
+    private readonly bool _introDone;
 
-    public MainWindow(MainViewModel vm, ILog log)
+    public MainWindow(MainViewModel vm, ILog log, bool introDone)
     {
         _vm = vm;
         _log = log;
+        _introDone = introDone;
         DataContext = vm;
         InitializeComponent();
         TryApplyBackdrop(log);
@@ -50,7 +55,7 @@ public partial class MainWindow : Window
         {
             Left = saved.Left;
             Top = saved.Top;
-            if (_vm.OnboardingDone && saved.Version >= WindowBounds.CurrentVersion)
+            if (_introDone && saved.Version >= WindowBounds.CurrentVersion)
             {
                 Width = saved.Width;
                 Height = saved.Height;

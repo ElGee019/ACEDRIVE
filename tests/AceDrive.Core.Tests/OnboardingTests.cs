@@ -25,13 +25,21 @@ public sealed class OnboardingTests
 
     private static MainViewModel Create(
         OnboardingState? start = null, FakeClock? clock = null,
+        FakeProfileStore? profiles = null, FakeOnboardingStore? onboarding = null) =>
+        CreateSession(start, clock, profiles, onboarding).Vm;
+
+    // The walk's verbs and flags live on the story flow, so a test that drives
+    // the introduction keeps the whole session instead of a coordinator that
+    // forwards them.
+    private static TestSessionResult CreateSession(
+        OnboardingState? start = null, FakeClock? clock = null,
         FakeProfileStore? profiles = null, FakeOnboardingStore? onboarding = null)
     {
         var store = onboarding ?? new FakeOnboardingStore();
         if (start is not null) store.Save(start);
         // The walk suite's session: an empty career and the smallest content
         // that can carry the pages, driven through the shared builder.
-        var (vm, _, _, _) = MainViewModelTests.Create(
+        return MainViewModelTests.Create(
             clock: clock, onboarding: store, profileStore: profiles,
             content: Content, cars: [], garage: new Garage([]),
             city: new CityEconomy([], CityRules.Default),
@@ -39,7 +47,6 @@ public sealed class OnboardingTests
             shiftStandings: new OfflineShiftStandings(),
             rarity: new OfflineCarRarity(),
             telemetry: new OfflinePlayerTelemetry());
-        return vm;
     }
 
     // The first-run page (unit + language) sits before the name form; its
@@ -59,8 +66,6 @@ public sealed class OnboardingTests
     {
         var profiles = new FakeProfileStore();
         var vm = Create(profiles: profiles);
-        Assert.True(vm.IsOnboarding);
-        Assert.False(vm.JobsVisible);
 
         var preferences = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(2, preferences.UnitOptions.Count);
@@ -107,7 +112,7 @@ public sealed class OnboardingTests
         // A finished introduction is not replayed: once the whole tour is
         // banked, the next launch opens the menu with its three tiles, and
         // Jobs leads to the career page.
-        var vm = Create(OnboardingState.Fresh with
+        var session = CreateSession(OnboardingState.Fresh with
         {
             BirthdayDone = true,
             MaxErrandDone = true,
@@ -116,9 +121,9 @@ public sealed class OnboardingTests
             PancakesDone = true,
             CommunityCentreDone = true,
         });
+        var vm = session.Vm;
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        Assert.False(vm.IsOnboarding);
-        Assert.False(vm.IntroTourInProgress);
+        Assert.False(session.Story.IntroTourInProgress);
         Assert.True(vm.IsShown);
 
         menu.JobsCommand.Execute(null);
@@ -131,19 +136,21 @@ public sealed class OnboardingTests
         // The walk pages are the introduction the player must see, so a new
         // career still opens the panel at once (with a mic the app root calls
         // Show() for this same page).
-        var vm = Create();
+        var session = CreateSession();
+        var vm = session.Vm;
 
         Assert.True(vm.IsShown);
-        Assert.False(vm.IntroTourInProgress);
+        Assert.False(session.Story.IntroTourInProgress);
         Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
     public void BootDuringTheTour_StartsHiddenUntilTheTourEnds()
     {
-        var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
+        var session = CreateSession(OnboardingState.Fresh with { BirthdayDone = true });
+        var vm = session.Vm;
 
-        Assert.True(vm.IntroTourInProgress);
+        Assert.True(session.Story.IntroTourInProgress);
         Assert.False(vm.IsShown);
     }
 
@@ -164,7 +171,8 @@ public sealed class OnboardingTests
     public void EveryPage_IsBankedBeforeItOpens()
     {
         var store = new FakeOnboardingStore();
-        var vm = Create(onboarding: store);
+        var session = CreateSession(onboarding: store);
+        var vm = session.Vm;
         Assert.Equal(OnboardingStage.Preferences, store.State.Stage);
 
         ContinuePreferences(vm);
@@ -174,10 +182,10 @@ public sealed class OnboardingTests
             .ContinueCommand.Execute(null);
         Assert.Equal(OnboardingStage.Brand, store.State.Stage);
 
-        vm.ChooseBrand("Mazda");
+        session.Story.ChooseBrand("Mazda");
         Assert.Equal(OnboardingStage.GrandmaCar, store.State.Stage);
 
-        vm.ChooseCar("ks_mazda_mx5_na");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         Assert.Equal(OnboardingStage.VoiceInfo, store.State.Stage);
 
         Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
@@ -208,9 +216,10 @@ public sealed class OnboardingTests
         // Ctrl+Shift+C is a call to the app like the wake word: the hidden ->
         // shown edge opens the menu page instead of resuming the page the
         // player was last on.
-        var vm = Create(OnboardingState.Fresh with { BirthdayDone = true });
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        var session = CreateSession(OnboardingState.Fresh with { BirthdayDone = true });
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -226,8 +235,9 @@ public sealed class OnboardingTests
     [Fact]
     public void ChooseBrand_PersistsAndShowsCars()
     {
-        var vm = Create();
-        vm.ChooseBrand("Mazda");
+        var session = CreateSession();
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Mazda");
         var cars = Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(2, cars.Options.Count);
         Assert.Equal("1990 Mazda MX-5 NA", cars.Options[0].Label);
@@ -236,9 +246,10 @@ public sealed class OnboardingTests
     [Fact]
     public void ChooseUnknownBrand_Ignored()
     {
-        var vm = Create();
+        var session = CreateSession();
+        var vm = session.Vm;
         ToBrandPage(vm);
-        vm.ChooseBrand("Nope");
+        session.Story.ChooseBrand("Nope");
         Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
     }
 
@@ -248,12 +259,13 @@ public sealed class OnboardingTests
         var store = new FakeOnboardingStore();
         var clock = new FakeClock();
         // Same shell as the other onboarding tests: one shared service graph.
-        var vm = Create(clock: clock, onboarding: store);
+        var session = CreateSession(clock: clock, onboarding: store);
+        var vm = session.Vm;
 
-        vm.ChooseBrand("Honda");
+        session.Story.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);
 
-        vm.ChooseCar("ks_datsun_240z_fairlady");
+        session.Story.ChooseCar("ks_datsun_240z_fairlady");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         Assert.Equal("ks_datsun_240z_fairlady", store.State.GrandmaCarId);
 
@@ -286,9 +298,10 @@ public sealed class OnboardingTests
     [Fact]
     public void ChooseCar_ShowsVoiceInfo()
     {
-        var vm = Create();
-        vm.ChooseBrand("Mazda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        var session = CreateSession();
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Mazda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         Assert.Contains("Control navigation with your voice.", voice.LeadText, StringComparison.Ordinal);
         Assert.DoesNotContain("HEY", voice.LeadText, StringComparison.Ordinal);
@@ -298,9 +311,10 @@ public sealed class OnboardingTests
     [Fact]
     public void VoiceInfoContinue_ShowsDialogue()
     {
-        var vm = Create();
-        vm.ChooseBrand("Mazda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        var session = CreateSession();
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Mazda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -312,9 +326,10 @@ public sealed class OnboardingTests
         // Voice navigation waits out the half-second beat so the teal glow
         // is actually seen; clicks (the test above) stay instant.
         var clock = new FakeClock();
-        var vm = Create(clock: clock);
-        vm.ChooseBrand("Mazda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        var session = CreateSession(clock: clock);
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Mazda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         string? label = VoiceMatch.MatchLabel("could you please continue", voice.VoiceActions.Keys);
         Assert.Equal("CONTINUE", label);
@@ -335,9 +350,10 @@ public sealed class OnboardingTests
         // the teal text is shown before the page turns, not only on the last
         // page.
         var clock = new FakeClock();
-        var vm = Create(clock: clock);
-        vm.ChooseBrand("Honda");
-        vm.ChooseCar("ks_mazda_mx5_na");
+        var session = CreateSession(clock: clock);
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Honda");
+        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);

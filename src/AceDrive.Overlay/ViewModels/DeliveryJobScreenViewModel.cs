@@ -23,7 +23,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// delivery twin); the shelves are filled at each stop, never on this tap.
 /// Voice parity with the control page: every button answers to its text.
 /// </summary>
-public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private DeliveryCatalog _catalog;
     private readonly DeliveryCareer _career;

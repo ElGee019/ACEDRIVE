@@ -29,8 +29,7 @@ internal static class TestSession
     // car; production primes it in MainViewModel.Start, which the tests skip.
     private const string FallbackBrand = "mazda";
 
-    public static (MainViewModel Vm, FakeClock Clock, FakeTelemetry Tel, FakeStore Store)
-        Create(TestSessionOptions options)
+    public static TestSessionResult Create(TestSessionOptions options)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -219,7 +218,7 @@ internal static class TestSession
             // headless: the VM now follows the announced car like live.
             brands.Fire("test", announced);
         }
-        return (vm, clock, tel, store);
+        return new TestSessionResult(vm, clock, tel, store, story);
     }
 
     // The real career opens these through the street/job thresholds; the flow

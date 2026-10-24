@@ -24,7 +24,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// and wait out the shared beat, DECLINE stays on the page and acts at once
 /// like a click.
 /// </summary>
-public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly TaxiJobProposer _proposals;
     private readonly AddressMap _map;

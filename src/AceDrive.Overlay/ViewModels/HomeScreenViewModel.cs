@@ -13,7 +13,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// page owns only navigation and its voice acknowledgment; the host builds
 /// the screen on every visit.
 /// </summary>
-public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly ICommand _garageCommand;
     private readonly ICommand _addressesCommand;

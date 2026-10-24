@@ -19,7 +19,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// game time flows through <see cref="GameClock"/> (clock header + calendar
 /// highlight), never tick counts.
 /// </summary>
-public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen, IJobsScreen
+public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
 {
     // resx key suffixes for Day 1=Sunday..7=Saturday: indexed by weekday
     // number, so the labels are independent of the strip's Monday-first
