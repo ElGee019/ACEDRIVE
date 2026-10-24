@@ -14,13 +14,12 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class MainViewModel
     : ViewModelBase, IVoiceHost, IStoryHost, IJobSettlementHost, ITaxiJobHost,
-      IDeliveryHost, IPoiWorldHost, IDisposable
+      IDeliveryHost, IPoiWorldHost, INavigationHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
     private readonly GameClock _game;
-    private readonly RoadTestLedger _roads;
     // The single writer of every save file: the stores, the snapshot assembly
     // and the write throttles live there, never in this class (SRP).
     private readonly GameStateSaver _saver;
@@ -48,12 +47,6 @@ public sealed class MainViewModel
     private readonly DriverWallet _wallet;
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
-    // What the driven car carries (PORTPLAN 26): the trunk page lists it and
-    // the EAT tap consumes from it. Persisted through _saver, never here.
-    private readonly Trunk _trunk;
-    // The item database (PORTPLAN 26): the trunk page reads each carried
-    // stack's hunger value from the catalogue row its name resolves.
-    private readonly StoreCatalog _storeCatalog;
     private readonly IFriendshipStore _friends;
     // XP world standings backend (PORTPLAN 60, Unity RivalsService): the
     // receipt's rivals block reads through it on every settle.
@@ -81,7 +74,6 @@ public sealed class MainViewModel
     // The introduction walk + its errand (PORTPLAN Career Start 1-5): owns the
     // persisted progress, the profile, the errand POI and the trunk read.
     private readonly OnboardingFlow _story;
-    private readonly TodoTable _todos;
     private readonly IVoiceListener _voice;
     private readonly ICarBrandSource _carBrands;
     // The delivery distance-charge table (no forfait/tip/fine): the dropped
@@ -94,9 +86,6 @@ public sealed class MainViewModel
     // runtime, so the live catalogue is a holder the board page, the run
     // planner and the settle all read.
     private readonly DeliveryBoard _deliveryBoard;
-    // The discovered POIs behind the addresses page and the introduction's
-    // errand doors; PoiWorld owns the growth that fills them.
-    private readonly PoiDirectory _poiDirectory;
     // The POI world: the business/store/hub doors and the arrival handlers.
     private readonly PoiWorld _poiWorld;
     // The delivery run from DELIVER to receipt: owns the live run and the board
@@ -140,21 +129,13 @@ public sealed class MainViewModel
     // The 200 px companion: the poll pushes it one snapshot so
     // the HUD never opens its own timer or shared-memory handle.
     private readonly ITelemetryHud? _hud;
-    private MainControlScreenViewModel? _control;
-    // The calendar page is built once per session so its week and day rows
-    // survive leaving the page; the poll refreshes it on the minute guard.
-    private CalendarScreenViewModel? _calendar;
-    // The menu is built once per session so its clock keeps ticking behind
-    // another page; the poll refreshes it on the minute guard.
-    private MenuScreenViewModel? _menu;
-    private ParameterizedCommand<int>? _openDayAction;
+    // The page graph: the control page, the menu and every tile behind it. It
+    // owns the page caches, so this class keeps only panel policy.
+    private readonly Navigation _nav;
     private int _lastDay = -1;
     // Display week: rolls on the Sunday-midnight crossing, persists across
     // restarts via the clock store (seeded from the save at startup).
     private int _displayWeek;
-    // Weekday number of the road-test event (Unity: Tuesday), read off the
-    // calendar data by RoadTestDayOfWeek, never hardcoded here.
-    private readonly int _roadTestDay = RoadTestDayOfWeek();
 
     // WHY a throttle at all: a rebuild/Stop-Debugging kills the process, and
     // a killed process never raises Window.Closed — so the shutdown save
@@ -224,24 +205,22 @@ public sealed class MainViewModel
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, GameClock game,
-        TaxiShift shift, IShiftStore shiftStore, ISettingsStore store,
+        TaxiShift shift, ISettingsStore store,
         ILog log, FareTable fares,
         IOnboardingStore onboarding, IContentSource content,
         IProfileStore profiles, IPlayerNameRegistry playerNames,
         AddressMap addressMap, string? detectedPlayerName,
         IVoiceListener voice, ICarBrandSource carBrands,
-        TodoTable todos, DeliveryBoard deliveryBoard, DeliveryCareer career,
+        DeliveryBoard deliveryBoard, DeliveryCareer career,
         DeliveryFareTable deliveryFares,
-        CityEconomy city, ICityStore cityStore,
-        RoadTestLedger roadTests, IRoadTestStore roadTestStore,
-        IGameClockStore clockStore, int startWeek,
-        VoiceBeat beat, DriverWallet wallet, IDriverStore driverStore,
+        CityEconomy city, int startWeek,
+        VoiceBeat beat, DriverWallet wallet,
         DailyStreak streak, OperatingZone zone, IFriendshipStore friendships, IReadOnlyList<CarSpec> cars,
         IRivalsService rivals,
         IPlayerTelemetry playerTelemetry, ShiftRecord shifts,
         IShiftStandings shiftStandings,
-        Hunger hunger, IHungerStateStore hungerStore,
-        Garage garage, IGarageStore garageStore, InsuranceRules insuranceRules,
+        Hunger hunger,
+        Garage garage, InsuranceRules insuranceRules,
         Random rng,
         PoiGenerator pois,
         PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
@@ -251,17 +230,15 @@ public sealed class MainViewModel
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, TaxiDriveMeter meter, ShopInteriors shops,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
-        PoiArrivalRouter poiArrivals,
+        PoiArrivalRouter poiArrivals, Navigation navigation,
         ITelemetryHud? hud = null,
         ISaveDataResetter? saveResets = null,
-        IAppRestarter? restarter = null,
-        StoreCatalog? storeCatalog = null)
+        IAppRestarter? restarter = null)
     {
         _telemetry = telemetry;
         _clock = clock;
         _beat = beat;
         _game = game;
-        _roads = roadTests;
         _displayWeek = startWeek;
         _shift = shift;
         _store = store;
@@ -270,10 +247,8 @@ public sealed class MainViewModel
         _log = log;
         _fares = fares;
         _addressMap = addressMap;
-        _poiDirectory = poiDirectory;
         _taxiRules = taxiRules;
         _content = content;
-        _todos = todos;
         _voice = voice;
         _carBrands = carBrands;
         _deliveryBoard = deliveryBoard;
@@ -294,8 +269,6 @@ public sealed class MainViewModel
         _wallet = wallet;
         _streak = streak;
         _zone = zone;
-        _trunk = trunk;
-        _storeCatalog = storeCatalog ?? StoreCatalog.Default;
         _friends = friendships;
         _rivals = rivals;
         _online = playerTelemetry;
@@ -313,6 +286,12 @@ public sealed class MainViewModel
         _taxi = taxi;
         _delivery = delivery;
         _poiWorld = poiWorld;
+        // The page graph is built by the root; the navigator only reaches back
+        // for the entries whose domain is not a page (shift close, readouts,
+        // settings, haul), so the attach closes before any page command can
+        // fire — the same late edge the three flows use.
+        _nav = navigation;
+        _nav.Attach(this);
         // All three collaborators are built before the shell they report to;
         // these are the late edges, and they close here before anything can
         // fire a command or enter a door.
@@ -391,8 +370,6 @@ public sealed class MainViewModel
         _timer.Tick += (_, _) => Poll();
         _lastTick = _clock.UtcNow;
 
-        TaxiShiftCommand = new RelayCommand(OpenTaxiShift);
-        GarageCommand = new RelayCommand(OpenGarage);
         ToggleShowCommand = new RelayCommand(() =>
         {
             if (IsShown) Hide(); else Show();
@@ -415,7 +392,7 @@ public sealed class MainViewModel
         {
             _hud?.Reveal();
         }
-        SetScreen(OnboardingDone ? CreateMenuScreen() : _story.StartPage());
+        _nav.ShowScreen(OnboardingDone ? _nav.MenuPage() : _story.StartPage());
 
         // The VM's default: hidden until called when a mic is present, visible
         // otherwise so the shell stays usable (and testable). A save that is
@@ -459,15 +436,12 @@ public sealed class MainViewModel
     private string _shiftText = "";
     public string ShiftText { get => _shiftText; private set => SetField(ref _shiftText, value); }
 
-    public ICommand TaxiShiftCommand { get; }
     public ICommand PickupCommand => _taxi.PickupCommand;
     public ICommand DropoffCommand => _taxi.DropoffCommand;
     public ICommand ToggleShowCommand { get; }
 
-    /// <summary>Temporary garage entry (PORTPLAN 30): a You-menu page in Unity,
-    /// opened from the home page; moves behind the marker network (items 24/59)
-    /// with the rest.</summary>
-    public ICommand GarageCommand { get; }
+    /// <summary>The control page's START/CONTINUE TAXI entry (the navigator builds it).</summary>
+    public ICommand TaxiShiftCommand => _nav.TaxiShiftCommand;
 
     // ---- onboarding navigation -----------------------------------------------
 
@@ -519,14 +493,14 @@ public sealed class MainViewModel
     // panel reveal/hide, the control page and the shared driver save.
     object? IStoryHost.CurrentScreen => CurrentScreen;
     bool IStoryHost.IsShown => IsShown;
-    void IStoryHost.ShowScreen(object? screen) => SetScreen(screen);
+    void IStoryHost.ShowScreen(object? screen) => _nav.ShowScreen(screen);
     void IStoryHost.Present(object screen) => Present(screen);
     void IStoryHost.Hide() => Hide();
-    object IStoryHost.ControlScreen() => CreateControlScreen();
-    object IStoryHost.MenuScreen() => CreateMenuScreen();
+    object IStoryHost.ControlScreen() => _nav.ControlPage();
+    object IStoryHost.MenuScreen() => _nav.MenuPage();
     void IStoryHost.ShowMenu()
     {
-        SetScreen(CreateMenuScreen());
+        _nav.ShowMenuPage();
         Show();
     }
     void IStoryHost.SaveDriver() => SaveDriver(_rivals.LastResult);
@@ -545,31 +519,30 @@ public sealed class MainViewModel
         _poiWorld.Grow();
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
-    void IJobSettlementHost.GoToControlPage() => SetScreen(CreateControlScreen());
+    void IJobSettlementHost.GoToControlPage() => _nav.ShowControl();
     void IJobSettlementHost.RefreshDeliveryBoard() => _delivery.RefreshBoard();
     void IJobSettlementHost.ClearDeliveryRun() => _delivery.Stop();
-    void IJobSettlementHost.GoToDeliveryBoard() =>
-        SetScreen(_delivery.Board ?? (object)CreateControlScreen());
+    void IJobSettlementHost.GoToDeliveryBoard() => _nav.ShowDeliveryBoard();
 
     // The host slice the taxi flow sees: the flow owns the job and the ask; the
     // shell owns the panel and the settle that prices the ride.
-    void ITaxiJobHost.ShowPage(object screen) => SetScreen(screen);
+    void ITaxiJobHost.ShowPage(object screen) => _nav.ShowScreen(screen);
     void ITaxiJobHost.RevealPage(object screen) => ShowJobScreen(screen);
     void ITaxiJobHost.HidePanel() => Hide();
     void ITaxiJobHost.RefreshJob() => RefreshJob();
-    void ITaxiJobHost.RefreshControlPage() => _control?.Refresh();
-    object ITaxiJobHost.ControlPage() => CreateControlScreen();
+    void ITaxiJobHost.RefreshControlPage() => _nav.RefreshControl();
+    object ITaxiJobHost.ControlPage() => _nav.ControlPage();
     AddressLocation? ITaxiJobHost.HomeAddress() => AddressBook.Home(_addressMap, _story.Profile);
     void ITaxiJobHost.SettleRide(TaxiJobState job) =>
         _settlement.SettleTaxiRide(job, HomeCountry, _carBrand, this);
 
     // The host slice the delivery run sees: the flow owns the run and the board;
     // the shell owns the panel, the companion's line, the hub page and the settle.
-    void IDeliveryHost.ShowPage(object screen) => SetScreen(screen);
+    void IDeliveryHost.ShowPage(object screen) => _nav.ShowScreen(screen);
     void IDeliveryHost.RevealPage(object screen) => ShowJobScreen(screen);
     void IDeliveryHost.HidePanel() => Hide();
-    object IDeliveryHost.ControlPage() => CreateControlScreen();
-    void IDeliveryHost.OpenHub() => OpenHub();
+    object IDeliveryHost.ControlPage() => _nav.ControlPage();
+    void IDeliveryHost.OpenHub() => _nav.ShowHub();
     void IDeliveryHost.ClearGuidance() => _hud?.SetJobGuidance(null);
     bool IDeliveryHost.PinStop(DeliveryStop leg)
     {
@@ -584,10 +557,24 @@ public sealed class MainViewModel
         _settlement.SettleDeliveryRun(run, HomeCountry, this);
 
     // The host slice the POI world sees: the world owns the doors and the
-    // board growth; the shell owns the board page and the dealer's follow-up.
+    // board growth; the navigator owns the board page and the dealer's follow-up.
     void IPoiWorldHost.RefreshBoard() => _delivery.RefreshBoard();
     int IPoiWorldHost.DisplayWeek => _displayWeek;
-    void IPoiWorldHost.CarBought(CarSpec car) => OnCarBought(car);
+    void IPoiWorldHost.CarBought(CarSpec car) => _nav.CarBought(car);
+
+    // The host slice the navigator sees: the entries whose work is not a page.
+    // A shift that already timed out is this class's to close (it owns the
+    // record and its summary page), and the settings page is the story flow's.
+    void INavigationHost.ShiftTimedOut(TimeSpan idle) => EndShift(idle);
+    void INavigationHost.ReadoutsChanged()
+    {
+        // The shift button flipped: the second-guarded countdown would only
+        // repaint on its next tick, so force the readout now.
+        _lastShiftSecs = -1;
+        RefreshJob();
+    }
+    void INavigationHost.ShowSettings() => OpenSettings();
+    void INavigationHost.SettleHaul() => OnCarHaul();
 
     // Reveal the panel on the requested POI screen. Show() deliberately
     // resets a hidden start to the control page; entering a shop must land
@@ -598,71 +585,6 @@ public sealed class MainViewModel
         _introShown = true;
         _shell.Reveal(screen);
         _log.LogInfo("overlay shown (POI)");
-    }
-
-    // Built once and reused. The taxi entry opens the job proposal page (port
-    // of Unity TaxiJobProposalScreen); delivery opens the career page (port
-    // of Unity DeliveryJobScreen). The weekly strip lives on its own page
-    // (see CreateCalendarScreen).
-    private MainControlScreenViewModel CreateControlScreen()
-    {
-        _control ??= new MainControlScreenViewModel(
-            _beat, _todos, _shift,
-            new ControlActions(
-                TaxiShiftCommand, new RelayCommand(OpenDelivery),
-                new RelayCommand(OnCarHaul)),
-            new RelayCommand(() => SetScreen(CreateMenuScreen())));
-        return _control;
-    }
-
-    // Built once and reused; boots on the resumed week (if any), not the
-    // stamp default, so the header is right on the first paint. The calendar
-    // day buttons have no destinations until the freeroam map lands, so
-    // tapping the highlighted day just logs — except the road-test day, which
-    // banks the week's car as tested and switches to the next pick (manual
-    // stand-in until the road-test drive flow lands). Off-gate taps never
-    // reach this action: the page's own day command warns them before
-    // dispatching.
-    private CalendarScreenViewModel CreateCalendarScreen()
-    {
-        _openDayAction ??= new ParameterizedCommand<int>(OnDay);
-        _calendar ??= new CalendarScreenViewModel(
-            _beat, _game, _clock, _roads,
-            CalendarStamp.Default with { Week = _displayWeek },
-            _openDayAction, new RelayCommand(() => SetScreen(CreateMenuScreen())));
-        return _calendar;
-    }
-
-    private void OpenCalendar() => SetScreen(CreateCalendarScreen());
-
-    private void OnDay(int day)
-    {
-        if (day == _roadTestDay)
-        {
-            string before = DescribeRoadTest();
-            _roads.MarkTested();
-            SaveRoadTest();
-            _log.LogInfo($"road test done: {before} -> {DescribeRoadTest()}");
-            _calendar?.Refresh();
-            return;
-        }
-        _log.LogInfo($"calendar day {day} tapped while locked: waiting on the freeroam map");
-    }
-
-    private string DescribeRoadTest() =>
-        _roads.Current is { } car ? CarTitles.Of(car) : "none";
-
-    // Built once and reused: the pickup cart survives leaving the page, like
-    // Unity's player.pickupCart. Back lands on the control page. The run
-    // button carries the whole cart run to the flow, which drives the hub
-    // pickups and store drop-offs on the companion before it settles the
-    // receipt. The hub button opens the real OPEN NEW CAREER page (item 18).
-    private void OpenDelivery()
-    {
-        // A hub bought on the previous visit may have opened store doors; the
-        // board must include them before the cached page paints.
-        _poiWorld.Grow();
-        SetScreen(_delivery.OpenBoard());
     }
 
     // Car-hauling contracts (PORTPLAN 20): today the tap settles the haul
@@ -702,9 +624,8 @@ public sealed class MainViewModel
         _log.LogInfo($"haul settled: {carName} minutes={receipt.DriveMinutes} " +
             $"tier={receipt.Tier} rate={receipt.RatePerMin:0.00}/min " +
             $"earned={receipt.TotalEarned:0.00} wallet={_wallet.Cash:0.00}");
-        SetScreen(new CarHaulReceiptScreenViewModel(
-            receipt, _wallet, _beat,
-            new RelayCommand(() => SetScreen(CreateControlScreen()))));
+        _nav.ShowScreen(new CarHaulReceiptScreenViewModel(
+            receipt, _wallet, _beat, _nav.ControlCommand));
     }
 
     // Car-haul placeholders until the drive slice feeds the legs: a
@@ -718,33 +639,6 @@ public sealed class MainViewModel
     // overall directly; the receipt model is an int).
     private int DriverRatingPercent =>
         (int)Math.Round(_wallet.Rating.Overall, MidpointRounding.AwayFromZero);
-
-    // Unity closes the board and shows a fresh DeliveryHubScreen; the board's
-    // own VM survives (its cart does), so coming back refreshes it to pull in
-    // the spent CredP and the newly connected stores.
-    private void OpenHub() =>
-        SetScreen(new DeliveryHubScreenViewModel(
-            _career, _deliveryBoard.Catalog, _city, _log,
-            new RelayCommand(CloseHub),
-            _beat,
-            _poiWorld.PlaceHubDoor));
-
-    private void CloseHub()
-    {
-        // Unity's backfill runs when the career opens: the newly owned
-        // category places its first store before the board is shown again.
-        _poiWorld.Grow();
-        _delivery.RefreshBoard();
-        SetScreen(_delivery.Board ?? (object)CreateControlScreen());
-    }
-
-    private void SetScreen(object? screen)
-    {
-        // WHY a real screen change supersedes a pending voice tap (wake-word
-        // re-home, mouse navigation): the old beat must never fire afterwards.
-        _beat.Cancel();
-        _shell.ShowScreen(screen);
-    }
 
     // ---- lifecycle (called by the view) ----------------------------------
 
@@ -760,7 +654,7 @@ public sealed class MainViewModel
         // Bank the resumed (or freshly drawn) pick at the top of the session:
         // a killed process never reaches a completion, and the next session
         // must still name this car (PORTPLAN 49).
-        SaveRoadTest();
+        _saver.SaveRoadTest();
     }
 
     public WindowBounds? LoadPlacement() => _store.Load();
@@ -772,14 +666,6 @@ public sealed class MainViewModel
     /// the interval honest. Never throws (the store swallows IO).
     /// </summary>
     public void SaveClock() => _saver.SaveClock(_displayWeek);
-
-    /// <summary>
-    /// Banks the road-test pick. Two moments need it: a session opening (a
-    /// rebuild/Stop-Debugging kills the process before any test is driven, and
-    /// the next session must offer that very same car) and a completion (the
-    /// only event allowed to move the car). Never throws (the store swallows IO).
-    /// </summary>
-    private void SaveRoadTest() => _saver.SaveRoadTest();
 
     /// <summary>
     /// Banks the town for the next session (PORTPLAN 25): the city size plus
@@ -860,15 +746,9 @@ public sealed class MainViewModel
         // Voice acknowledgment: the beat drains first so a due tap acts at
         // its end, then flash expiry runs on the clock, not the minute
         // guard: a half-second teal glow must clear inside the same minute
-        // it started.
+        // it started. The cached pages' own minute guards live with them.
         _beat.Poll();
-        _control?.UpdateFlash();
-        _control?.Refresh();
-        _calendar?.UpdateFlash();
-        _calendar?.Refresh();
-        _menu?.UpdateFlash();
-        _menu?.UpdateReveal();
-        _menu?.Refresh();
+        _nav.Tick();
 
         // Game-day flip: the calendar highlight moved. One int compare per
         // tick, work only on transitions (hot-path discipline).
@@ -885,16 +765,10 @@ public sealed class MainViewModel
             if (prev == ControlCalendar.Sunday && today == ControlCalendar.Monday)
             {
                 _displayWeek++;
-                if (_calendar is not null)
-                {
-                    _calendar.DisplayWeek = _displayWeek;
-                    // The header repaints now instead of on the next tick: a
-                    // week opening is the one transition the poll already ran
-                    // its refresh before.
-                    _calendar.Refresh();
-                }
-                if (_menu is not null) _menu.DisplayWeek = _displayWeek;
-                _log.LogInfo($"week {_displayWeek} opened: road test stays {DescribeRoadTest()}");
+                // The pages repaint now instead of on the next tick: a week
+                // opening is the one transition the poll already ran its
+                // refresh before.
+                _nav.DisplayWeekChanged(_displayWeek);
             }
             SaveClock();
         }
@@ -1132,60 +1006,8 @@ public sealed class MainViewModel
             return;
         }
         _introShown = true;
-        SetScreen(CreateMenuScreen());
+        _nav.ShowMenuPage();
         _log.LogInfo("overlay shown (menu)");
-    }
-
-    private MenuScreenViewModel CreateMenuScreen() =>
-        _menu ??= new MenuScreenViewModel(
-            new RelayCommand(OpenWallet),
-            new RelayCommand(() => SetScreen(CreateControlScreen())),
-            new RelayCommand(OpenCalendar),
-            new RelayCommand(OpenTrunk),
-            new RelayCommand(OpenSettings),
-            new RelayCommand(OpenHome),
-            _hunger, _garage,
-            _beat,
-            _game,
-            _clock,
-            _displayWeek);
-
-    // The home page (Unity YouScreen): the player's own doors, starting with
-    // the garage. A fresh page per visit like the wallet, so nothing stale
-    // survives between openings; BACK returns to the menu it was opened from.
-    private void OpenHome() => SetScreen(CreateHomeScreen());
-
-    private HomeScreenViewModel CreateHomeScreen() =>
-        new(GarageCommand,
-            new RelayCommand(OpenAddresses),
-            new RelayCommand(() => SetScreen(CreateMenuScreen())),
-            _beat);
-
-    // The addresses page (PORTPLAN 24/27): the discovered POIs alphabetic,
-    // the temporary stand-in for markers on the map. A row pins the HUD's
-    // drive-to line; driving there and pressing ENTER enters the place.
-    private void OpenAddresses() =>
-        SetScreen(new AddressesScreenViewModel(
-            _poiDirectory, _hud,
-            new RelayCommand(() => SetScreen(CreateHomeScreen())),
-            _beat));
-
-    // The trunk page (PORTPLAN 26, Unity YouScreen's TrunkScreen) is rebuilt
-    // on every visit like Unity's RebuildTrunkScreen: a shop purchase made
-    // since the last look must show, so the page is never cached. EAT banks
-    // the trunk and the appetite together — they live in different files, and
-    // a bite moves both.
-    private void OpenTrunk() =>
-        SetScreen(new TrunkScreenViewModel(
-            _trunk, _hunger, _garage, _storeCatalog,
-            new RelayCommand(() => SetScreen(CreateMenuScreen())),
-            OnTrunkItemEaten,
-            _beat));
-
-    private void OnTrunkItemEaten()
-    {
-        SaveDriver(_rivals.LastResult);
-        SaveHunger();
     }
 
     // The Settings tile reuses the first-run unit + language page: selections
@@ -1197,8 +1019,7 @@ public sealed class MainViewModel
     {
         Func<bool>? resetGame =
             _saveResets is null || _restarter is null ? null : ResetGame;
-        SetScreen(_story.CreateSettingsPage(
-            () => SetScreen(CreateMenuScreen()), resetGame));
+        _nav.ShowScreen(_story.CreateSettingsPage(_nav.ShowMenuPage, resetGame));
     }
 
     /// <summary>
@@ -1275,43 +1096,6 @@ public sealed class MainViewModel
     }
 
     // ---- job commands ------------------------------------------------------
-
-    // Unity JobSelectionScreen's OnStartTaxiShift: the tap owns the shift
-    // bookkeeping (start fresh, or end an idle-timed-out one first), then
-    // opens the proposal page — the job itself only exists once ACCEPTed.
-    // The shift flips the control-page button to CONTINUE right here,
-    // behind the voice acknowledgment glow, exactly like Unity stamps
-    // taxiShiftStarted before showing the job.
-    private void OpenTaxiShift()
-    {
-        DateTime now = _clock.UtcNow;
-        if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
-        {
-            // Unity parity: the shift-ended page takes over and the tap stops
-            // here. The player reads the result, comes back to the control
-            // page and taps TAXI again for a fresh shift.
-            EndShift(idle);
-            return;
-        }
-        if (!_shift.IsStarted)
-        {
-            _shift.Start(now);
-            _lastShiftSecs = -1;
-            _log.LogInfo("taxi shift started");
-            // Checkpoint bank: a shift start is the moment a player reads as
-            // progress, so the calendar never rewinds past it when the process
-            // dies before the next throttled write. The shift itself is banked
-            // too: an empty shift must still idle out across a restart.
-            SaveClock();
-            SaveShift();
-        }
-
-        // The proposal page is the flow's: built once and reused like the
-        // delivery board, so the committed radius survives leaving the page.
-        SetScreen(_taxi.OpenProposal());
-        RefreshJob();
-        _control?.Refresh();
-    }
 
     private void OnJobEntered()
     {
@@ -1423,86 +1207,12 @@ public sealed class MainViewModel
         SaveDriver(_rivals.LastResult);
         RefreshJob();
         ShowJobScreen(new ShiftEndedScreenViewModel(
-            summary, _shifts, _shiftBoard, _beat,
-            new RelayCommand(() => SetScreen(CreateControlScreen()))));
+            summary, _shifts, _shiftBoard, _beat, _nav.ControlCommand));
     }
 
     private string PlayerName() => _story.Profile?.DisplayName ?? string.Empty;
 
     private string HomeCountry => _story.Profile?.Country ?? _addressMap.Country;
-
-    // The wallet page (PORTPLAN 06/43/48/60): a fresh page per visit, so the
-    // cash, XP and bank figures always open on the live wallet and the
-    // leaderboard on the latest board result. Read-only — opening never
-    // writes; BACK returns to the menu it was opened from.
-    private void OpenWallet()
-    {
-        // Re-rank locally against the current display name: the boot board may
-        // have landed before the opening screen confirmed it, and the wallet
-        // must not keep showing the old 1-of-1 fallback.
-        _rivals.Refresh(_wallet.Xp);
-        SetScreen(new WalletScreenViewModel(
-            _wallet, _rivals,
-            new RelayCommand(() => SetScreen(CreateMenuScreen())),
-            _beat));
-    }
-
-    // The garage page (PORTPLAN 30, Unity GarageScreen): a fresh page per visit,
-    // so a car bought since the last visit is on it. A switch banks the garage
-    // through the shared save (Unity SaveManager.Save) — the page never writes.
-    // BACK returns to the home page it is opened from (Unity's You menu).
-    private void OpenGarage()
-    {
-        SetScreen(new GarageScreenViewModel(
-            _garage,
-            new RelayCommand(() => SetScreen(CreateHomeScreen())),
-            key =>
-            {
-                SaveGarage();
-                _log.LogInfo($"[Garage] now driving {key} " +
-                    $"({_garage.Cars.Count} cars owned)");
-            },
-            _beat));
-    }
-
-    // Unity CarDealerScreen.OnBuyClicked's tail: the car is already in the
-    // garage (the page added it after the cash moved), the purchase is banked,
-    // and the follow-up choice opens. Unity shows the summary block only when
-    // this was the garage's second car — the starter plus this purchase.
-    private void OnCarBought(CarSpec car)
-    {
-        SaveGarage();
-        _log.LogInfo($"[Dealer] bought {car.Key}: {CarTitles.Of(car)} " +
-            $"for {car.Price:0} CR (cash {_wallet.Cash:0.00}, " +
-            $"{_garage.Cars.Count} cars owned)");
-        bool second = _garage.Cars.Count == 2;
-        SetScreen(new BoughtFirstCarScreenViewModel(
-            car, second,
-            new RelayCommand(() => DriveNewCar(car)),
-            new RelayCommand(KeepCurrentCar)));
-    }
-
-    // Unity BoughtFirstCar.OnNewCarClicked: the new car becomes the one driven
-    // (and with it the trunk capacity the delivery jobs read). Both branches
-    // bank and return to the control page.
-    private void DriveNewCar(CarSpec car)
-    {
-        if (_garage.SetCurrent(car.Key))
-        {
-            _log.LogInfo($"[Dealer] driving the new car: {car.Key}");
-        }
-        SaveGarage();
-        SetScreen(CreateControlScreen());
-    }
-
-    // Unity BoughtFirstCar.OnCurrentCarClicked: the new car stays parked; the
-    // car driven does not change.
-    private void KeepCurrentCar()
-    {
-        _log.LogInfo($"[Dealer] keeping {_garage.CurrentKey ?? "no car"}");
-        SaveGarage();
-        SetScreen(CreateControlScreen());
-    }
 
     // The garage's own save (PORTPLAN 51 interim): its file, its call sites
     // (a purchase, a switch, the starter seed), never the driver's scalars — a

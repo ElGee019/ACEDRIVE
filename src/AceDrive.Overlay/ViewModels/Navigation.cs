@@ -1,0 +1,465 @@
+using System.Windows.Input;
+using AceDrive.Core;
+using AceDrive.Overlay.Localization;
+using AceDrive.Overlay.Services;
+
+namespace AceDrive.Overlay.ViewModels;
+
+/// <summary>
+/// The panel's page graph (Unity's ScreenManager): the control page, the menu,
+/// every page a tile opens — calendar, home, wallet, trunk, garage, addresses,
+/// the delivery board and the hub — and the bought-car choice.
+///
+/// It owns the page caches (control, menu and calendar are built once so their
+/// state survives leaving the page, exactly like Unity's cached screens; the
+/// rest are rebuilt on every visit) and the one "swap the page" seam, which
+/// also drops a pending voice tap so an old beat can never fire after the
+/// player moved on.
+///
+/// Pages take commands and data, never policy: the entries whose domain lives
+/// elsewhere (the settings page with RESET GAME, the haul settle) and the
+/// outcomes the coordinator banks (a timed-out shift, the readouts) travel
+/// through <see cref="INavigationHost"/>. The display week mirrors the value
+/// the coordinator owns (the day flip rolls it) until <c>DayCycle</c> takes it
+/// over (S5).
+/// </summary>
+public sealed class Navigation
+{
+    private readonly OverlayShell _shell;
+    private readonly VoiceBeat _beat;
+    private readonly ILog _log;
+
+    // Page data: each page reads the live instance, never a snapshot.
+    private readonly GameClock _game;
+    private readonly IClock _clock;
+    private readonly TaxiShift _shift;
+    private readonly TodoTable _todos;
+    private readonly RoadTestLedger _roads;
+    private readonly DriverWallet _wallet;
+    private readonly Garage _garage;
+    private readonly IRivalsService _rivals;
+    private readonly Trunk _trunk;
+    private readonly Hunger _hunger;
+    private readonly StoreCatalog _stores;
+    private readonly PoiDirectory _directory;
+    private readonly ITelemetryHud? _hud;
+    private readonly DeliveryBoard _board;
+    private readonly DeliveryCareer _career;
+    private readonly CityEconomy _city;
+
+    // The collaborators these pages belong to: the proposal page and the board
+    // are theirs, and the doors behind a delivery stop are the world's.
+    private readonly TaxiJobFlow _taxi;
+    private readonly DeliveryFlow _delivery;
+    private readonly PoiWorld _world;
+
+    // The pages' banks: the garage file, the road-test pick, the shift start and
+    // the trunk's driver save all go through the one saver the root built.
+    private readonly GameStateSaver _saver;
+
+    // The display week mirrors the coordinator's (it owns the day flip and so
+    // the roll) so a page built after a roll still stamps the right week. The
+    // mirror moves with its owner once DayCycle exists (S5).
+    private int _week;
+
+    // Built once and reused: the control page flips its shift button, the menu
+    // keeps its clock ticking behind another page, and the calendar keeps its
+    // week rows, all like Unity's cached screens.
+    private MainControlScreenViewModel? _control;
+    private CalendarScreenViewModel? _calendar;
+    private MenuScreenViewModel? _menu;
+    private ParameterizedCommand<int>? _openDay;
+
+    // Weekday number of the road-test event (Unity: Tuesday), read off the
+    // calendar data by RoadTestDayOfWeek, never hardcoded here.
+    private readonly int _roadTestDay = RoadTestDayOfWeek();
+
+    // WHY late: the host is the coordinator, which is built after this
+    // navigator. Every member below is only reachable from a page command, so
+    // the attach in the coordinator's constructor always comes first.
+    private INavigationHost _host = null!;
+
+    public Navigation(
+        OverlayShell shell, VoiceBeat beat,
+        GameClock game, IClock clock, TaxiShift shift, TodoTable todos,
+        RoadTestLedger roads, GameStateSaver saver,
+        DriverWallet wallet, Garage garage, IRivalsService rivals,
+        Trunk trunk, Hunger hunger, StoreCatalog stores,
+        PoiDirectory directory, ITelemetryHud? hud,
+        DeliveryBoard board, DeliveryCareer career, CityEconomy city,
+        TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld world,
+        int startWeek, ILog log)
+    {
+        _shell = shell;
+        _beat = beat;
+        _game = game;
+        _clock = clock;
+        _shift = shift;
+        _todos = todos;
+        _roads = roads;
+        _saver = saver;
+        _wallet = wallet;
+        _garage = garage;
+        _rivals = rivals;
+        _trunk = trunk;
+        _hunger = hunger;
+        _stores = stores;
+        _directory = directory;
+        _hud = hud;
+        _board = board;
+        _career = career;
+        _city = city;
+        _taxi = taxi;
+        _delivery = delivery;
+        _world = world;
+        _week = startWeek;
+        _log = log;
+
+        ControlCommand = new RelayCommand(ShowControl);
+        MenuCommand = new RelayCommand(ShowMenuPage);
+        GarageCommand = new RelayCommand(OpenGarage);
+        TaxiShiftCommand = new RelayCommand(OpenTaxiShift);
+    }
+
+    /// <summary>The control page's START/CONTINUE TAXI entry.</summary>
+    public ICommand TaxiShiftCommand { get; }
+
+    /// <summary>Attaches the coordinator that banks the shift and builds the settings page.</summary>
+    public void Attach(INavigationHost host) => _host = host;
+
+    /// <summary>Opens the control page (the BACK target of every job page).</summary>
+    public ICommand ControlCommand { get; }
+
+    /// <summary>Opens the menu (the BACK target of every menu page).</summary>
+    public ICommand MenuCommand { get; }
+
+    /// <summary>Opens the garage page (the home page's tile).</summary>
+    public ICommand GarageCommand { get; }
+
+    /// <summary>
+    /// Swaps the visible page. WHY the beat cancel rides here: a real screen
+    /// change (wake-word re-home, mouse navigation) supersedes a pending voice
+    /// tap, so one utterance can never flip the page after the player moved on.
+    /// </summary>
+    public void ShowScreen(object? screen)
+    {
+        _beat.Cancel();
+        _shell.ShowScreen(screen);
+    }
+
+    /// <summary>Swaps to the menu page without touching visibility.</summary>
+    public void ShowMenuPage() => ShowScreen(MenuPage());
+
+    /// <summary>Swaps to the control page without touching visibility.</summary>
+    public void ShowControl() => ShowScreen(ControlPage());
+
+    // Built once and reused. The taxi entry opens the job proposal page (port
+    // of Unity TaxiJobProposalScreen); delivery opens the career page (port
+    // of Unity DeliveryJobScreen). The weekly strip lives on its own page
+    // (see CalendarPage).
+    public MainControlScreenViewModel ControlPage()
+    {
+        _control ??= new MainControlScreenViewModel(
+            _beat, _todos, _shift,
+            new ControlActions(
+                TaxiShiftCommand, new RelayCommand(ShowDelivery),
+                new RelayCommand(_host.SettleHaul)),
+            MenuCommand);
+        return _control;
+    }
+
+    /// <summary>Re-reads the cached control page (the taxi flow's tick does).</summary>
+    public void RefreshControl() => _control?.Refresh();
+
+    // Unity JobSelectionScreen's OnStartTaxiShift: the tap owns the shift
+    // bookkeeping (start fresh, or end an idle-timed-out one first), then opens
+    // the proposal page — the job itself only exists once ACCEPTed. A shift that
+    // already timed out is the coordinator's to close and show (it owns the
+    // shift record and its summary page).
+    private void OpenTaxiShift()
+    {
+        DateTime now = _clock.UtcNow;
+        if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
+        {
+            _host.ShiftTimedOut(idle);
+            return;
+        }
+
+        if (!_shift.IsStarted)
+        {
+            _shift.Start(now);
+            _log.LogInfo("taxi shift started");
+            // Checkpoint bank: a shift start is the moment a player reads as
+            // progress, so the calendar never rewinds past it when the process
+            // dies before the next throttled write. The shift itself is banked
+            // too: an empty shift must still idle out across a restart.
+            _saver.SaveClock(_week);
+            _saver.SaveShift();
+        }
+
+        // The proposal page is the flow's: built once and reused like the
+        // delivery board, so the committed radius survives leaving the page.
+        ShowScreen(_taxi.OpenProposal());
+        _host.ReadoutsChanged();
+        RefreshControl();
+    }
+
+    // Built once and reused: the pickup cart survives leaving the page, like
+    // Unity's player.pickupCart. The run button carries the whole cart run to
+    // the flow, which drives the hub pickups and store drop-offs on the
+    // companion before it settles the receipt. The hub button opens the real
+    // OPEN NEW CAREER page (item 18).
+    private void ShowDelivery()
+    {
+        // A hub bought on the previous visit may have opened store doors; the
+        // board must include them before the cached page paints.
+        _world.Grow();
+        ShowScreen(_delivery.OpenBoard());
+    }
+
+    /// <summary>Opens the hub page (Unity's OPEN NEW CAREER, PORTPLAN 18).</summary>
+    public void ShowHub() =>
+        ShowScreen(new DeliveryHubScreenViewModel(
+            _career, _board.Catalog, _city, _log,
+            new RelayCommand(CloseHub),
+            _beat,
+            _world.PlaceHubDoor));
+
+    /// <summary>
+    /// The board itself, for the paths that come back to it from elsewhere (the
+    /// delivery receipt's CONTINUE).
+    /// </summary>
+    public void ShowDeliveryBoard() =>
+        ShowScreen(_delivery.Board ?? (object)ControlPage());
+
+    /// <summary>
+    /// The poll's page maintenance: the flash edges and the minute-guarded
+    /// refreshes of the three cached pages. Warm path only — each page does one
+    /// int compare per tick at worst (hot-path discipline).
+    /// </summary>
+    public void Tick()
+    {
+        _control?.UpdateFlash();
+        _control?.Refresh();
+        _calendar?.UpdateFlash();
+        _calendar?.Refresh();
+        _menu?.UpdateFlash();
+        _menu?.UpdateReveal();
+        _menu?.Refresh();
+    }
+
+    /// <summary>
+    /// The coordinator's display week (it owns the day flip, and with it the
+    /// roll): the mirror moves, the calendar strip and the menu header repaint
+    /// now instead of on the next tick, and the road-test pick is named in the
+    /// log. Reported rather than read, so the week has one owner.
+    /// </summary>
+    public void DisplayWeekChanged(int week)
+    {
+        _week = week;
+        if (_calendar is not null)
+        {
+            _calendar.DisplayWeek = week;
+            _calendar.Refresh();
+        }
+
+        if (_menu is not null)
+        {
+            _menu.DisplayWeek = week;
+        }
+
+        // The road-test pick deliberately does NOT rotate with the week — an
+        // untested car stays on offer until it is actually driven (PORTPLAN 49).
+        _log.LogInfo($"week {week} opened: road test stays {DescribeRoadTest()}");
+    }
+
+    // Unity CarDealerScreen.OnBuyClicked's tail: the car is already in the
+    // garage (the page added it after the cash moved), the purchase is banked,
+    // and the follow-up choice opens. Unity shows the summary block only when
+    // this was the garage's second car — the starter plus this purchase.
+    public void CarBought(CarSpec car)
+    {
+        _saver.SaveGarage();
+        _log.LogInfo($"[Dealer] bought {car.Key}: {CarTitles.Of(car)} " +
+            $"for {car.Price:0} CR (cash {_wallet.Cash:0.00}, " +
+            $"{_garage.Cars.Count} cars owned)");
+        bool second = _garage.Cars.Count == 2;
+        ShowScreen(new BoughtFirstCarScreenViewModel(
+            car, second,
+            new RelayCommand(() => DriveNewCar(car)),
+            new RelayCommand(KeepCurrentCar)));
+    }
+
+    // Built once and reused; boots on the resumed week (if any), not the
+    // stamp default, so the header is right on the first paint. The calendar
+    // day buttons have no destinations until the freeroam map lands, so
+    // tapping the highlighted day just logs — except the road-test day, which
+    // banks the week's car as tested and switches to the next pick (manual
+    // stand-in until the road-test drive flow lands). Off-gate taps never
+    // reach this action: the page's own day command warns them before
+    // dispatching.
+    private CalendarScreenViewModel CalendarPage()
+    {
+        _openDay ??= new ParameterizedCommand<int>(OnDay);
+        _calendar ??= new CalendarScreenViewModel(
+            _beat, _game, _clock, _roads,
+            CalendarStamp.Default with { Week = _week },
+            _openDay, MenuCommand);
+        return _calendar;
+    }
+
+    private void OpenCalendar() => ShowScreen(CalendarPage());
+
+    private void OnDay(int day)
+    {
+        if (day == _roadTestDay)
+        {
+            string before = DescribeRoadTest();
+            _roads.MarkTested();
+            _saver.SaveRoadTest();
+            _log.LogInfo($"road test done: {before} -> {DescribeRoadTest()}");
+            _calendar?.Refresh();
+            return;
+        }
+
+        _log.LogInfo($"calendar day {day} tapped while locked: waiting on the freeroam map");
+    }
+
+    private string DescribeRoadTest() =>
+        _roads.Current is { } car ? CarTitles.Of(car) : "none";
+
+    // Built once and reused so its clock keeps ticking behind another page. The
+    // settings tile is the coordinator's page (it owns the preferences writer
+    // and RESET GAME), so it travels through the host.
+    public MenuScreenViewModel MenuPage() =>
+        _menu ??= new MenuScreenViewModel(
+            new RelayCommand(OpenWallet),
+            ControlCommand,
+            new RelayCommand(OpenCalendar),
+            new RelayCommand(OpenTrunk),
+            new RelayCommand(_host.ShowSettings),
+            new RelayCommand(OpenHome),
+            _hunger, _garage,
+            _beat,
+            _game,
+            _clock,
+            _week);
+
+    // The home page (Unity YouScreen): the player's own doors, starting with
+    // the garage. A fresh page per visit like the wallet, so nothing stale
+    // survives between openings; BACK returns to the menu it was opened from.
+    private void OpenHome() => ShowScreen(CreateHomeScreen());
+
+    private HomeScreenViewModel CreateHomeScreen() =>
+        new(GarageCommand,
+            new RelayCommand(OpenAddresses),
+            MenuCommand,
+            _beat);
+
+    // The addresses page (PORTPLAN 24/27): the discovered POIs alphabetic, the
+    // temporary stand-in for markers on the map. A row pins the HUD's drive-to
+    // line; driving there and pressing ENTER enters the place.
+    private void OpenAddresses() =>
+        ShowScreen(new AddressesScreenViewModel(
+            _directory, _hud,
+            new RelayCommand(OpenHome),
+            _beat));
+
+    // The trunk page (PORTPLAN 26, Unity YouScreen's TrunkScreen) is rebuilt on
+    // every visit like Unity's RebuildTrunkScreen: a shop purchase made since
+    // the last look must show, so the page is never cached. EAT banks the trunk
+    // and the appetite together — they live in different files, and a bite
+    // moves both.
+    private void OpenTrunk() =>
+        ShowScreen(new TrunkScreenViewModel(
+            _trunk, _hunger, _garage, _stores,
+            MenuCommand,
+            OnTrunkItemEaten,
+            _beat));
+
+    private void OnTrunkItemEaten()
+    {
+        _saver.SaveDriver(_rivals.LastResult);
+        _saver.SaveHunger();
+    }
+
+    // The wallet page (PORTPLAN 06/43/48/60): a fresh page per visit, so the
+    // cash, XP and bank figures always open on the live wallet and the
+    // leaderboard on the latest board result. Read-only — opening never writes;
+    // BACK returns to the menu it was opened from.
+    private void OpenWallet()
+    {
+        // Re-rank locally against the current display name: the boot board may
+        // have landed before the opening screen confirmed it, and the wallet
+        // must not keep showing the old 1-of-1 fallback.
+        _rivals.Refresh(_wallet.Xp);
+        ShowScreen(new WalletScreenViewModel(
+            _wallet, _rivals,
+            MenuCommand,
+            _beat));
+    }
+
+    // The garage page (PORTPLAN 30, Unity GarageScreen): a fresh page per visit,
+    // so a car bought since the last visit is on it. A switch banks the garage
+    // through the shared save (Unity SaveManager.Save) — the page never writes.
+    // BACK returns to the home page it is opened from (Unity's You menu).
+    private void OpenGarage() =>
+        ShowScreen(new GarageScreenViewModel(
+            _garage,
+            new RelayCommand(OpenHome),
+            OnCarSwitched,
+            _beat));
+
+    private void OnCarSwitched(string key)
+    {
+        _saver.SaveGarage();
+        _log.LogInfo($"[Garage] now driving {key} ({_garage.Cars.Count} cars owned)");
+    }
+
+    // Unity BoughtFirstCar.OnNewCarClicked: the new car becomes the one driven
+    // (and with it the trunk capacity the delivery jobs read). Both branches
+    // bank and return to the control page.
+    private void DriveNewCar(CarSpec car)
+    {
+        if (_garage.SetCurrent(car.Key))
+        {
+            _log.LogInfo($"[Dealer] driving the new car: {car.Key}");
+        }
+
+        _saver.SaveGarage();
+        ShowControl();
+    }
+
+    // Unity BoughtFirstCar.OnCurrentCarClicked: the new car stays parked; the
+    // car driven does not change.
+    private void KeepCurrentCar()
+    {
+        _log.LogInfo($"[Dealer] keeping {_garage.CurrentKey ?? "no car"}");
+        _saver.SaveGarage();
+        ShowControl();
+    }
+
+    private void CloseHub()
+    {
+        // Unity's backfill runs when the career opens: the newly owned category
+        // places its first store before the board is shown again.
+        _world.Grow();
+        _delivery.RefreshBoard();
+        ShowDeliveryBoard();
+    }
+
+    // Road-test weekday number, read off the calendar data (no Unity-day
+    // literal here: the strip owns which weekday hosts the event).
+    private static int RoadTestDayOfWeek()
+    {
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.EventId == ControlCalendar.RoadTest)
+            {
+                return day.DayOfWeek;
+            }
+        }
+
+        return -1;
+    }
+}

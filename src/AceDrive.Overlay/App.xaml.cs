@@ -365,12 +365,23 @@ public partial class App : Application, IDisposable
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,
             beat, _log);
+        // The page graph: the control page, the menu and every tile behind
+        // them, with their own caches. It takes the flows (their pages are
+        // theirs) and the session's data; the coordinator attaches as its host
+        // inside the VM's constructor, which is the one late edge for the
+        // entries that are not pages (a timed-out shift, the settings page,
+        // the haul settle).
+        int startWeek = saved?.Week ?? CalendarStamp.Default.Week;
+        var navigation = new Navigation(
+            shell, beat, game, wall, shift, todos, roadTests, saver,
+            driver, garage, rivals, trunk, hunger, storeCatalog,
+            poiDirectory, hud, deliveryBoard, deliveryCareer, city,
+            taxi, delivery, poiWorld, startWeek, _log);
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
             game,
             shift,
-            shiftStore,
             new JsonSettingsStore(),
             _log,
             fares,
@@ -382,19 +393,13 @@ public partial class App : Application, IDisposable
             playerName,
             CreateVoice(_log),
             carBrands,
-            todos,
             deliveryBoard,
             deliveryCareer,
             deliveryFares,
             city,
-            cityStore,
-            roadTests,
-            roadTestStore,
-            clockStore,
-            saved?.Week ?? CalendarStamp.Default.Week,
+            startWeek,
             beat,
             driver,
-            driverStore,
             streak,
             zone,
             friendships,
@@ -404,9 +409,7 @@ public partial class App : Application, IDisposable
             shifts,
             shiftStandings,
             hunger,
-            hungerStore,
             garage,
-            garageStore,
             insuranceRules,
             // The streak's random skill gains (PORTPLAN 06/47): its own seeded
             // stream, offset from the taxi seed like the other draws.
@@ -415,9 +418,9 @@ public partial class App : Application, IDisposable
             poiDirectory, poiStore,
             preferencesStore, preferences, culture,
             trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
-            taxi, delivery, poiWorld, poiArrivals,
+            taxi, delivery, poiWorld, poiArrivals, navigation,
             hud,
-            saveResets, restarter, storeCatalog);
+            saveResets, restarter);
 
         MainWindow = new MainWindow(vm, _log);
         // The 200 px companion: own placement file, width follows the main

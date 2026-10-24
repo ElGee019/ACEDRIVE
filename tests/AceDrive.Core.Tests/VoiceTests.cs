@@ -125,30 +125,35 @@ public sealed class VoiceTests
             null, logger);
         var delivery = new DeliveryFlow(
             deliveryBoard, career, city, friendships, meter, breakdowns, beat, logger);
-        var vm = new MainViewModel(telemetry ?? new FakeTelemetry(), clock, game, shift, shiftStore,
+        var shell = new OverlayShell();
+        var navigation = new Navigation(
+            shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
+            wallet, garage, rivals, trunk, hunger, StoreCatalog.Default,
+            poiDirectory, null, deliveryBoard, career, city,
+            taxi, delivery, poiWorld, 1, logger);
+        var vm = new MainViewModel(telemetry ?? new FakeTelemetry(), clock, game, shift,
             new FakeStore(), logger, fares,
             onboarding, contentSource,
             new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
-            mic, car, TodoTable.Default,
+            mic, car,
             deliveryBoard, career,
             deliveryFares,
-            city, cityStore,
-            roads,
-            roadTestStore, clockStore, 1, beat, wallet,
-            driverStore, streak, zone,
+            city, 1,
+            beat, wallet,
+            streak, zone,
             friendships, cars,
             rivals,
             playerTelemetry, shifts,
             new OfflineShiftStandings(),
-            hunger, hungerStore,
-            garage, garageStore, InsuranceRules.Default,
+            hunger,
+            garage, InsuranceRules.Default,
             new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             poiDirectory, poiStore,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops,
-            taxi, delivery, poiWorld, poiArrivals);
+            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
+            taxi, delivery, poiWorld, poiArrivals, navigation);
         return (vm, clock, mic, car);
     }
 

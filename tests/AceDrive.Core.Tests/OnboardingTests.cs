@@ -102,28 +102,34 @@ public sealed class OnboardingTests
             null, logger);
         var delivery = new DeliveryFlow(
             deliveryBoard, career, city, friendships, meter, breakdowns, beat, logger);
-        return new MainViewModel(new FakeTelemetry(), clock, game, shift, shiftStore,
+        var shell = new OverlayShell();
+        var navigation = new Navigation(
+            shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
+            wallet, garage, rivals, trunk, hunger, StoreCatalog.Default,
+            poiDirectory, null, deliveryBoard, career, city,
+            taxi, delivery, poiWorld, 1, logger);
+        return new MainViewModel(new FakeTelemetry(), clock, game, shift,
             new FakeStore(), logger, fares,
             store, contentSource,
             profiles ?? new FakeProfileStore(), new OfflinePlayerNameRegistry(),
             AddressMap.Default, "ElGee",
             new FakeVoiceListener(available: false),
-            carBrands, TodoTable.Default, deliveryBoard, career,
+            carBrands, deliveryBoard, career,
             deliveryFares,
-            city, cityStore,
-            roads, roadTestStore,
-            clockStore, 1, beat, wallet, driverStore,
-            streak, zone, friendships, cars, rivals,
+            city, 1, beat, wallet,
+            streak, zone,
+            friendships, cars,
+            rivals,
             playerTelemetry, shifts,
             new OfflineShiftStandings(),
-            hunger, hungerStore,
-            garage, garageStore, InsuranceRules.Default,
+            hunger,
+            garage, InsuranceRules.Default,
             new Random(0),
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             poiDirectory, poiStore,
             new FakePreferencesStore(), PlayerPreferences.Default, new FakeCultureService(),
-            trunk, taxiRules, saver, fleet, settlement, new OverlayShell(), meter, shops,
-            taxi, delivery, poiWorld, poiArrivals);
+            trunk, taxiRules, saver, fleet, settlement, shell, meter, shops,
+            taxi, delivery, poiWorld, poiArrivals, navigation);
     }
 
     // The first-run page (unit + language) sits before the name form; its

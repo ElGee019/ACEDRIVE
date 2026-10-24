@@ -180,18 +180,23 @@ public sealed class MainViewModelTests
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
             breakdownsInstance, beat, logger);
-        var vm = new MainViewModel(tel, clock, game, shiftInstance, shiftStoreInstance, store,
+        // The page graph shares the one shell the VM binds: the tests assert
+        // vm.CurrentScreen, so both must report the same panel.
+        var shell = new OverlayShell();
+        var navigation = new Navigation(
+            shell, beat, game, clock, shiftInstance, TodoTable.Default, roadsInstance,
+            saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
+            hungerInstance, storeCatalogInstance, directory, hud, deliveryBoard,
+            deliveryCareer, cityInstance, taxi, delivery, poiWorld, startWeek, logger);
+        var vm = new MainViewModel(tel, clock, game, shiftInstance, store,
             logger, faresInstance,
             onboardingStore, contentSource,
             profiles, playerNames ?? new OfflinePlayerNameRegistry(), map, detectedName,
             voice ?? new FakeVoiceListener(available: false),
-            brands, TodoTable.Default, deliveryBoard, deliveryCareer,
+            brands, deliveryBoard, deliveryCareer,
             deliveryFaresInstance,
-            cityInstance, cityStoreInstance,
-            roadsInstance, roadTestStoreInstance,
-            clockStoreInstance, startWeek,
+            cityInstance, startWeek,
             beat, walletInstance,
-            driverStoreInstance,
             streakInstance,
             zoneInstance,
             friendsInstance, pool,
@@ -200,8 +205,8 @@ public sealed class MainViewModelTests
             telemetryInstance,
             shiftsInstance,
             shiftStandings ?? new FakeShiftStandings(),
-            hungerInstance, hungerStoreInstance,
-            garageInstance, garageStoreInstance,
+            hungerInstance,
+            garageInstance,
             InsuranceRules.Default,
             rng ?? new Random(0),
             pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
@@ -209,9 +214,9 @@ public sealed class MainViewModelTests
             preferencesStore ?? new FakePreferencesStore(),
             preferences ?? PlayerPreferences.Default,
             culture ?? new FakeCultureService(),
-            trunkInstance, taxiRulesInstance, saver, fleet, settlement, new OverlayShell(),
-            meter, shops, taxi, delivery, poiWorld, poiArrivals, hud,
-            saveResets, restarter, storeCatalogInstance);
+            trunkInstance, taxiRulesInstance, saver, fleet, settlement, shell,
+            meter, shops, taxi, delivery, poiWorld, poiArrivals, navigation, hud,
+            saveResets, restarter);
         if (carKsId is not null)
         {
             // The watcher thread lands via the dispatcher, which runs inline

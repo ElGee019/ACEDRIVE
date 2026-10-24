@@ -36,8 +36,9 @@ Extracted and pushed, each verified (build 0 warnings, 1659 tests, format clean)
 | `4d4c0e2` | Taxi job → `TaxiJobFlow` + `ITaxiJobHost`, −397 lines and six constructor parameters |
 | S2 | Delivery run → `DeliveryFlow` + `IDeliveryHost`; `TripBreakdowns` and the `DeliveryBoard` holder, −145 lines |
 | S3 | POI growth/doors/handlers → `PoiWorld` + `IPoiWorldHost`, −146 lines |
+| S4 | Pages → `Navigation` + `INavigationHost`; the control/menu/calendar caches and the bought-car choice, −291 lines |
 
-`MainViewModel`: 2658 → 1596 lines. Over 1,000 of the remaining lines are
+`MainViewModel`: 2658 → 1306 lines. Over 800 of the remaining lines are
 domain work that belongs to someone else; the target coordinator is roughly
 500.
 
@@ -80,7 +81,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
 | `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
 | `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, calendar week, bought-car page |
-| `Navigation` | `_control`, `_menu`, `_calendar`, `_openDayAction`, `_roadTestDay` | `Control()`, `Menu()`, `Calendar()`, `Home()`, `Wallet()`, `Garage()`, `Addresses()`, `Trunk()`, `Settings()`, `Delivery()`, `Hub()` | `OverlayShell` (page swap) + `GameStateSaver` |
+| `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay`, the week mirror | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (4 members) |
 | `TelemetryReadouts` | the seven painted strings + their caches | `Paint(sample)`, `PaintWaiting()`, `RefreshJob(job, shift)` | `IReadoutSink` (or returns a record) |
 | `DayCycle` | `_displayWeek`, `_lastDay`, `_lastShiftSecs` | `Tick(today)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: pages' `DisplayWeek`, shift-ended page, `SaveClock` |
 | `JobSettlement` ✅ | — | `SettleTaxiRide`, `SettleDeliveryRun` | `IJobSettlementHost` |
@@ -124,7 +125,7 @@ stores + saved state
           └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
           └ DeliveryFlow (board, career, city, meter, breakdowns)
           └ PoiWorld (growth, directory, career, shops, board)
-              └ Navigation (flows' commands, shop pages, saver)
+              └ Navigation (flows' pages, page data, saver)
                   └ OnboardingFlow (Navigation, saver)
                   └ VoiceRouter (shell, brand, content, TaxiJobFlow)
                       └ MainViewModel (all of the above)
@@ -132,6 +133,8 @@ stores + saved state
 
 `PoiArrivalRouter` is built in the root right after `PoiWorld`, from
 `PoiWorld.Handlers(...)`; the store handler still comes in from the root.
+`Navigation` reports back to `MainViewModel` through `INavigationHost`, the
+same late `Attach` the three flows use.
 
 ## 6. Extraction sequence
 
@@ -175,11 +178,34 @@ them, so they cross as reports instead of the world reaching for the shell.
 The world takes `IOnboardingStore` for its introduction gate, the same
 `Load().IsComplete` contract `TripBreakdowns` already uses.
 
-**S4 — `Navigation`** (~260 lines: control/menu/calendar/home/wallet/garage/
-addresses/trunk/settings/delivery/hub + the bought-car choice). Takes the
-flows' `ICommand`s; owns the page caches.
-*Unblocks:* `IStoryHost.ControlScreen`/`MenuScreen`, so `OnboardingFlow` is
-constructible in the root. After S4 the coordinator constructs nothing.
+**S4 — `Navigation`** ✅ (~465 lines: control/menu/calendar/home/wallet/
+garage/addresses/trunk/delivery/hub + the bought-car choice). Takes the flows
+(their pages are theirs), the session's data and the saver; owns the page
+caches and the one page-swap seam.
+*Unblocked:* `IStoryHost.ControlScreen`/`MenuScreen` now answer from the
+navigator, so the settings page, the menu and the control page are one graph.
+`Poll` lost the five page-maintenance lines and the week-flip push, and the
+constructor lost `TodoTable`, `StoreCatalog`, `RoadTestLedger` and seven
+store/router parameters it never read.
+*Deviations:*
+- The settings page stays with the coordinator (`INavigationHost.ShowSettings`).
+  It is the story flow's (it owns the preferences writer) and RESET GAME is
+  session plumbing (§4), so moving it into the navigator would close a cycle
+  Navigation ↔ `OnboardingFlow` ↔ `IStoryHost`. The menu's SETTINGS tile is the
+  one report that is a page.
+- The haul settle and a shift that timed out before the tap are reports too
+  (`SettleHaul`, `ShiftTimedOut`): the first is a job settle, the second is
+  `EndShift` (S5's `DayCycle`).
+- `OpenTaxiShift` moved in, because the control page owns the tap: it starts
+  the shift, banks it and opens the flow's proposal page, and the timeout edge
+  is reported instead of closed.
+- The display week is a mirror, not a delegate: the coordinator still owns the
+  number (the day flip rolls it) and reports it through `DisplayWeekChanged`,
+  which also repaints the cached header and strip. It moves with its owner in
+  S5.
+- The coordinator still constructs `OnboardingFlow` and `VoiceRouter`: making
+  them root-built needs the S6 rewrite, so "the coordinator constructs
+  nothing" lands there, not here.
 
 **S5 — `TelemetryReadouts` + `DayCycle`** (~270 lines). The readouts become a
 formatter the coordinator applies; the day flip, week display and shift timeout
@@ -192,11 +218,15 @@ constructor's parameter list, collapse the test builders to named collaborators.
 
 ### Host implementations after S4
 
-Neither host interface needs the coordinator once the pieces above exist:
+The navigator exists, so three of the four reads are in place:
 
-- `IStoryHost` — `Navigation` supplies `ControlScreen`/`MenuScreen`/`ShowScreen`/
-  `Present`/`Hide`/`ShowMenu`, `OverlayShell` supplies `CurrentScreen`/`IsShown`,
-  and `GameStateSaver` supplies `SaveDriver`.
+- `IStoryHost` — `Navigation` supplies `ControlScreen`/`MenuScreen`/
+  `ShowScreen`/`ShowMenu`, `OverlayShell` supplies `CurrentScreen`/`IsShown`/
+  `Present`/`Hide`, and `GameStateSaver` supplies `SaveDriver`. Until the S6
+  rewrite the coordinator still assembles them.
+- `IStoryHost`'s remaining gap is `Present`/`Hide`: they carry the reveal
+  policy (`_introShown`, the log lines), so they stay with the coordinator —
+  the same panel policy §4 keeps there.
 - `IVoiceHost` — `OverlayShell` supplies `IsShown`/`CurrentScreen`/`Show`/
   `RecordActivity` once the call gate reads `TaxiJobFlow.InProgress`,
   `IContentSource` supplies `Content`, `ICarBrandSource` supplies `CarBrand`.
@@ -264,32 +294,45 @@ in S1, when the gate moves.
 
 ## 11. Resume here
 
-State: S1 pushed as `4d4c0e2`; S2 pushed; S3 is green locally.
-`MainViewModel` 1596 lines (was 1742), −146 lines: the POI growth, shop
-adoption, hub doors and handler assembly left, along with `_poiGrowth` and
-`_jobs`. 1678 tests green (+8: `PoiWorldTests`).
+State: S1 pushed as `4d4c0e2`; S2 and S3 pushed; S4 is green locally.
+`MainViewModel` 1306 lines (was 1596), −291 lines: the control/menu/calendar/
+home/wallet/garage/addresses/trunk/delivery/hub builders and the bought-car
+choice left, along with `_control`, `_menu`, `_calendar`, `_openDayAction`,
+`_roadTestDay`, `_roads`, `_todos`, `_trunk`, `_storeCatalog` and
+`_poiDirectory`. 1687 tests green (+9: `NavigationTests`).
 
-Next: **S4 — `Navigation`** (~260 lines: control/menu/calendar/home/wallet/
-garage/addresses/trunk/settings/delivery/hub + the bought-car choice). Takes
-the flows' `ICommand`s; owns the page caches.
-*Unblocks:* `IStoryHost.ControlScreen`/`MenuScreen`, so `OnboardingFlow` is
-constructible in the root. After S4 the coordinator constructs nothing.
+Next: **S5 — `TelemetryReadouts` + `DayCycle`** (~270 lines). The readouts
+become a formatter the coordinator applies (the seven painted strings and
+their caches leave); the day flip, the display week and the shift timeout
+leave `Poll`, which the week mirror in `Navigation` then follows
+(`DisplayWeekChanged` is the seam `DayCycle` takes over).
+*Unblocks:* nothing construction-wise; this is the SRP win on the hot path and
+what makes `Poll` reviewable (~60 lines).
 
 Working agreements earned so far:
 
 - The coordinator implements the host; a flow attaches with `Attach(this)` in
   the coordinator's constructor — the one late edge, closed before any command
   can fire. `PoiWorld` joins that list: its arrival delegates only read the
-  host when a door is entered.
+  host when a door is entered. `Navigation` joins it too, for the four entries
+  that are not pages.
 - A collaborator that only *produces* a page takes no host at all:
   `TripBreakdowns.Interrupt` charges the tow and returns the page, and the
   caller's own host puts it up with its own BACK command.
 - Collaborators take the saver, watcher and rivals directly; the host only
   reports (page, saves, readouts). A stop's door is asked as
   `bool PinStop(leg)` — reporting plus a degrade signal, never a host getter.
+- Pages are built by one collaborator and cached there; the coordinator keeps
+  only the panel policy (`Present`/`Hide`, the mid-job call gate, which page a
+  call opens) and routes its own page swaps through `Navigation.ShowScreen`,
+  the one beat-cancelling seam.
+- A page whose domain belongs elsewhere is a report on the host, not a builder
+  in the navigator: the settings page (story flow + RESET GAME), the haul
+  settle (a job) and a shift that already timed out (`EndShift`, S5).
 - A value that a collaborator needs now but another collaborator will own later
   crosses the host explicitly and moves with its new owner (`DisplayWeek`:
-  coordinator → `DayCycle` in S5).
+  coordinator → `DayCycle` in S5; the navigator's copy is a mirror it only
+  reads for a page built after a roll).
 - Tests: one instance per service graph; builders hoist their locals.
 - Never round-trip UTF-8 through `Get-Content`/`Set-Content` (PowerShell 5.1
   decodes as ANSI and re-encodes, silently mangling `—` and `€`); use
