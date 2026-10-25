@@ -1,0 +1,82 @@
+<UserControl x:Class="AceDrive.Overlay.Views.CentoMigliaScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Cento Miglia page (PORTPLAN 49, Unity CentoMigliaScreen): the same page
+         skeleton as the other pages - viewport-pinned MinHeight, title band,
+         one body block centered in the leftover height, BACK flush at the
+         bottom. Two panels share the body slot like Unity's CentoA/CentoB:
+         the tier list, then the picked tier's description and eligibility.
+         A locked tier stays on the page and only loses its ink, exactly like
+         Unity's non-interactable button. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=CentoTitle}"/>
+        <TextBlock Grid.Row="1" Style="{StaticResource PageBody}" Text="{Binding WeekLine}"/>
+        <TextBlock Grid.Row="2" Style="{StaticResource PageBody}" Text="{Binding ReputationLine}"/>
+        <Grid Grid.Row="3">
+            <!-- CentoA: the clubs, each with the reputation level it asks for.
+                 The list starts under the header and runs the panel's width,
+                 like Unity's 500-of-1200 button column scaled to this panel. -->
+            <StackPanel VerticalAlignment="Top"
+                        Visibility="{Binding IsTierList, Converter={StaticResource BoolToVis}}">
+                <ItemsControl ItemsSource="{Binding Tiers}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Margin="0,2" Padding="14,3" HorizontalAlignment="Stretch"
+                                    IsEnabled="{Binding Eligible}"
+                                    Command="{Binding DataContext.TierCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Label}" FontSize="13" TextAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#FFF"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Eligible}" Value="False">
+                                                        <Setter Property="Foreground" Value="#66FFFFFF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="{Binding Requirement}" FontSize="11" TextAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="#FFBFC4C9"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Eligible}" Value="False">
+                                                        <Setter Property="Foreground" Value="#55FFFFFF"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <!-- CentoB: the picked club - its description, why the driver does
+                 or does not qualify, and the enter button (Unity's registration
+                 line stays out until a race can hand one out). -->
+            <StackPanel VerticalAlignment="Center"
+                        Visibility="{Binding IsDetail, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="{Binding DetailLabel}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                           TextAlignment="Center" Margin="0,0,0,6"/>
+                <TextBlock Style="{StaticResource PageBody}" Text="{Binding DetailDescription}"/>
+                <TextBlock Style="{StaticResource PageBody}" Text="{Binding EligibilityText}" Margin="0,6,0,0"/>
+                <Button Content="{loc:Loc Key=CentoEnter}" Command="{Binding EnterCommand}"
+                        Padding="14,3" Margin="0,14,0,0" HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+        <Button Grid.Row="4" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}"/>
+    </Grid>
+</UserControl>

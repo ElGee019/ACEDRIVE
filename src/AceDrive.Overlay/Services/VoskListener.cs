@@ -39,6 +39,12 @@ public sealed class VoskListener : IVoiceListener
         try
         {
             Vosk.Vosk.SetLogLevel(-1);
+            // The model is whichever folder the player unzipped (App.CreateVoice
+            // looks for the neutral name), so log its size and the README line it
+            // ships: that is the difference between "brands never wake" and a
+            // perfect setup, it lands before the load can fail, and it is one
+            // line per start, never per tick.
+            _log.LogInfo($"voice model: {VoskModelInfo.Describe(_modelPath)}");
             _model = new Model(_modelPath);
             _rec = new VoskRecognizer(_model, _sampleRate);
             _rec.SetWords(false);

@@ -273,4 +273,42 @@ public sealed class DriverWalletTests
         Assert.Equal(2.0, resumed.PendingInsurance);
         Assert.Equal("2026-10-12", resumed.LastInsuranceChargeDate);
     }
+
+    [Fact]
+    public void CreditEarned_CountsEarningsOnly()
+    {
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
+        wallet.AddReceipt(Receipt());     // 13.78
+        wallet.AddDelivery(Delivery());   // 143.40
+        wallet.AddHaul(Haul());           // 74.70
+        wallet.AddBonus(4);               // +4.00
+        wallet.AddInsurancePayout(9.0);   // escrow first: not earnings yet
+        _ = wallet.CollectInsurancePayout();
+
+        Assert.Equal(244.88, wallet.CreditEarned, precision: 6);
+
+        // Moving money around never counts: the ToDo tip measures work, so
+        // Unity's bank-withdrawal quirk is deliberately not ported.
+        wallet.ApplyInterest(5.0);
+        _ = wallet.Withdraw(10.0);
+        wallet.ChargeUnavoidable(3.0);
+        Assert.Equal(244.88, wallet.CreditEarned, precision: 6);
+    }
+
+    [Fact]
+    public void CreditEarned_ResumesAndNeverGoesNegative()
+    {
+        Assert.Equal(
+            12.5,
+            new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 12.5)).CreditEarned);
+
+        // A hand-edited negative reads as a fresh counter.
+        Assert.Equal(
+            0.0,
+            new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: -3.0)).CreditEarned);
+
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
+        wallet.AddReceipt(Receipt());
+        Assert.Equal(13.78, wallet.Snapshot().CreditEarned, precision: 6);
+    }
 }

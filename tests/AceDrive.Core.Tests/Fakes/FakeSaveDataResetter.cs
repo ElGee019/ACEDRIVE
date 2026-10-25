@@ -2,15 +2,15 @@ using AceDrive.Overlay.Services;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>Scriptable save wipe: records the call and reports success.</summary>
+/// <summary>Scriptable save wipe: records the call and answers with a report.</summary>
 public sealed class FakeSaveDataResetter : ISaveDataResetter
 {
-    public bool Result { get; set; } = true;
+    public SaveResetReport Report { get; set; } = SaveResetReport.Completed;
     public int Calls { get; private set; }
 
-    public bool DeleteAll()
+    public SaveResetReport DeleteAll()
     {
         Calls++;
-        return Result;
+        return Report;
     }
 }

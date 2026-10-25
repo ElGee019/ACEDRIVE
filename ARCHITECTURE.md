@@ -91,7 +91,7 @@ coordinator. Pages take commands from the domain that owns them.
 
 | Collaborator | Owns (state) | Public surface | Reporting host |
 |---|---|---|---|
-| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (8 members) |
+| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_conditionMonitor`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (8 members) |
 | `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
 | `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
@@ -470,6 +470,50 @@ The reads now live with their owners:
    entry path (open/closed).
 6. **`AceDrive.Core` stays pure**; no collaborator here may add WPF, IO or
    telemetry offsets.
+
+## 7a. Caches (one owner each, and where they live)
+
+`AGENTS.md` states the policy: cache-first, one owner, invalidate on write, no
+disk on the hot path, bounded, lazy. This is where the caches that already
+exist live, so a new one joins the list instead of becoming an eighth ad-hoc
+dictionary. If a slice adds a cache, it adds its row here.
+
+| Cache | Owner | Key | Invalidated by | Bound |
+|---|---|---|---|---|
+| `_control`/`_menu`/`_calendar` pages | `Navigation` | page | explicit refresh reports (`ControlPage`, `MenuPage`, `WeekChanged`) | 3 fixed pages |
+| `TelemetryReadouts`' painted strings | `TelemetryReadouts` | field + painted text | the value changing (the cache *is* the guard) | fixed fields |
+| `_cache` bitmaps | `ThumbnailImageSource` | image path | file timestamp/sidecar (`EnsurePng`'s freshness check) | per-session, disk-backed |
+| `_cache` bitmaps | `PackImageSource` | pack URI | never (embedded, immutable) | assembly-lifetime |
+| `_geometry` | `OutlinedText` | text + size | the text or size changing | per-element |
+| `_current` profile | `JsonProfileStore` | — | `Save` replaces it | one row |
+| `_km`, `_levels`, `_index`, `_byId`, `_live` … | the `Json*`/`*` store that owns the file | id | `Save` after each mutation | one file's rows |
+| token cache | `FirebaseSession` | — | `Invalidate`/expiry | one token |
+| board/standings cache | `FirestoreRivals`, `FirestoreShiftStandings`, `FirestoreCarRarity` | board | `Refresh()` | one board |
+| `_lastDay`, `_lastShiftSecs` | `DayCycle` | — | the day/time changing | 2 values |
+| `_lastPacketId` | `TelemetryReadouts` | — | packet id change | 1 value |
+
+Two rules the table makes checkable: **no row's owner is a View or the
+coordinator** (a cache whose owner is `MainViewModel` is a mirror of someone
+else's state — §7 rule 1), and **every row has a named invalidator**. A row
+with "never" is only allowed for data that cannot change in a session
+(embedded packs), and must say so.
+
+### Stores: read once, then cache
+
+Every `Json*Store` sits on the same boundary, so the same rule applies to all
+of them: the first `Load()` may read the file, and `Save` must leave the cache
+holding exactly what was written. A store that re-reads per call turns one
+file into a per-job disk hit on cold paths (`JsonOnboardingStore.Load` is read
+from `PoiWorld.Grow`, `TripBreakdowns.Interrupt`, `ZoneGrowth.Expand`,
+`TodoBoard` and the boot catch-up; `IProfileStore.Load` from `DayCycle`,
+`ZoneGrowth` and two rivals callbacks; `IGameClockStore.Load` from `WorldTicks`
+and `DayCycle`).
+
+`JsonProfileStore` already does this (`_loaded`/`_current`, replaced by
+`Save`) and is the pattern to copy. The remaining stores read straight through;
+converting one is a small, self-contained change with one test per store
+(cold `Load`, then a `Save` that is visible to the next `Load` without a
+second read).
 
 ## 8. Tests
 

@@ -41,10 +41,29 @@ public sealed class DriverWallet
             saved?.Cornering ?? DriverRating.NewGameOverall,
             saved?.Concentration ?? DriverRating.NewGameOverall,
             saved?.OffTheLine ?? DriverRating.NewGameOverall);
+        // The ToDo subject's lifetime-earned reading (PORTPLAN 46, Unity
+        // PlayerData.totalCREarned). Unlike Unity the port counts earnings
+        // only, never bank withdrawals: the tip has to measure work, not
+        // moving the same money around.
+        CreditEarned = Math.Max(0.0, saved?.CreditEarned ?? 0.0);
+        // The Gentlemen Drivers Club reputation (PORTPLAN 49, Unity
+        // PlayerData.clubReputation): raw 0 for a fresh driver, exactly like
+        // Unity — the Cento Miglia page applies the 1.0 display floor itself.
+        ClubReputation = Math.Max(0.0, saved?.ClubReputation ?? 0.0);
     }
 
     public double Cash { get; private set; }
     public double Xp { get; private set; }
+
+    /// <summary>Every CR this driver ever earned from a job, a bonus or an
+    /// insurance payout (Unity totalCREarned).</summary>
+    public double CreditEarned { get; private set; }
+
+    /// <summary>The Gentlemen Drivers Club reputation the Cento Miglia page
+    /// gates its tiers on (Unity PlayerData.clubReputation). Read-only for the
+    /// overlay today: only a finished race moves it, and that port has not
+    /// landed.</summary>
+    public double ClubReputation { get; private set; }
 
     /// <summary>The persisted driver-rating skills (Unity PlayerData's three
     /// driver* fields). Skill events move them through the Add* helpers below;
@@ -152,6 +171,7 @@ public sealed class DriverWallet
         }
         PendingInsurance = 0.0;
         Cash = Math.Round(Cash + moved, 2, MidpointRounding.AwayFromZero);
+        Earn(moved);
         return moved;
     }
 
@@ -178,18 +198,19 @@ public sealed class DriverWallet
     }
 
     /// <summary>The consecutive-days login bonus (PORTPLAN 47, Unity
-    /// GrantDailyBonusIfDue): cash only, never XP — Unity matches. The
-    /// totalCREarned counter it feeds there is not part of this port yet,
-    /// so that slice stays behind.</summary>
+    /// GrantDailyBonusIfDue): cash only, never XP — Unity matches. It feeds
+    /// the lifetime-earned reading the ToDo subject shows.</summary>
     public void AddBonus(double bonus)
     {
         Cash = Math.Round(Cash + bonus, 2, MidpointRounding.AwayFromZero);
+        Earn(bonus);
     }
 
     public void AddReceipt(TaxiReceipt receipt)
     {
         Cash = Math.Round(Cash + receipt.Total, 2, MidpointRounding.AwayFromZero);
         Xp += receipt.XpEarned;
+        Earn(receipt.Total);
     }
 
     /// <summary>One settled delivery run: the wholesale cost left with the
@@ -199,6 +220,7 @@ public sealed class DriverWallet
     {
         Cash = Math.Round(Cash + receipt.TotalEarned, 2, MidpointRounding.AwayFromZero);
         Xp += receipt.XpEarned;
+        Earn(receipt.TotalEarned);
     }
 
     /// <summary>One settled car-haul: the car reached the customer and the
@@ -208,6 +230,7 @@ public sealed class DriverWallet
     public void AddHaul(CarHaulReceipt receipt)
     {
         Cash = Math.Round(Cash + receipt.TotalEarned, 2, MidpointRounding.AwayFromZero);
+        Earn(receipt.TotalEarned);
     }
 
     public DriverState Snapshot() => new(Cash, Xp)
@@ -219,5 +242,15 @@ public sealed class DriverWallet
         Cornering = Rating.Cornering,
         Concentration = Rating.Concentration,
         OffTheLine = Rating.OffTheLine,
+        CreditEarned = CreditEarned,
+        ClubReputation = ClubReputation,
     };
+
+    private void Earn(double amount)
+    {
+        if (amount > 0.0)
+        {
+            CreditEarned = Math.Round(CreditEarned + amount, 2, MidpointRounding.AwayFromZero);
+        }
+    }
 }

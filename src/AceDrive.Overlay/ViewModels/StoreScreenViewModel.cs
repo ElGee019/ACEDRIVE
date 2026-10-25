@@ -174,20 +174,27 @@ public sealed class StoreScreenViewModel :
     }
     private bool _trunkOverflow;
 
-    /// <summary>"You have bought N x item", shown after a purchase.</summary>
-    public string BoughtText
+    /// <summary>
+    /// The till receipt of this visit, one line per purchase ("You have bought
+    /// 1 x MAPLE SYRUP"), in the order they were paid for. The page is built
+    /// per store entry, so leaving the shop drops the list; until then a
+    /// purchase only appends, and a fresh selection never hides what was
+    /// already bought.
+    /// </summary>
+    public IReadOnlyList<string> BoughtLines
     {
-        get => _boughtText;
-        private set => SetField(ref _boughtText, value);
+        get => _boughtLines;
+        private set
+        {
+            if (SetField(ref _boughtLines, value))
+            {
+                OnPropertyChanged(nameof(BoughtVisible));
+            }
+        }
     }
-    private string _boughtText = "";
+    private IReadOnlyList<string> _boughtLines = [];
 
-    public bool BoughtVisible
-    {
-        get => _boughtVisible;
-        private set => SetField(ref _boughtVisible, value);
-    }
-    private bool _boughtVisible;
+    public bool BoughtVisible => BoughtLines.Count > 0;
 
     /// <summary>The once-per-visit familiarity notification.</summary>
     public string FriendshipText
@@ -222,15 +229,15 @@ public sealed class StoreScreenViewModel :
             return;
         }
 
-        // Unity starts every fresh selection at one and hides the previous
-        // bought confirmation; the friendship notice stays for the visit.
+        // Unity starts every fresh selection at one; the till receipt and the
+        // friendship notice stay on the page for the whole visit instead of
+        // being overwritten by the next pick.
         foreach (StoreItemRowViewModel item in Items)
         {
             item.IsSelected = ReferenceEquals(item, row);
         }
         _selected = row;
         _quantity = 1;
-        BoughtVisible = false;
         RepaintSelection();
     }
 
@@ -264,8 +271,11 @@ public sealed class StoreScreenViewModel :
 
         ReloadCash();
         Greeting = Strings.Get("StoreGreetingAfter");
-        BoughtText = Strings.Format("StoreBought", quote.Quantity, row.Item.Name);
-        BoughtVisible = true;
+        BoughtLines =
+        [
+            .. _boughtLines,
+            Strings.Format("StoreBought", quote.Quantity, row.Item.Name),
+        ];
         RegisterFriendship();
 
         // Unity resets the selection after a purchase so the player picks a

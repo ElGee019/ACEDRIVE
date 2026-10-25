@@ -46,6 +46,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private HudJobGuidance? _jobGuidance;
     private bool _hasDestination;
     private bool _atDestination;
+    // Set while the player is inside the pinned door. The arrival was consumed
+    // by the entry, so the task text and ENTER hide until a new leg is pinned
+    // or the car leaves and parks there again.
+    private bool _entered;
     private bool _wrongCar;
     private bool _isRevealed;
     // The customer request currently presented on the companion, if any. The
@@ -64,12 +68,13 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private long _shownLegDistance = long.MinValue;
     private bool _legDistanceInKm;
 
-    // The speed challenge's remaining delivery time, painted under the
-    // distance line. The deadline rides on HudJobGuidance, so the HUD still
-    // formats and ticks it while the host owns the clock.
-    private string _speedChallengeText = string.Empty;
-    private bool _speedChallengeLate;
-    private long _shownSpeedSeconds = long.MinValue;
+    // The timed ask's remaining delivery time (speed challenge or accepted
+    // passenger promise), painted under the distance line. The deadline rides
+    // on HudJobGuidance, so the HUD still formats and ticks it while the host
+    // owns the clock.
+    private string _deadlineText = string.Empty;
+    private bool _deadlineLate;
+    private long _shownDeadlineSeconds = long.MinValue;
 
     // Voice acknowledgment: the ENTER button glows teal for one shared beat,
     // then the deferred voice tap acts. Cleared by the 10 Hz poll on expiry.
@@ -199,33 +204,36 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public bool HasHudLine => HudLineText.Length > 0;
 
     /// <summary>
-    /// The speed challenge's countdown ("2:31", then "TOO LATE — NO TIP"),
-    /// empty when no timed challenge is up. Painted in the design's Tourney
-    /// face so it reads as a clock rather than a guidance sentence.
+    /// The timed ask's countdown ("2:31", then "TOO LATE — NO TIP"), empty
+    /// when no deadline is up. The label comes from the guidance's
+    /// <c>DeadlineKey</c>, so a speed challenge and a passenger's hurry read
+    /// differently on the same clock. Painted in the design's Tourney face so
+    /// it reads as a clock rather than a guidance sentence.
     /// </summary>
-    public string SpeedChallengeText
+    public string DeadlineText
     {
-        get => _speedChallengeText;
+        get => _deadlineText;
         private set
         {
-            if (SetField(ref _speedChallengeText, value))
+            if (SetField(ref _deadlineText, value))
             {
-                OnPropertyChanged(nameof(HasSpeedChallenge));
+                OnPropertyChanged(nameof(HasDeadline));
             }
         }
     }
 
-    public bool HasSpeedChallenge => _speedChallengeText.Length > 0;
+    public bool HasDeadline => _deadlineText.Length > 0;
 
-    public bool SpeedChallengeLate
+    public bool DeadlineLate
     {
-        get => _speedChallengeLate;
-        private set => SetField(ref _speedChallengeLate, value);
+        get => _deadlineLate;
+        private set => SetField(ref _deadlineLate, value);
     }
 
     /// <summary>
-    /// True once the birthday dialogue has handed the errand over. The window
-    /// binds its visibility to this so the intro pages own the screen first.
+    /// True once the walk's closing car page has handed the errand over. The
+    /// window binds its visibility to this so the intro pages own the screen
+    /// first.
     /// </summary>
     public bool IsRevealed
     {
@@ -272,8 +280,8 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     /// <summary>
     /// True while the car is parked on the destination house. The drive-to
-    /// sentence swaps for the arrival sentence and the ENTER button; driving
-    /// off swaps both back.
+    /// sentence swaps for the arrival sentence and the ENTER button; walking
+    /// in consumes the guidance, driving off swaps both back.
     /// </summary>
     public bool AtDestination
     {
@@ -285,16 +293,33 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 return;
             }
 
-            OnPropertyChanged(nameof(ShowEnterButton));
             if (!value)
             {
                 EnterFlash = false;
+                // The car left the door: the next arrival invites ENTER again.
+                SetEntered(false);
             }
+            OnPropertyChanged(nameof(ShowEnterButton));
             RepaintDestination();
         }
     }
 
-    public bool ShowEnterButton => AtDestination;
+    /// <summary>
+    /// True while the task text is up: the drive-to/arrival line, the distance
+    /// and the action button. Entering the pinned door consumes the arrival,
+    /// so the block hides until a new destination is pinned or the car parks
+    /// there again; a customer request swaps it out on its own.
+    /// </summary>
+    public bool HasTaskText => !_entered;
+
+    public bool ShowEnterButton => AtDestination && !_entered;
+
+    /// <summary>
+    /// The host entered the pinned door (a shop interior, a story dialogue or
+    /// an arrival with nothing to open). The task text and the action button
+    /// have done their job and hide until the next arrival or a new leg.
+    /// </summary>
+    public void DestinationEntered() => SetEntered(true);
 
     /// <summary>Teal voice acknowledgment on the ENTER button for one beat.</summary>
     public bool EnterFlash
@@ -376,6 +401,9 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     {
         _destination = destination;
         _copy = copy;
+        // A fresh leg has not been entered yet, even when the previous door
+        // was; the guidance just changed, so its text comes back.
+        SetEntered(false);
         // A taxi leg already pinned keeps the banner: the job outranks a story
         // destination until it settles.
         HasDestination = destination is not null || _jobGuidance is not null;
@@ -409,15 +437,17 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public void SetJobGuidance(HudJobGuidance? guidance)
     {
         _jobGuidance = guidance;
+        // A new leg is never already entered: its action button must come back.
+        SetEntered(false);
         _shownLegDistance = long.MinValue;
-        _shownSpeedSeconds = long.MinValue;
+        _shownDeadlineSeconds = long.MinValue;
         SetLegDistanceText(string.Empty);
-        SetSpeedChallengeText(string.Empty, late: false);
+        SetDeadlineText(string.Empty, late: false);
         HasDestination = guidance is not null || _destination is not null;
         AtDestination = false;
         RepaintDestination();
         UpdateLegDistance(_lastSample, force: true);
-        UpdateSpeedChallenge(force: true);
+        UpdateDeadline(force: true);
     }
 
     /// <summary>
@@ -444,7 +474,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// </summary>
     public void RequestEnter()
     {
-        if (!AtDestination)
+        if (!ShowEnterButton)
         {
             return;
         }
@@ -468,6 +498,21 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// The host confirms the pickup or the drop-off from the job phase.
     /// </summary>
     public event EventHandler? JobEnterRequested;
+
+    // One latch drives both halves of the task text: the guidance block and
+    // its action button hide together when the player walks in, so a visit
+    // never keeps inviting an ENTER it already consumed.
+    private void SetEntered(bool entered)
+    {
+        if (_entered == entered)
+        {
+            return;
+        }
+
+        _entered = entered;
+        OnPropertyChanged(nameof(HasTaskText));
+        OnPropertyChanged(nameof(ShowEnterButton));
+    }
 
     // BannerText and HasBanner are one state machine (warning > destination), so
     // every input change repaints through here instead of each setter raising
@@ -534,7 +579,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     private void Enter()
     {
-        if (!AtDestination)
+        if (!ShowEnterButton)
         {
             return;
         }
@@ -592,7 +637,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         UpdateAddress(location, force);
         UpdateArrival(sample, location);
         UpdateLegDistance(sample, force);
-        UpdateSpeedChallenge(force);
+        UpdateDeadline(force);
 
         if (sample is null)
         {
@@ -702,29 +747,31 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     }
 
     // The countdown repaints only when the displayed second moves, so the
-    // 10 Hz poll costs one subtraction and one comparison per tick.
-    private void UpdateSpeedChallenge(bool force)
+    // 10 Hz poll costs one subtraction and one comparison per tick. The label
+    // key belongs to the guidance: the same clock counts a speed challenge or
+    // an accepted passenger's hurry.
+    private void UpdateDeadline(bool force)
     {
-        if (_jobGuidance?.SpeedChallengeDeadline is not { } deadline)
+        if (_jobGuidance?.Deadline is not { } deadline)
         {
-            _shownSpeedSeconds = long.MinValue;
-            SetSpeedChallengeText(string.Empty, late: false);
+            _shownDeadlineSeconds = long.MinValue;
+            SetDeadlineText(string.Empty, late: false);
             return;
         }
 
         double left = (deadline - _clock.UtcNow).TotalSeconds;
         bool late = left < 0.0;
         long seconds = late ? 0 : (long)Math.Ceiling(left);
-        if (!force && seconds == _shownSpeedSeconds && late == _speedChallengeLate)
+        if (!force && seconds == _shownDeadlineSeconds && late == _deadlineLate)
         {
             return;
         }
 
-        _shownSpeedSeconds = seconds;
-        SetSpeedChallengeText(
+        _shownDeadlineSeconds = seconds;
+        SetDeadlineText(
             late
-                ? Strings.Get("HudSpeedChallengeLate")
-                : Strings.Format("HudSpeedChallengeLeft", ClockText(seconds)),
+                ? Strings.Get("HudDeadlineLate")
+                : Strings.Format(_jobGuidance.DeadlineKey, ClockText(seconds)),
             late);
     }
 
@@ -750,14 +797,14 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         OnPropertyChanged(nameof(HasHudLine));
     }
 
-    private void SetSpeedChallengeText(string value, bool late)
+    private void SetDeadlineText(string value, bool late)
     {
         bool changed = SetField(
-            ref _speedChallengeText, value, nameof(SpeedChallengeText));
-        SpeedChallengeLate = late;
+            ref _deadlineText, value, nameof(DeadlineText));
+        DeadlineLate = late;
         if (changed)
         {
-            OnPropertyChanged(nameof(HasSpeedChallenge));
+            OnPropertyChanged(nameof(HasDeadline));
         }
     }
 

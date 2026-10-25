@@ -22,12 +22,14 @@ public sealed class ShopInteriors
     private readonly InsuranceRules _insurance;
     private readonly IReadOnlyList<CarSpec> _cars;
     private readonly GameStateSaver _saver;
+    private readonly VisitLedger _visits;
     private readonly VoiceBeat _beat;
     private readonly ILog _log;
 
     public ShopInteriors(
         DriverWallet wallet, Garage garage, GameClock game, InsuranceRules insurance,
-        IReadOnlyList<CarSpec> cars, GameStateSaver saver, VoiceBeat beat, ILog log)
+        IReadOnlyList<CarSpec> cars, GameStateSaver saver, VisitLedger visits,
+        VoiceBeat beat, ILog log)
     {
         _wallet = wallet;
         _garage = garage;
@@ -35,6 +37,7 @@ public sealed class ShopInteriors
         _insurance = insurance;
         _cars = cars;
         _saver = saver;
+        _visits = visits;
         _beat = beat;
         _log = log;
     }
@@ -58,15 +61,22 @@ public sealed class ShopInteriors
     // and a re-opened page inside one week shows the same cars (DealerStock).
     // The bought-car choice is the host's page (onBought).
     public DealerScreenViewModel Dealer(
-        ICommand back, int displayWeek, Action<CarSpec> onBought) =>
-        new(_cars, _garage, _wallet, displayWeek, back, onBought, _beat);
+        ICommand back, int displayWeek, Action<CarSpec> onBought)
+    {
+        // The visit itself is the ToDo subject's requirement; the flag rides
+        // the driver save the story host runs on POI entry.
+        _visits.MarkCarDealer();
+        return new(_cars, _garage, _wallet, displayWeek, back, onBought, _beat);
+    }
 
     // The car wash (PORTPLAN 33, Unity CarWashScreen): a fresh page per visit,
     // so the car driven now and its reading are live. A wash spends the flat
     // price and clears the car's filth; both are banked here (the driver save
     // through onChanged for the cash, garage.json for the reading) and logged.
-    public CarWashScreenViewModel CarWash(ICommand back, Action onChanged) =>
-        new CarWashScreenViewModel(
+    public CarWashScreenViewModel CarWash(ICommand back, Action onChanged)
+    {
+        _visits.MarkCarWash();
+        return new CarWashScreenViewModel(
             _garage, _wallet, _beat, back,
             (removed, paid) =>
             {
@@ -75,6 +85,7 @@ public sealed class ShopInteriors
                 _log.LogInfo($"[CarWash] removed {removed} filth for {paid:0.00} CR " +
                     $"(cash {_wallet.Cash:0.00}, {_garage.CurrentKey ?? "no car"})");
             });
+    }
 
     // The car mechanic (PORTPLAN items 31/32, Unity CarMechanicScreen): a fresh
     // page per visit, so the car driven now, its wear deck and its engine are
@@ -106,8 +117,10 @@ public sealed class ShopInteriors
     // visit, so the cover flags and the escrow are live. A toggle and a
     // collection are banked here (the garage for the flag, the driver through
     // onChanged for the cash + escrow) and logged.
-    public InsuranceScreenViewModel Insurance(ICommand back, Action onChanged) =>
-        new InsuranceScreenViewModel(
+    public InsuranceScreenViewModel Insurance(ICommand back, Action onChanged)
+    {
+        _visits.MarkInsuranceBroker();
+        return new InsuranceScreenViewModel(
             _garage, _wallet, _insurance, _wallet.Rating.Overall, _beat, back,
             (key, insured) =>
             {
@@ -120,4 +133,5 @@ public sealed class ShopInteriors
                 onChanged();
                 _log.LogInfo($"[Insurance] collected {moved:0.00} CR (cash {_wallet.Cash:0.00})");
             });
+    }
 }

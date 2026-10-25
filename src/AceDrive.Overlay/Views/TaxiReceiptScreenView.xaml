@@ -78,11 +78,11 @@
                               Margin="0,6,0,2"/>
             <TextBlock Text="{Binding WalletLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center"/>
-            <!-- Two blank lines of separation between the shift total and
-                 the XP award: the money block and the XP block read as
-                 distinct sections (8 existing beat + ~2 × 14pt body lines). -->
             <TextBlock Text="{Binding ShiftLine}" Foreground="#FFBFC4C9" FontSize="14"
-                       TextAlignment="Center" Margin="0,0,0,45"/>
+                       TextAlignment="Center"/>
+            <!-- The wallet's hairline above the XP award: the money block and
+                 the XP block read as two sections, not one long list. -->
+            <Border Style="{StaticResource SectionDivider}"/>
             <TextBlock Text="{Binding XpLine}" Foreground="#FFF" FontSize="16"
                        TextAlignment="Center"/>
             <TextBlock Text="{Binding XpCalcLine}" Foreground="#FFBFC4C9" FontSize="14"
@@ -94,12 +94,14 @@
             <TextBlock Text="{Binding RarityLine}" Foreground="#FFBFC4C9" FontSize="12"
                        TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"
                        Visibility="{Binding HasRarityLine, Converter={StaticResource BoolToVis}}"/>
-            <!-- XP world standings (PORTPLAN 60, Unity rivals block): rank
-                 line + delta line under Total XP. Gained AND lost both
-                 render teal #97EAD2 — kept verbatim from Unity, whose
-                 "RedColor" constant is the same teal value. StandingsLine
-                 owns the 2 s 1x->1.5x pulse and restarts it on every rank
-                 move, like ReceiptValuePop on the Unity receipts. -->
+            <!-- Global XP rank (PORTPLAN 60, Unity rivals block): rank line +
+                 gained/lost delta, fenced by two hairlines so the pair reads
+                 as its own section. Gained AND lost both render teal
+                 #97EAD2 — kept verbatim from Unity, whose "RedColor"
+                 constant is the same teal value. StandingsLine owns the 2 s
+                 1x->1.5x pulse and restarts it on every rank move, like
+                 ReceiptValuePop on the Unity receipts. -->
+            <Border Style="{StaticResource SectionDivider}" Margin="0,4,0,6"/>
             <views:StandingsLine Text="{Binding Standings.Line}"
                                  PulseSignal="{Binding Standings.PulseSignal}"
                                  Foreground="#FFF" FontSize="16" TextAlignment="Center"/>
@@ -116,6 +118,7 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
+            <Border Style="{StaticResource SectionDivider}" Margin="0,0,0,0"/>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

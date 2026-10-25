@@ -17,9 +17,14 @@ internal sealed class FakeNavigationHost : INavigationHost
 
     public int Settings { get; private set; }
 
+    /// <summary>How many destinations the addresses page pinned.</summary>
+    public int Pins { get; private set; }
+
     public void ShiftTimedOut(TimeSpan idle) => Idle = idle;
 
     public void ReadoutsChanged() => Readouts++;
 
     public void ShowSettings() => Settings++;
+
+    public void DestinationPinned() => Pins++;
 }

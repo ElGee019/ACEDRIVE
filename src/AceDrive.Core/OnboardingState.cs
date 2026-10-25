@@ -1,6 +1,6 @@
 // Onboarding data (PORTPLAN Career Start items 2-5): favorite brand ->
-// grandma's car -> birthday dialogue -> errand. Progress persists via
-// IOnboardingStore.
+// voice info -> birthday dialogue -> grandma's car -> errand. Progress
+// persists via IOnboardingStore.
 namespace AceDrive.Core;
 
 /// <summary>

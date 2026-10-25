@@ -14,7 +14,19 @@ public sealed class JsonCustomerRequestStoreTests
           "tier2Chance": 0.2,
           "tier3Chance": 0.2,
           "speedChallengeText": "Quickly!",
-          "suffixRequests": { "and some friends": "[name] are here." },
+          "monitor": {
+            "movingKmh": 15,
+            "brakeBrusque": 0.7,
+            "throttleBrusque": 0.8,
+            "steerBrusqueRad": 0.35,
+            "speedToleranceKmh": 1
+          },
+          "suffixRequests": {
+            "and some friends": {
+              "text": "[name] are here.",
+              "condition": { "brakeBrusque": true }
+            }
+          },
           "questionCategories": [
             {
               "key": "weight",
@@ -73,7 +85,11 @@ public sealed class JsonCustomerRequestStoreTests
             Assert.Equal(0.2, table.Tier2Chance);
             Assert.Equal(0.2, table.Tier3Chance);
             Assert.Equal("Quickly!", table.SpeedChallengeText);
-            Assert.Equal("[name] are here.", table.SuffixRequests["and some friends"]);
+            Assert.Equal(RideMonitorRules.Default, table.MonitorRules);
+            SuffixRequest line = table.SuffixRequests["and some friends"];
+            Assert.Equal("[name] are here.", line.Text);
+            Assert.True(line.Condition.BrakeBrusque);
+            Assert.False(line.Condition.Deadline);
             CarStatCategory category = Assert.Single(table.QuestionCategories);
             Assert.Equal("weight", category.Key);
             Assert.Equal(CarStat.MassKg, category.Stat);
@@ -91,7 +107,11 @@ public sealed class JsonCustomerRequestStoreTests
             {
               "timerSeconds": 14, "tier2Chance": 0.2, "tier3Chance": 0.2,
               "speedChallengeText": "Quickly!",
-              "suffixRequests": { "and some friends": "text" },
+              "monitor": {
+                "movingKmh": 15, "brakeBrusque": 0.7, "throttleBrusque": 0.8,
+                "steerBrusqueRad": 0.35, "speedToleranceKmh": 1
+              },
+              "suffixRequests": { "and some friends": { "text": "text" } },
               "questionCategories": [
                 { "key": "weight", "stat": "MassKg", "unitKey": "QuizUnitKg",
                   "bands": [ { "tier": "medium", "variants": ["A?"] } ] },
@@ -123,6 +143,24 @@ public sealed class JsonCustomerRequestStoreTests
     }
 
     [Fact]
+    public void ImpossibleConditionRange_MeansNoRequests()
+    {
+        // A minimum above the maximum can never be met by the monitor, so the
+        // hand-edited file is rejected instead of voiding every tip.
+        string file = Write(ValidJson.Replace(
+            "\"condition\": { \"brakeBrusque\": true }",
+            "\"condition\": { \"minRpm\": 5000, \"maxRpm\": 3000 }",
+            StringComparison.Ordinal));
+        try
+        {
+            var log = new TestLog();
+            Assert.Equal(CustomerRequestTable.Empty, new JsonCustomerRequestStore(file, log).Load());
+            Assert.Single(log.Warnings);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
     public void RealDataFile_CoversEverySuffixAndAllSixCategories()
     {
         string data = Path.Combine(AppContext.BaseDirectory, "Data");
@@ -134,10 +172,26 @@ public sealed class JsonCustomerRequestStoreTests
 
         Assert.Empty(log.Warnings);
         Assert.Equal(19, table.TimerSeconds);
-        Assert.Equal(49, table.SuffixRequests.Count);
+        Assert.Equal(43, table.SuffixRequests.Count);
         Assert.Equal(6, table.QuestionCategories.Count);
         Assert.Equal(6, table.QuestionCategories.Select(c => c.Stat).Distinct().Count());
         Assert.All(table.QuestionCategories, category => Assert.NotEmpty(category.Bands));
+        Assert.Equal(RideMonitorRules.Default, table.MonitorRules);
+
+        // The content the passenger promises are tuned from: 20 tracked lines
+        // (one deadline, 15 live limits, the rest accept/refuse only).
+        Assert.Equal(20, table.SuffixRequests.Values.Count(
+            line => line.Condition.Deadline || line.Condition.HasLiveLimits));
+        Assert.True(table.SuffixRequests["and some boxing partners"].Condition.Deadline);
+        Assert.Equal(2000,
+            table.SuffixRequests["and some motorsport enthusiasts"].Condition.MinRpm);
+        Assert.Equal(4000,
+            table.SuffixRequests["and some people who insist they have already lived before"]
+                .Condition.MaxRpm);
+        Assert.Equal(90.0,
+            table.SuffixRequests["and some people who read medicine leaflets"]
+                .Condition.MaxSpeedKmh);
+        Assert.DoesNotContain("and some birdwatchers", table.SuffixRequests.Keys);
 
         foreach (string suffix in table.SuffixRequests.Keys)
         {

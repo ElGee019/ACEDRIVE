@@ -13,6 +13,15 @@ namespace AceDrive.Core.Tests;
 /// </summary>
 public sealed class NavigationTests
 {
+    // The tier table the navigator hands the Cento Miglia page: content at
+    // runtime (Data/cento_miglia.json), two rows here so the wiring is what
+    // these tests read.
+    private static readonly CentoTier[] CentoTiers =
+    [
+        new("gentlemen_drivers", "Gentlemen Drivers Club", "Free for all.", 1),
+        new("era_event", "{0}s Era Only", "Exclusive event.", 2),
+    ];
+
     private static (Navigation Nav, OverlayShell Shell, FakeNavigationHost Host,
         FakeClock Clock, TaxiShift Shift, FakeShiftStore ShiftStore,
         RoadTestLedger Roads, FakeRoadTestStore RoadTests,
@@ -40,14 +49,17 @@ public sealed class NavigationTests
         var rivals = new FakeRivals();
         var friends = new FakeFriendshipStore();
         var onboarding = new FakeOnboardingStore();
+        // The zone the Cento Miglia gates read: no street discovered yet, so
+        // the event opens with every club locked (Unity's fresh-driver state).
+        var zoneInstance = new OperatingZone(null, seed: 0);
         // One instance per service graph: the saver writes the same stores the
         // assertions read.
         var saver = new GameStateSaver(
             clock, game, new FakeGameClockStore(), new FakeDriverStore(), garageStore,
             new FakeCityStore(), new FakeHungerStore(), roadTests, shiftStore,
-            wallet, new DailyStreak(clock, null), new OperatingZone(null, seed: 0),
+            wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
-            new JobLedger());
+            new JobLedger(), new DestinationPins(), new VisitLedger());
         var board = new DeliveryBoard(DeliveryCatalog.Default);
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var directory = new PoiDirectory();
@@ -65,7 +77,7 @@ public sealed class NavigationTests
             onboarding,
             new ShopInteriors(
                 wallet, garageInstance, game, InsuranceRules.Default, poolCars,
-                saver, beat, log),
+                saver, new VisitLedger(), beat, log),
             day, log);
         var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);
         var breakdowns = new TripBreakdowns(
@@ -82,10 +94,17 @@ public sealed class NavigationTests
             game, clock, beat, meter, saver, rivals, breakdowns, null, log);
         var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
         var haul = new CarHaulFlow(brands, poolCars, wallet, day, saver, beat, log);
+        // The ToDo list the jobs page reads: its own ledger over the same
+        // state instances, with an in-memory file.
+        var todoBoard = new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), directory, onboarding,
+            wallet, new JobLedger(), new OperatingZone(null, seed: 0), garageInstance,
+            new DestinationPins(), new VisitLedger(), career, log);
         var nav = new Navigation(
-            shell, beat, game, clock, shift, TodoTable.Default, roads, saver,
+            shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
-            directory, null, board, career, city, taxi, delivery, haul, world, day, log);
+            directory, null, board, career, city, taxi, delivery, haul, world, day,
+            zoneInstance, CentoTiers, () => "mazda", log);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The proposal page asks the job's host for the player's door on every
@@ -144,6 +163,38 @@ public sealed class NavigationTests
         Assert.Equal(roads.Current?.Id, saved.CarId);
         Assert.NotEqual(first, RoadTestButton(calendar));
         Assert.Contains(log.Infos, line => line.StartsWith("road test done:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CentoDay_OpensTheEventPageAndBackReturnsToTheCalendar()
+    {
+        var (nav, shell, _, clock, _, _, _, _, _, _, log) = Create();
+        nav.ShowMenuPage();
+        var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
+        menu.CalendarCommand.Execute(null);
+        var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
+        // The strip opens on Monday noon; advance six game days plus a minute in
+        // the clock's own unit to reach Sunday noon — the event's day inside its
+        // 8am-8pm window — then let the poll repaint the highlight.
+        double gameMinutesToSunday = (6 * 24 * 60) + 1;
+        clock.Advance(TimeSpan.FromSeconds(
+            gameMinutesToSunday * GameClock.RealSecondsPerGameMinute));
+        nav.Tick();
+        int centoDay = ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.CentoMiglia).DayOfWeek;
+        Assert.Equal(1, centoDay);
+
+        calendar.DayCommand.Execute(centoDay);
+
+        // The tap opens the event page on the calendar's week; BACK lands on the
+        // same cached calendar page it left (Unity's screen pops back to jobs).
+        var page = Assert.IsType<CentoMigliaScreenViewModel>(shell.CurrentScreen);
+        Assert.Equal("Week 1, 1924", page.WeekLine);
+        Assert.Equal(CentoTiers.Length, page.Tiers.Count);
+        page.BackCommand.Execute(null);
+        Assert.Same(calendar, shell.CurrentScreen);
+        Assert.Contains(
+            log.Infos, line => line.StartsWith("cento miglia opened:", StringComparison.Ordinal));
     }
 
     [Fact]

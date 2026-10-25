@@ -34,4 +34,11 @@ public interface IStoryHost
 
     /// <summary>Banks the shared driver file (wallet + trunk live in it).</summary>
     void SaveDriver();
+
+    /// <summary>
+    /// A POI interior was entered: the one-time visit flags a shop page stamps
+    /// are readable now, so the ToDo list syncs and the driver save carries the
+    /// new flag (PORTPLAN 46).
+    /// </summary>
+    void PoiEntered();
 }

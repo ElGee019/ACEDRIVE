@@ -11,7 +11,7 @@ public sealed class MainControlScreenTests
 {
     // FakeClock default: Monday 2026-10-12 12:00 UTC.
     private static MainControlScreenViewModel Create(
-        FakeClock? clock = null, TodoTable? todos = null,
+        FakeClock? clock = null, TodoBoard? todos = null,
         bool deliveryOpen = false, TaxiShift? shift = null,
         bool taxiStartsShift = false, VoiceBeat? beat = null,
         ICommand? backCommand = null)
@@ -19,26 +19,89 @@ public sealed class MainControlScreenTests
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
         TaxiShift shiftState = shift ?? new TaxiShift();
+        TodoBoard board = todos ?? DefaultTodoBoard();
         return new MainControlScreenViewModel(
             beat ?? new VoiceBeat(tick),
-            todos ?? TodoTable.Default,
+            board,
             shiftState,
             new ControlActions(
                 taxiStartsShift
                     ? new RelayCommand(() => shiftState.Start(tick.UtcNow))
                     : new RelayCommand(() => { }),
                 new RelayCommand(() => { }, () => deliveryOpen),
-                new RelayCommand(() => { })),
+                new RelayCommand(() => { }),
+                board.AcknowledgeCommand),
             backCommand ?? new RelayCommand(() => { }));
     }
 
+    // The real board over a fresh career: the four Unity starting tips, so the
+    // page's formatting is the production one instead of a hand-made string.
+    private static TodoBoard DefaultTodoBoard()
+    {
+        return new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
+            new FakeOnboardingStore(), new DriverWallet(), new JobLedger(),
+            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new DestinationPins(), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+    }
+
+    // The real board over a given career: the boot sync flags whatever the
+    // state already meets, so the page renders the production lines.
+    private static TodoBoard Board(DriverState state)
+    {
+        return new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
+            new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
+            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new DestinationPins(state), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+    }
+
     [Fact]
-    public void TodoLines_StartWithMaxGrocery()
+    public void TodoLines_RenderTheLedgersFourTips()
     {
         var vm = Create();
         Assert.Equal(4, vm.TodoLines.Count);
-        Assert.Contains("Max's", vm.TodoLines[0], StringComparison.Ordinal);
-        Assert.Contains("3", vm.TodoLines[1], StringComparison.Ordinal);
+        Assert.Contains("Earn 500 CR", vm.TodoLines[0], StringComparison.Ordinal);
+        Assert.Contains("Earn 2 XP", vm.TodoLines[1], StringComparison.Ordinal);
+        Assert.Contains("1002 CR in the bank", vm.TodoLines[2], StringComparison.Ordinal);
+        Assert.Contains("Max's Grocery", vm.TodoLines[3], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompletedTodo_ListsTheKitButWithholdsDeliverBelowFive()
+    {
+        // One earned target is a listed kit, not a delivery: the explanation
+        // shows, but DELIVER CARE PACKAGES waits for the five-kit threshold.
+        var vm = Create(todos: Board(new DriverState(0.0, 0.0, CreditEarned: 500.0)));
+
+        Assert.True(vm.HasCompletedTodos);
+        Assert.Contains("Earn 500 CR", Assert.Single(vm.CompletedTodoLines), StringComparison.Ordinal);
+        Assert.False(vm.ShowDeliverCarePackages);
+        Assert.DoesNotContain("DELIVER CARE PACKAGES", vm.VoiceActions.Keys);
+    }
+
+    [Fact]
+    public void CarePackages_DeliverOffersItselfAtFiveAndClearsTheList()
+    {
+        // Six subjects already met: the block lists them and the button appears.
+        var vm = Create(todos: Board(new DriverState(
+            0.0, 2.0, Bank: 1002.0, CreditEarned: 500.0,
+            TaxiJobsCompleted: 5, DeliveryJobsCompleted: 2,
+            ManuallySetDestinations: 18)));
+
+        Assert.True(vm.ShowDeliverCarePackages);
+        Assert.Equal(6, vm.CompletedTodoLines.Count);
+        Assert.True(vm.VoiceActions.ContainsKey("DELIVER CARE PACKAGES"));
+
+        vm.TodoAcknowledgeCommand.Execute(null);
+        vm.Refresh();
+
+        Assert.False(vm.HasCompletedTodos);
+        Assert.False(vm.ShowDeliverCarePackages);
+        Assert.Empty(vm.CompletedTodoLines);
+        Assert.DoesNotContain("DELIVER CARE PACKAGES", vm.VoiceActions.Keys);
     }
 
     [Fact]
@@ -115,11 +178,12 @@ public sealed class MainControlScreenTests
         var beat = new VoiceBeat(clock);
         bool fired = false;
         var vm = new MainControlScreenViewModel(
-            beat, TodoTable.Default,
+            beat, DefaultTodoBoard(),
             new TaxiShift(),
             new ControlActions(
                 new RelayCommand(() => { }),
                 new RelayCommand(() => fired = true),
+                new RelayCommand(() => { }),
                 new RelayCommand(() => { })),
             new RelayCommand(() => { }));
 

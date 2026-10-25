@@ -2,29 +2,36 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
-    <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
-         title row at a fixed height, car list centered below it. Centering
-         horizontally too so thumb+button read as one block. -->
+    <!-- Same page skeleton as the other introduction pages: viewport-pinned
+         MinHeight, title row at the top, the one action in its own bottom row.
+         The car is a picture, not a picker: the offer is fixed, so the render
+         sits centered in the height left over with the instruction line
+         directly under it, and CONTINUE is the page's only button. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=GrandmaCarTitle}"/>
-        <ItemsControl Grid.Row="1" ItemsSource="{Binding Options}"
-                      VerticalAlignment="Center" HorizontalAlignment="Center">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                    <StackPanel Margin="0,0,0,8">
-                        <Image Source="{Binding Car.ImagePath, Converter={StaticResource ThumbnailImage}}" MaxWidth="240" Stretch="Uniform"
-                               HorizontalAlignment="Center" Margin="0,0,0,4"
-                               Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
-                        <Button Content="{Binding Label}" Padding="4"
-                                Command="{Binding DataContext.SelectCarCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                CommandParameter="{Binding}"/>
-                    </StackPanel>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+            <Image Source="{Binding Car.ImagePath, Converter={StaticResource ThumbnailImage}}"
+                   MaxWidth="420" Stretch="Uniform" HorizontalAlignment="Center" Margin="0,0,0,10"
+                   Visibility="{Binding HasImage, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Style="{StaticResource PageBody}" Text="{loc:Loc Key=GrandmaCarInstruction}"
+                       MaxWidth="420"/>
+        </StackPanel>
+        <!-- The *2* column keeps CONTINUE at half the text column's width, the
+             same shape the dialogue and voice pages use for their bottom row. -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=DialogueContinue}" Padding="4"
+                    HorizontalAlignment="Stretch"
+                    Command="{Binding ContinueCommand}"/>
+        </Grid>
     </Grid>
 </UserControl>

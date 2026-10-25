@@ -40,6 +40,27 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
     public string Body { get => _body; private set => SetField(ref _body, value); }
     private string _body = "";
 
+    /// <summary>
+    /// Aside printed under the page's rule: guidance the speaker does not
+    /// say (Max's first-visit pointer at the JOBS page). Empty when the page
+    /// carries no note, which hides the rule with it.
+    /// </summary>
+    public string Note
+    {
+        get => _note;
+        private set
+        {
+            if (SetField(ref _note, value))
+            {
+                OnPropertyChanged(nameof(HasNote));
+            }
+        }
+    }
+
+    private string _note = "";
+
+    public bool HasNote => Note.Length > 0;
+
     public ICommand ContinueCommand { get; }
 
     /// <summary>Spoken label -&gt; action, for the coming voice phase (buttons stay mouse-first).</summary>
@@ -99,6 +120,7 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
         {
             SpeakerName = "";
             Body = "";
+            Note = "";
             return;
         }
 
@@ -114,5 +136,6 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
             _ => line.Speaker,
         };
         Body = line.Text;
+        Note = line.Note ?? "";
     }
 }

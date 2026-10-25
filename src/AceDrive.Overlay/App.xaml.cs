@@ -49,6 +49,9 @@ public partial class App : Application, IDisposable
         culture.Apply(preferences.Language);
         var fares = new JsonFareStore(_log).Load();
         var todos = new JsonTodoStore(_log).Load();
+        // The Cento Miglia tier table (PORTPLAN 49): shipped content, read once
+        // at startup like the fares so no page touches a file.
+        IReadOnlyList<CentoTier> centoTiers = new JsonCentoTierStore(_log).Load();
         // The placeholder address map grounds the HUD, the onboarding home and
         // the taxi job doors; load it before the proposal draw.
         var addressMap = new JsonAddressMapStore(_log).Load();
@@ -134,7 +137,7 @@ public partial class App : Application, IDisposable
         // introduction hands over the intro CredP (Unity firstSceneComplete +
         // hasSeenMaxJobIntro, PORTPLAN 5/51). The banked visit restores that
         // gift on relaunch until the persistent career save lands.
-        var onboardingStore = new JsonOnboardingStore();
+        var onboardingStore = new JsonOnboardingStore(_log);
         OnboardingState onboardingProgress = onboardingStore.Load();
         bool introGiftClaimed = onboardingProgress.MaxDeliveryIntroSeen;
         var deliveryCareer = new DeliveryCareer(
@@ -203,6 +206,12 @@ public partial class App : Application, IDisposable
         // the dealer and mechanic POIs gate on it, so it must survive a
         // restart beside the cash it was earned with.
         var jobs = new JobLedger(savedDriver);
+        // The ToDo career readings (PORTPLAN 46): the manual-destination count
+        // and the one-time business visits ride the driver file, so the four
+        // tips measure a real career instead of a placeholder.
+        var pins = new DestinationPins(savedDriver);
+        var visits = new VisitLedger(savedDriver);
+        var todoStore = new JsonTodoProgressStore(_log);
         // The open taxi shift resumes with its wall-clock stamps (PORTPLAN 12):
         // the 30-minute idle rule keeps running while the app and EVO are
         // closed, so a restart inside the window continues the same shift and
@@ -336,12 +345,12 @@ public partial class App : Application, IDisposable
         var saver = new GameStateSaver(
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
-            garage, city, hunger, roadTests, shift, shifts, jobs);
+            garage, city, hunger, roadTests, shift, shifts, jobs, pins, visits);
         // The panel, its page and the activity stamp: view state with an owner
         // the view binds through the shell, not state the coordinator holds.
         var shell = new OverlayShell();
         var shops = new ShopInteriors(
-            driver, garage, game, insuranceRules, cars, saver, beat, _log);
+            driver, garage, game, insuranceRules, cars, saver, visits, beat, _log);
         int startWeek = saved?.Week ?? CalendarStamp.Default.Week;
         // The session's calendar: the day flip, the week it rolls and the idle
         // shift timeout with its ended page. The pages and the dealer's floor
@@ -405,11 +414,17 @@ public partial class App : Application, IDisposable
         // theirs) and the session's data; the coordinator attaches as its host
         // inside the VM's constructor, which is the one late edge for the
         // entries that are not pages (a timed-out shift, the settings page).
+        // The ToDo list (PORTPLAN 46) is a collaborator of its own: it owns
+        // the ledger and its file, and the jobs page reads only its lines.
+        var todoBoard = new TodoBoard(
+            todos, todoStore, poiDirectory, onboardingStore, driver, jobs, zone,
+            garage, pins, visits, deliveryCareer, _log);
         var navigation = new Navigation(
-            shell, beat, game, wall, shift, todos, roadTests, saver,
+            shell, beat, game, wall, shift, todoBoard, roadTests, saver,
             driver, garage, rivals, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
-            taxi, delivery, haul, poiWorld, dayCycle, _log);
+            taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
+            () => carBrands.Brand, _log);
         // The panel's reveal policy: what a call opens, what revealing a POI
         // or a job page does, and hiding. The story flow, the voice router and
         // the coordinator share this one instance, so the root can build the
@@ -425,7 +440,7 @@ public partial class App : Application, IDisposable
             deliveryCareer, deliveryBoard.Catalog.StartCredP,
             preferencesStore, preferences, culture, beat, hud, garage,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => carBrands.Brand,
-            _log, new StoryHost(panel, navigation, saver, rivals));
+            _log, new StoryHost(panel, navigation, saver, rivals, todoBoard));
         // Voice dispatch: the wake word and the button taps, on the same panel
         // and content tables the screens use.
         var voiceRouter = new VoiceRouter(panel, carBrands, content, wall, _log, hud);
@@ -446,6 +461,7 @@ public partial class App : Application, IDisposable
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
+            todoBoard, pins,
             hud,
             saveResets, restarter);
 
@@ -453,9 +469,10 @@ public partial class App : Application, IDisposable
         // The 200 px companion: own placement file, width follows the main
         // panel, and it outlives the main window's hide/show because it is a
         // separate top-level window. Its VM keeps it hidden through the
-        // introduction and reveals it when the birthday dialogue ends.
+        // introduction and reveals it when the walk's closing car page is
+        // confirmed.
         var hudWindow = new HudWindow(
-            hud, HudSettings(), _log, MainWindow.Left, MainWindow.Top, MainWindow.Width);
+            hud, HudSettings(), MainWindow.Left, MainWindow.Top, MainWindow.Width);
         // A page can hand its task text to the companion while the panel is
         // still open (an address was just pinned): show it at once instead of
         // waiting for the panel to hide.
@@ -479,8 +496,8 @@ public partial class App : Application, IDisposable
         // the panel hidden (and the first-run pages unseen) until the player
         // happened to say the phrase. The VM still owns visibility, so
         // idle-hide, the hotkey and the wake word keep working; the companion
-        // HUD stays hidden through the walk until the birthday hand-over
-        // reveals it (a save past the birthday reveals it at startup).
+        // HUD stays hidden through the walk until the closing car page hands
+        // the errand over (a save past the walk reveals it at startup).
         // A save that resumes mid-tour stays hidden: the tour is still the
         // introduction and is driven on the HUD, so opening the menu here
         // would put the panel up before the intro is finished. The gate is the

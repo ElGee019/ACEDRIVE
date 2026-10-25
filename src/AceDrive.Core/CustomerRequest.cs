@@ -5,12 +5,15 @@ namespace AceDrive.Core;
 /// <summary>
 /// One special request the passenger makes at the pickup. Text is already
 /// composed for the customer identity; a quiz carries its three options and
-/// the correct one so the page never re-derives gameplay data.
+/// the correct one so the page never re-derives gameplay data. A passive ask
+/// carries the conditions its accepted tip depends on (deadline and/or live
+/// limits); the other kinds leave it null.
 /// </summary>
 public sealed record CustomerRequest(
     CustomerRequestKind Kind,
     string Text,
-    CarStatQuestion? Quiz = null)
+    CarStatQuestion? Quiz = null,
+    RideCondition? Condition = null)
 {
     public bool IsSpeedChallenge => Kind == CustomerRequestKind.SpeedChallenge;
 }

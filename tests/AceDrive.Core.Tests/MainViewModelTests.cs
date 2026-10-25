@@ -13,6 +13,14 @@ public sealed class MainViewModelTests
     // skip the store without relying on a persistent maple-syrup item.
     private static OnboardingState ErrandDone =>
         new(null, null, BirthdayDone: true, MaxErrandDone: true);
+
+    // The walk's closing car page needs a car to offer; every other test drives
+    // the earlier pages or a save that is already past the introduction, so
+    // only the closing-page tests hand this content in.
+    private static readonly OnboardingContent WalkWithCar = new(
+        [], new Dictionary<string, string[]>(),
+        [new GrandmaCar("ks_mazda_mx5_na", "Mazda MX-5 NA", 1990, 12000, null)],
+        [new DialogueLine("GRANDMA", "Go.")], [], [], []);
     internal static TestSessionResult Create(
         float speedKmh = 90f, OnboardingState? progress = null,
         DeliveryCatalog? catalog = null, HubCatalog? hubs = null, ILog? log = null,
@@ -178,9 +186,12 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void SettingsReset_WipeFailure_KeepsTheSession()
+    public void SettingsReset_WipeFailure_KeepsTheSessionAndNamesTheFile()
     {
-        var resets = new FakeSaveDataResetter { Result = false };
+        var resets = new FakeSaveDataResetter
+        {
+            Report = new SaveResetReport("driver.json", SaveResetBlock.InUse),
+        };
         var restarter = new FakeAppRestarter();
         var (vm, _, _, _) = Create(
             progress: OnboardingState.Fresh with { BirthdayDone = true },
@@ -195,8 +206,36 @@ public sealed class MainViewModelTests
         Assert.Equal(1, resets.Calls);
         Assert.Equal(0, restarter.Calls);
         Assert.False(vm.SkipShutdownSave);
+        // The page names the file to unblock; the old generic line sent the
+        // player to the overlay that had just refused the wipe.
         Assert.Equal(
-            "Could not reset the game. Close AceDrive and try again.",
+            "Could not reset the game: driver.json is open in another program. " +
+            "Close it and try again.",
+            settings.ResetStatus);
+    }
+
+    [Fact]
+    public void SettingsReset_RestartFailure_StillSkipsTheShutdownSave()
+    {
+        var resets = new FakeSaveDataResetter();
+        var restarter = new FakeAppRestarter { Result = false };
+        var (vm, _, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            saveResets: resets, restarter: restarter);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).SettingsCommand
+            .Execute(null);
+        var settings = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+
+        settings.ResetCommand.Execute(null);
+        settings.ResetCommand.Execute(null);
+
+        Assert.Equal(1, resets.Calls);
+        Assert.Equal(1, restarter.Calls);
+        // The wipe is final: a failed restart must not bank the old career.
+        Assert.True(vm.SkipShutdownSave);
+        Assert.Equal(
+            "The saves are deleted, but AceDrive could not start again. " +
+            "Close AceDrive and open it again.",
             settings.ResetStatus);
     }
 
@@ -481,7 +520,7 @@ public sealed class MainViewModelTests
         // The streak slice rides every settle save (SaveDriver).
         Assert.Equal(1, saved.DaysInARow);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("Your XP world standings is 4th of 30.", receipt.Standings.Line);
+        Assert.Equal("Your Global XP Rank is 4th of 30.", receipt.Standings.Line);
         Assert.Equal("You gained 2 positions.", receipt.Standings.DeltaLine);
         Assert.Equal(1, receipt.Standings.PulseSignal);
     }
@@ -524,7 +563,7 @@ public sealed class MainViewModelTests
         Assert.Equal(0, saved.RivalsTotal);
         Assert.Equal(1, saved.DaysInARow);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("Your XP world standings is —/—.", receipt.Standings.Line);
+        Assert.Equal("Your Global XP Rank is —/—.", receipt.Standings.Line);
         Assert.Equal(string.Empty, receipt.Standings.DeltaLine);
         Assert.False(receipt.Standings.Changed);
         Assert.Equal(0, receipt.Standings.PulseSignal);
@@ -1043,10 +1082,107 @@ public sealed class MainViewModelTests
 
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.False(receipt.HasTip);
-        Assert.Equal(Strings.Get("HudSpeedChallengeLate"), hud.Notice);
+        Assert.Equal(Strings.Get("HudDeadlineLate"), hud.Notice);
         // A beaten deadline pays nothing: the challenge failed, so cornering
         // stays where it started.
         Assert.Equal(20.0, wallet.Rating.Cornering);
+    }
+
+    [Fact]
+    public void Pickup_BrakePromise_HardStopShowsTheReasonAndDropsTheTip()
+    {
+        var hud = new FakeTelemetryHud();
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.BrakePromise,
+        };
+        var tel = new FakeTelemetry();
+        var (vm, clock, _, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, physics: tel);
+
+        TaxiFlow.Propose(vm);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
+        screen.Options[0].Command.Execute(null);
+        screen.BackCommand.Execute(null);
+        Assert.Null(hud.Notice);
+
+        // A gentle sample at speed keeps the promise.
+        tel.Next = tel.Next with { SpeedKmh = 60f, Gas = 0.3f, Brake = 0.1f };
+        clock.Advance(TimeSpan.FromSeconds(TaxiFlow.DriveTickSeconds));
+        vm.Poll();
+        Assert.Null(hud.Notice);
+
+        // Stomping the brake at speed breaks it; the HUD names the reason.
+        tel.Next = tel.Next with { SpeedKmh = 60f, Gas = 0.1f, Brake = 0.9f };
+        clock.Advance(TimeSpan.FromSeconds(TaxiFlow.DriveTickSeconds));
+        vm.Poll();
+        Assert.Equal(Strings.Get("HudPromiseBrake"), hud.Notice);
+
+        // The ride still settles; only the tip is gone.
+        TaxiFlow.Drive(vm, clock, tel);
+        vm.DropoffCommand.Execute(null);
+
+        Assert.False(Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen).HasTip);
+    }
+
+    [Fact]
+    public void Pickup_HurryPromise_ArmsTheHudClockAndAnOnTimeRideStillTips()
+    {
+        var hud = new FakeTelemetryHud();
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.HurryPromise,
+        };
+        var (vm, clock, tel, _) = Create(speedKmh: 0f, hud: hud, requests: requests);
+
+        TaxiFlow.Propose(vm);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
+        screen.Options[0].Command.Execute(null);
+        screen.BackCommand.Execute(null);
+
+        // The passenger's hurry rides the same clock with its own label.
+        Assert.NotNull(hud.JobGuidance!.Deadline);
+        Assert.Equal("HudHurryLeft", hud.JobGuidance.DeadlineKey);
+
+        TaxiFlow.Drive(vm, clock, tel);
+        vm.DropoffCommand.Execute(null);
+
+        Assert.True(Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen).HasTip);
+    }
+
+    [Fact]
+    public void Pickup_HurryPromise_LateRemovesTheTip()
+    {
+        var hud = new FakeTelemetryHud();
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.HurryPromise,
+        };
+        // A tiny allowance: waiting five minutes at the door is too late.
+        TaxiRules rules = TaxiRules.Default with
+        {
+            SpeedChallenge = new SpeedChallengeRules(
+                TopSpeedFraction: 0.55, MinAverageKmh: 130.0,
+                MaxAverageKmh: 130.0, SlackFactor: 0.1,
+                BufferSeconds: 0),
+        };
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, taxiRules: rules);
+
+        TaxiFlow.Propose(vm);
+        var screen = Assert.IsType<CustomerRequestScreenViewModel>(
+            TaxiFlow.Pickup(vm, clock));
+        screen.Options[0].Command.Execute(null);
+        screen.BackCommand.Execute(null);
+
+        clock.Advance(TimeSpan.FromMinutes(5));
+        TaxiFlow.Drive(vm, clock, tel);
+        vm.DropoffCommand.Execute(null);
+
+        Assert.False(Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen).HasTip);
+        Assert.Equal(Strings.Get("HudDeadlineLate"), hud.Notice);
     }
 
     [Fact]
@@ -1079,7 +1215,7 @@ public sealed class MainViewModelTests
         Assert.Null(hud.Request);
         Assert.Equal(1, hud.ClearRequestCalls);
         Assert.Equal("HudJobDropoffDrive", hud.JobGuidance!.DriveKey);
-        Assert.NotNull(hud.JobGuidance.SpeedChallengeDeadline);
+        Assert.NotNull(hud.JobGuidance.Deadline);
     }
 
     [Fact]
@@ -1692,27 +1828,48 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void FinishDialogue_ClosesThePanelForTheTour()
+    public void FinishDialogue_ShowsGrandmasCarPage()
     {
-        var session = Create();
+        var session = Create(content: WalkWithCar);
+        var (vm, _, _, _) = session;
+
+        session.Story.FinishDialogue();
+
+        // Grandma's last line sends the player out for maple syrup; one page is
+        // left in the walk, so the introduction is not over yet.
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
+        Assert.False(session.Story.Done);
+    }
+
+    [Fact]
+    public void CarPage_Continue_ClosesThePanelForTheTour()
+    {
+        var session = Create(content: WalkWithCar);
         var (vm, _, _, _) = session;
         session.Story.FinishDialogue();
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
 
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         // The guided tour still has to be driven (Max, the friends, pancakes,
         // the community centre): the hand-over hides the panel and lets the
         // HUD guide instead of leaving the menu over the road.
         Assert.False(vm.IsShown);
+        Assert.True(session.Story.Done);
     }
 
     [Fact]
-    public void FinishDialogue_RevealsTheHud()
+    public void CarPage_Continue_RevealsTheHud()
     {
         var hud = new FakeTelemetryHud();
-        var session = Create(hud: hud);
+        var session = Create(content: WalkWithCar, hud: hud);
         Assert.False(hud.Revealed);
 
         session.Story.FinishDialogue();
+        Assert.False(hud.Revealed); // the closing page still owns the screen
+
+        Assert.IsType<GrandmaCarScreenViewModel>(session.Vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
 
         Assert.True(hud.Revealed);
     }
@@ -1836,6 +1993,24 @@ public sealed class MainViewModelTests
         Assert.Contains(
             log.Infos,
             line => line.Contains($"entered {expected.Name}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EnterRequested_HidesTheCompanionTaskText()
+    {
+        // The companion asked "enter?" and the player walked into the door:
+        // the guidance and its button are consumed by the entry, so the mini
+        // window must not keep showing them.
+        var hud = new FakeTelemetryHud();
+        var session = Create(
+            content: TestSession.OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud);
+
+        session.Story.ShowDialogue();
+        hud.RaiseEnter();
+
+        Assert.Equal(1, hud.DestinationEnteredCalls);
     }
 
     [Fact]
@@ -2286,10 +2461,10 @@ public sealed class MainViewModelTests
         Assert.Null(hud.Destination);
         var voiceInfo = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         Assert.True(vm.IsShown);
-        Assert.Contains("HEY MAZDA", voiceInfo.LeadText, StringComparison.Ordinal);
-        Assert.DoesNotContain("{0}", voiceInfo.LeadText, StringComparison.Ordinal);
-        Assert.Contains("\"HEY {BRAND}\"", voiceInfo.LeadText, StringComparison.Ordinal);
-        Assert.Contains("CTRL+Shift+C", voiceInfo.DetailText, StringComparison.Ordinal);
+        // The wake word and the hotkey moved to the menu's clock band; this
+        // closing page only names the next step.
+        Assert.Null(voiceInfo.LeadText);
+        Assert.Null(voiceInfo.DetailText);
         string hint = Assert.IsType<string>(voiceInfo.HintText);
         Assert.Contains("Click \"CONTINUE\"", hint, StringComparison.Ordinal);
         Assert.Contains("select \"JOBS\"", hint, StringComparison.Ordinal);
@@ -2298,10 +2473,15 @@ public sealed class MainViewModelTests
         voiceInfo.ContinueCommand.Execute(null);
 
         // The tour is over: the panel opens on the menu by itself for the
-        // first time since the introduction started.
+        // first time since the introduction started, with the reminder above
+        // the clock.
         Assert.False(session.Story.IntroInProgress);
         Assert.True(vm.IsShown);
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.Contains("\"Hey {BRAND}\"", menu.VoiceWakeText, StringComparison.Ordinal);
+        Assert.Contains("\"Hey MAZDA\"", menu.VoiceWakeText, StringComparison.Ordinal);
+        Assert.DoesNotContain("{0}", menu.VoiceWakeText, StringComparison.Ordinal);
+        Assert.Contains("CTRL+Shift+C", menu.VoiceHotkeyText, StringComparison.Ordinal);
     }
 
     [Fact]

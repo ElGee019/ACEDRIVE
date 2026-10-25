@@ -17,7 +17,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// at once like every other page. Marked as a jobs-side screen so the
 /// onboarding gate treats it like every other post-introduction page. The
 /// header repeats the design's clock (ontwerpdesign.psd): the game time over
-/// the abbreviated weekday and the display week. The hunger and filth tiles
+/// the abbreviated weekday and the display week, with the wake word and the
+/// hotkey reminder in the empty band above it. The hunger and filth tiles
 /// show their meter as a battery: the mask reveals the art's gradient bottom
 /// up, one step per point of that meter (PORTPLAN 26/33). A tap on either
 /// meter tile swaps the battery for the reading as a whole percent for three
@@ -56,6 +57,11 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     // the translation instead of being stitched on in code.
     private const string MeterPercentKey = "MenuMeterPercent";
 
+    // The reminder above the clock: how to call the panel back from the
+    // driver's seat (it replaced the closing voice page's lesson).
+    private const string WakeKey = "MenuVoiceWake";
+    private const string HotkeyKey = "MenuVoiceHotkey";
+
     // Danger band of the revealed reading. Display data like HungerRules'
     // amber band, not economy balance: no rules field, no JSON round-trip.
     // Strictly over, so a reading that still shows 85 stays calm.
@@ -72,11 +78,17 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly Hunger _hunger;
     // The fleet: the FILTH tile reads the current car's dirt (PORTPLAN 33).
     private readonly Garage _garage;
+    // The brand the mic listens for, read live: the menu is cached for the
+    // session, so a car switch has to repaint the wake reminder.
+    private readonly Func<string> _carBrand;
     private int _week;
     private int _lastMinute = -1;
     private int _lastWeek = -1;
     private int _lastHunger = -1;
     private int _lastFilth = -1;
+    // Null, not "": the first Refresh must build the wake line even when the
+    // brand is still unknown.
+    private string? _lastWakeBrand;
 
     // Voice acknowledgment state: the tile currently glowing and the beat's
     // deadline on the injected clock, never a tick count.
@@ -92,7 +104,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     public MenuScreenViewModel(
         ICommand wallet, ICommand jobs, ICommand calendar, ICommand trunk, ICommand settings,
         ICommand home,
-        Hunger hunger, Garage garage,
+        Hunger hunger, Garage garage, Func<string> carBrand,
         VoiceBeat beat, GameClock game, IClock clock, int displayWeek)
     {
         _beat = beat;
@@ -100,6 +112,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         _clock = clock;
         _hunger = hunger;
         _garage = garage;
+        _carBrand = carBrand;
         _week = displayWeek;
         // The tile commands wrap the injected ones so a click is newer input
         // than a pending voice tap: it drops the deferred navigation instead
@@ -136,6 +149,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         actions[HungerTile] = () => VoiceReveal(HungerTile);
         actions[FilthTile] = () => VoiceReveal(FilthTile);
         VoiceActions = actions;
+        VoiceHotkeyText = Strings.Get(HotkeyKey);
         Refresh();
     }
 
@@ -211,6 +225,15 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     /// <summary>Weekday + week line under the clock ("THU / WEEK 1").</summary>
     public string DayWeekText { get => _dayWeekText; private set => SetField(ref _dayWeekText, value); }
     private string _dayWeekText = "";
+
+    /// <summary>Wake-word line above the clock, naming the brand the mic
+    /// listens for. Empty until a brand is known (the line would otherwise
+    /// read "Hey "); repainted when the driven car changes.</summary>
+    public string VoiceWakeText { get => _voiceWakeText; private set => SetField(ref _voiceWakeText, value); }
+    private string _voiceWakeText = "";
+
+    /// <summary>Hotkey line above the clock: the second way to call the panel.</summary>
+    public string VoiceHotkeyText { get; }
 
     /// <summary>Hunger steps filled on the HUNGER tile: 0 (empty) .. 1 (all
     /// 36 steps lit). The tile masks its gradient to this fraction, so the
@@ -288,10 +311,11 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
 
     /// <summary>
     /// Repaints the header, the two battery fills and the readings a reveal
-    /// would draw. Called from the 10 Hz poll; the minute/week/level guards
-    /// keep it allocation-free between changes (hot-path discipline). A hunger
-    /// point or a dirtier car repaints even inside the same game minute, so a
-    /// wash shows at once — also on a number still on screen.
+    /// would draw. Called from the 10 Hz poll; the minute/week/level/brand
+    /// guards keep it allocation-free between changes (hot-path discipline). A
+    /// hunger point, a dirtier car or a switch to another brand repaints even
+    /// inside the same game minute, so a wash or the new wake word shows at
+    /// once — also on a number still on screen.
     /// </summary>
     public void Refresh()
     {
@@ -299,14 +323,18 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         int minute = now.Hour * 60 + now.Minute;
         int hunger = _hunger.Value;
         int filth = _garage.Current?.Filth.Value ?? 0;
+        string brand = _carBrand();
         if (minute == _lastMinute && _week == _lastWeek
-            && hunger == _lastHunger && filth == _lastFilth) return;
+            && hunger == _lastHunger && filth == _lastFilth
+            && string.Equals(brand, _lastWakeBrand, StringComparison.Ordinal)) return;
         _lastMinute = minute;
         _lastWeek = _week;
         _lastHunger = hunger;
         _lastFilth = filth;
+        _lastWakeBrand = brand;
         ClockText = GameClockText.Time(now);
         DayWeekText = GameClockText.DayWeek(_game.Today, _week);
+        VoiceWakeText = WakeText(brand);
         // The fills are fractions of each meter's own cap: hunger walks its 36
         // steps, filth the car-wash rules' 25. Never a fixed denominator, or a
         // filthy car would stop short of a full battery.
@@ -326,6 +354,14 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     // fraction, never the raw step count, so both tiles read on one scale.
     private static int Percent(double fill) =>
         (int)Math.Round(fill * 100.0, MidpointRounding.AwayFromZero);
+
+    // The wake reminder names the car the mic listens for, in caps like the
+    // voice page drew it. No brand yet means no line at all: the copy would
+    // otherwise name an empty car ("... For instance "Hey ".").
+    private static string WakeText(string brand) =>
+        string.IsNullOrWhiteSpace(brand)
+            ? ""
+            : Strings.Format(WakeKey, brand.ToUpperInvariant());
 
     // Voice taps glow first and wait out the shared beat, so the
     // acknowledgment is visible before the page flips.

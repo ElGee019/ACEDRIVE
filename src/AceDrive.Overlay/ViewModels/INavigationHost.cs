@@ -1,12 +1,13 @@
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The slice of the coordinator the navigator reports to: the three entries
-/// whose work is not a page — closing a shift that already timed out (the
+/// The slice of the coordinator the navigator reports to: the entries whose
+/// work is not a page — closing a shift that already timed out (the
 /// coordinator owns the shift record and its summary page), re-reading the
-/// readouts after a shift starts, and the settings page, which belongs to the
-/// story flow rather than to navigation. The haul settle is the haul flow's
-/// page, so it takes no report at all.
+/// readouts after a shift starts, the settings page (which belongs to the
+/// story flow rather than to navigation), and a destination pinned from the
+/// addresses page (the ToDo list counts it). The haul settle is the haul
+/// flow's page, so it takes no report at all.
 /// </summary>
 public interface INavigationHost
 {
@@ -21,4 +22,10 @@ public interface INavigationHost
 
     /// <summary>Opens the settings page (the story flow's preferences writer).</summary>
     void ShowSettings();
+
+    /// <summary>
+    /// The addresses page pinned a destination (Unity manuallySetDestinations):
+    /// the coordinator counts it and syncs the ToDo list.
+    /// </summary>
+    void DestinationPinned();
 }

@@ -1,14 +1,11 @@
 using System.ComponentModel;
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using AceDrive.Core;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
@@ -24,36 +21,20 @@ public partial class HudWindow : Window
     private const double DefaultWidth = 413.6;
     private const double HudHeight = 200.0;
     private const double DefaultMargin = 24.0;
-    private const string BlueBackdropUri = "pack://application:,,,/Assets/bluebg.webp";
-
-    // The blue plate inside the backdrop art's transparent export margin (see
-    // TryLoadBackdrop), in the brush's relative units. A re-export at another
-    // canvas size only trims a sliver of art instead of exposing the margin.
-    private static readonly Rect BackdropPlate = new(
-        30.0 / 1080.0, 30.0 / 2280.0, 1020.0 / 1080.0, 2220.0 / 2280.0);
-
-    // The XAML fallback fill, kept so the request toggle can restore it when
-    // the WebP backdrop is unavailable.
-    private static readonly Brush DarkBackdrop =
-        new SolidColorBrush(Color.FromArgb(0xF2, 0x14, 0x16, 0x1A));
 
     private readonly ISettingsStore _store;
-    private readonly ILog _log;
-    private readonly Brush? _blueBackdrop;
     private bool _panelOpen;
     // A page can summon the task text while the panel is still up (pinning an
     // address); the strip then stays over the panel until the panel next opens.
     private bool _showTaskTextOverPanel;
 
     public HudWindow(
-        HudViewModel viewModel, ISettingsStore store, ILog log,
+        HudViewModel viewModel, ISettingsStore store,
         double mainLeft, double mainTop, double mainWidth)
     {
         _store = store;
-        _log = log;
         DataContext = viewModel;
         InitializeComponent();
-        _blueBackdrop = TryLoadBackdrop();
 
         Width = double.IsFinite(mainWidth) && mainWidth > 0.0 ? mainWidth : DefaultWidth;
         Height = HudHeight;
@@ -95,7 +76,7 @@ public partial class HudWindow : Window
         Closed += OnClosed;
         viewModel.PropertyChanged += OnViewModelChanged;
         ApplyShown();
-        ApplyRequest();
+        ApplyRequestSize();
     }
 
     /// <summary>Keeps the HUD the same width as the main overlay.</summary>
@@ -113,7 +94,8 @@ public partial class HudWindow : Window
     /// strip on top of a page would cover a row and turn its click into a HUD
     /// drag (logged at Max's store), so it returns once the player drives and
     /// the panel hides again. <see cref="ShowTaskTextOverPanel"/> is the one
-    /// deliberate exception, for a destination the player just pinned.
+    /// deliberate exception, for a destination the player just pinned; it ends
+    /// when that destination is entered, since there is no task text left to read.
     /// </summary>
     public void SetPanelOpen(bool open)
     {
@@ -146,13 +128,20 @@ public partial class HudWindow : Window
         }
         else if (e.PropertyName == nameof(HudViewModel.HasRequest))
         {
-            ApplyRequest();
+            ApplyRequestSize();
+        }
+        else if (e.PropertyName == nameof(HudViewModel.HasTaskText))
+        {
+            // The over-panel exception exists to surface the task text; once
+            // that text is gone (the player entered the door) the companion
+            // steps aside again instead of covering page rows.
+            ApplyShown();
         }
     }
 
     // The VM owns the hand-over: hidden through the introduction, revealed once
-    // the birthday dialogue finishes. The window itself has no timer or rule;
-    // an open main panel keeps it aside until the panel closes again.
+    // the walk's closing car page is confirmed. The window itself has no timer
+    // or rule; an open main panel keeps it aside until the panel closes again.
     private void ApplyShown()
     {
         if (DataContext is not HudViewModel vm)
@@ -160,7 +149,7 @@ public partial class HudWindow : Window
             return;
         }
 
-        if (vm.IsRevealed && (!_panelOpen || _showTaskTextOverPanel))
+        if (vm.IsRevealed && (!_panelOpen || (_showTaskTextOverPanel && vm.HasTaskText)))
         {
             if (!IsVisible)
             {
@@ -173,51 +162,23 @@ public partial class HudWindow : Window
         }
     }
 
-    // The customer request takes the companion over: the frame turns blue while
-    // the ask is up and reverts when the host clears it. The frame keeps the
-    // driving strip's size — the page scrolls inside it instead of growing over
-    // the game. A machine without the WebP codec keeps the dark fill and still
-    // shows the ask.
-    private void ApplyRequest()
+    // A customer request takes the companion over; its page is taller than the
+    // driving strip, so the frame grows to the page instead of scrolling inside
+    // it, and keeps the strip's black. WHY SizeToContent: the ask's length
+    // varies by quiz and language, so a fixed taller height would either clip
+    // a long ask or bring the scrollbar back. MinHeight keeps a short ask (the
+    // speed-challenge read-in) from shrinking the strip.
+    private void ApplyRequestSize()
     {
-        bool request = DataContext is HudViewModel { HasRequest: true };
-        Backdrop.Background = request ? _blueBackdrop ?? DarkBackdrop : DarkBackdrop;
-    }
+        if (DataContext is HudViewModel { HasRequest: true })
+        {
+            SizeToContent = SizeToContent.Height;
+            return;
+        }
 
-    // WHY: WPF has no WebP codec of its own — the decode rides on the OS WIC
-    // one. OnLoad forces the decode to throw synchronously inside this try, so
-    // a codec-less machine keeps the dark XAML fill instead of crashing on the
-    // render thread later (AGENTS.md: degrade gracefully).
-    private ImageBrush? TryLoadBackdrop()
-    {
-        try
-        {
-            var art = new BitmapImage();
-            art.BeginInit();
-            art.UriSource = new Uri(BlueBackdropUri, UriKind.Absolute);
-            art.CacheOption = BitmapCacheOption.OnLoad;
-            art.EndInit();
-            art.Freeze();
-            return new ImageBrush(art)
-            {
-                Stretch = Stretch.UniformToFill,
-                // WHY the Viewbox: the art is exported on a 1080 x 2280 canvas
-                // whose blue plate is the 1020 x 2220 content inside a 30 px
-                // transparent margin. Mapping the whole canvas leaves that
-                // margin transparent around the frame edge — at the companion's
-                // width the white ring then shows right at the window border.
-                // Mapping just the plate lets UniformToFill reach the edge.
-                Viewbox = BackdropPlate,
-            };
-        }
-        catch (Exception ex) when (ex is NotSupportedException or IOException)
-        {
-            // NotSupportedException = WIC has no WebP codec on this machine;
-            // IOException = resource missing from the build. Either way the
-            // request keeps its dark fill instead of blocking window start.
-            _log.LogWarning($"blue request backdrop not shown ({ex.GetType().Name}: {ex.Message}); using dark fill");
-            return null;
-        }
+        // Back to the strip: the saved Height may already be the grown one.
+        SizeToContent = SizeToContent.Manual;
+        Height = HudHeight;
     }
 
     private void OnDrag(object sender, MouseButtonEventArgs e)
@@ -291,6 +252,9 @@ public partial class HudWindow : Window
         return IntPtr.Zero;
     }
 
+    // The request page may have grown the frame; the companion always starts
+    // as the 200 px strip, so the placement file stores that height, not the
+    // transient request height.
     private void OnClosed(object? sender, EventArgs e) =>
-        _store.Save(new WindowBounds(Left, Top, Width, Height));
+        _store.Save(new WindowBounds(Left, Top, Width, HudHeight));
 }

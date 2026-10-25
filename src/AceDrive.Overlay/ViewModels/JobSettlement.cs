@@ -102,6 +102,9 @@ public sealed class JobSettlement
             _wallet.AddCornering(1.0);
             _log.LogInfo($"[Rating] speed challenge won: cornering {_wallet.Rating.Cornering:0.00}");
         }
+        // A passenger's hurry is a plain tip condition: late costs the ordinary
+        // tip, like the challenge, but there is no award to win.
+        ResolveRequestDeadline(job);
         int capacity = _fleet.PassengerCapacity();
         // The car that actually ran the ride. An owned car supplies its real
         // class + global rarity and contributes its km. An unowned free-roam
@@ -144,7 +147,7 @@ public sealed class JobSettlement
         TaxiReceipt receipt = TaxiReceiptBuilder.Build(
             job.DistanceKm, capacity, carClass,
             carRarity, PlaceholderStreetKnowledgePct,
-            tipEligible: job.TipEligible || job.QuizAnsweredCorrectly,
+            tipEligible: (job.TipEligible || job.QuizAnsweredCorrectly) && job.ConditionsMet,
             fines: job.SpeedChallengeFines, _fares, _wallet.Xp,
             new FriendshipResult(friendship.OwnerName, friendship.Level, friendship.TierIncreased),
             brandName, brandKm, carKey,
@@ -181,7 +184,7 @@ public sealed class JobSettlement
             // The lifetime total (Unity jobsCompleted) rides the same hook and
             // gates the job-opened businesses.
             _zone.RegisterJob();
-            _jobs.Register();
+            _jobs.RegisterTaxi();
         }
         ApplyBankInterest();
         if (earnsProgress)
@@ -301,7 +304,7 @@ public sealed class JobSettlement
             // Zone tick, delivery twin (Unity DeliveryJobHandler's settle): the
             // counters, interest and expansion flow exactly like the taxi hook.
             _zone.RegisterJob();
-            _jobs.Register();
+            _jobs.RegisterDelivery();
         }
         ApplyBankInterest();
         if (earnsProgress)
@@ -380,11 +383,33 @@ public sealed class JobSettlement
 
         job.TipEligible = false;
         _hud?.ShowNotice(
-            Strings.Get("HudSpeedChallengeLate"),
+            Strings.Get("HudDeadlineLate"),
             TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
         _log.LogInfo(
             $"speed challenge late: {(_clock.UtcNow - deadline).TotalSeconds:0}s " +
             $"past the deadline; tip dropped");
         return false;
+    }
+
+    // The accepted passenger's own deadline (a "we're in a hurry" line) has
+    // the same verdict as the challenge: the ordinary tip is gone, the fare is
+    // not. ConditionsMet is the gate so a ride that broke a live limit earlier
+    // keeps its single no-tip outcome.
+    private void ResolveRequestDeadline(TaxiJobState job)
+    {
+        if (job.Request is not { Condition.Deadline: true }
+            || job.RequestDeadline is not { } deadline
+            || _clock.UtcNow <= deadline)
+        {
+            return;
+        }
+
+        job.ConditionsMet = false;
+        _hud?.ShowNotice(
+            Strings.Get("HudDeadlineLate"),
+            TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
+        _log.LogInfo(
+            $"customer request late: {(_clock.UtcNow - deadline).TotalSeconds:0}s " +
+            $"past the deadline; tip dropped");
     }
 }

@@ -44,9 +44,12 @@ public sealed class JsonCustomerRequestStore
             return CustomerRequestTable.Empty;
         }
 
+        int tracked = table.SuffixRequests.Values.Count(
+            line => line.Condition.Deadline || line.Condition.HasLiveLimits);
         _log.LogInfo(
             $"customer requests loaded: suffixes={table.SuffixRequests.Count} " +
-            $"categories={table.QuestionCategories.Count} timer={table.TimerSeconds}s");
+            $"tracked={tracked} categories={table.QuestionCategories.Count} " +
+            $"timer={table.TimerSeconds}s");
         return table;
     }
 
@@ -57,14 +60,17 @@ public sealed class JsonCustomerRequestStore
             || !IsChance(table.Tier3Chance)
             || string.IsNullOrWhiteSpace(table.SpeedChallengeText)
             || table.SuffixRequests is not { Count: > 0 }
-            || table.QuestionCategories is not { Count: > 0 })
+            || table.QuestionCategories is not { Count: > 0 }
+            || table.MonitorRules is not { IsValid: true })
         {
             return false;
         }
 
-        foreach ((string suffix, string text) in table.SuffixRequests)
+        foreach ((string suffix, SuffixRequest? line) in table.SuffixRequests)
         {
-            if (string.IsNullOrWhiteSpace(suffix) || string.IsNullOrWhiteSpace(text))
+            if (string.IsNullOrWhiteSpace(suffix)
+                || string.IsNullOrWhiteSpace(line?.Text)
+                || line.Condition is not { IsValid: true })
             {
                 return false;
             }

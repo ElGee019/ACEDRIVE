@@ -17,13 +17,14 @@ internal sealed class TestSessionResult
 {
     public TestSessionResult(
         MainViewModel vm, FakeClock clock, FakeTelemetry tel, FakeStore store,
-        OnboardingFlow story)
+        OnboardingFlow story, TodoBoard todos)
     {
         Vm = vm;
         Clock = clock;
         Tel = tel;
         Store = store;
         Story = story;
+        Todos = todos;
     }
 
     public MainViewModel Vm { get; }
@@ -36,6 +37,9 @@ internal sealed class TestSessionResult
 
     /// <summary>The introduction walk the root hands the coordinator.</summary>
     public OnboardingFlow Story { get; }
+
+    /// <summary>The ToDo list the jobs page reads (PORTPLAN 46).</summary>
+    public TodoBoard Todos { get; }
 
     public void Deconstruct(
         out MainViewModel vm, out FakeClock clock, out FakeTelemetry tel,

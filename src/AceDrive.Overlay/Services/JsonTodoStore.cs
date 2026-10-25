@@ -35,7 +35,7 @@ public sealed class JsonTodoStore
         return table;
     }
 
-    // Every entry needs a subject the ViewModel can format plus a reachable target.
+    // Every entry needs a registered subject plus a reachable target.
     private static bool IsValid(TodoTable table)
     {
         if (table.Entries is not { Count: > 0 })
@@ -45,7 +45,7 @@ public sealed class JsonTodoStore
 
         foreach (TodoEntry entry in table.Entries)
         {
-            if (!GrandmaTodo.IsKnown(entry.SubjectId) || entry.Target < 1)
+            if (!TodoRequirements.IsRegistered(entry.SubjectId) || entry.Target < 1)
             {
                 return false;
             }

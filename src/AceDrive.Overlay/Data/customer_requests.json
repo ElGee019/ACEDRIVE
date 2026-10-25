@@ -3,56 +3,203 @@
     "tier2Chance": 0.2,
     "tier3Chance": 0.2,
     "speedChallengeText": "Please get there quickly!",
+    "monitor": {
+        "movingKmh": 15,
+        "brakeBrusque": 0.7,
+        "throttleBrusque": 0.8,
+        "steerBrusqueRad": 0.35,
+        "speedToleranceKmh": 1
+    },
     "suffixRequests": {
-        "and some boxing partners": "[name] are in a hurry for a match.",
-        "and some tea loving friends": "[name] are asking you to avoid sudden stops.",
-        "and some motorsport enthusiasts": "[name] are asking you to keep the revs up; they enjoy the sound of the engine.",
-        "and modelling office colleagues": "[name] are asking you to drive smoothly to avoid wrinkles and motion sickness.",
-        "and some business partners": "[name] are asking you to keep the ride professional so they can work, and to keep the radio quiet.",
-        "and some jazz band members": "[name] are asking if you can put on jazz.",
-        "and some poker friends": "[name] are asking you not to talk about luck or odds during the ride.",
-        "and some not very well-liked people": "[name] are asking you to keep interaction minimal and just focus on the road.",
-        "and some yoga classmates": "[name] are asking you to drive gently and avoid aggressive acceleration.",
-        "and some amateur astronomers": "[name] are complaining about light pollution and asking you to turn off the interior lights.",
-        "and some birdwatchers": "[name] are asking you to slow down near parks and trees, just in case.",
-        "and some metalheads": "[name] are asking if you can turn the music up.",
-        "and some people who believe pigeons are government spies": "[name] are asking you to keep the windows closed.",
-        "and some people who only listen to classical music": "[name] are asking you to turn the radio to classical.",
-        "and some sugar addicts": "[name] are asking you to avoid sudden braking.",
-        "and some people who think their pets are family": "[name] are asking you to drive extra carefully because their pet is stressed.",
-        "and some videogame fanatics who never skip a dialogue": "[name] are asking you not to interrupt them while they are talking.",
-        "and some people who read medicine leaflets": "[name] are asking you to drive within the speed limit at all times.",
-        "and some friends who smoke": "[name] are asking if cracking a window slightly would be okay.",
-        "and some people who do not talk much": "[name] are asking you to keep the ride quiet and peaceful.",
-        "and some Twin Peaks fans": "[name] are asking you to keep the radio low because something strange might happen.",
-        "and some Trekkies": "[name] are asking you to keep the ride smooth and logical, with no unnecessary risks.",
-        "and some bureaucrats": "[name] are asking you to follow traffic rules precisely.",
-        "and some ecologists": "[name] are asking you to drive efficiently and avoid unnecessary idling.",
-        "and some amateur photographers": "[name] are asking you to slow down occasionally.",
-        "and some chess club members": "[name] are asking you to plan your moves ahead and avoid last-second lane changes.",
-        "and some choir members": "[name] are asking you to turn down the radio so they can rest their voice.",
-        "and some sailing crew mates": "[name] are asking you to take turns smoothly, sailing through traffic.",
-        "and some open-mic regulars": "[name] are asking you to keep the radio off so they can rehearse silently.",
-        "and some community radio hosts": "[name] are asking you to keep the engine noise low so they can record a voice note.",
-        "and some people who record voice notes to not forget": "[name] are asking you not to interrupt while they are recording.",
-        "and some friends who name their houseplants": "[name] are asking you to turn off the airco.",
-        "and some former time-travelers": "[name] are asking you to take the same route as last time.",
-        "and some acquaintances who clap when their plane lands": "[name] are asking whether you are a safe driver and if you can take it slow.",
-        "and some amateur weather prophets": "[name] are asking you to drive carefully because the weather is no good today.",
-        "and some friends who refuse to sit with their back to a door": "[name] are asking you to adjust the seating.",
-        "and some people who claim to remember their previous life": "[name] are asking you to pass a familiar street.",
-        "and some lovers of obscure national anthems": "[name] are asking if you can put on the radio and search for something ceremonial.",
-        "and some friends who test chairs before trusting them": "[name] are asking you not to brake suddenly.",
-        "and some late-night philosophers": "[name] are asking you to keep a slow, thoughtful pace.",
-        "and some people who never turn mirrors toward their beds": "[name] are asking you to adjust the rear-view mirror away from them.",
-        "and some friends who keep old voicemails they can't bring themselves to delete": "[name] are asking you to keep the ride quiet.",
-        "and some neighbors who know exactly when the neighbor leaves the building": "[name] are asking you to check whether someone is tailing.",
-        "and some acquaintances who like to gossip": "[name] are asking if you have heard anything interesting about the area.",
-        "and some people who insist they have already lived before": "[name] are asking you to take another route than last time.",
-        "and some people who count steps without knowing why": "[name] are asking you to stop at crossings.",
-        "and some friends who keep packed bags read for you never know": "[name] are asking you not to put their bags in the trunk.",
-        "and some neighbors who do not finish their sentences": "[name] are asking you to just\u2026",
-        "and some people who avoid specific dates": "[name] are asking you to avoid mentioning the time."
+        "and some boxing partners": {
+            "text": "[name] are in a hurry for a match.",
+            "condition": {
+                "deadline": true
+            }
+        },
+        "and some tea loving friends": {
+            "text": "[name] are asking you to avoid sudden stops.",
+            "condition": {
+                "brakeBrusque": true
+            }
+        },
+        "and some motorsport enthusiasts": {
+            "text": "[name] are asking you to keep the revs over 2000. They enjoy the sound of the engine.",
+            "condition": {
+                "minRpm": 2000
+            }
+        },
+        "and modelling office colleagues": {
+            "text": "[name] are asking you to drive smoothly to avoid wrinkles and motion sickness.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some business partners": {
+            "text": "[name] are asking you to keep the ride professional so they can work, and to keep the radio quiet.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some jazz band members": {
+            "text": "[name] are asking if you can put on jazz."
+        },
+        "and some poker friends": {
+            "text": "[name] are asking you not to talk about luck or odds during the ride."
+        },
+        "and some not very well-liked people": {
+            "text": "[name] are asking you to keep interaction minimal and just focus on the road."
+        },
+        "and some yoga classmates": {
+            "text": "[name] are asking you to drive gently and avoid aggressive acceleration.",
+            "condition": {
+                "throttleBrusque": true
+            }
+        },
+        "and some amateur astronomers": {
+            "text": "[name] are complaining about light pollution and asking you to turn off the interior lights."
+        },
+        "and some metalheads": {
+            "text": "[name] are asking if you can turn the music up."
+        },
+        "and some people who believe pigeons are government spies": {
+            "text": "[name] are asking you to keep the windows closed."
+        },
+        "and some people who only listen to classical music": {
+            "text": "[name] are asking you to turn the radio to classical."
+        },
+        "and some sugar addicts": {
+            "text": "[name] are asking you to avoid sudden braking.",
+            "condition": {
+                "brakeBrusque": true
+            }
+        },
+        "and some people who think their pets are family": {
+            "text": "[name] are asking you to drive extra carefully because their pet is stressed.",
+            "condition": {
+                "throttleBrusque": true
+            }
+        },
+        "and some videogame fanatics who never skip a dialogue": {
+            "text": "[name] are asking you not to interrupt them while they are talking."
+        },
+        "and some people who read medicine leaflets": {
+            "text": "[name] are asking you to not drive faster than 90 at all times.",
+            "condition": {
+                "maxSpeedKmh": 90
+            }
+        },
+        "and some friends who smoke": {
+            "text": "[name] are asking if cracking a window slightly would be okay."
+        },
+        "and some people who do not talk much": {
+            "text": "[name] are asking you to keep the ride quiet and peaceful.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some Twin Peaks fans": {
+            "text": "[name] are asking you to keep the radio low because something strange might happen."
+        },
+        "and some Trekkies": {
+            "text": "[name] are asking you to keep the ride smooth and logical, with no unnecessary risks.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some ecologists": {
+            "text": "[name] are asking you to drive efficiently and avoid going over 3000rpm.",
+            "condition": {
+                "maxRpm": 3000
+            }
+        },
+        "and some chess club members": {
+            "text": "[name] are asking you to plan your moves ahead and avoid last-second lane changes."
+        },
+        "and some choir members": {
+            "text": "[name] are asking you to turn down the radio so they can rest their voice."
+        },
+        "and some sailing crew mates": {
+            "text": "[name] are asking you to take turns smoothly, sailing through traffic.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some open-mic regulars": {
+            "text": "[name] are asking you to keep the radio off so they can rehearse silently."
+        },
+        "and some community radio hosts": {
+            "text": "[name] are asking you to keep the engine under 2500rpm so they can record a voice note.",
+            "condition": {
+                "maxRpm": 2500
+            }
+        },
+        "and some people who record voice notes to not forget": {
+            "text": "[name] are asking you not to interrupt while they are recording."
+        },
+        "and some friends who name their houseplants": {
+            "text": "[name] are asking you to turn off the airco."
+        },
+        "and some acquaintances who clap when their plane lands": {
+            "text": "[name] are asking whether you are a safe driver and if you can keep it under 120.",
+            "condition": {
+                "maxSpeedKmh": 120
+            }
+        },
+        "and some amateur weather prophets": {
+            "text": "[name] are asking you to drive carefully because the weather is no good today.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some friends who refuse to sit with their back to a door": {
+            "text": "[name] are asking you to adjust the seating."
+        },
+        "and some lovers of obscure national anthems": {
+            "text": "[name] are asking if you can put on the radio and search for something ceremonial."
+        },
+        "and some friends who test chairs before trusting them": {
+            "text": "[name] are asking you not to brake suddenly.",
+            "condition": {
+                "brakeBrusque": true
+            }
+        },
+        "and some late-night philosophers": {
+            "text": "[name] are asking you to keep a slow, thoughtful pace, under 100.",
+            "condition": {
+                "maxSpeedKmh": 100
+            }
+        },
+        "and some people who never turn mirrors toward their beds": {
+            "text": "[name] are asking you to adjust the rear-view mirror away from them."
+        },
+        "and some friends who keep old voicemails they can't bring themselves to delete": {
+            "text": "[name] are asking you to keep the ride quiet.",
+            "condition": {
+                "steeringBrusque": true
+            }
+        },
+        "and some neighbors who know exactly when the neighbor leaves the building": {
+            "text": "[name] are asking you to check whether someone is tailing."
+        },
+        "and some acquaintances who like to gossip": {
+            "text": "[name] are asking if you have heard anything interesting about the area."
+        },
+        "and some people who insist they have already lived before": {
+            "text": "[name] are asking you to drive carefully and stay under 4000rpm.",
+            "condition": {
+                "maxRpm": 4000
+            }
+        },
+        "and some friends who keep packed bags read for you never know": {
+            "text": "[name] are asking you not to put their bags in the trunk."
+        },
+        "and some neighbors who do not finish their sentences": {
+            "text": "[name] are asking you to just\u2026"
+        },
+        "and some people who avoid specific dates": {
+            "text": "[name] are asking you to avoid mentioning the time."
+        }
     },
     "questionCategories": [
         {

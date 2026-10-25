@@ -1,5 +1,6 @@
 // Onboarding data (PORTPLAN Career Start items 2-4): favorite brand ->
-// grandma's car -> birthday dialogue. Pure data records, no behavior.
+// voice info -> birthday dialogue -> grandma's car. Pure data records, no
+// behavior.
 namespace AceDrive.Core;
 
 /// <summary>One of grandma's starter cars. ImagePath is null when no thumbnail ships.</summary>

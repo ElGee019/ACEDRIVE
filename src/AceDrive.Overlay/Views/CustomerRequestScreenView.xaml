@@ -11,7 +11,7 @@
     <UserControl.Resources>
         <FontFamily x:Key="TourneyThin">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Tourney Thin</FontFamily>
     </UserControl.Resources>
-    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+    <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>

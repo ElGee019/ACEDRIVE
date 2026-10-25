@@ -116,7 +116,7 @@ public sealed class DeliveryReceiptScreenTests
         var rivals = new FakeRivals();
         rivals.Result = new RivalsResult(7, 41, 3, 10, false);
         var (vm, _, _) = Create(rivals: rivals);
-        Assert.Equal("Your XP world standings is 7th of 41.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is 7th of 41.", vm.Standings.Line);
         Assert.Equal("You gained 3 positions.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
         Assert.Equal(1, vm.Standings.PulseSignal);

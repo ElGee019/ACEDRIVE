@@ -1,8 +1,8 @@
 {
   "Entries": [
-    { "SubjectId": "MaxGrocery", "Target": 1 },
-    { "SubjectId": "TaxiJobs", "Target": 3 },
-    { "SubjectId": "EarnCr", "Target": 500 },
-    { "SubjectId": "VisitBank", "Target": 1 }
+    { "SubjectId": "CrEarnings", "Target": 500 },
+    { "SubjectId": "XpEarnings", "Target": 2 },
+    { "SubjectId": "BankStandings", "Target": 1002 },
+    { "SubjectId": "GoToMaxGroceryStore", "Target": 1 }
   ]
 }

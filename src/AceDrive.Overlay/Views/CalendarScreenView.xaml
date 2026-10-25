@@ -27,7 +27,8 @@
          small size, so a long event never outshouts the day it belongs to. The
          highlighted (current game) day wears teal on both halves:
          the event button takes the teal outline in place of the old teal text,
-         and the day name joins it — eventless days still mark today by name.
+         and the day name sits black on a teal square — eventless days still
+         mark today by name.
          Tapping a row inside its gate glows the button text teal for one beat
          like every other button; outside it the text swaps to the white COME
          BACK warning for three seconds. The road-test button names the week's
@@ -68,7 +69,7 @@
                                      BACK copy never resizes the strip.
                                      Teal is the shared highlight (hub activated
                                      cells): the selectable day wears it on the
-                                     button border and the day name alike. -->
+                                     button border and behind its day name. -->
                                 <Grid Margin="0,1">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" MinHeight="47" SharedSizeGroup="DayRow"/>
@@ -82,24 +83,41 @@
                                         <ColumnDefinition Width="Auto" SharedSizeGroup="DayName"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Column="0" Text="{Binding ShortLabel}"
-                                               FontFamily="{StaticResource TileFace}" FontSize="18"
-                                               Margin="0,0,8,0"
-                                               VerticalAlignment="Center">
-                                        <TextBlock.Style>
-                                            <Style TargetType="TextBlock">
-                                                <Setter Property="Foreground" Value="#FFF"/>
+                                    <!-- Today's day name sits black on the solid
+                                         teal square: the light fill needs dark ink to
+                                         stay legible, and the square — not the glyph
+                                         colour — is what marks the day. The square
+                                         pads out to roughly its own width around the
+                                         text and centers on the shared row height;
+                                         every other day stays plain white. -->
+                                    <Border Grid.Column="0" Margin="0,0,8,0"
+                                            Padding="4,6"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
                                                 <Style.Triggers>
-                                                    <!-- The name wears the shared teal whenever the
-                                                         button beside it wears the outline, so even
-                                                         an eventless today still marks the day. -->
                                                     <DataTrigger Binding="{Binding IsToday}" Value="True">
-                                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                                        <Setter Property="Background" Value="#FF97EAD2"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
-                                        </TextBlock.Style>
-                                    </TextBlock>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding ShortLabel}"
+                                                   FontFamily="{StaticResource TileFace}" FontSize="18">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Setter Property="Foreground" Value="#FFF"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsToday}" Value="True">
+                                                            <Setter Property="Foreground" Value="#000"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </Border>
                                     <Button Grid.Column="1" Margin="0,1"
                                             Command="{Binding DataContext.DayCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                             CommandParameter="{Binding DayOfWeek}">

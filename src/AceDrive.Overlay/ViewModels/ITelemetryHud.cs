@@ -10,8 +10,8 @@ namespace AceDrive.Overlay.ViewModels;
 public interface ITelemetryHud
 {
     /// <summary>
-    /// Puts the companion on screen. The introduction keeps it hidden until
-    /// the birthday dialogue hands the errand over, so the opening pages are
+    /// Puts the companion on screen. The introduction keeps it hidden until the
+    /// walk's closing car page hands the errand over, so the opening pages are
     /// not covered by live mileage and position.
     /// </summary>
     void Reveal();
@@ -66,9 +66,9 @@ public interface ITelemetryHud
     /// <summary>
     /// Presents the customer request on the companion instead of a main-window
     /// page: the ask, its options and the countdown replace the task text, and
-    /// the frame turns blue. The host still owns the timer and the outcome; the
-    /// HUD only paints what it is handed and raises the taps back through the
-    /// screen's own commands.
+    /// the frame grows to the page's height on the same black backdrop. The
+    /// host still owns the timer and the outcome; the HUD only paints what it
+    /// is handed and raises the taps back through the screen's own commands.
     /// </summary>
     void ShowRequest(CustomerRequestScreenViewModel request);
 
@@ -79,7 +79,7 @@ public interface ITelemetryHud
     /// Surfaces the companion's task text even while the main panel is open,
     /// so a destination pinned from a page (the addresses list) is readable at
     /// once instead of waiting for the panel to hide. The companion keeps it
-    /// up until the panel next opens.
+    /// up until the panel next opens or the player enters the pinned door.
     /// </summary>
     void ShowTaskText();
 
@@ -90,10 +90,18 @@ public interface ITelemetryHud
     IVoiceScreen? RequestScreen { get; }
 
     /// <summary>
-    /// True while the car is parked on the destination house; the ENTER button is
-    /// up and voice may fire it.
+    /// True while the companion's action button is up: parked on the pinned
+    /// door and not entered yet. Voice taps the button only while it is up.
     /// </summary>
-    bool AtDestination { get; }
+    bool ShowEnterButton { get; }
+
+    /// <summary>
+    /// The host entered the pinned door (a shop interior, a story dialogue or
+    /// an arrival with nothing to open). The companion's task text and action
+    /// button hide until the next arrival or a new leg, so a visit does not
+    /// keep inviting the ENTER it just consumed.
+    /// </summary>
+    void DestinationEntered();
 
     /// <summary>
     /// Spoken words that fire the action button while it is up: "enter"

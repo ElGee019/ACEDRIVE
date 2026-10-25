@@ -3,14 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:AceDrive.Overlay.ViewModels"
         xmlns:views="clr-namespace:AceDrive.Overlay.Views"
-        Title="AceDrive HUD" Width="413.6" Height="200"
+        Title="AceDrive HUD" Width="413.6" Height="200" MinHeight="200"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ShowActivated="False" ShowInTaskbar="False" Topmost="True"
         ResizeMode="NoResize" Focusable="False">
-    <!-- Same two-ring companion frame as MainWindow, fixed at 200 px high.
-         The HUD is a separate top-level window on purpose: MainViewModel's
-         show/hide only touches the main panel, so Ctrl+Shift+C can hide the
-         menu while this stays visible over the game. -->
+    <!-- Same two-ring companion frame as MainWindow: a 200 px strip while
+         driving, grown to the page's height while a customer request owns the
+         frame (HudWindow.ApplyRequestSize). The HUD is a separate top-level
+         window on purpose: MainViewModel's show/hide only touches the main
+         panel, so Ctrl+Shift+C can hide the menu while this stays visible over
+         the game. -->
     <Window.Resources>
         <!-- The customer request rides the companion (PORTPLAN 11): the same
              page VM the panel used, painted here instead so the ask is
@@ -18,20 +20,22 @@
         <DataTemplate DataType="{x:Type vm:CustomerRequestScreenViewModel}">
             <views:CustomerRequestScreenView/>
         </DataTemplate>
-        <!-- The speed challenge's delivery clock uses the design's Tourney
-             face, like the menu clock. A machine without the embedded font
-             falls back to the default face rather than failing the HUD. -->
+        <!-- A timed ask's delivery clock (the speed challenge or a
+             passenger's hurry) uses the design's Tourney face, like the menu
+             clock. A machine without the embedded font falls back to the
+             default face rather than failing the HUD. -->
         <FontFamily x:Key="TourneyThin">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Tourney Thin</FontFamily>
     </Window.Resources>
-    <!-- The fill is the dark XAML default; the blue request backdrop is applied
-         in code (HudWindow.ApplyRequest) because a WebP ImageSource would
-         render-thread-crash on machines whose WIC has no WebP codec. -->
-    <Border x:Name="Backdrop" Background="#F214161A" CornerRadius="18" Padding="10">
+    <!-- The frame is the same black as the driving strip; the request page
+         paints no backdrop of its own. -->
+    <Border Background="#F214161A" CornerRadius="18" Padding="10">
         <Border BorderBrush="#FFFFFFFF" BorderThickness="2" CornerRadius="8" Padding="14,10">
             <Grid>
                 <!-- Normal task text: the destination/wrong-car line, the
                      remaining distance or a notice, ENTER, the street and the
-                     mileage. Hidden while a customer request owns the frame. -->
+                     mileage. Hidden while a customer request owns the frame,
+                     and its guidance block stays down once the player entered
+                     the pinned door (the street and mileage keep updating). -->
                 <Grid Visibility="{Binding HasNoRequest, Converter={StaticResource BoolToVis}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="*"/>
@@ -49,7 +53,8 @@
                          line and the centered ENTER button appears. While a car
                          other than the garage's current car is driven, the warning
                          replaces the destination line in this same slot and font. -->
-                    <Grid Grid.Row="0" Grid.ColumnSpan="2">
+                    <Grid Grid.Row="0" Grid.ColumnSpan="2"
+                          Visibility="{Binding HasTaskText, Converter={StaticResource BoolToVis}}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
@@ -80,15 +85,15 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
-                            <TextBlock Text="{Binding SpeedChallengeText}"
+                            <TextBlock Text="{Binding DeadlineText}"
                                        FontFamily="{StaticResource TourneyThin}"
                                        FontSize="22" TextTrimming="CharacterEllipsis"
-                                       Visibility="{Binding HasSpeedChallenge, Converter={StaticResource BoolToVis}}">
+                                       Visibility="{Binding HasDeadline, Converter={StaticResource BoolToVis}}">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Foreground" Value="#FFFFFFFF"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding SpeedChallengeLate}" Value="True">
+                                            <DataTrigger Binding="{Binding DeadlineLate}" Value="True">
                                                 <Setter Property="Foreground" Value="#FFFF9E64"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -135,12 +140,11 @@
 
                 <!-- Customer request: the ask, its options and the countdown,
                      replacing the task text for the duration of the ask. The
-                     ScrollViewer keeps a tall quiz reachable if the frame is
-                     small. -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                              Visibility="{Binding HasRequest, Converter={StaticResource BoolToVis}}">
-                    <ContentControl Content="{Binding Request}"/>
-                </ScrollViewer>
+                     window sizes itself to this page (ApplyRequestSize), so a
+                     tall quiz needs neither a scrollbar nor a taller magic
+                     height. -->
+                <ContentControl Content="{Binding Request}"
+                                Visibility="{Binding HasRequest, Converter={StaticResource BoolToVis}}"/>
             </Grid>
         </Border>
     </Border>

@@ -343,4 +343,37 @@ public sealed class VoiceMatchTests
 
         Assert.Equal(expected, VoiceMatch.MatchLabel(text, labels, confusions));
     }
+
+    // 2026-10-25 store session: five spoken "buy" attempts at 09:52:41-50
+    // landed as "my", "boy" x3 and "why" — never the word — while BACK four
+    // seconds later matched first try, so the page's voice pass was live and
+    // the three-letter label simply had no door. The 2026-10-21 shop visit
+    // failed the same way ("by" x2). BUY is a ONE-word label, so the table row
+    // is what makes these readings reach it; the exact hearing is untouched.
+    // Accepted consequence: the swap is phrase-wide, so an ambient sentence
+    // carrying "my"/"why" while the shop page is up also resolves to "buy".
+    // The spend is one grocery line and only with a shelf row already picked
+    // (BUY hidden otherwise), while the dealer's "BUY IT" needs the second
+    // word too — that is why the risk stops at the shop receipt.
+    [Theory]
+    [InlineData("my", "BUY")]
+    [InlineData("boy", "BUY")]
+    [InlineData("why", "BUY")]
+    [InlineData("by", "BUY")]
+    [InlineData("buy", "BUY")]        // the exact hearing is untouched
+    [InlineData("back", "BACK")]      // the page's other door keeps working
+    [InlineData("blah blah", null)]   // the table never invents a match
+    public void MatchLabel_BuyMishearings_ResolveThroughTheTable(string text, string? expected)
+    {
+        var confusions = new Dictionary<string, string>
+        {
+            ["my"] = "buy",
+            ["boy"] = "buy",
+            ["why"] = "buy",
+            ["by"] = "buy",
+        };
+        string[] labels = ["BUY", "BACK"];
+
+        Assert.Equal(expected, VoiceMatch.MatchLabel(text, labels, confusions));
+    }
 }

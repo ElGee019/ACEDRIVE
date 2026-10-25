@@ -106,11 +106,15 @@ internal static class TestSession
         var hungerStoreInstance = options.HungerStore ?? new FakeHungerStore();
         var garageStoreInstance = options.GarageStore ?? new FakeGarageStore();
         var jobsInstance = options.Jobs ?? new JobLedger(options.SavedDriver);
+        var pinsInstance = options.Pins ?? new DestinationPins(options.SavedDriver);
+        var visitsInstance = options.Visits ?? new VisitLedger(options.SavedDriver);
+        var todoStoreInstance = options.TodoStore ?? new FakeTodoProgressStore();
         var saver = new GameStateSaver(
             clock, game, clockStoreInstance, driverStoreInstance, garageStoreInstance,
             cityStoreInstance, hungerStoreInstance, roadTestStoreInstance, shiftStoreInstance,
             walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
-            cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance, jobsInstance);
+            cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance,
+            jobsInstance, pinsInstance, visitsInstance);
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
             brands, contentSource);
@@ -132,7 +136,8 @@ internal static class TestSession
             deliveryCareer, cityInstance, deliveryFaresInstance, meter,
             faresInstance, taxiRulesInstance, beat, options.Hud, logger);
         var shops = new ShopInteriors(
-            walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver, beat, logger);
+            walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver,
+            visitsInstance, beat, logger);
         var spawnerInstance = options.PoiSpawner ?? new PoiSpawner(
             map, PoiCatalog.Default,
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0);
@@ -164,6 +169,12 @@ internal static class TestSession
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
             onboardingStore, shops, dayCycle, logger);
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(handlers));
+        // The ToDo list: its own ledger + file, synced on the cold edges the
+        // tests drive (settle, POI entry, pin, purchase, boot).
+        var todoBoard = new TodoBoard(
+            options.Todos ?? TodoTable.Default, todoStoreInstance, directory,
+            onboardingStore, walletInstance, jobsInstance, zoneInstance, garageInstance,
+            pinsInstance, visitsInstance, deliveryCareer, logger);
         var proposalsInstance = TaxiTestData.Proposer(map: map, seed: 0);
         var taxi = new TaxiJobFlow(
             proposalsInstance, map, brands, pool, options.Requests,
@@ -182,10 +193,11 @@ internal static class TestSession
         // vm.CurrentScreen, so both must report the same panel.
         var shell = new OverlayShell();
         var navigation = new Navigation(
-            shell, beat, game, clock, shiftInstance, TodoTable.Default, roadsInstance,
+            shell, beat, game, clock, shiftInstance, todoBoard, roadsInstance,
             saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
-            deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle, logger);
+            deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
+            zoneInstance, [], () => brands.Brand, logger);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(shell, navigation, taxi, delivery, clock, logger);
@@ -199,7 +211,7 @@ internal static class TestSession
             options.Preferences ?? PlayerPreferences.Default,
             options.Culture ?? new FakeCultureService(), beat, options.Hud, garageInstance,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => brands.Brand,
-            logger, new StoryHost(panel, navigation, saver, rivalsInstance));
+            logger, new StoryHost(panel, navigation, saver, rivalsInstance, todoBoard));
         var voiceRouter = new VoiceRouter(
             panel, brands, contentSource, clock, logger, options.Hud);
         var vm = new MainViewModel(
@@ -211,6 +223,7 @@ internal static class TestSession
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, navigation, readouts, dayCycle,
+            todoBoard, pinsInstance,
             options.Hud, options.SaveResets, options.Restarter);
         if (options.CarKsId is not null)
         {
@@ -218,7 +231,7 @@ internal static class TestSession
             // headless: the VM now follows the announced car like live.
             brands.Fire("test", announced);
         }
-        return new TestSessionResult(vm, clock, tel, store, story);
+        return new TestSessionResult(vm, clock, tel, store, story, todoBoard);
     }
 
     // The real career opens these through the street/job thresholds; the flow

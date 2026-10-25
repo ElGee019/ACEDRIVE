@@ -57,6 +57,22 @@ public sealed class TaxiJobState
     /// (Unity's quizAnsweredCorrectly). Tips on its own, even after a fine.</summary>
     public bool QuizAnsweredCorrectly { get; set; }
 
+    /// <summary>
+    /// True until an accepted passive ask's live promise is broken (a brusque
+    /// input, a rev or speed limit) or its delivery deadline passes. A broken
+    /// promise removes the ordinary tip; the quiz's own tip is not affected.
+    /// Reset to true for every new job.
+    /// </summary>
+    public bool ConditionsMet { get; set; } = true;
+
+    /// <summary>
+    /// When the accepted passive ask's delivery deadline falls, null when that
+    /// ask set none or the map could not supply a route. Separate from the
+    /// speed challenge's deadline: a ride has at most one of the two, and only
+    /// the challenge pays a cornering award.
+    /// </summary>
+    public DateTime? RequestDeadline { get; set; }
+
     /// <summary>True when the speed challenge was accepted; the police
     /// patrols and fine checks are armed for the rest of the ride.</summary>
     public bool SpeedChallengeAgreed { get; set; }

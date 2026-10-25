@@ -27,8 +27,6 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen
     private const int ColumnCount = 2;
 
     private readonly DeliveryCareer _career;
-    private readonly DeliveryCatalog _board;
-    private readonly CityEconomy _city;
     private readonly ILog _log;
     private readonly VoiceBeat _beat;
     private readonly Action _goBack;
@@ -41,14 +39,12 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen
     private int _selectedLevel = -1;
 
     public DeliveryHubScreenViewModel(
-        DeliveryCareer career, DeliveryCatalog board, CityEconomy city, ILog log,
+        DeliveryCareer career, ILog log,
         ICommand backCommand,
         VoiceBeat beat,
         Action<OwnedHub>? hubOpened = null)
     {
         _career = career;
-        _board = board;
-        _city = city;
         _log = log;
         _beat = beat;
         _hubOpened = hubOpened;
@@ -77,9 +73,6 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen
 
     public string CredPLine { get => _credPLine; private set => SetField(ref _credPLine, value); }
     private string _credPLine = "";
-
-    public string CityGrowthLine { get => _cityGrowthLine; private set => SetField(ref _cityGrowthLine, value); }
-    private string _cityGrowthLine = "";
 
     public ICommand ChooseTierCommand { get; }
     public ICommand ChooseCareerCommand { get; }
@@ -186,9 +179,6 @@ public sealed class DeliveryHubScreenViewModel : ViewModelBase, IVoiceScreen
         Columns = columns;
 
         CredPLine = Strings.Format("DeliveryCredP", _career.CredP);
-        // The headline follows the connected stores, on the town's live stock.
-        CityGrowthLine = DeliveryCopy.CityGrowth(
-            _city.TotalGrowthPerHour(_career.VisibleStores(_board)));
         HasSelectedCareer = HasSelection();
         _openCareer.RaiseCanExecuteChanged();
         RebuildVoice();

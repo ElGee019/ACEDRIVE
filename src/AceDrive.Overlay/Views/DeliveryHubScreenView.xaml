@@ -72,8 +72,7 @@
         <StackPanel Grid.Row="1" VerticalAlignment="Top">
             <TextBlock Text="{loc:Loc Key=HubSubtitle}" Foreground="#B0FFFFFF" FontSize="11"
                        TextWrapping="Wrap" Margin="0,0,0,6"/>
-            <TextBlock Text="{Binding CredPLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,2"/>
-            <TextBlock Text="{Binding CityGrowthLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding CredPLine}" Foreground="#FFF" FontSize="12" Margin="0,0,0,8"/>
             <ItemsControl ItemsSource="{Binding TierCells}" Margin="0,0,0,8">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

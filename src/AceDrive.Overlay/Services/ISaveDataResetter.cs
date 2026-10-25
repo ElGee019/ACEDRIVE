@@ -10,9 +10,9 @@ namespace AceDrive.Overlay.Services;
 public interface ISaveDataResetter
 {
     /// <summary>
-    /// Deletes every save file. Returns false when at least one file could not
-    /// be removed, so the caller keeps the running session instead of
-    /// restarting onto a half-wiped career.
+    /// Deletes every save file. The report names the first file that survived,
+    /// so the caller keeps the running session instead of restarting onto a
+    /// half-wiped career — and can tell the player which file to unblock.
     /// </summary>
-    bool DeleteAll();
+    SaveResetReport DeleteAll();
 }

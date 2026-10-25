@@ -82,24 +82,25 @@ public sealed class VoiceTests
         return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
-    // Brand page -> grandma's car -> voice info -> birthday dialogue, the
-    // spoken route onto the main page (shared by the tests below).
-    // The last tap lands on the menu and leaves the panel up, so its Jobs tile
-    // takes the test onto the control page whose voice buttons these tests
-    // exercise.
+    // Brand page -> voice info -> birthday dialogue -> grandma's car, the
+    // spoken route onto the main page (shared by the tests below). The car
+    // page is mouse-only like the brand page, so the test clicks its CONTINUE
+    // and lands on the menu; the Jobs tile takes it onto the control page
+    // whose voice buttons these tests exercise.
     private static MainControlScreenViewModel ToControlPage(VoiceSession session)
     {
         OnboardingFlow story = session.Story;
         MainViewModel vm = session.Vm;
         story.ChooseBrand("Honda");
-        story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null); // page 2
-        dialogue.ContinueCommand.Execute(null); // finishes: the menu is shown
+        dialogue.ContinueCommand.Execute(null); // finishes: grandma's car page
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        vm.Show(); // the voice start was hidden; this keeps the built menu
+        vm.Show(); // the hand-over hid the panel; this keeps the built menu
         Assert.Same(menu, vm.CurrentScreen);
         menu.JobsCommand.Execute(null);
         return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
@@ -589,7 +590,6 @@ public sealed class VoiceTests
         var (vm, clock, _, _) = session;
         vm.Show();
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -607,12 +607,13 @@ public sealed class VoiceTests
         var (vm, clock, _, _) = session;
         vm.Show();
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null); // page 2
-        dialogue.ContinueCommand.Execute(null); // finishes
+        dialogue.ContinueCommand.Execute(null); // finishes: grandma's car page
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
         Assert.True(dialogue.IsComplete);
         Assert.False(vm.IsShown);
         clock.Advance(TimeSpan.FromSeconds(16));
@@ -640,7 +641,6 @@ public sealed class VoiceTests
         var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -662,8 +662,8 @@ public sealed class VoiceTests
         Assert.True(dialogue.ContinueFlash);
         Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen); // waits out the beat
         DrainBeat(vm, clock);
-        // The finished flow lands on the menu, no empty screen.
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        // The finished dialogue lands on grandma's car page, no empty screen.
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -731,12 +731,13 @@ public sealed class VoiceTests
         mic.Fire("hey mazda");
         Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
-        dialogue.ContinueCommand.Execute(null); // finishes: the panel closes
+        dialogue.ContinueCommand.Execute(null); // finishes: grandma's car page
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
         Assert.False(vm.IsShown);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         clock.Advance(TimeSpan.FromSeconds(4)); // wake cooldown over
@@ -886,14 +887,13 @@ public sealed class VoiceTests
     {
         // Regression for the logged 2026-10-14 surprise: "continue" closing
         // the birthday dialogue turned START TAXI SHIFT into CONTINUE without
-        // the player ever asking. The last tap now lands on the menu, whose
-        // words do not include "continue", so the utterance's FINAL tail
-        // cannot touch the control page's bare "continue" taxi keyword.
+        // the player ever asking. The last tap now lands on grandma's car page,
+        // which answers no voice words, so the utterance's FINAL tail cannot
+        // touch the control page's bare "continue" taxi keyword.
         var session = Create();
         var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -901,16 +901,21 @@ public sealed class VoiceTests
 
         mic.Fire("continue"); // partial: finishes the dialogue
         clock.Advance(TimeSpan.FromSeconds(0.51));
-        vm.Poll(); // beat drains: the menu is built, the hand-over closes the panel
-        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        Assert.False(vm.IsShown);
-        // The tail must be inert on the menu. Calling the app back puts the
-        // menu (not the control page) under it for the assertion below.
-        vm.Show();
-        Assert.True(vm.IsShown);
+        vm.Poll(); // beat drains: the car page is built, the panel stays up
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
 
         mic.Fire("continue", isFinal: true); // same utterance's tail
-        Assert.Same(menu, vm.CurrentScreen); // no menu word answers it
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen); // inert
+
+        // The car page's CONTINUE is mouse-only; the hand-over behind it lands
+        // on the menu, whose words do not include "continue" either.
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
+        // Calling the app back puts the menu (not the control page) under it.
+        vm.Show();
+        Assert.True(vm.IsShown);
 
         // Jobs opens the untouched control page; the NEXT "continue" is a new
         // utterance and still taps the taxi entry.
@@ -934,7 +939,6 @@ public sealed class VoiceTests
         var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -943,9 +947,18 @@ public sealed class VoiceTests
         mic.Fire("we continue"); // partial: taps CONTINUE, waits out the beat
         clock.Advance(TimeSpan.FromSeconds(0.51));
         vm.Poll();
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
+
+        // The car page answers no voice words, so the re-scored tail cannot
+        // reach anything before the player clicks the page's CONTINUE.
+        mic.Fire("the continue", isFinal: true); // same utterance, re-scored
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
+
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.False(vm.IsShown);
-        // Call the menu back so the re-scored tail has a page to land on.
+        // Call the menu back so a later tail has a page to land on.
         vm.Show();
         Assert.True(vm.IsShown);
 

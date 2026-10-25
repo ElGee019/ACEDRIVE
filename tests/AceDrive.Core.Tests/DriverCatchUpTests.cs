@@ -53,7 +53,7 @@ public sealed class DriverCatchUpTests
             wallet, streak, new OperatingZone(null, seed: 0), new Trunk(), garage,
             new CityEconomy(DeliveryCatalog.Default.Stores, CityRules.Default),
             new Hunger(HungerRules.Default), TestRoadCars.Ledger(), new TaxiShift(),
-            new ShiftRecord(null), new JobLedger());
+            new ShiftRecord(null), new JobLedger(), new DestinationPins(), new VisitLedger());
         var catchUp = new DriverCatchUp(
             onboarding, garage, streak, wallet, new Random(0), saver, new FakeRivals(), log);
         return new Fixture(catchUp, garage, wallet, streak, drivers, garages, log);

@@ -45,19 +45,35 @@ internal static class CustomerRequestTestData
     public static CustomerRequest PassiveRequest { get; } =
         new(CustomerRequestKind.Passive, "Could you avoid the potholes?");
 
+    /// <summary>A passive ask that watches the brakes, so the flow tests can
+    /// break it with one hard sample.</summary>
+    public static CustomerRequest BrakePromise { get; } = new(
+        CustomerRequestKind.Passive,
+        "Please avoid sudden stops.",
+        Condition: new RideCondition(BrakeBrusque: true));
+
+    /// <summary>A passive ask with a delivery deadline, the timed sibling of
+    /// the speed challenge.</summary>
+    public static CustomerRequest HurryPromise { get; } = new(
+        CustomerRequestKind.Passive,
+        "We are in a hurry for a match.",
+        Condition: new RideCondition(Deadline: true));
+
     /// <summary>A speed challenge, for the police/fine flow.</summary>
     public static CustomerRequest SpeedRequest { get; } =
         new(CustomerRequestKind.SpeedChallenge, "Please get there quickly!");
 
     public static CustomerRequestTable Table(
         double tier2 = 0.0, double tier3 = 0.0,
-        IReadOnlyDictionary<string, string>? suffixes = null,
-        IReadOnlyList<CarStatCategory>? categories = null) =>
+        IReadOnlyDictionary<string, SuffixRequest>? suffixes = null,
+        IReadOnlyList<CarStatCategory>? categories = null,
+        RideMonitorRules? monitor = null) =>
         new(
-            suffixes ?? new Dictionary<string, string>(StringComparer.Ordinal),
+            suffixes ?? new Dictionary<string, SuffixRequest>(StringComparer.Ordinal),
             categories ?? Categories,
             SpeedChallengeText: "Quickly!",
             Tier2Chance: tier2,
             Tier3Chance: tier3,
-            TimerSeconds: 19);
+            TimerSeconds: 19,
+            MonitorRules: monitor ?? RideMonitorRules.Default);
 }

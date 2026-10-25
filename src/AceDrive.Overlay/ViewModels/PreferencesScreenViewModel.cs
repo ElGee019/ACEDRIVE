@@ -22,12 +22,15 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     private const string ResetConfirmLabelKey = "SettingsResetConfirm";
     private const string ResetWarningKey = "SettingsResetWarning";
     private const string ResetFailedKey = "SettingsResetFailed";
+    private const string ResetFailedInUseKey = "SettingsResetFailedInUse";
+    private const string ResetFailedDeniedKey = "SettingsResetFailedDenied";
+    private const string ResetFailedRestartKey = "SettingsResetFailedRestart";
 
     private readonly Action<PlayerPreferences> _changed;
     private readonly Action _done;
     private readonly string _doneLabelKey;
     // Null on the first run: there is no career to wipe yet.
-    private readonly Func<bool>? _resetGame;
+    private readonly Func<GameResetFailure>? _resetGame;
 
     private PreferenceOption<MileageUnit> _unit;
     private PreferenceOption<UiLanguage> _language;
@@ -42,6 +45,9 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     private string _resetWarning = Strings.Get(ResetWarningKey);
     private string _resetStatus = string.Empty;
     private bool _confirmingReset;
+    // The last failure, kept so a language change can re-read the same
+    // sentence in the new language instead of dropping or freezing it.
+    private GameResetFailure _resetFailure = GameResetFailure.None;
 
     public PreferencesScreenViewModel(
         PlayerPreferences current,
@@ -49,7 +55,7 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         Action done,
         string doneLabelKey = ContinueLabelKey,
         string? voiceDoneLabel = null,
-        Func<bool>? resetGame = null)
+        Func<GameResetFailure>? resetGame = null)
     {
         _changed = changed;
         _done = done;
@@ -149,9 +155,9 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         ResetLabel = Strings.Get(
             IsConfirmingReset ? ResetConfirmLabelKey : ResetLabelKey);
         ResetWarning = Strings.Get(ResetWarningKey);
-        if (ResetStatus.Length > 0)
+        if (_resetFailure.Kind != GameResetFailureKind.None)
         {
-            ResetStatus = Strings.Get(ResetFailedKey);
+            ResetStatus = DescribeReset(_resetFailure);
         }
     }
 
@@ -161,6 +167,7 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     private void RequestReset()
     {
         if (_resetGame is null) return;
+        _resetFailure = GameResetFailure.None;
         ResetStatus = string.Empty;
         if (!IsConfirmingReset)
         {
@@ -168,8 +175,27 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
             return;
         }
 
-        if (_resetGame()) return;
+        GameResetFailure failure = _resetGame();
+        // None means the replacement process is starting and this one is about
+        // to end; painting a status line here would only flash for a frame.
+        if (failure.Kind == GameResetFailureKind.None) return;
+
+        _resetFailure = failure;
         IsConfirmingReset = false;
-        ResetStatus = Strings.Get(ResetFailedKey);
+        ResetStatus = DescribeReset(failure);
     }
+
+    // WHY three keys: a file another program holds open, a delete Windows
+    // refused and a restart that would not spawn are fixed by three different
+    // actions, so the single "close AceDrive and try again" line pointed the
+    // player the wrong way in two of them.
+    private static string DescribeReset(GameResetFailure failure) => failure.Kind switch
+    {
+        GameResetFailureKind.SaveInUse when failure.File is not null =>
+            Strings.Format(ResetFailedInUseKey, failure.File),
+        GameResetFailureKind.SaveDenied when failure.File is not null =>
+            Strings.Format(ResetFailedDeniedKey, failure.File),
+        GameResetFailureKind.Restart => Strings.Get(ResetFailedRestartKey),
+        _ => Strings.Get(ResetFailedKey),
+    };
 }

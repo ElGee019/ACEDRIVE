@@ -100,6 +100,12 @@ public sealed class MainViewModel
     // The session's calendar: the day flip, the display week and the idle shift
     // timeout with its ended page. The pages read the week from it.
     private readonly DayCycle _day;
+    // The ToDo list: the sync the settles and the POI entries report into, and
+    // the list the jobs page reads. It banks its own file.
+    private readonly TodoBoard _todos;
+    // The manual-destination counter the ToDo subject reads (Unity
+    // manuallySetDestinations).
+    private readonly DestinationPins _pins;
 
     // WHY a throttle at all: a rebuild/Stop-Debugging kills the process, and
     // a killed process never raises Window.Closed — so the shutdown save
@@ -145,6 +151,7 @@ public sealed class MainViewModel
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
+        TodoBoard todos, DestinationPins pins,
         ITelemetryHud? hud = null,
         ISaveDataResetter? saveResets = null,
         IAppRestarter? restarter = null)
@@ -192,6 +199,8 @@ public sealed class MainViewModel
         _readouts = readouts;
         _day = day;
         _day.Attach(this);
+        _todos = todos;
+        _pins = pins;
         // The page graph is built by the root; the navigator only reaches back
         // for the entries whose domain is not a page (shift close, readouts,
         // settings), so the attach closes before any page command can fire —
@@ -226,6 +235,10 @@ public sealed class MainViewModel
         // login streak is recounted with today's bonus granted once past the
         // introduction. Both rules and their saves live in the collaborator.
         _catchUp.Run(_day.DisplayWeek);
+        // The catch-up's streak bonus is a lifetime-earned credit, and the
+        // business growth above may have placed a visit door: one boot sync
+        // lets both land in the ToDo list before the first paint.
+        _ = _todos.Sync();
         _shell.RecordActivity(_clock.UtcNow);
         _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -332,6 +345,11 @@ public sealed class MainViewModel
     {
         _zoneGrowth.Expand();
         _poiWorld.Grow();
+        // The job may complete a tip and rotate the list: sync against the
+        // fresh career first, then count this job's rotation turn on the
+        // slots the sync left behind.
+        _ = _todos.Sync();
+        _todos.RotateOnJob();
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
     void IJobSettlementHost.GoToControlPage() => _nav.ShowControl();
@@ -374,7 +392,15 @@ public sealed class MainViewModel
     // The host slice the POI world sees: the world owns the doors and the
     // board growth; the navigator owns the board page and the dealer's follow-up.
     void IPoiWorldHost.RefreshBoard() => _delivery.RefreshBoard();
-    void IPoiWorldHost.CarBought(CarSpec car) => _nav.CarBought(car);
+    void IPoiWorldHost.CarBought(CarSpec car)
+    {
+        _nav.CarBought(car);
+        // A purchase changes the owned-car count the ToDo subject reads.
+        if (_todos.Sync().Changed)
+        {
+            SaveDriver(_rivals.LastResult);
+        }
+    }
 
     // The host slice the navigator sees: the entries whose work is not a page.
     // A shift that already timed out is the day cycle's to close (it owns the
@@ -382,6 +408,16 @@ public sealed class MainViewModel
     void INavigationHost.ShiftTimedOut(TimeSpan idle) => _day.EndShift(idle);
     void INavigationHost.ReadoutsChanged() => RefreshJob();
     void INavigationHost.ShowSettings() => OpenSettings();
+    void INavigationHost.DestinationPinned()
+    {
+        _pins.Register();
+        // The pin count is a ToDo reading, so the list syncs and the new
+        // count rides the same driver save the pin already banks.
+        if (_todos.Sync().Changed)
+        {
+            SaveDriver(_rivals.LastResult);
+        }
+    }
 
     // The host slice the day cycle sees: the week roll repaints the cached
     // pages, the countdown forces a readout, and the shift-end page arrives
@@ -608,36 +644,55 @@ public sealed class MainViewModel
     // wipe + restart pair; otherwise the page keeps its first-run shape.
     private void OpenSettings()
     {
-        Func<bool>? resetGame =
+        Func<GameResetFailure>? resetGame =
             _saveResets is null || _restarter is null ? null : ResetGame;
         _nav.ShowScreen(_story.CreateSettingsPage(_nav.ShowMenuPage, resetGame));
     }
 
     /// <summary>
     /// Settings' RESET GAME: wipes every save file, then hands over to a fresh
-    /// process that boots from the introduction like a new install. A false
-    /// result leaves this session running with its failure line on the page.
+    /// process that boots from the introduction like a new install. A failure
+    /// leaves this session running with its reason on the page.
     /// </summary>
-    private bool ResetGame()
+    private GameResetFailure ResetGame()
     {
         // WHY stop the poll first: its throttled banks would otherwise
         // recreate a save file between the wipe and the process exit.
         _timer.Stop();
-        if (_saveResets is null || _restarter is null || !_saveResets.DeleteAll())
+        if (_saveResets is null || _restarter is null)
         {
             _timer.Start();
-            _log.LogWarning("game reset aborted: not every save file could be removed");
-            return false;
+            _log.LogWarning("game reset aborted: the wipe or the restart service is missing");
+            return new GameResetFailure(GameResetFailureKind.Unavailable);
+        }
+
+        SaveResetReport report = _saveResets.DeleteAll();
+        if (!report.Complete)
+        {
+            _timer.Start();
+            _log.LogWarning(
+                $"game reset aborted: {report.BlockedFile} survived the wipe ({report.Block})");
+            return new GameResetFailure(BlockedKind(report.Block), report.BlockedFile);
         }
 
         // The wipe is final: a restart failure must not let the close path
         // bank the old career back onto disk.
         SkipShutdownSave = true;
         _log.LogInfo("game reset: save data removed, restarting from the introduction");
-        if (_restarter.Restart()) return true;
+        if (_restarter.Restart()) return GameResetFailure.None;
         _timer.Start();
-        return false;
+        return new GameResetFailure(GameResetFailureKind.Restart);
     }
+
+    // The wipe knows why a file survived; the page only needs to know which
+    // sentence to show, so the mapping lives here instead of leaking a
+    // services enum into a screen.
+    private static GameResetFailureKind BlockedKind(SaveResetBlock block) => block switch
+    {
+        SaveResetBlock.InUse => GameResetFailureKind.SaveInUse,
+        SaveResetBlock.Denied => GameResetFailureKind.SaveDenied,
+        _ => GameResetFailureKind.Unavailable,
+    };
 
     // Mic thread lands here; marshal to the UI thread for all state changes.
     private void OnVoiceHeard(string text, bool isFinal)

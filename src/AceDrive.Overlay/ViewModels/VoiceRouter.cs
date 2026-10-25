@@ -177,7 +177,7 @@ public sealed class VoiceRouter
     // wait, while the host still owns what entering means.
     private bool TryEnterPoi(string text)
     {
-        if (_hud is not { AtDestination: true } hud)
+        if (_hud is not { ShowEnterButton: true } hud)
         {
             return false;
         }

@@ -33,11 +33,12 @@ public sealed class CustomerRequestRoller : ICustomerRequestRoller
         // boxing partners are ..."): [name] is replaced here, once, so no
         // format-brace hazard reaches the page.
         if (customer.Suffix.Length > 0
-            && _table.SuffixRequests.TryGetValue(customer.Suffix, out string? template))
+            && _table.SuffixRequests.TryGetValue(customer.Suffix, out SuffixRequest? line))
         {
             return new CustomerRequest(
                 CustomerRequestKind.Passive,
-                template.Replace("[name]", customer.Full, StringComparison.Ordinal));
+                line.Text.Replace("[name]", customer.Full, StringComparison.Ordinal),
+                Condition: line.Condition);
         }
 
         if (_rng.NextDouble() < _table.Tier2Chance)

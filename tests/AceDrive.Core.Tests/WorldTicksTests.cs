@@ -32,7 +32,8 @@ public sealed class WorldTicksTests
 
     private sealed record Fixture(
         WorldTicks World, FakeClock Clock, CityEconomy City, Hunger Hunger,
-        Garage Garage, DriverWallet Wallet, FakeDriverStore Drivers, TestLog Log);
+        Garage Garage, DriverWallet Wallet, FakeDriverStore Drivers,
+        FakeHungerStore HungerStore, TestLog Log);
 
     public WorldTicksTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -55,6 +56,7 @@ public sealed class WorldTicksTests
             garage.Add(car.Key, week: 0).SetInsurance(insured: true);
         }
         var driverStore = new FakeDriverStore();
+        var hungerStore = new FakeHungerStore();
         var rivals = new FakeRivals();
         var career = new DeliveryCareer(HubCatalog.Default, catalog.StartCredP);
         var board = new DeliveryBoard(catalog);
@@ -65,14 +67,14 @@ public sealed class WorldTicksTests
             new FakeCarBrandSource(), new FakeContentSource(TestSession.EmptyContent));
         var saver = new GameStateSaver(
             clock, game, new FakeGameClockStore(), driverStore, new FakeGarageStore(),
-            new FakeCityStore(), new FakeHungerStore(), new FakeRoadTestStore(),
+            new FakeCityStore(), hungerStore, new FakeRoadTestStore(),
             new FakeShiftStore(), wallet, new DailyStreak(clock, null),
             new OperatingZone(null, seed: 0), new Trunk(), garage, city, appetite,
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
-            new JobLedger());
+            new JobLedger(), new DestinationPins(), new VisitLedger());
         var world = new WorldTicks(
             game, city, appetite, fleet, board, career, saver, rivals, log);
-        return new Fixture(world, clock, city, appetite, garage, wallet, driverStore, log);
+        return new Fixture(world, clock, city, appetite, garage, wallet, driverStore, hungerStore, log);
     }
 
     [Fact]
@@ -121,6 +123,31 @@ public sealed class WorldTicksTests
         _ = fixture.World.Tick(true);
         Assert.Equal(1, fixture.Hunger.Value);
         Assert.Contains("[Hunger] 1/36", fixture.Log.Infos);
+    }
+
+    [Fact]
+    public void Tick_HungerGain_BanksTheReadingWithTheHour()
+    {
+        // A killed overlay never reaches the exit-only bank, so the meter banks
+        // itself when the reading moves: at most a partial hour is lost, never
+        // the session's appetite (one write per game hour, not per poll).
+        var fixture = Build(MondayNoon);
+        _ = fixture.World.Tick(onboardingDone: true); // anchors the meter
+        Assert.Empty(fixture.HungerStore.Saved);
+
+        // One game hour plus a minute: the hour boundary is the bank, and the
+        // extra minute keeps the assertion off the clock's floating-point edge.
+        fixture.Clock.Advance(OneGameHour + OneGameMinute);
+        _ = fixture.World.Tick(true);
+
+        HungerState saved = Assert.Single(fixture.HungerStore.Saved);
+        Assert.Equal(1, saved.Hunger);
+        Assert.False(saved.ThresholdTriggered);
+
+        // Polls inside the same hour bank nothing.
+        fixture.Clock.Advance(OneGameMinute);
+        _ = fixture.World.Tick(true);
+        Assert.Single(fixture.HungerStore.Saved);
     }
 
     [Fact]

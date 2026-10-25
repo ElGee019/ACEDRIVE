@@ -96,6 +96,60 @@ firing change events arrives with PORTPLAN item 50 — not before.
 - Placeholders (`{0}`, `{1:0.0}`) must survive translation; translators may
   reorder, never remove.
 
+## Caching (cache-first is the default, not an optimisation)
+
+Assume every read is expensive: cache the result and re-read only when the
+thing behind it changes. Reading the same file, decoding the same image,
+parsing the same JSON or re-deriving the same sentence twice in a session is a
+bug, not a style preference. The cold boot path may pay a read; nothing after
+it may pay the same read again.
+
+Cache at the owner, and mean all five of these:
+
+1. **One owner.** The service or collaborator that owns the data owns its
+   cache, and is the only thing that writes it. No second copy to keep in
+   sync (a coordinator holding a mirror of what a collaborator owns is the
+   smell). No cache in a View; no cache of another type's state.
+2. **Single writer, invalidate on write.** Every `Save`/mutation refreshes or
+   evicts the cache of the thing it changed, in the same call. A stale cache
+   after a write is the one failure mode that is always a bug: a cache over
+   immutable data may stay forever, a cache over mutable data must be
+   refreshed by its writer. `JsonProfileStore` is the pattern — `Save`
+   replaces `_current`, so `Load` never hits the disk twice.
+3. **No disk (or HWND, or process) on the hot path.** The 10 Hz `Poll` and
+   anything it calls must not touch files, the registry or Win32: a per-tick
+   read breaks "the one allowed loop" from the other side. Pass a value or
+   cache before the tick; where a poll-site read is unavoidable it takes a
+   cached value, never a load (see `WorldTicks` taking `onboardingDone`
+   instead of `IOnboardingStore`).
+4. **Bounded and reused.** A cache over a growing key set (paths, ids,
+   addresses) is bounded by construction — fixed pool, per-session, or an
+   explicit cap. Hot-path caches reuse buffers and views, never allocate per
+   tick, and a cache that only ever grows across sessions is a leak: scope it
+   to the session unless it is on disk on purpose.
+5. **Lazy, never eager.** Fill the cache on first use, not in the composition
+   root, unless startup genuinely needs the value: a decode or parse paid at
+   boot for a screen the player may never open is the cost this rule exists
+   to avoid.
+
+- Prefer a cache over a re-read, a cached lookup over a second parse, and an
+  existing cached page over rebuilding the page: the page caches in
+  `Navigation` (control/menu/calendar) are the intent, not an exception.
+- Decoded bitmaps, resolved paths, resx strings, JSON tables, assembled
+  sentences and geometry all qualify; `ThumbnailImageSource`,
+  `PackImageSource`, `OutlinedText` and the `Data/*.json` table stores are
+  the reference shapes to copy.
+- Do not cache across a boundary you do not own: telemetry is read live, the
+  file system is the source of truth on first read, and a `Try*`-guarded read
+  keeps its fallback. Cache the *result* of the read, not the decision to
+  read.
+- Write the WHY when a cache is deliberately absent (the value is cheap, a
+  cache would be a second source of truth, the data changes every tick) — an
+  unexplained uncached read is what a reviewer will flag.
+- Test the invalidation, not the hit: a cache test asserts that a write is
+  visible to the next read
+  (`GetIdToken_ReturnsTheCachedTokenWithoutASecondCall` is the shape).
+
 ## Clean code
 
 Working code that violates these rules still fails review.
@@ -140,6 +194,9 @@ Working code that violates these rules still fails review.
 
 ## Workflow
 
+- If a request is unclear or lacks its intended target/calculation, ask one
+  concise clarifying question before changing code — never spend time guessing
+  or building the wrong thing.
 - `dotnet build ACEDRIVE.slnx`, `dotnet test ACEDRIVE.slnx`. Zero warnings —
   enforced by `Directory.Build.props` (Recommended analyzers +
   `TreatWarningsAsErrors`). New analyzer errors are fixed, not suppressed;

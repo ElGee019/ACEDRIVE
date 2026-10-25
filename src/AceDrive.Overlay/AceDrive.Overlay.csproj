@@ -13,6 +13,15 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!-- Sign the apphost .exe, not $(TargetPath): for an app project TargetPath is
+       the managed .dll, and Authenticode on the launcher is what SmartScreen
+       reads. ContinueOnError: a machine without the developer certificate (CI,
+       a clean checkout) signs nothing and still builds. -->
+  <Target Name="SignOverlayOutput" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\tools\Sign-Overlay.ps1&quot; -ExePath &quot;$(TargetDir)$(TargetName).exe&quot;"
+          ContinueOnError="true" />
+  </Target>
+
   <ItemGroup>
     <Content Include="Data\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -26,7 +35,6 @@
     <!-- UI art ships inside the exe (pack URI), unlike Data/ which is loose.
          Not auto-globbed as Resource by the SDK: .webp is unknown to it. -->
     <Resource Include="Assets\backdrop.webp" />
-    <Resource Include="Assets\bluebg.webp" />
     <Resource Include="Assets\Buttons\*.webp" />
     <!-- Tourney Thin (SIL OFL): the menu clock's outline face, as in
          ontwerpdesign.psd. Ship the licence beside the exe. -->

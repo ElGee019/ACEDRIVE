@@ -21,6 +21,8 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     public string? Notice { get; private set; }
     public TimeSpan? NoticeDuration { get; private set; }
     public bool AtDestination { get; set; }
+    public bool ShowEnterButton => AtDestination;
+    public int DestinationEnteredCalls { get; private set; }
     public IReadOnlyList<string> EnterKeywords { get; set; } = ["enter"];
     public bool Revealed { get; private set; }
     public int EnterRequests { get; private set; }
@@ -71,6 +73,8 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     }
 
     public void SetJobGuidance(HudJobGuidance? guidance) => JobGuidance = guidance;
+
+    public void DestinationEntered() => DestinationEnteredCalls++;
 
     public void ShowNotice(string text, TimeSpan duration)
     {

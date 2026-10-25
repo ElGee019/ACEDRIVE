@@ -4,8 +4,9 @@ public sealed record WindowBounds(
     double Left, double Top, double Width, double Height, int Version = 0)
 {
     // Both windows are user-placed: the main panel can shrink to 80 px high,
-    // the companion HUD is fixed at 200 px. Reject only finite,
-    // implausibly small boxes, never a legitimate HUD strip.
+    // the companion HUD's driving strip is 200 px (a customer request grows
+    // the frame while it is up). Reject only finite, implausibly small boxes,
+    // never a legitimate HUD strip.
     public bool IsSane =>
         double.IsFinite(Left) && double.IsFinite(Top)
         && double.IsFinite(Width) && double.IsFinite(Height)

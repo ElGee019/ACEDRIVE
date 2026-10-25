@@ -60,4 +60,26 @@ public sealed class JsonGameClockStoreTests
         }
         finally { File.Delete(file); }
     }
+
+    [Fact]
+    public void Save_IsVisibleToTheNextLoad_WithoutRereadingTheFile()
+    {
+        string file = Path.GetTempFileName();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonGameClockStore(file, log);
+            store.Save(new GameClockState(
+                new DateTime(2026, 10, 18, 8, 5, 0, DateTimeKind.Utc), 3));
+
+            // Delete the file: the cache must answer, proving the saved moment
+            // is served from memory instead of a disk read (cache-first).
+            File.Delete(file);
+
+            GameClockState? loaded = store.Load();
+            Assert.NotNull(loaded);
+            Assert.Equal(3, loaded.Week);
+        }
+        finally { File.Delete(file); }
+    }
 }

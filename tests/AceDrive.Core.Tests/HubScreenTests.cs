@@ -20,11 +20,6 @@ public sealed class HubScreenTests
         new HubTier(2, false, []),
     ]);
 
-    private static readonly DeliveryStore Post =
-        new("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries");
-
-    private static readonly DeliveryCatalog Board = new([Post], 0.7, 100);
-
     private static (
         DeliveryHubScreenViewModel Vm,
         DeliveryCareer Career,
@@ -34,7 +29,6 @@ public sealed class HubScreenTests
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var career = new DeliveryCareer(Hubs, credP);
-        var city = new CityEconomy(Board.Stores, CityRules.Default);
         var log = new TestLog();
         var fired = new bool[1];
         // Tests that assert the deferred voice BACK wait own the clock and
@@ -42,7 +36,7 @@ public sealed class HubScreenTests
         clock ??= new FakeClock();
         beat ??= new VoiceBeat(clock);
         var vm = new DeliveryHubScreenViewModel(
-            career, Board, city, log, new RelayCommand(() => fired[0] = true), beat);
+            career, log, new RelayCommand(() => fired[0] = true), beat);
         return (vm, career, log, fired);
     }
 
@@ -71,8 +65,6 @@ public sealed class HubScreenTests
         Assert.False(Cell(vm, 0, 1).IsSelectable);
 
         Assert.Equal("Credibility Points: 100", vm.CredPLine);
-        // No career open yet: the gated store is not on the map (Unity totals).
-        Assert.Equal("City growth: ▬ 0 / hr", vm.CityGrowthLine);
         Assert.False(vm.OpenCareerCommand.CanExecute(null));
     }
 
@@ -119,9 +111,7 @@ public sealed class HubScreenTests
         var career = new DeliveryCareer(hubs, 200);
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var vm = new DeliveryHubScreenViewModel(
-            career, DeliveryCatalog.Default,
-            new CityEconomy(DeliveryCatalog.Default.Stores, CityRules.Default),
-            new TestLog(), new RelayCommand(() => { }),
+            career, new TestLog(), new RelayCommand(() => { }),
             new VoiceBeat(new FakeClock()));
 
         Assert.Equal(["CHINESE IMPORT", "COMING SOON"], vm.Columns.Select(c => c.TitleLine).ToArray());
@@ -140,15 +130,13 @@ public sealed class HubScreenTests
         Assert.Equal("groceries", hub.Category);
 
         Assert.Equal("Credibility Points: 0", vm.CredPLine);
-        // Unity: owned cells drop the price and the selection; the connected
-        // store now counts in the city growth headline.
+        // Unity: owned cells drop the price and the selection.
         Assert.Equal("Grocers and Sons", Cell(vm, 0, 0).LabelLine);
         Assert.Equal("", Cell(vm, 0, 0).PriceLine); // owned: name only, no price
         Assert.True(Cell(vm, 0, 0).IsOwned);
         Assert.False(Cell(vm, 0, 0).IsSelected);
         Assert.Equal("CoffeeUs - 100CredP", Cell(vm, 1, 0).LabelLine);
         Assert.False(Cell(vm, 1, 0).IsAffordable);
-        Assert.Equal("City growth: ▼ -1 / hr", vm.CityGrowthLine);
         Assert.False(vm.OpenCareerCommand.CanExecute(null));
         Assert.Contains("career opened: Grocers and Sons (groceries)", string.Join("|", log.Infos), StringComparison.Ordinal);
     }

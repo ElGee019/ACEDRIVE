@@ -23,6 +23,16 @@
                  font: two blank lines between speaker and body (~42 px). -->
             <TextBlock Text="{Binding Body}" Foreground="#FFF" FontSize="16" TextWrapping="Wrap" TextAlignment="Center"
                        Margin="0,42,0,12"/>
+            <!-- Authored aside under a rule: guidance that is not part of what
+                 the speaker says (Max's first-visit pointer at the JOBS page).
+                 The rule is the wallet page's section divider; teal is the
+                 app's "do this next" colour, so it reads as a hint and not as
+                 more dialogue. Hidden whole when the page carries no note. -->
+            <StackPanel Visibility="{Binding HasNote, Converter={StaticResource BoolToVis}}">
+                <Border BorderBrush="#33FFFFFF" BorderThickness="0,1,0,0" Margin="0,0,0,10"/>
+                <TextBlock Text="{Binding Note}" Foreground="#FF97EAD2" FontSize="13"
+                           TextWrapping="Wrap" TextAlignment="Center"/>
+            </StackPanel>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

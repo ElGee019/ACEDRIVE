@@ -50,14 +50,14 @@ public sealed class ShiftEndedScreenTests
     {
         var (vm, _, board) = Create();
 
-        Assert.Equal("Your shift world standings is —/—.", vm.Standings.Line);
+        Assert.Equal("Your Global Shift Earnings Rank is —/—.", vm.Standings.Line);
         Assert.Equal(string.Empty, vm.Standings.DeltaLine);
         Assert.False(vm.Standings.Changed);
 
         // The boot board lands while the page is up: the block follows it.
         board.Publish(new ShiftStandingsResult(3, 20, 2, 5, false));
 
-        Assert.Equal("Your shift world standings is 3rd of 20.", vm.Standings.Line);
+        Assert.Equal("Your Global Shift Earnings Rank is 3rd of 20.", vm.Standings.Line);
         Assert.Equal("You gained 2 positions.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
         Assert.Equal(1, vm.Standings.PulseSignal);
@@ -77,7 +77,7 @@ public sealed class ShiftEndedScreenTests
         int pulses = vm.Standings.PulseSignal;
         board.Publish(new ShiftStandingsResult(2, 20, 1, 3, false));
         Assert.Equal(pulses, vm.Standings.PulseSignal);
-        Assert.Equal("Your shift world standings is 3rd of 20.", vm.Standings.Line);
+        Assert.Equal("Your Global Shift Earnings Rank is 3rd of 20.", vm.Standings.Line);
     }
 
     [Fact]

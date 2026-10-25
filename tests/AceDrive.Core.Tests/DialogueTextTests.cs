@@ -47,6 +47,21 @@ public sealed class DialogueTextTests
     }
 
     [Fact]
+    public void Fill_ReplacesTheNoteTokens_WithTheSameValues()
+    {
+        // The note is authored beside the spoken page, so a hint that names
+        // the car must not leak the [CAR] placeholder either.
+        DialogueLine[] lines =
+            [new("MAX", "Interested?", "Open JOBS from your [CAR].")];
+
+        DialogueLine page = Assert.Single(
+            DialogueText.Fill(lines, "", "", "", "Mazda"));
+
+        Assert.Equal("Interested?", page.Text);
+        Assert.Equal("Open JOBS from your Mazda.", page.Note);
+    }
+
+    [Fact]
     public void Fill_KeepsLinesWithoutTokens()
     {
         DialogueLine page = new("YOU", "Thanks!");

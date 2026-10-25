@@ -24,6 +24,8 @@ public sealed class GameStateSaver
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
     private readonly JobLedger _jobs;
+    private readonly DestinationPins _pins;
+    private readonly VisitLedger _visits;
     private readonly Trunk _trunk;
     private readonly Garage _garage;
     private readonly CityEconomy _city;
@@ -40,7 +42,8 @@ public sealed class GameStateSaver
         IShiftStore shiftStore,
         DriverWallet wallet, DailyStreak streak, OperatingZone zone, Trunk trunk,
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
-        TaxiShift shift, ShiftRecord shifts, JobLedger jobs)
+        TaxiShift shift, ShiftRecord shifts, JobLedger jobs,
+        DestinationPins pins, VisitLedger visits)
     {
         _clock = clock;
         _game = game;
@@ -55,6 +58,8 @@ public sealed class GameStateSaver
         _streak = streak;
         _zone = zone;
         _jobs = jobs;
+        _pins = pins;
+        _visits = visits;
         _trunk = trunk;
         _garage = garage;
         _city = city;
@@ -106,7 +111,8 @@ public sealed class GameStateSaver
     /// <summary>
     /// Banks the hunger reading for the next session (Unity PlayerData.hunger
     /// survives restarts): the meter plus the one-shot event state resume
-    /// instead of re-seeding at 0. Exit-only, like the city.
+    /// instead of re-seeding at 0. The hourly tick banks with the change, so a
+    /// killed process costs at most the partial hour since the last write.
     /// </summary>
     public void SaveHunger() => _hungerStore.Save(_hunger.Snapshot());
 
@@ -144,6 +150,12 @@ public sealed class GameStateSaver
             StreetIds = _zone.StreetIds,
             ZoneKm = _zone.Km,
             JobsCompleted = _jobs.Completed,
+            TaxiJobsCompleted = _jobs.TaxiCompleted,
+            DeliveryJobsCompleted = _jobs.DeliveryCompleted,
+            ManuallySetDestinations = _pins.Count,
+            VisitedCarWash = _visits.CarWash,
+            VisitedCarDealer = _visits.CarDealer,
+            VisitedInsurance = _visits.InsuranceBroker,
             Bank = _wallet.BankBalance,
             HasEnteredBank = _wallet.HasEnteredBank,
             Trunk = _trunk.Snapshot(),

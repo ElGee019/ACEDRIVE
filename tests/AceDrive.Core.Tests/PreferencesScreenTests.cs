@@ -199,7 +199,7 @@ public sealed class PreferencesScreenTests
         {
             CultureInfo.CurrentUICulture = new CultureInfo("en-US");
             int calls = 0;
-            var vm = ResetPage(() => { calls++; return true; });
+            var vm = ResetPage(() => { calls++; return GameResetFailure.None; });
 
             Assert.True(vm.CanReset);
             Assert.Equal("RESET GAME", vm.ResetLabel);
@@ -221,13 +221,14 @@ public sealed class PreferencesScreenTests
     }
 
     [Fact]
-    public void SettingsReset_Failure_ShowsTheErrorAndAsksAgain()
+    public void SettingsReset_LockedFile_ShowsTheErrorAndAsksAgain()
     {
         CultureInfo original = CultureInfo.CurrentUICulture;
         try
         {
             CultureInfo.CurrentUICulture = new CultureInfo("en-US");
-            var vm = ResetPage(() => false);
+            var vm = ResetPage(() =>
+                new GameResetFailure(GameResetFailureKind.SaveInUse, "driver.json"));
 
             vm.ResetCommand.Execute(null);
             vm.ResetCommand.Execute(null);
@@ -235,7 +236,57 @@ public sealed class PreferencesScreenTests
             Assert.False(vm.IsConfirmingReset);
             Assert.Equal("RESET GAME", vm.ResetLabel);
             Assert.Equal(
-                "Could not reset the game. Close AceDrive and try again.",
+                "Could not reset the game: driver.json is open in another program. " +
+                "Close it and try again.",
+                vm.ResetStatus);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void SettingsReset_RefusedDelete_SaysItHasNoWriteAccess()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            var vm = ResetPage(() =>
+                new GameResetFailure(GameResetFailureKind.SaveDenied, "onboarding.json"));
+
+            vm.ResetCommand.Execute(null);
+            vm.ResetCommand.Execute(null);
+
+            // Nothing is locked and the ACLs are fine in this case: the advice
+            // has to point at how the overlay was started, not at the folder.
+            Assert.Contains("Windows blocked deleting onboarding.json", vm.ResetStatus);
+            Assert.Contains("no write access", vm.ResetStatus);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
+    public void SettingsReset_RestartFailure_AsksToReopenTheOverlay()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            var vm = ResetPage(() => new GameResetFailure(GameResetFailureKind.Restart));
+
+            vm.ResetCommand.Execute(null);
+            vm.ResetCommand.Execute(null);
+
+            // The wipe already happened, so the advice is to reopen, not to
+            // try the reset again on a career that is already gone.
+            Assert.Equal(
+                "The saves are deleted, but AceDrive could not start again. " +
+                "Close AceDrive and open it again.",
                 vm.ResetStatus);
         }
         finally
@@ -257,7 +308,7 @@ public sealed class PreferencesScreenTests
                     new CultureInfo(preferences.Language == UiLanguage.Dutch ? "nl-NL" : "en-US"),
                 () => { },
                 "PreferencesBack", "BACK",
-                () => true);
+                () => GameResetFailure.None);
 
             vm.SelectedLanguage = vm.LanguageOptions[1];
 
@@ -274,7 +325,7 @@ public sealed class PreferencesScreenTests
         }
     }
 
-    private static PreferencesScreenViewModel ResetPage(Func<bool> reset) =>
+    private static PreferencesScreenViewModel ResetPage(Func<GameResetFailure> reset) =>
         new(PlayerPreferences.Default, _ => { }, () => { },
             "PreferencesBack", "BACK", reset);
 }

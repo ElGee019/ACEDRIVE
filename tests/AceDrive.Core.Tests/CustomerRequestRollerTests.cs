@@ -12,9 +12,13 @@ public sealed class CustomerRequestRollerTests
     [Fact]
     public void SuffixMatch_RollsAPassiveLineWithTheFullIdentity()
     {
-        var suffixes = new Dictionary<string, string>(StringComparer.Ordinal)
+        var suffixes = new Dictionary<string, SuffixRequest>(StringComparer.Ordinal)
         {
-            ["and some boxing partners"] = "[name] are in a hurry.",
+            ["and some boxing partners"] = new()
+            {
+                Text = "[name] are in a hurry.",
+                Condition = new RideCondition(BrakeBrusque: true),
+            },
         };
         var roller = new CustomerRequestRoller(
             [CustomerRequestTestData.Car()],
@@ -28,6 +32,8 @@ public sealed class CustomerRequestRollerTests
         Assert.Equal(CustomerRequestKind.Passive, request.Kind);
         Assert.Equal("Max Weber and some boxing partners are in a hurry.", request.Text);
         Assert.Null(request.Quiz);
+        // The line's condition rides the request so the host can watch it.
+        Assert.True(request.Condition?.BrakeBrusque);
     }
 
     [Fact]

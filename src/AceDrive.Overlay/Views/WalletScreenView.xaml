@@ -69,8 +69,8 @@
                            Foreground="#FFBFC4C9" FontSize="14" HorizontalAlignment="Left" Margin="0,3,0,0"/>
                 <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding XpAmount}"
                            Foreground="#FFF" FontSize="16" HorizontalAlignment="Right" Margin="0,3,0,0"/>
-                <Border Grid.Row="2" Grid.ColumnSpan="2" BorderBrush="#33FFFFFF"
-                        BorderThickness="0,1,0,0" Margin="0,5"/>
+                <Border Grid.Row="2" Grid.ColumnSpan="2"
+                        Style="{StaticResource SectionDivider}" Margin="0,5"/>
                 <TextBlock Grid.Row="3" Grid.Column="0" Text="{Binding BankLabel}"
                            Foreground="#FFBFC4C9" FontSize="14" HorizontalAlignment="Left" Margin="0,3,0,0"/>
                 <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding BankAmount}"

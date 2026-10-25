@@ -6,14 +6,15 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// Main control page (PORTPLAN item 54, port of JobSelectionScreen): the
-/// taxi/delivery/car-hauling entries and Grandma's ToDo list, in the same
-/// order as the Unity page. The weekly calendar strip lives on its own page
-/// (<see cref="CalendarScreenViewModel"/>), opened from the menu's CALENDAR
-/// tile. The delivery entry opens the delivery career page; the car-hauling
-/// entry (PORTPLAN item 20) has no flow yet, so it only answers to taps with
-/// the teal glow. Every business (bank, dealer, car wash, mechanic, insurance)
-/// is now a POI on the addresses page, not a job button (PORTPLAN 24/59); the
-/// garage lives on the home page, where Unity's You menu keeps it.
+/// taxi/delivery/car-hauling entries, the career ToDo list (PORTPLAN 46) and
+/// the completed block that offers DELIVER CARE PACKAGES once five kits wait,
+/// in the same order as the Unity page. The weekly calendar strip lives on its
+/// own page (<see cref="CalendarScreenViewModel"/>), opened from the menu's
+/// CALENDAR tile. The delivery entry opens the delivery career page; the
+/// car-hauling entry settles the haul flow's run and shows its receipt. Every
+/// business (bank, dealer, car wash, mechanic, insurance) is now a POI on the
+/// addresses page, not a job button (PORTPLAN 24/59); the garage lives on the
+/// home page, where Unity's You menu keeps it.
 /// The shared <see cref="VoiceBeat"/> times the teal acknowledgment glow on
 /// the injected clock, never tick counts.
 /// </summary>
@@ -56,23 +57,31 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // lights the button, exactly like a stray "continue" does for the taxi.
     private static readonly string[] HaulKeywords = ["car", "car hauling"];
 
+    // Completed kits needed before DELIVER CARE PACKAGES offers itself (Unity
+    // TipsCompletedScreen.CarePackageBagThreshold). Below it the finished tips
+    // stay listed and the button waits.
+    private const int DeliverThreshold = 5;
+
     private readonly VoiceBeat _beat;
-    private readonly TodoTable _todos;
+    private readonly ITodoList _todos;
     private readonly TaxiShift _shift;
     private readonly ICommand _backCommand;
+    private readonly ICommand _todoAcknowledge;
     // Null until the first Refresh, so the ctor's paint always runs (the HUD
     // lines used to force it with their -1 sentinels).
     private bool? _deliveryOffered;
     private bool? _shiftOffered;
+    private int _todoVersion = -1;
 
     public MainControlScreenViewModel(
-        VoiceBeat beat, TodoTable todos,
+        VoiceBeat beat, ITodoList todos,
         TaxiShift shift, ControlActions actions, ICommand back)
     {
         _beat = beat;
         _todos = todos;
         _shift = shift;
         _backCommand = back;
+        _todoAcknowledge = actions.TodoAcknowledge;
         TaxiCommand = actions.Taxi;
         DeliveryCommand = actions.Delivery;
         HaulCommand = actions.Haul;
@@ -84,6 +93,21 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
 
     public IReadOnlyList<string> TodoLines { get => _todoLines; private set => SetField(ref _todoLines, value); }
     private IReadOnlyList<string> _todoLines = [];
+
+    /// <summary>The completed tips the popup block lists (Unity's TodoFinishedPopup).</summary>
+    public IReadOnlyList<string> CompletedTodoLines { get => _completedTodoLines; private set => SetField(ref _completedTodoLines, value); }
+    private IReadOnlyList<string> _completedTodoLines = [];
+
+    /// <summary>True while the completed block is showing.</summary>
+    public bool HasCompletedTodos { get => _hasCompletedTodos; private set => SetField(ref _hasCompletedTodos, value); }
+    private bool _hasCompletedTodos;
+
+    /// <summary>True once DeliverThreshold kits wait: DELIVER CARE PACKAGES is up.</summary>
+    public bool ShowDeliverCarePackages { get => _showDeliverCarePackages; private set => SetField(ref _showDeliverCarePackages, value); }
+    private bool _showDeliverCarePackages;
+
+    /// <summary>DELIVER CARE PACKAGES: acknowledges the completed tips and refills the slots.</summary>
+    public ICommand TodoAcknowledgeCommand => _todoAcknowledge;
 
     public string TaxiLabel { get => _taxiLabel; private set => SetField(ref _taxiLabel, value); }
     private string _taxiLabel = "";
@@ -139,14 +163,19 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         bool deliveryOpen = DeliveryCommand.CanExecute(null);
         bool shiftStarted = _shift.IsStarted;
         if (deliveryOpen == _deliveryOffered
-            && shiftStarted == _shiftOffered)
+            && shiftStarted == _shiftOffered
+            && _todos.Version == _todoVersion)
         {
             return;
         }
         _deliveryOffered = deliveryOpen;
         _shiftOffered = shiftStarted;
+        _todoVersion = _todos.Version;
 
-        TodoLines = BuildTodos();
+        TodoLines = BuildLines(_todos.Slots);
+        CompletedTodoLines = BuildLines(_todos.CompletedLines);
+        HasCompletedTodos = _todos.HasCompleted;
+        ShowDeliverCarePackages = _todos.CompletedCount >= DeliverThreshold;
         SyncTaxiLabel();
         RebuildVoice();
     }
@@ -165,27 +194,21 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         TaxiLabel = ShiftLabel(_shift.IsStarted);
     }
 
-    private string[] BuildTodos()
+    // A visit tip carries the door name in {0}; every progressive tip carries
+    // the target in {0} and the career reading in {1}. The copy's own format
+    // specifiers decide the decimals, so no number formatting lives here.
+    private static string[] BuildLines(IReadOnlyList<TodoLine> lines)
     {
-        var lines = new string[_todos.Entries.Count];
-        for (int i = 0; i < lines.Length; i++)
+        var texts = new string[lines.Count];
+        for (int i = 0; i < texts.Length; i++)
         {
-            lines[i] = FormatTodo(_todos.Entries[i]);
+            TodoLine line = lines[i];
+            texts[i] = line.Placeholder is null
+                ? Strings.Format(line.CopyKey, line.Target, line.Current)
+                : Strings.Format(line.CopyKey, line.Placeholder);
         }
-        return lines;
+        return texts;
     }
-
-    // Progress reads 0 until the persistent save lands (PORTPLAN item 51);
-    // the top slot is reserved for the grandma quest tip, whose addresses
-    // need the Eifel table (PORTPLAN Step 1).
-    private static string FormatTodo(TodoEntry entry) => entry.SubjectId switch
-    {
-        GrandmaTodo.MaxGrocery => Strings.Get("TodoMaxGrocery"),
-        GrandmaTodo.VisitBank => Strings.Get("TodoVisitBank"),
-        GrandmaTodo.TaxiJobs => Strings.Format("TodoTaxiJobs", entry.Target, 0),
-        GrandmaTodo.EarnCr => Strings.Format("TodoEarnCr", entry.Target, 0),
-        _ => entry.SubjectId,
-    };
 
     private void RebuildVoice()
     {
@@ -211,6 +234,12 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
                 _beat.Defer(Back);
             },
         };
+        if (ShowDeliverCarePackages)
+        {
+            // DELIVER CARE PACKAGES is a utility tap, not a navigation: it acts
+            // at once like a click.
+            actions[Strings.Get("TodoDeliver")] = () => _todoAcknowledge.Execute(null);
+        }
         foreach (string keyword in TaxiKeywords)
         {
             actions[keyword] = taxi;

@@ -183,9 +183,6 @@ public sealed class OnboardingTests
         Assert.Equal(OnboardingStage.Brand, store.State.Stage);
 
         session.Story.ChooseBrand("Mazda");
-        Assert.Equal(OnboardingStage.GrandmaCar, store.State.Stage);
-
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         Assert.Equal(OnboardingStage.VoiceInfo, store.State.Stage);
 
         Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
@@ -195,6 +192,12 @@ public sealed class OnboardingTests
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
         dialogue.ContinueCommand.Execute(null);
+
+        // Grandma's last line sends the player out for maple syrup; the car
+        // page is the walk's closing page, banked before it paints.
+        Assert.Equal(OnboardingStage.GrandmaCar, store.State.Stage);
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
 
         Assert.True(store.State.BirthdayDone);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
@@ -219,12 +222,13 @@ public sealed class OnboardingTests
         var session = CreateSession(OnboardingState.Fresh with { BirthdayDone = true });
         var vm = session.Vm;
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
+        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
         dialogue.ContinueCommand.Execute(null);
+        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         vm.ToggleShowCommand.Execute(null); // hide
@@ -233,14 +237,38 @@ public sealed class OnboardingTests
     }
 
     [Fact]
-    public void ChooseBrand_PersistsAndShowsCars()
+    public void ChooseBrand_ShowsVoiceInfo()
     {
         var session = CreateSession();
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        var cars = Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(2, cars.Options.Count);
-        Assert.Equal("1990 Mazda MX-5 NA", cars.Options[0].Label);
+        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void CarPage_ContinuePicksTheOfferAndEndsTheWalk()
+    {
+        var store = new FakeOnboardingStore();
+        var session = CreateSession(onboarding: store);
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Mazda");
+        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
+        var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
+        dialogue.ContinueCommand.Execute(null);
+        dialogue.ContinueCommand.Execute(null);
+
+        // The page is the picture of the car she hands over, one offer and one
+        // CONTINUE that banks it; the pick is not a button per car any more.
+        var car = Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("ks_mazda_mx5_na", car.Car.Id);
+        Assert.False(car.HasImage);
+
+        car.ContinueCommand.Execute(null);
+
+        Assert.Equal("ks_mazda_mx5_na", store.State.GrandmaCarId);
+        Assert.True(store.State.BirthdayDone);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -265,10 +293,7 @@ public sealed class OnboardingTests
         session.Story.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);
 
-        session.Story.ChooseCar("ks_datsun_240z_fairlady");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("ks_datsun_240z_fairlady", store.State.GrandmaCarId);
-
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(Strings.Get("BirthdayTitle"), dialogue.Title);
@@ -277,7 +302,11 @@ public sealed class OnboardingTests
         dialogue.ContinueCommand.Execute(null);
         Assert.Equal("You", dialogue.SpeakerName);
 
-        dialogue.ContinueCommand.Execute(null); // last page finishes
+        dialogue.ContinueCommand.Execute(null); // last page: grandma's car
+        var car = Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
+        car.ContinueCommand.Execute(null);
+        Assert.Equal("ks_mazda_mx5_na", store.State.GrandmaCarId);
+
         // The finished flow lands on the menu; progress is persisted.
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.True(store.State.BirthdayDone);
@@ -292,16 +321,15 @@ public sealed class OnboardingTests
         ToBrandPage(vm);
         var brands = Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
         brands.ChooseBrandCommand.Execute("Mazda");
-        Assert.IsType<GrandmaCarScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
-    public void ChooseCar_ShowsVoiceInfo()
+    public void VoiceInfoPage_NamesNoWakePhrase()
     {
         var session = CreateSession();
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         Assert.Contains("Control navigation with your voice.", voice.LeadText, StringComparison.Ordinal);
         Assert.DoesNotContain("HEY", voice.LeadText, StringComparison.Ordinal);
@@ -314,7 +342,6 @@ public sealed class OnboardingTests
         var session = CreateSession();
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -329,7 +356,6 @@ public sealed class OnboardingTests
         var session = CreateSession(clock: clock);
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         string? label = VoiceMatch.MatchLabel("could you please continue", voice.VoiceActions.Keys);
         Assert.Equal("CONTINUE", label);
@@ -353,7 +379,6 @@ public sealed class OnboardingTests
         var session = CreateSession(clock: clock);
         var vm = session.Vm;
         session.Story.ChooseBrand("Honda");
-        session.Story.ChooseCar("ks_mazda_mx5_na");
         var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
         voice.ContinueCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -386,7 +411,7 @@ public sealed class OnboardingTests
             File.WriteAllText(Path.Combine(dir, "community_centre_dialogue.json"),
                 """[{"speaker":"SIGNORE MORO","text":"Welcome!"}]""");
             File.WriteAllText(Path.Combine(dir, "max_dialogue.json"),
-                """[{"speaker":"MAX","text":"Easy job."}]""");
+                """[{"speaker":"MAX","text":"Easy job.","note":"Open JOBS."}]""");
             File.WriteAllText(Path.Combine(dir, "voice_confusions.json"),
                 """{"Your":"NEW","dear":"tier","two words":"x","y":"y","":"z"}""");
             var log = new TestLog();
@@ -399,6 +424,7 @@ public sealed class OnboardingTests
             Assert.Single(loaded.PancakeDialogue);
             Assert.Single(loaded.CommunityCentreDialogue);
             Assert.Single(loaded.MaxDialogue);
+            Assert.Equal("Open JOBS.", loaded.MaxDialogue[0].Note); // page aside, not speech
             // "Your"/"NEW" normalized; multi-word, self-map and empty halves dropped.
             Assert.Equal(2, loaded.Confusions!.Count);
             Assert.Equal("new", loaded.Confusions["your"]);
@@ -429,9 +455,39 @@ public sealed class OnboardingTests
         Assert.Contains("nissan", loaded.Aliases["datsun"]); // live 17:13 Datsun garble
         Assert.Contains("nathan", loaded.Aliases["datsun"]); // live 17:17 Datsun garble
         Assert.Contains("henderson", loaded.Aliases["datsun"]); // live 17:17:36 Datsun fused-word garble
+        // 2026-10-25 Datsun session: the model never once returned "datsun"
+        // for this car's own brand. It said "hey dawson" x4, "hey nice so" x3
+        // and "hey dotson" (which only opened through "dodson", one slip
+        // away), so those attempts were silence until "hey nissan" or a lucky
+        // partial landed. Both doors must keep answering for this car: its
+        // brand as the model spells it, and "nissan" for the same car.
+        Assert.Contains("dawson", loaded.Aliases["datsun"]);
+        Assert.Contains("nice so", loaded.Aliases["datsun"]);
+        Assert.True(VoiceMatch.IsWake("hey dawson", "datsun", loaded.Aliases["datsun"]));
+        Assert.True(VoiceMatch.IsWake("hey nice so", "datsun", loaded.Aliases["datsun"]));
+        Assert.True(VoiceMatch.IsWake("hey dotson", "datsun", loaded.Aliases["datsun"]));
+        Assert.True(VoiceMatch.IsWake("hey datsun", "datsun", loaded.Aliases["datsun"]));
+        Assert.True(VoiceMatch.IsWake("hey nissan", "datsun", loaded.Aliases["datsun"]));
         Assert.NotEmpty(loaded.PancakeDialogue); // home leg's dialogue ships with the build
         Assert.NotEmpty(loaded.CommunityCentreDialogue); // post-pancake leg's dialogue ships too
         Assert.NotEmpty(loaded.MaxDialogue); // first post-intro Max visit ships its offer
+        Assert.Empty(log.Warnings);
+    }
+
+    [Fact]
+    public void ContentLoader_ShippedData_KeepsTheLoggedBuyDoor()
+    {
+        // 2026-10-25 09:52 shop visit: five spoken "buy" attempts landed as
+        // "my", "boy" x3 and "why", none reached the BUY button, while BACK
+        // matched four seconds later; 2026-10-21 failed the same way on
+        // "by" x2. Dropping these rows from the table silently brings the
+        // miss back in-game, so this fails at the table instead.
+        var log = new TestLog();
+        OnboardingContent loaded = new JsonOnboardingContent(log).Load();
+        Assert.Equal("buy", loaded.Confusions!["boy"]);
+        Assert.Equal("buy", loaded.Confusions["by"]);
+        Assert.Equal("buy", loaded.Confusions["my"]);
+        Assert.Equal("buy", loaded.Confusions["why"]);
         Assert.Empty(log.Warnings);
     }
 
@@ -477,10 +533,10 @@ public sealed class OnboardingTests
     [Fact]
     public void OnboardingStore_RoundTrips()
     {
-        string file = Path.GetTempFileName();
+        string file = TempSaveFile();
         try
         {
-            var store = new JsonOnboardingStore(file);
+            var store = new JsonOnboardingStore(file, new TestLog());
             Assert.Equal(OnboardingState.Fresh, store.Load());
             var state = new OnboardingState(
                 "Mazda", "ks_mazda_mx5_na", true,
@@ -489,21 +545,193 @@ public sealed class OnboardingTests
                 CommunityCentreAddress: new AddressLocation("Street 2", 7, HouseSide.Right),
                 Stage: OnboardingStage.VoiceInfo);
             store.Save(state);
-            Assert.Equal(state, new JsonOnboardingStore(file).Load());
+            Assert.Equal(state, new JsonOnboardingStore(file, new TestLog()).Load());
         }
-        finally { File.Delete(file); }
+        finally { DeleteSave(file); }
     }
 
     [Fact]
     public void OnboardingStore_InvalidFile_FallsBackToFresh()
     {
-        string file = Path.GetTempFileName();
+        string file = TempSaveFile();
         try
         {
+            var log = new TestLog();
             File.WriteAllText(file, "{ not json");
-            Assert.Equal(OnboardingState.Fresh, new JsonOnboardingStore(file).Load());
+            Assert.Equal(OnboardingState.Fresh, new JsonOnboardingStore(file, log).Load());
+            // A file that exists but cannot be read is not a first run: the log
+            // has to say why the introduction started from the first page.
+            Assert.Contains(log.Warnings, w => w.Contains("first page", StringComparison.Ordinal));
         }
-        finally { File.Delete(file); }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_CachesTheLoad_AndSaveInvalidates()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var store = new JsonOnboardingStore(file, new TestLog());
+            Assert.Equal(OnboardingState.Fresh, store.Load());
+
+            // The gate is asked from five places; only the first ask may read.
+            File.Delete(file);
+            Assert.Equal(OnboardingState.Fresh, store.Load());
+
+            var state = new OnboardingState("Mazda", "ks_mazda_mx5_na", true);
+            store.Save(state);
+            Assert.Equal(state, store.Load());
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_KeepsThePreviousSaveAsBackup()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonOnboardingStore(file, log);
+            OnboardingState first = OnboardingState.Fresh with { FavoriteBrand = "Mazda" };
+            OnboardingState second = first with { GrandmaCarId = "ks_mazda_mx5_na" };
+            store.Save(first);
+            store.Save(second);
+
+            Assert.True(File.Exists(file + ".bak"));
+            Assert.False(File.Exists(file + ".tmp"));
+            Assert.Equal(first, new JsonOnboardingStore(file + ".bak", log).Load());
+            Assert.Equal(second, new JsonOnboardingStore(file, log).Load());
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_CorruptFile_ResumesTheLastGoodSave()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonOnboardingStore(file, log);
+            OnboardingState first = OnboardingState.Fresh with
+            {
+                FavoriteBrand = "Mazda",
+                Stage = OnboardingStage.Brand,
+            };
+            store.Save(first);
+            store.Save(first with { GrandmaCarId = "ks_mazda_mx5_na" });
+            // A crash in the middle of a write, or a filter that truncated the
+            // file: the career must not rewind to the first page.
+            File.WriteAllText(file, "{ truncated");
+
+            Assert.Equal(first, new JsonOnboardingStore(file, log).Load());
+            Assert.Contains(log.Warnings, w => w.Contains("last good save", StringComparison.Ordinal));
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_DeletedFile_ResumesTheLastGoodSave()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonOnboardingStore(file, log);
+            OnboardingState first = OnboardingState.Fresh with { FavoriteBrand = "Mazda" };
+            store.Save(first);
+            store.Save(first with { GrandmaCarId = "ks_mazda_mx5_na" });
+            File.Delete(file);
+
+            Assert.Equal(first, new JsonOnboardingStore(file, log).Load());
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_BothCopiesUnreadable_StartsFreshAndWarns()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+            File.WriteAllText(file, "{ not json");
+            File.WriteAllText(file + ".bak", "{ not json either");
+
+            Assert.Equal(OnboardingState.Fresh, new JsonOnboardingStore(file, log).Load());
+            Assert.NotEmpty(log.Warnings);
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_MissingFile_StartsFreshWithoutAWarning()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+
+            Assert.Equal(OnboardingState.Fresh, new JsonOnboardingStore(file, log).Load());
+            Assert.Empty(log.Warnings);
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_LogsThePageItResumesOn()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+            new JsonOnboardingStore(file, log).Save(
+                OnboardingState.Fresh with { Stage = OnboardingStage.VoiceInfo });
+
+            _ = new JsonOnboardingStore(file, log).Load();
+
+            // The boot log has to answer "did it resume or start over?", so the
+            // page is part of the load line.
+            Assert.Contains(log.Infos, i => i.Contains("stage=VoiceInfo", StringComparison.Ordinal));
+        }
+        finally { DeleteSave(file); }
+    }
+
+    [Fact]
+    public void OnboardingStore_LockedFile_LogsTheFailedWriteAndKeepsTheSessionState()
+    {
+        string file = TempSaveFile();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonOnboardingStore(file, log);
+            store.Save(OnboardingState.Fresh);
+            var next = OnboardingState.Fresh with { Stage = OnboardingStage.Brand };
+            using (new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.None))
+            {
+                store.Save(next);
+            }
+
+            Assert.Contains(log.Warnings, w => w.Contains("unwritable", StringComparison.Ordinal));
+            // The in-memory state is the live one even when the disk refused:
+            // the next save retries with the page the player is on.
+            Assert.Equal(next, store.Load());
+        }
+        finally { DeleteSave(file); }
+    }
+
+    private static string TempSaveFile() =>
+        Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
+
+    // The JSON boundary writes .bak/.tmp companions beside every save, so the
+    // cleanup removes them or the temp directory fills up between runs.
+    private static void DeleteSave(string file)
+    {
+        File.Delete(file + ".bak");
+        File.Delete(file + ".tmp");
+        File.Delete(file);
     }
 
     private static string NewTempDir()

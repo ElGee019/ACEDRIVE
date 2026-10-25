@@ -39,6 +39,25 @@ public sealed class TaxiReceiptTests
     }
 
     [Fact]
+    public void ShortRide_OnlyTheBandsItReaches()
+    {
+        // The receipt lists the driven km per band, never the table: 0.9 km
+        // stops inside the first band, 4.3 km reaches into the second.
+        TaxiReceipt shortRide = TaxiReceiptBuilder.Build(
+            0.9, 1, 1, 1, 100, tipEligible: false, fines: 0, Table, 0.0);
+        Assert.Equal(
+            [new ReceiptTier(0.0, 2.0, 6.67, 0.9, 6.00)],
+            shortRide.TierLines);
+
+        TaxiReceipt midRide = TaxiReceiptBuilder.Build(
+            4.3, 1, 1, 1, 100, tipEligible: false, fines: 0, Table, 0.0);
+        Assert.Equal(
+            [new ReceiptTier(0.0, 2.0, 6.67, 2.0, 13.34),
+             new ReceiptTier(2.0, 3.0, 5.67, 2.3, 13.04)],
+            midRide.TierLines);
+    }
+
+    [Fact]
     public void PlaceholderRide_XpAward()
     {
         // (8.2 x class 1 x rarity 1) / 100 x SK 100%, no diminishing yet.

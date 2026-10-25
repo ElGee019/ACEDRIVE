@@ -5,8 +5,8 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Replaces the <c>[POI]</c>, <c>[STREET]</c>, <c>[YOU]</c> and <c>[CAR]</c>
-/// tokens in authored dialogue. Lines without a token keep their original
-/// instance, so an ordinary page is never copied.
+/// tokens in authored dialogue pages and their notes. Lines without a token
+/// keep their original instance, so an ordinary page is never copied.
 /// </summary>
 public static class DialogueText
 {
@@ -38,10 +38,9 @@ public static class DialogueText
         DialogueLine line, string poi, string address, string playerName,
         string carBrand)
     {
-        if (!line.Text.Contains(PoiToken, StringComparison.Ordinal)
-            && !line.Text.Contains(AddressToken, StringComparison.Ordinal)
-            && !line.Text.Contains(PlayerToken, StringComparison.Ordinal)
-            && !line.Text.Contains(CarToken, StringComparison.Ordinal))
+        // The note is authored beside the spoken page, so it earns the same
+        // tokens; a page whose note is the only carrier still gets copied.
+        if (!NeedsFill(line.Text) && !NeedsFill(line.Note))
         {
             return line;
         }
@@ -53,11 +52,24 @@ public static class DialogueText
         string car = string.IsNullOrWhiteSpace(carBrand) ? "machine" : carBrand;
         return line with
         {
-            Text = line.Text
-                .Replace(PoiToken, poi, StringComparison.Ordinal)
-                .Replace(AddressToken, address, StringComparison.Ordinal)
-                .Replace(PlayerToken, name, StringComparison.Ordinal)
-                .Replace(CarToken, car, StringComparison.Ordinal),
+            Text = FillTokens(line.Text, poi, address, name, car),
+            Note = line.Note is null
+                ? null
+                : FillTokens(line.Note, poi, address, name, car),
         };
     }
+
+    private static bool NeedsFill(string? text) =>
+        text is not null
+        && (text.Contains(PoiToken, StringComparison.Ordinal)
+            || text.Contains(AddressToken, StringComparison.Ordinal)
+            || text.Contains(PlayerToken, StringComparison.Ordinal)
+            || text.Contains(CarToken, StringComparison.Ordinal));
+
+    private static string FillTokens(
+        string text, string poi, string address, string name, string car) =>
+        text.Replace(PoiToken, poi, StringComparison.Ordinal)
+            .Replace(AddressToken, address, StringComparison.Ordinal)
+            .Replace(PlayerToken, name, StringComparison.Ordinal)
+            .Replace(CarToken, car, StringComparison.Ordinal);
 }

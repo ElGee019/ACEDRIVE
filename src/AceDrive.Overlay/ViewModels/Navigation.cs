@@ -32,7 +32,7 @@ public sealed class Navigation
     private readonly GameClock _game;
     private readonly IClock _clock;
     private readonly TaxiShift _shift;
-    private readonly TodoTable _todos;
+    private readonly TodoBoard _todos;
     private readonly RoadTestLedger _roads;
     private readonly DriverWallet _wallet;
     private readonly Garage _garage;
@@ -59,6 +59,19 @@ public sealed class Navigation
     // here.
     private readonly DayCycle _day;
 
+    // The operating zone, read only for the Cento Miglia gates: the event opens
+    // no tier before the driver has discovered a street (Unity's
+    // discoveredStreets check).
+    private readonly OperatingZone _zone;
+
+    // The Cento Miglia tier table (Data/cento_miglia.json), loaded once at
+    // startup: content, so the page never reads a file itself.
+    private readonly IReadOnlyList<CentoTier> _centoTiers;
+
+    // The brand the wake word listens for: the menu's reminder reads it live,
+    // so the cached menu never names the car the player already sold.
+    private readonly Func<string> _carBrand;
+
     // The pages' banks: the garage file, the road-test pick, the shift start and
     // the trunk's driver save all go through the one saver the root built.
     private readonly GameStateSaver _saver;
@@ -75,6 +88,10 @@ public sealed class Navigation
     // calendar data by RoadTestDayOfWeek, never hardcoded here.
     private readonly int _roadTestDay = RoadTestDayOfWeek();
 
+    // Weekday number of the Cento Miglia event (Unity: Sunday), read the same
+    // way: the strip owns which weekday hosts the event.
+    private readonly int _centoDay = CentoDayOfWeek();
+
     // WHY late: the host is the coordinator, which is built after this
     // navigator. Every member below is only reachable from a page command, so
     // the attach in the coordinator's constructor always comes first.
@@ -82,14 +99,15 @@ public sealed class Navigation
 
     public Navigation(
         OverlayShell shell, VoiceBeat beat,
-        GameClock game, IClock clock, TaxiShift shift, TodoTable todos,
+        GameClock game, IClock clock, TaxiShift shift, TodoBoard todos,
         RoadTestLedger roads, GameStateSaver saver,
         DriverWallet wallet, Garage garage, IRivalsService rivals,
         Trunk trunk, Hunger hunger, StoreCatalog stores,
         PoiDirectory directory, ITelemetryHud? hud,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
-        DayCycle day, ILog log)
+        DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
+        Func<string> carBrand, ILog log)
     {
         _shell = shell;
         _beat = beat;
@@ -115,6 +133,9 @@ public sealed class Navigation
         _haul = haul;
         _world = world;
         _day = day;
+        _zone = zone;
+        _centoTiers = centoTiers;
+        _carBrand = carBrand;
         _log = log;
 
         ControlCommand = new RelayCommand(ShowControl);
@@ -166,7 +187,7 @@ public sealed class Navigation
             _beat, _todos, _shift,
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
-                new RelayCommand(SettleHaul)),
+                new RelayCommand(SettleHaul), _todos.AcknowledgeCommand),
             MenuCommand);
         return _control;
     }
@@ -228,7 +249,7 @@ public sealed class Navigation
     /// <summary>Opens the hub page (Unity's OPEN NEW CAREER, PORTPLAN 18).</summary>
     public void ShowHub() =>
         ShowScreen(new DeliveryHubScreenViewModel(
-            _career, _board.Catalog, _city, _log,
+            _career, _log,
             new RelayCommand(CloseHub),
             _beat,
             _world.PlaceHubDoor));
@@ -300,11 +321,12 @@ public sealed class Navigation
     // Built once and reused; boots on the resumed week (if any), not the
     // stamp default, so the header is right on the first paint. The calendar
     // day buttons have no destinations until the freeroam map lands, so
-    // tapping the highlighted day just logs — except the road-test day, which
-    // banks the week's car as tested and switches to the next pick (manual
-    // stand-in until the road-test drive flow lands). Off-gate taps never
-    // reach this action: the page's own day command warns them before
-    // dispatching.
+    // tapping the highlighted day just logs — except two events that own a
+    // page: the road-test day, which banks the week's car as tested and
+    // switches to the next pick (manual stand-in until the road-test drive
+    // flow lands), and the Cento Miglia day, which opens the event page.
+    // Off-gate taps never reach this action: the page's own day command warns
+    // them before dispatching.
     private CalendarScreenViewModel CalendarPage()
     {
         _openDay ??= new ParameterizedCommand<int>(OnDay);
@@ -329,7 +351,61 @@ public sealed class Navigation
             return;
         }
 
+        // The Cento Miglia page (PORTPLAN 49): Unity JobSelectionScreen's
+        // Sunday tap, which the calendar's own gate has already checked against
+        // the day and the 8am-8pm window.
+        if (day == _centoDay)
+        {
+            OpenCento();
+            return;
+        }
+
         _log.LogInfo($"calendar day {day} tapped while locked: waiting on the freeroam map");
+    }
+
+    // The event page per visit, never cached: the reputation it prints and the
+    // garage size it counts are the driver's current ones. BACK and ENTER both
+    // return to the calendar it was opened from — Unity's ENTER would start the
+    // race here; the overlay has none yet, so the page closes like Unity's
+    // screen does and leaves the outcome to the race port.
+    private void OpenCento()
+    {
+        // The year is not persisted (PORTPLAN 51): the game's fixed 1924 seed is
+        // what every page stamps, and Unity prints the same pair.
+        CalendarStamp stamp = CalendarStamp.Default with { Week = _day.DisplayWeek };
+        var facts = new CentoMigliaFacts(
+            stamp.Week,
+            stamp.Year,
+            _wallet.ClubReputation,
+            _zone.StreetIds.Count > 0,
+            _garage.Cars.Count,
+            CurrentCarClass());
+        ShowScreen(new CentoMigliaScreenViewModel(
+            _centoTiers, facts, new RelayCommand(() => ShowScreen(CalendarPage()))));
+        _log.LogInfo(
+            $"cento miglia opened: week {facts.Week}, rep {facts.ClubReputation:0.00}, " +
+            $"{facts.CarsOwned} cars, class {facts.CarClass}, {_centoTiers.Count} tiers");
+    }
+
+    // The class of the car being driven: Unity reads CarData.Get(player.grandmaCar),
+    // the car the player took out of the garage — here the garage's current car.
+    // 0 when the garage cannot name it, which is the fresh-driver reading.
+    private int CurrentCarClass() =>
+        _garage.Current is { } owned && _garage.SpecOf(owned) is { } spec ? spec.Class : 0;
+
+    // Cento Miglia weekday number, read off the calendar data like the road
+    // test's: no Unity day literal here.
+    private static int CentoDayOfWeek()
+    {
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.EventId == ControlCalendar.CentoMiglia)
+            {
+                return day.DayOfWeek;
+            }
+        }
+
+        return -1;
     }
 
     private string DescribeRoadTest() =>
@@ -346,7 +422,7 @@ public sealed class Navigation
             new RelayCommand(OpenTrunk),
             new RelayCommand(_host.ShowSettings),
             new RelayCommand(OpenHome),
-            _hunger, _garage,
+            _hunger, _garage, _carBrand,
             _beat,
             _game,
             _clock,
@@ -370,7 +446,8 @@ public sealed class Navigation
         ShowScreen(new AddressesScreenViewModel(
             _directory, _hud,
             new RelayCommand(OpenHome),
-            _beat));
+            _beat,
+            _host.DestinationPinned));
 
     // The trunk page (PORTPLAN 26, Unity YouScreen's TrunkScreen) is rebuilt on
     // every visit like Unity's RebuildTrunkScreen: a shop purchase made since
@@ -448,6 +525,11 @@ public sealed class Navigation
 
     private void CloseHub()
     {
+        // Opening a career is the fact the follow-up tip reads (PORTPLAN 46):
+        // sync as the page closes so the tip completes without waiting for the
+        // next cold edge. The tip's own store banks the change; the career
+        // itself stays in memory until the persistent save lands (PORTPLAN 51).
+        _ = _todos.Sync();
         // Unity's backfill runs when the career opens: the newly owned category
         // places its first store before the board is shown again.
         _world.Grow();

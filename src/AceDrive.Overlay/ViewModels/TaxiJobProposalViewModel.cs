@@ -13,8 +13,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// same information the Unity page shows.
 /// Like Unity's generator, a proposal pairs the customer's home address with
 /// a second address and a coin flip decides which leg is the pickup: the
-/// home leg reads "home, {address}", the other "the {surname} residence,
-/// {address}" after its resident. Addresses come from the address map's real
+/// home leg is "home", the other "the {surname} residence" after its resident,
+/// and the pickup puts its address on a fresh line while the dropoff keeps the
+/// compact "door, address" form. Addresses come from the address map's real
 /// streets and houses, and the optional radius filters the draw like Unity's
 /// TaxiJobGenerator (both legs within the committed km of home, 5 km floor).
 /// Residents are reused per address through the persisted resident book, so
@@ -134,9 +135,16 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen
         // pickup, exactly like isCustomerHomePickup.
         string home = Describe(proposal.CustomerHome, "ProposalAddressA");
         string residence = Describe(proposal.SecondResidence, "ProposalAddressB");
-        string homeLeg = Strings.Format("ProposalLegHome", home);
-        string residenceLeg = Strings.Format(
-            "ProposalLegResidence", proposal.SecondResident.Surname, residence);
+        // Doors are drawn once and joined per leg: the pickup's address starts
+        // on its own line (a wrapped residence street reads badly), the
+        // dropoff keeps the compact "door, address" form.
+        string homeDoor = Strings.Get("ProposalDoorHome");
+        string residenceDoor = Strings.Format(
+            "ProposalDoorResidence", proposal.SecondResident.Surname);
+        string pickupDoor = proposal.HomeIsPickup ? homeDoor : residenceDoor;
+        string dropoffDoor = proposal.HomeIsPickup ? residenceDoor : homeDoor;
+        string pickupAddress = proposal.HomeIsPickup ? home : residence;
+        string dropoffAddress = proposal.HomeIsPickup ? residence : home;
         _current = new TaxiJobState
         {
             Phase = JobPhase.Proposed,
@@ -149,14 +157,14 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen
             DropoffAddress = proposal.HomeIsPickup
                 ? proposal.SecondResidence
                 : proposal.CustomerHome,
-            PickupName = proposal.HomeIsPickup ? home : residence,
-            DropoffName = proposal.HomeIsPickup ? residence : home,
+            PickupName = pickupAddress,
+            DropoffName = dropoffAddress,
         };
         Phrase = Strings.Format(
             "ProposalPhrase",
             proposal.Customer.Full,
-            proposal.HomeIsPickup ? homeLeg : residenceLeg,
-            proposal.HomeIsPickup ? residenceLeg : homeLeg);
+            Strings.Format("ProposalPickupLeg", pickupDoor, pickupAddress),
+            Strings.Format("ProposalDropoffLeg", dropoffDoor, dropoffAddress));
         _log.LogInfo(
             $"job proposed: {proposal.Customer.Full} " +
             $"{_current.PickupName} -> {_current.DropoffName}");

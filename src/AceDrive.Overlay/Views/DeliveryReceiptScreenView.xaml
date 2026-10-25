@@ -61,19 +61,20 @@
                 <TextBlock Text="{Binding TotalCredPLine}" Foreground="#FFBFC4C9" FontSize="14"
                            TextAlignment="Center"/>
             </StackPanel>
-            <!-- Two blank lines of separation between the money block and
-                 the XP award, matching the taxi receipt's section rhythm. -->
-            <TextBlock Height="45"/>
+            <!-- The wallet's hairline above the XP award, matching the taxi
+                 receipt's section rhythm. -->
+            <Border Style="{StaticResource SectionDivider}"/>
             <TextBlock Text="{Binding XpLine}" Foreground="#FFF" FontSize="16"
                        TextAlignment="Center"/>
             <TextBlock Text="{Binding XpCalcLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" TextWrapping="Wrap"/>
             <TextBlock Text="{Binding TotalXpLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" Margin="0,0,0,4"/>
-            <!-- XP world standings: same block the taxi receipt hosts;
+            <!-- Global XP rank: same fenced block the taxi receipt hosts;
                  StandingsLine owns the pulse and restarts it on every rank
                  move, delta line gains AND lost render teal (Unity keeps
                  both green #97EAD2 verbatim). -->
+            <Border Style="{StaticResource SectionDivider}" Margin="0,4,0,6"/>
             <views:StandingsLine Text="{Binding Standings.Line}"
                                  PulseSignal="{Binding Standings.PulseSignal}"
                                  Foreground="#FFF" FontSize="16" TextAlignment="Center"/>
@@ -90,6 +91,7 @@
                     </Style>
                 </TextBlock.Style>
             </TextBlock>
+            <Border Style="{StaticResource SectionDivider}" Margin="0,0,0,0"/>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

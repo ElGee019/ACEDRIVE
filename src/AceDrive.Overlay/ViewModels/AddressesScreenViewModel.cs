@@ -18,15 +18,18 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly ITelemetryHud? _hud;
     private readonly ICommand _backCommand;
     private readonly VoiceBeat _beat;
+    private readonly Action? _onPinned;
     private string? _selectedId;
 
     public AddressesScreenViewModel(
-        PoiDirectory directory, ITelemetryHud? hud, ICommand backCommand, VoiceBeat beat)
+        PoiDirectory directory, ITelemetryHud? hud, ICommand backCommand,
+        VoiceBeat beat, Action? onPinned = null)
     {
         _directory = directory;
         _hud = hud;
         _backCommand = backCommand;
         _beat = beat;
+        _onPinned = onPinned;
         SelectCommand = new ParameterizedCommand<AddressRow>(Select);
         BackCommand = new RelayCommand(Back);
         Rows = BuildRows();
@@ -86,6 +89,10 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
         // only after the player closes this page; the companion surfaces its
         // task text over the still-open panel.
         _hud?.ShowTaskText();
+        // The pin is the "set a destination yourself" action the ToDo subject
+        // counts (Unity manuallySetDestinations); the host does the counting
+        // and the sync, the page only reports the tap.
+        _onPinned?.Invoke();
         Rows = BuildRows();
         SelectedLine = Strings.Format("AddressesSelected", row.Name, row.Address);
     }

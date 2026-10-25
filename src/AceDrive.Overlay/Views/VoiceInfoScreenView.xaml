@@ -12,19 +12,22 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=VoiceInfoTitle}"/>
         <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <!-- One paragraph, one idea per line: no blank line between them. -->
             <TextBlock Text="{Binding LeadText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
                        Margin="0,6,0,6"/>
-            <!-- One blank line between the explanations, one per idea. -->
             <TextBlock Text="{Binding DetailText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
-                       Margin="0,19,0,8"/>
-            <TextBlock Text="{Binding HintText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
-                       Margin="0,19,0,8"
-                       Visibility="{Binding HasHint, Converter={StaticResource BoolToVis}}"/>
+                       Margin="0,0,0,6"/>
         </StackPanel>
-        <Grid Grid.Row="2">
+        <!-- The next step sits at the bottom of the page, one blank line above
+             the button. Pages without one collapse the row. -->
+        <TextBlock Grid.Row="2" Text="{Binding HintText}" Foreground="#FFF" FontSize="14" TextWrapping="Wrap" TextAlignment="Center"
+                   Margin="0,0,0,19"
+                   Visibility="{Binding HasHint, Converter={StaticResource BoolToVis}}"/>
+        <Grid Grid.Row="3">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="2*"/>

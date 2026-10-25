@@ -100,6 +100,12 @@ public sealed class WorldTicks
         if (report.Changed)
         {
             _log.LogInfo($"[Hunger] {_hunger.Value}/{_hunger.Max}");
+            // WHY bank with the hour: the meter only moves on a crossed game
+            // hour, and a killed process never reaches the exit-only save —
+            // every hour since the last clean exit would be lost (a 13-point
+            // session went with one kill on 2026-10-25). One small write per
+            // game hour, never per poll, the same policy as the premium below.
+            _saver.SaveHunger();
         }
 
         if (_hunger.Blocks == _hungerBlocked)

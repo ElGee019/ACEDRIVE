@@ -21,5 +21,6 @@ internal static class TestSaveState
             new FakeShiftStore(),
             wallet, new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new Trunk(),
             garage, new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
-            new RoadTestLedger([], seed: 0), new TaxiShift(), new ShiftRecord(null), new JobLedger());
+            new RoadTestLedger([], seed: 0), new TaxiShift(), new ShiftRecord(null), new JobLedger(),
+            new DestinationPins(), new VisitLedger());
 }

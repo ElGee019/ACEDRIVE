@@ -101,16 +101,16 @@ public sealed class JsonOnboardingContent : IContentSource
                 .Select(c => new GrandmaCar(c.Id, c.Name, c.Year, c.Price, ThumbFor(c.Id)))
                 .ToArray(),
             dialogue.Where(l => !string.IsNullOrWhiteSpace(l.Text))
-                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!, l.Note))
                 .ToArray(),
             pancakes.Where(l => !string.IsNullOrWhiteSpace(l.Text))
-                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!, l.Note))
                 .ToArray(),
             communityCentre.Where(l => !string.IsNullOrWhiteSpace(l.Text))
-                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!, l.Note))
                 .ToArray(),
             maxDialogue.Where(l => !string.IsNullOrWhiteSpace(l.Text))
-                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!))
+                .Select(l => new DialogueLine(l.Speaker ?? "", l.Text!, l.Note))
                 .ToArray(),
             confusions);
         _log.LogInfo($"content: {content.Brands.Count} brands, {content.Cars.Count} cars " +
@@ -191,5 +191,8 @@ public sealed class JsonOnboardingContent : IContentSource
     {
         public string? Speaker { get; set; }
         public string? Text { get; set; }
+
+        // Aside printed under the spoken page, never spoken by the character.
+        public string? Note { get; set; }
     }
 }

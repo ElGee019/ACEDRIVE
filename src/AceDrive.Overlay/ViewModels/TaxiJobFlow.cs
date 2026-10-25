@@ -54,6 +54,9 @@ public sealed class TaxiJobFlow
     private TaxiJobProposalViewModel? _proposal;
     private ParameterizedCommand<TaxiJobState>? _acceptJobAction;
     private bool _speedChallengeArmed;
+    // The accepted passive ask's live limits, watched on the paid leg. Null
+    // when the ask only promised a tip, or was declined.
+    private RideConditionMonitor? _conditionMonitor;
     private double? _trackLengthMeters;
 
     public TaxiJobFlow(
@@ -164,6 +167,19 @@ public sealed class TaxiJobFlow
         {
             CheckPolice(sample);
         }
+
+        // The passenger's promise is watched on the same paid leg, one sample
+        // per poll. A broken promise is final, so the monitor is dropped after
+        // its first violation.
+        if (_job.Phase == JobPhase.EnRoute && _conditionMonitor is { } monitor)
+        {
+            RideViolation violation = monitor.Observe(
+                sample.SpeedKmh, sample.Rpm, sample.Gas, sample.Brake, sample.SteerRad);
+            if (violation != RideViolation.None)
+            {
+                BreakCondition(monitor, violation, sample);
+            }
+        }
     }
 
     // ACCEPT only commits the proposal: the customer is not aboard yet, so
@@ -181,7 +197,10 @@ public sealed class TaxiJobFlow
         _job.FinedPatrolIds.Clear();
         _job.WarnedPatrolIds.Clear();
         _job.SpeedChallengeDeadline = null;
+        _job.RequestDeadline = null;
+        _job.ConditionsMet = true;
         _speedChallengeArmed = false;
+        _conditionMonitor = null;
         _pendingRequest = null;
         _meter.Reset();
         ShowPickupGuidance();
@@ -324,7 +343,10 @@ public sealed class TaxiJobFlow
         _job.FinedPatrolIds.Clear();
         _job.WarnedPatrolIds.Clear();
         _job.SpeedChallengeDeadline = null;
+        _job.RequestDeadline = null;
+        _job.ConditionsMet = true;
         _speedChallengeArmed = false;
+        _conditionMonitor = null;
         _pendingRequest = null;
         _requestScreen = null;
         _hud?.ClearRequest();
@@ -344,6 +366,7 @@ public sealed class TaxiJobFlow
         _job.QuizAnsweredCorrectly = outcome.QuizAnsweredCorrectly;
         _job.SpeedChallengeAgreed = outcome.SpeedChallengeAgreed;
         ApplyQuizRating(outcome);
+        ApplyRequestConditions(outcome);
 
         if (outcome.SpeedChallengeAgreed)
         {
@@ -367,6 +390,91 @@ public sealed class TaxiJobFlow
             $"quiz={outcome.QuizAnsweredCorrectly} speed={outcome.SpeedChallengeAgreed}");
         _host.RefreshJob();
     }
+
+    // An accepted passive ask arms what it promised: a delivery deadline (the
+    // speed challenge's own estimate, but no patrols and no cornering award) or
+    // the live limits the paid leg is watched for. A declined ask, or one that
+    // only promises a tip, leaves the ride alone.
+    private void ApplyRequestConditions(CustomerRequestOutcome outcome)
+    {
+        if (_job.Request is not
+            {
+                Kind: CustomerRequestKind.Passive,
+                Condition: { } condition,
+            }
+            || !outcome.Answered || !outcome.TipEligible)
+        {
+            return;
+        }
+
+        if (condition.Deadline)
+        {
+            TimeSpan? allowance = EstimateAllowance();
+            _job.RequestDeadline = allowance is { } span
+                ? _clock.UtcNow + span
+                : null;
+            _log.LogInfo(allowance is { } estimated
+                ? $"request deadline: {estimated.TotalSeconds:0}s " +
+                  $"({SpeedChallengeRouteMeters() / 1000.0:0.00} km)"
+                : "request has no deadline: route unavailable");
+        }
+
+        if (condition.HasLiveLimits)
+        {
+            _conditionMonitor = new RideConditionMonitor(condition, _requestTable.MonitorRules);
+            _log.LogInfo(
+                $"request limits armed for {_job.Customer.BaseName}: " +
+                $"{DescribeLimits(condition)}");
+        }
+    }
+
+    // The armed limits in one log line, so a test drive can tell why a tip
+    // vanished without reading the JSON back.
+    private static string DescribeLimits(RideCondition condition)
+    {
+        List<string> parts = [];
+        if (condition.BrakeBrusque) parts.Add("brakes");
+        if (condition.ThrottleBrusque) parts.Add("throttle");
+        if (condition.SteeringBrusque) parts.Add("steering");
+        if (condition.MinRpm is { } min) parts.Add($"revs>={min}");
+        if (condition.MaxRpm is { } max) parts.Add($"revs<={max}");
+        if (condition.MaxSpeedKmh is { } speed) parts.Add($"speed<={speed:0}");
+        return string.Join(", ", parts);
+    }
+
+    // The first broken promise costs the tip for good: drop the monitor, paint
+    // the reason once and log the reading that tripped it.
+    private void BreakCondition(
+        RideConditionMonitor monitor, RideViolation violation, TelemetrySample sample)
+    {
+        _conditionMonitor = null;
+        _job.ConditionsMet = false;
+        _hud?.ShowNotice(
+            ConditionNotice(violation, monitor.Condition),
+            TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
+        _log.LogInfo(
+            $"customer request broken: {violation} " +
+            $"(speed {sample.SpeedKmh:0} km/h, revs {sample.Rpm}, " +
+            $"gas {sample.Gas:0.00}, brake {sample.Brake:0.00}, " +
+            $"steer {sample.SteerRad:0.00} rad)");
+    }
+
+    // The one-line reason under the HUD banner. The passenger's own limit is
+    // formatted into the copy, so "under 90" names the number the ride missed.
+    private static string ConditionNotice(RideViolation violation, RideCondition condition) =>
+        violation switch
+        {
+            RideViolation.Brake => Strings.Get("HudPromiseBrake"),
+            RideViolation.Throttle => Strings.Get("HudPromiseThrottle"),
+            RideViolation.Steering => Strings.Get("HudPromiseSteering"),
+            RideViolation.RevsTooLow =>
+                Strings.Format("HudPromiseRevsLow", condition.MinRpm ?? 0),
+            RideViolation.RevsTooHigh =>
+                Strings.Format("HudPromiseRevsHigh", condition.MaxRpm ?? 0),
+            RideViolation.Speed =>
+                Strings.Format("HudPromiseSpeed", condition.MaxSpeedKmh ?? 0.0),
+            _ => string.Empty,
+        };
 
     // The quiz asks about the car in the garage, like Unity's playerCar: the
     // catalogue row behind the current key, never a copy taken at purchase.
@@ -400,12 +508,7 @@ public sealed class TaxiJobFlow
     // patrol planner already use, so no routing service is needed.
     private void BeginSpeedChallenge()
     {
-        double routeMeters = SpeedChallengeRouteMeters();
-        CarSpec? timedCar = _fleet.XpCar()
-            ?? _carBrands.CurrentIdentity?.FindIn(_cars)
-            ?? CurrentCarSpec();
-        TimeSpan? allowance = SpeedChallengeTimer.Estimate(
-            routeMeters, timedCar?.TopSpeedKmh ?? 0, _taxiRules.SpeedChallenge);
+        TimeSpan? allowance = EstimateAllowance();
         _job.SpeedChallengeDeadline = allowance is { } span
             ? _clock.UtcNow + span
             : null;
@@ -414,10 +517,22 @@ public sealed class TaxiJobFlow
         ArmSpeedChallenge();
         _log.LogInfo(allowance is { } estimated
             ? $"speed challenge deadline: {estimated.TotalSeconds:0}s " +
-              $"({routeMeters / 1000.0:0.00} km, " +
-              $"{timedCar?.TopSpeedKmh ?? 0} km/h top)"
+              $"({SpeedChallengeRouteMeters() / 1000.0:0.00} km, " +
+              $"{TimedCar()?.TopSpeedKmh ?? 0} km/h top)"
             : "speed challenge has no deadline: route unavailable");
     }
+
+    // One estimate serves both timed asks: the challenge and a passenger's
+    // hurry are the same promise, only the consequence differs.
+    private TimeSpan? EstimateAllowance() =>
+        SpeedChallengeTimer.Estimate(
+            SpeedChallengeRouteMeters(), TimedCar()?.TopSpeedKmh ?? 0,
+            _taxiRules.SpeedChallenge);
+
+    private CarSpec? TimedCar() =>
+        _fleet.XpCar()
+        ?? _carBrands.CurrentIdentity?.FindIn(_cars)
+        ?? CurrentCarSpec();
 
     private double SpeedChallengeRouteMeters() =>
         _job.PickupAddress is { } pickup && _job.DropoffAddress is { } dropoff
@@ -518,17 +633,21 @@ public sealed class TaxiJobFlow
         _hud?.SetJobGuidance(Guidance(
             _job.Customer.BaseName, _job.DropoffAddress,
             "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction",
-            _job.SpeedChallengeDeadline));
+            _job.SpeedChallengeDeadline ?? _job.RequestDeadline,
+            _job.SpeedChallengeDeadline is not null
+                ? "HudSpeedChallengeLeft"
+                : "HudHurryLeft"));
 
     // A proposal generated on a map that cannot supply two doors has no
     // structured address; the HUD then has nothing to route to and stays
     // unpinned rather than showing a wrong street.
     private HudJobGuidance? Guidance(
         string name, AddressLocation? target, string driveKey,
-        string arrivedKey, string actionKey, DateTime? speedDeadline = null) =>
+        string arrivedKey, string actionKey, DateTime? deadline = null,
+        string deadlineKey = "HudSpeedChallengeLeft") =>
         target is { } door
             ? new HudJobGuidance(
                 name, door, driveKey, arrivedKey, actionKey,
-                _taxiRules.ArrivalRadiusMeters, speedDeadline)
+                _taxiRules.ArrivalRadiusMeters, deadline, deadlineKey)
             : null;
 }

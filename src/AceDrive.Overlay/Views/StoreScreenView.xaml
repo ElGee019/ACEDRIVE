@@ -163,10 +163,20 @@
                        FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
                        Margin="0,6,0,0"
                        Visibility="{Binding FriendshipVisible, Converter={StaticResource BoolToVis}}"/>
-            <TextBlock Text="{Binding BoughtText}" Foreground="#FF97EAD2"
-                       FontSize="12" TextWrapping="Wrap" TextAlignment="Center"
-                       Margin="0,4,0,0"
-                       Visibility="{Binding BoughtVisible, Converter={StaticResource BoolToVis}}"/>
+            <!-- The till receipt: every purchase of this visit stays on the
+                 page as its own line, so a second buy never overwrites the
+                 first. Only leaving the store drops it, because the page is
+                 rebuilt per visit. -->
+            <ItemsControl ItemsSource="{Binding BoughtLines}"
+                          Visibility="{Binding BoughtVisible, Converter={StaticResource BoolToVis}}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}" Foreground="#FF97EAD2"
+                                   FontSize="12" TextWrapping="Wrap"
+                                   TextAlignment="Center" Margin="0,4,0,0"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </StackPanel>
 
         <StackPanel Grid.Row="2">

@@ -11,6 +11,9 @@ public sealed class JsonGameClockStore : IGameClockStore
 {
     private readonly string _file;
     private readonly ILog _log;
+    private readonly object _gate = new();
+    private GameClockState? _current;
+    private bool _loaded;
 
     public JsonGameClockStore(ILog log)
         : this(DataPaths.UserSave("gameclock.json"), log)
@@ -22,7 +25,22 @@ public sealed class JsonGameClockStore : IGameClockStore
         _log = log;
     }
 
+    // Read once, then cached: both WorldTicks and DayCycle ask for the moment,
+    // and the save rewrites it every few minutes, so a read per ask would put
+    // the file on paths that should never touch the disk (AGENTS.md:
+    // cache-first, no disk on the hot path).
     public GameClockState? Load()
+    {
+        lock (_gate)
+        {
+            if (_loaded) return _current;
+            _loaded = true;
+            _current = Read();
+            return _current;
+        }
+    }
+
+    private GameClockState? Read()
     {
         JsonReadStatus status = JsonFile.TryRead(_file, out GameClockState? state, out string? error);
         if (status == JsonReadStatus.Missing)
@@ -49,6 +67,14 @@ public sealed class JsonGameClockStore : IGameClockStore
         if (!JsonFile.TryWrite(_file, state, out string? error))
         {
             _log.LogWarning($"gameclock.json unwritable at {_file} ({error})");
+        }
+
+        // Invalidate on write, so the next Load is the moment just saved even
+        // though the write is what carries the durability.
+        lock (_gate)
+        {
+            _current = state;
+            _loaded = true;
         }
     }
 }

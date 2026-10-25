@@ -53,7 +53,14 @@
   <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
   <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Snelheidsuitdaging: {0}</value></data>
-  <data name="HudSpeedChallengeLate" xml:space="preserve"><value>TE LAAT — GEEN FOOI</value></data>
+  <data name="HudHurryLeft" xml:space="preserve"><value>Haast: {0}</value></data>
+  <data name="HudDeadlineLate" xml:space="preserve"><value>TE LAAT - GEEN FOOI</value></data>
+  <data name="HudPromiseBrake" xml:space="preserve"><value>GEEN FOOI - TE HARD REMMEN</value></data>
+  <data name="HudPromiseThrottle" xml:space="preserve"><value>GEEN FOOI - TE VEEL GAS</value></data>
+  <data name="HudPromiseSteering" xml:space="preserve"><value>GEEN FOOI - TE HARD STUREN</value></data>
+  <data name="HudPromiseRevsLow" xml:space="preserve"><value>GEEN FOOI - HOUD DE TOEREN BOVEN {0}</value></data>
+  <data name="HudPromiseRevsHigh" xml:space="preserve"><value>GEEN FOOI - HOUD DE TOEREN ONDER {0}</value></data>
+  <data name="HudPromiseSpeed" xml:space="preserve"><value>GEEN FOOI - HOUD HET ONDER {0:0} KM/U</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (nepklus)</value></data>
   <data name="NoJob" xml:space="preserve"><value>Geen klus. Druk op Nieuwe klus en rijd.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Voorgesteld: {0} → {1}. Druk op OPHALEN.</value></data>
@@ -93,11 +100,15 @@
   <data name="SettingsResetGame" xml:space="preserve"><value>SPEL RESETTEN</value></data>
   <data name="SettingsResetConfirm" xml:space="preserve"><value>ALLE VOORTGANG WISSEN</value></data>
   <data name="SettingsResetWarning" xml:space="preserve"><value>Dit wist je profiel, geld, auto's en alle voortgang. Je begint opnieuw bij de introductie.</value></data>
-  <data name="SettingsResetFailed" xml:space="preserve"><value>Het spel kon niet worden gereset. Sluit AceDrive en probeer het opnieuw.</value></data>
+  <data name="SettingsResetFailed" xml:space="preserve"><value>Het spel kon niet worden gereset. Er is niets verwijderd; probeer het opnieuw.</value></data>
+  <data name="SettingsResetFailedInUse" xml:space="preserve"><value>Het spel kon niet worden gereset: {0} is in gebruik door een ander programma. Sluit het en probeer het opnieuw.</value></data>
+  <data name="SettingsResetFailedDenied" xml:space="preserve"><value>Het spel kon niet worden gereset: Windows heeft het verwijderen van {0} geblokkeerd. AceDrive heeft geen schrijfrechten in zijn save-map — start het vanuit Verkenner of Visual Studio, niet vanuit een sandbox-shell.</value></data>
+  <data name="SettingsResetFailedRestart" xml:space="preserve"><value>De saves zijn verwijderd, maar AceDrive kon niet opnieuw starten. Sluit AceDrive en open het opnieuw.</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WAT IS JE FAVORIETE MERK</value></data>
-  <data name="GrandmaCarTitle" xml:space="preserve"><value>IN WELKE AUTO RIJDT OMA</value></data>
+  <data name="GrandmaCarTitle" xml:space="preserve"><value>240Z</value></data>
+  <data name="GrandmaCarInstruction" xml:space="preserve"><value>Om ACEDRIVE te kunnen spelen, stap over naar de 1971 Datsun 240Z.</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
-  <data name="PancakeTitle" xml:space="preserve"><value>PANNEKOEKEN EN EEN AMERIKAANSE AUTO</value></data>
+  <data name="PancakeTitle" xml:space="preserve"><value>PANNEKOEKEN</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>BUURTHUIS</value></data>
   <data name="MaxDialogueTitle" xml:space="preserve"><value>EEN NIEUWE WENDING</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>DOORGAAN</value></data>
@@ -107,8 +118,6 @@
   <data name="SpeakerMax" xml:space="preserve"><value>Max</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>SPRAAKBEDIENING</value></data>
   <data name="VoiceInfoIntro" xml:space="preserve"><value>Bedien de navigatie met je stem.</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Zeg "HEY {{BRAND}}" om de app te activeren. Bijvoorbeeld "HEY {0}".</value></data>
-  <data name="VoiceInfoHotkey" xml:space="preserve"><value>Je kunt ook CTRL+Shift+C indrukken.</value></data>
   <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Klik op "{0}" en kies "JOBS" om je eerste taxidienst te starten.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Spreek de tekst van een knop uit om op die knop te drukken.
 Bijvoorbeeld "{0}".</value></data>
@@ -117,7 +126,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>AUTOTRANSPORTKLUS</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>KLUSSEN</value></data>
-  <data name="ControlTodo" xml:space="preserve"><value>OMA'S TAKENLIJSTJE</value></data>
+  <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TAKENLIJST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>KOM TERUG OP {0} TUSSEN 8 EN 20 UUR</value></data>
   <data name="DaySun" xml:space="preserve"><value>Zondag</value></data>
@@ -135,15 +144,39 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DayShortFri" xml:space="preserve"><value>VRI</value></data>
   <data name="DayShortSat" xml:space="preserve"><value>ZAT</value></data>
   <data name="EventCentoMiglia" xml:space="preserve"><value>Cento Miglia</value></data>
+  <data name="CentoTitle" xml:space="preserve"><value>CENTO MIGLIA EVENTS</value></data>
+  <data name="CentoWeek" xml:space="preserve"><value>Week {0}, {1}</value></data>
+  <data name="CentoReputation" xml:space="preserve"><value>JOUW CLUBREPUTATIE: {0:0.00000}</value></data>
+  <data name="CentoTierRequirement" xml:space="preserve"><value>Vereist reputatieniveau {0}</value></data>
+  <data name="CentoFreeEntry" xml:space="preserve"><value>Clubreputatie: gratis toegang</value></data>
+  <data name="CentoEligibilityReputation" xml:space="preserve"><value>Clubreputatie: {0:0} / {1}</value></data>
+  <data name="CentoOwnsCar" xml:space="preserve"><value>Je bezit {0} auto</value></data>
+  <data name="CentoOwnsCars" xml:space="preserve"><value>Je bezit {0} auto's</value></data>
+  <data name="CentoCarClass" xml:space="preserve"><value>De autoklasse van je huidige auto: {0}</value></data>
+  <data name="CentoEnter" xml:space="preserve"><value>DEELNEMEN</value></data>
   <data name="EventValuation" xml:space="preserve"><value>Taxatie</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Wegtest</value></data>
   <data name="EventWilly" xml:space="preserve"><value>Waar is Willy</value></data>
   <data name="EventPancakes" xml:space="preserve"><value>Oma's pannenkoeken</value></data>
   <data name="NoEvent" xml:space="preserve"><value>Geen evenement</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Klik op Max' kruidenier, rijd erheen en ga de winkel binnen.</value></data>
+  <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Ga naar de KLUSSEN-pagina, kies BEZORGKLUS en open een carrière naar keuze.</value></data>
   <data name="TodoVisitBank" xml:space="preserve"><value>Ga naar de bank om een deel van je spaargeld op te nemen.</value></data>
   <data name="TodoTaxiJobs" xml:space="preserve"><value>Voltooi {0} taxiritten. (nu {1})</value></data>
   <data name="TodoEarnCr" xml:space="preserve"><value>Verdien in totaal {0} CR. (nu {1})</value></data>
+  <data name="TodoEarnXp" xml:space="preserve"><value>Verdien in totaal {0} XP. (nu {1:0.00})</value></data>
+  <data name="TodoBankStandings" xml:space="preserve"><value>Heb {0} CR op de bank. (nu {1:0.00})</value></data>
+  <data name="TodoDeliveryJobs" xml:space="preserve"><value>Voltooi {0} bezorgingen. (nu {1})</value></data>
+  <data name="TodoSetDestinations" xml:space="preserve"><value>Stel {0} keer handmatig een bestemming in. (nu {1})</value></data>
+  <data name="TodoOperatingZone" xml:space="preserve"><value>Bereik een werkgebied van {0} km. (nu {1:0.00})</value></data>
+  <data name="TodoOwnCars" xml:space="preserve"><value>Bezit {0} auto's. (nu {1})</value></data>
+  <data name="TodoEnterPoi" xml:space="preserve"><value>Ga naar binnen bij {0}.</value></data>
+  <data name="TodoVisitCarWash" xml:space="preserve"><value>Ga de wasstraat binnen.</value></data>
+  <data name="TodoVisitCarDealer" xml:space="preserve"><value>Ga de autodealer binnen.</value></data>
+  <data name="TodoVisitInsurance" xml:space="preserve"><value>Ga naar de verzekeringsmakelaar.</value></data>
+  <data name="TodoCompletedHeader" xml:space="preserve"><value>TAKEN VOLTOOID!</value></data>
+  <data name="TodoCarePackages" xml:space="preserve"><value>Elke voltooide taak zet de goedhartige Sonja ertoe aan een zorgpakket voor de wijk te regelen. Verzamel er 5 en bezorg ze bij het buurtcentrum voor een gegarandeerde beloning!</value></data>
+  <data name="TodoDeliver" xml:space="preserve"><value>ZORGPAKKETTEN BEZORGEN</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Vertrouwenspunten: {0}</value></data>
   <data name="DeliveryGrowthUp" xml:space="preserve"><value>Stadsgroei: ▲ +{0} / uur</value></data>
@@ -177,8 +210,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="HubOpenCareer" xml:space="preserve"><value>CARRIERE OPENEN</value></data>
   <data name="ProposalTitle" xml:space="preserve"><value>TAXIVOORSTEL</value></data>
   <data name="ProposalPhrase" xml:space="preserve"><value>{0}
-wil graag een rit
-van {1}
+wil graag een rit van {1}
 naar {2}
 
 Deze klus aannemen?</value></data>
@@ -187,8 +219,11 @@ Deze klus aannemen?</value></data>
   <data name="ProposalAddress" xml:space="preserve"><value>{0}, {1}</value></data>
   <data name="ProposalAddressA" xml:space="preserve"><value>Adres A</value></data>
   <data name="ProposalAddressB" xml:space="preserve"><value>Adres B</value></data>
-  <data name="ProposalLegHome" xml:space="preserve"><value>thuis, {0}</value></data>
-  <data name="ProposalLegResidence" xml:space="preserve"><value>het huis van de familie {0}, {1}</value></data>
+  <data name="ProposalDoorHome" xml:space="preserve"><value>thuis</value></data>
+  <data name="ProposalDoorResidence" xml:space="preserve"><value>het huis van de familie {0}</value></data>
+  <data name="ProposalPickupLeg" xml:space="preserve"><value>{0},
+{1}</value></data>
+  <data name="ProposalDropoffLeg" xml:space="preserve"><value>{0}, {1}</value></data>
   <data name="ProposalRadiusHint" xml:space="preserve"><value>Beperk hoe ver je van oma's huis vandaan taxi's wilt aannemen door hieronder een straal in te voeren.</value></data>
   <data name="RequestTitle" xml:space="preserve"><value>KLANTVERZOEK</value></data>
   <data name="RequestTime" xml:space="preserve"><value>RESTERENDE TIJD: {0}s</value></data>
@@ -208,7 +243,7 @@ Deze klus aannemen?</value></data>
   <data name="QuizUnitFuel" xml:space="preserve"><value>{0:0.#} L/100km</value></data>
   <data name="QuizUnitEuro" xml:space="preserve"><value>€{0:0}</value></data>
   <data name="ReceiptTitle" xml:space="preserve"><value>TAXIBON</value></data>
-  <data name="ReceiptDistance" xml:space="preserve"><value>Afstand: {0:0.0} km</value></data>
+  <data name="ReceiptDistance" xml:space="preserve"><value>Ritafstand: {0:0.0} km</value></data>
   <data name="ReceiptCustomer" xml:space="preserve"><value>Klanten: {0}. {1}</value></data>
   <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km</value></data>
   <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km</value></data>
@@ -231,8 +266,8 @@ Deze klus aannemen?</value></data>
   <data name="ReceiptRarityCommon" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de {1} meest gebruikte auto in het spel.</value></data>
   <data name="ReceiptRarityLeast" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de minst gereden auto in het spel.</value></data>
   <data name="ReceiptRarityRare" xml:space="preserve"><value>Je auto is door alle spelers samen {0} km gereden en is de {1} minst gereden auto in het spel.</value></data>
-  <data name="ReceiptStandings" xml:space="preserve"><value>Je wereldstandaard voor XP is {0} van {1}.</value></data>
-  <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Je wereldstandaard voor XP is —/—.</value></data>
+  <data name="ReceiptStandings" xml:space="preserve"><value>Je wereldwijde XP-rang is {0} van {1}.</value></data>
+  <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Je wereldwijde XP-rang is —/—.</value></data>
   <data name="ReceiptStandingsGainedOne" xml:space="preserve"><value>Je bent 1 plek gestegen.</value></data>
   <data name="ReceiptStandingsGained" xml:space="preserve"><value>Je bent {0} plekken gestegen.</value></data>
   <data name="ReceiptStandingsLostOne" xml:space="preserve"><value>Je bent 1 plek gezakt.</value></data>
@@ -246,8 +281,8 @@ Deze klus aannemen?</value></data>
   <data name="ShiftEndedLongest" xml:space="preserve"><value>Langste dienst: {0} ritten</value></data>
   <data name="ShiftEndedBest" xml:space="preserve"><value>Hoogste verdiensten: €{0:0.00}</value></data>
   <data name="ShiftEndedTotal" xml:space="preserve"><value>Totaal afgeronde diensten: {0}</value></data>
-  <data name="ShiftEndedStandings" xml:space="preserve"><value>Je wereldstandaard voor diensten is {0} van {1}.</value></data>
-  <data name="ShiftEndedStandingsUnknown" xml:space="preserve"><value>Je wereldstandaard voor diensten is —/—.</value></data>
+  <data name="ShiftEndedStandings" xml:space="preserve"><value>Je wereldwijde rang in dienstinkomsten is {0} van {1}.</value></data>
+  <data name="ShiftEndedStandingsUnknown" xml:space="preserve"><value>Je wereldwijde rang in dienstinkomsten is —/—.</value></data>
   <data name="BankTitle" xml:space="preserve"><value>BANK</value></data>
   <data name="BankSaldo" xml:space="preserve"><value>Huidige banksaldo: CR{0:0.00}</value></data>
   <data name="BankAfter" xml:space="preserve"><value>Saldo na opname: CR{0:0.00}</value></data>
@@ -448,5 +483,12 @@ Deze klus aannemen?</value></data>
   <!-- Menu-metertegels (PORTPLAN 26/33): een tik wisselt de getekende accu
        voor de stand. {0} is een heel percentage; het teken staat direct op
        het getal, zoals op de getekende labels. -->
+  <!-- Spraakherinnering op het menu (verplaatst van de spraakpagina): de twee
+       manieren om het paneel terug te roepen, in de lege strook boven de klok.
+       {0} is het merk waar de microfoon naar luistert, in hoofdletters;
+       {{BRAND}} blijft een letterlijk token zodat de speler het patroon ziet,
+       niet één auto. -->
+  <data name="MenuVoiceWake" xml:space="preserve"><value>Zeg "Hey {{BRAND}}" om dit scherm tijdens het rijden op te roepen. Bijvoorbeeld "Hey {0}".</value></data>
+  <data name="MenuVoiceHotkey" xml:space="preserve"><value>Je kunt ook CTRL+Shift+C indrukken.</value></data>
   <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
 </root>

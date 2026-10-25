@@ -30,14 +30,21 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 ## Career Start — full onboarding flow
 1. Screen 1 above (name + home address) → create PlayerData.home, seed zone/discovery.
 2. Favorite brand (single-select from 26 in-build brands: Abarth, Alfa Romeo, Alpine, Audi, BMW, Caterham, Chevrolet, Dallara, Datsun, Ferrari, Ford, Honda, Hyundai, KTM, Lamborghini, Lancia, Lotus, Maserati, Mazda, Mercedes, Mini, Peugeot, Porsche, Renault, Toyota, Volkswagen). Drives BrandLoyalty (35).
-3. Grandma's car (choose 1 of 3, free starter): Mazda MX-5 NA (~€12k, 1 pax), Abarth 695 Biposto (~€35k, 1 pax), Datsun 240Z (~€35k, 1 pax). Sets first OwnedCar + odometer 0.
-4. Birthday dialogue (gift handover, tutorial tone, leads into Grandma ToDo (46)).
+3. Grandma's car — the walk's closing page, opened after the birthday dialogue: one car, the 1971 Datsun 240Z (`ks_datsun_240z_fairlady`, free starter). The page shows the car's render with the instruction under it and one CONTINUE; confirming it sets the first OwnedCar + odometer 0 and drops the panel onto the mini window with the errand pinned.
+4. Birthday dialogue (gift handover, tutorial tone, leads into Grandma ToDo (46)). Its last line sends the player out for maple syrup; page 3 follows and its CONTINUE closes the panel onto the HUD.
 5. Max's grocery store job (first guided delivery: hub intro → Model A fixed-fee (16) → receipt). Unlocks free roam jobs board.
 
 ## Status legend
 - [ ] PENDING — not yet asked / decided
 - [x] CONFIRMED — port it
 - [-] DECLINED — skip
+
+## Working rules
+- CACHE-FIRST (see AGENTS.md › Caching): every confirmed item below is built
+  cache-first — cache at the owner, invalidate on write, no disk on the hot
+  path, bounded, lazy. A ported feature that re-reads a file, re-parses a table
+  or rebuilds a page it already built is not done. New caches get a row in
+  ARCHITECTURE.md §7a.
 
 ## 1. Core driving
 - [-] 01 FixedUpdate physics loop — DECLINED (ACEVO has own driving model)
@@ -95,10 +102,10 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 - [x] 43 Dual-track XP/CredP + taxi/delivery levels + club rep — CONFIRMED
 - [x] 44 Attentive-Driver score — CONFIRMED
 - [x] 45 Friendship/relationship + street-knowledge XP — CONFIRMED
-- [x] 46 Grandma ToDo tutorial quests (7 subjects) — CONFIRMED
+- [x] 46 Grandma ToDo tutorial quests (7 subjects) — CONFIRMED (landed: the 14-subject career ledger (Unity's 13 plus a gated follow-up, Open Delivery Career, revealed once the Max grocery tip completes) — Unity's four rotating slots, the six-job turn counter, the completion latch with TO JOBS, threshold curves and its own todos_state.json; two Unity subjects stay out by decision: ClubReputation waits on the Mille Miglia (49), VisitFuelStation on the declined fuel sim (37). The care-package grant and reward cards are the next slice)
 - [x] 47 Daily streak + consecutive-day + starter bonus — CONFIRMED (starter bonus on the taxi receipt; delivery pending)
 - [x] 48 Bank savings + interest — CONFIRMED
-- [x] 49 Competitive events (Mille/Cento Miglia, Road-Test, Valuation, Star of Show) — CONFIRMED (road-test pick is sticky: one car until its test is driven, kept across overlay sessions)
+- [x] 49 Competitive events (Mille/Cento Miglia, Road-Test, Valuation, Star of Show) — CONFIRMED (road-test pick is sticky: one car until its test is driven, kept across overlay sessions; the Cento Miglia page landed — Sunday's calendar row opens the eight club tiers with their reputation gates and the pick's detail panel, from Data/cento_miglia.json; the race itself — route, NPC field, finish, Star of the Show receipt — and the club reputation it pays out are the next slice, so ENTER closes the page)
 
 ## 7. Time / World sim
 - [x] 50 Game clock (16x) + calendar — CONFIRMED (start from Kunos clock + add calendar)

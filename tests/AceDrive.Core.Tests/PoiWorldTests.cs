@@ -52,7 +52,7 @@ public sealed class PoiWorldTests
         var saver = TestSaveState.Saver(clock, wallet, garage);
         var shops = new ShopInteriors(
             wallet, garage, new GameClock(clock, clock.UtcNow), InsuranceRules.Default,
-            cars, saver, beat, logger);
+            cars, saver, new VisitLedger(), beat, logger);
         var onboarding = new FakeOnboardingStore();
         if (progress is not null)
         {

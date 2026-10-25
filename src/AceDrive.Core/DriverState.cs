@@ -33,7 +33,15 @@ namespace AceDrive.Core;
 /// fresh-driver profile instead of three zeros.
 /// The lifetime settled-job total (Unity PlayerData.jobsCompleted) gates the
 /// dealer and mechanic POIs; it is separate from the zone's expansion counter,
-/// which resets on every expansion.</summary>
+/// which resets on every expansion.
+/// The ToDo career readings (PORTPLAN 46) ride here too: the lifetime CR
+/// earned, the per-kind settled job totals, the manual destination pins and
+/// the one-time business visits. Unity keeps them on PlayerData; the driver
+/// file is this port's PlayerData.
+/// The Gentlemen Drivers Club reputation (PORTPLAN 49, Unity
+/// PlayerData.clubReputation) starts at Unity's raw 0 — the Cento Miglia page
+/// prints it with Unity's 1.0 floor — and only a finished Cento Miglia moves
+/// it, so the race port owns the writes while the page already reads it.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -60,7 +68,15 @@ public sealed record DriverState(
     double Cornering = DriverRating.NewGameOverall,
     double Concentration = DriverRating.NewGameOverall,
     double OffTheLine = DriverRating.NewGameOverall,
-    int JobsCompleted = 0)
+    int JobsCompleted = 0,
+    double CreditEarned = 0.0,
+    int TaxiJobsCompleted = 0,
+    int DeliveryJobsCompleted = 0,
+    int ManuallySetDestinations = 0,
+    bool VisitedCarWash = false,
+    bool VisitedCarDealer = false,
+    bool VisitedInsurance = false,
+    double ClubReputation = 0.0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

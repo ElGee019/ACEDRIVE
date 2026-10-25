@@ -19,6 +19,15 @@ public sealed class StoreScreenViewModelTests
         new AddressLocation("Street 1", 7, HouseSide.Right),
         PoiTypes.Grocery, "Max Silvestri", "groceries");
 
+    private static readonly string[] MapleReceipt =
+        ["You have bought 1 x MAPLE SYRUP"];
+
+    private static readonly string[] FullReceipt =
+    [
+        "You have bought 1 x MAPLE SYRUP",
+        "You have bought 1 x BANANA",
+    ];
+
     private static (
         StoreScreenViewModel Vm, StoreInventory Inventory, DriverWallet Wallet,
         Trunk Trunk, FakeFriendshipStore Friends, List<string> Events)
@@ -63,6 +72,27 @@ public sealed class StoreScreenViewModelTests
         Assert.Equal("", vm.SelectionText);
         Assert.False(vm.BuyVisible);
         Assert.False(vm.BuyCommand.CanExecute(null));
+        Assert.Empty(vm.BoughtLines);
+        Assert.False(vm.BoughtVisible);
+    }
+
+    [Fact]
+    public void Buy_KeepsEveryPurchaseOnTheReceiptUntilTheVisitEnds()
+    {
+        var (vm, _, _, _, _, _) = Create();
+
+        Row(vm, "MAPLE SYRUP").SelectCommand.Execute(null);
+        vm.BuyCommand.Execute(null);
+
+        // Picking the next item must not wipe what was already paid for.
+        Row(vm, "BANANA").SelectCommand.Execute(null);
+        Assert.Equal(MapleReceipt, vm.BoughtLines);
+        Assert.True(vm.BoughtVisible);
+
+        vm.BuyCommand.Execute(null);
+
+        Assert.Equal(FullReceipt, vm.BoughtLines);
+        Assert.True(vm.BoughtVisible);
     }
 
     [Fact]
@@ -116,7 +146,7 @@ public sealed class StoreScreenViewModelTests
         Assert.Equal(0.4, trunk.UsedLitres, 6);
         Assert.Equal("Your Cash: 954.01CR", vm.CashLine);
         Assert.Equal("\"Anything else?\"", vm.Greeting);
-        Assert.Equal("You have bought 1 x MAPLE SYRUP", vm.BoughtText);
+        Assert.Equal(MapleReceipt, vm.BoughtLines);
         Assert.True(vm.BoughtVisible);
         Assert.Equal(1, friends.GetLevel("Max Silvestri"));
         Assert.Equal(

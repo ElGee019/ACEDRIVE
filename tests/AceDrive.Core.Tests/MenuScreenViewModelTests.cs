@@ -24,6 +24,10 @@ public sealed class MenuScreenViewModelTests
         "HUNGER", "FILTH", "SETTINGS",
     ];
 
+    // The wake reminder names this brand. Mixed case on purpose: the line
+    // shows it in caps, the way the voice page drew it.
+    private const string MazdaBrand = "Mazda";
+
     [Fact]
     public void VoiceActions_ExposeEveryTile()
     {
@@ -181,6 +185,7 @@ public sealed class MenuScreenViewModelTests
             new RelayCommand(() => { }),
             new RelayCommand(() => { }),
             new Hunger(HungerRules.Default), new Garage([]),
+            () => MazdaBrand,
             new VoiceBeat(clock),
             new GameClock(clock, clock.UtcNow),
             clock,
@@ -197,6 +202,43 @@ public sealed class MenuScreenViewModelTests
 
         vm.DisplayWeek = 4;
         Assert.Equal("MON / WEEK 4", vm.DayWeekText);
+    }
+
+    [Fact]
+    public void WakeReminder_NamesTheBrandTheMicListensFor()
+    {
+        // The two ways to call the panel back moved off the closing voice page
+        // to the band above the clock: the pattern token, the current car and
+        // the hotkey line.
+        var (vm, _, _) = NewViewModel();
+
+        Assert.Contains("\"Hey {BRAND}\"", vm.VoiceWakeText, StringComparison.Ordinal);
+        Assert.Contains("\"Hey MAZDA\"", vm.VoiceWakeText, StringComparison.Ordinal);
+        Assert.Contains("CTRL+Shift+C", vm.VoiceHotkeyText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WakeReminder_RepaintsWhenTheDrivenCarChanges()
+    {
+        // The menu is cached for the session, so the poll has to notice a new
+        // car: the old brand must not linger above the clock.
+        string brand = MazdaBrand;
+        var (vm, _, _) = NewViewModel(brand: () => brand);
+
+        brand = "Ford";
+        vm.Refresh();
+
+        Assert.Contains("\"Hey FORD\"", vm.VoiceWakeText, StringComparison.Ordinal);
+        Assert.DoesNotContain("MAZDA", vm.VoiceWakeText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WakeReminder_StaysEmptyUntilABrandIsKnown()
+    {
+        // Before the watcher primes, the copy would name an empty car.
+        var (vm, _, _) = NewViewModel(brand: () => "");
+
+        Assert.Equal("", vm.VoiceWakeText);
     }
 
     [Fact]
@@ -404,7 +446,7 @@ public sealed class MenuScreenViewModelTests
     private static (MenuScreenViewModel Vm, FakeClock Clock, VoiceBeat Beat) NewViewModel(
         Action? wallet = null, Action? jobs = null, Action? calendar = null, Action? trunk = null,
         Action? settings = null, Action? home = null,
-        Hunger? hunger = null, Garage? garage = null)
+        Hunger? hunger = null, Garage? garage = null, Func<string>? brand = null)
     {
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
@@ -417,6 +459,7 @@ public sealed class MenuScreenViewModelTests
             new RelayCommand(home ?? (() => { })),
             hunger ?? new Hunger(HungerRules.Default),
             garage ?? new Garage([]),
+            brand ?? (() => MazdaBrand),
             beat,
             new GameClock(clock, clock.UtcNow),
             clock,

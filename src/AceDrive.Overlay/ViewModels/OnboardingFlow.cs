@@ -6,10 +6,10 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The introduction walk (PORTPLAN Career Start items 1-5 + item 54):
-/// preferences, opening screen, brand, grandma's car, voice info, birthday
-/// dialogue, and the errand it hands over. It owns the persisted progress and
-/// profile, so the pages talk to this flow through <see cref="IScreenController"/>
-/// instead of the whole shell.
+/// preferences, opening screen, brand, voice info, birthday dialogue, and the
+/// car page that closes it before the errand is handed over. It owns the
+/// persisted progress and profile, so the pages talk to this flow through
+/// <see cref="IScreenController"/> instead of the whole shell.
 /// </summary>
 public sealed class OnboardingFlow : IScreenController
 {
@@ -146,7 +146,7 @@ public sealed class OnboardingFlow : IScreenController
     /// <summary>The confirmed profile, or null before the opening screen.</summary>
     public PlayerProfile? Profile => _profile;
 
-    /// <summary>True once the birthday dialogue is done on disk.</summary>
+    /// <summary>True once the walk's closing car page is done on disk.</summary>
     public bool Done => _progress.IsComplete;
 
     /// <summary>
@@ -158,7 +158,7 @@ public sealed class OnboardingFlow : IScreenController
     public bool IntroInProgress => !_introClosed;
 
     /// <summary>
-    /// True from the birthday hand-over until the guided tour's last stop
+    /// True from the walk's closing hand-over until the guided tour's last stop
     /// (the community centre) is banked. The tour is still the introduction:
     /// the shell keeps the main panel closed and the HUD guides the drive.
     /// </summary>
@@ -166,21 +166,28 @@ public sealed class OnboardingFlow : IScreenController
 
     /// <summary>
     /// The walk page first paint opens on: the one the player closed the
-    /// overlay on, or the preferences page for a fresh install. Past the
-    /// birthday the caller opens the menu instead, so this only ever returns
-    /// an introduction page. The chain ends on the menu, so the walk is never
+    /// overlay on, or the preferences page for a fresh install. Past the walk
+    /// the caller opens the menu instead, so this only ever returns an
+    /// introduction page. The chain ends on the menu, so the walk is never
     /// a dead end. No new IScreenController verbs: each page
     /// takes its actions by constructor (composition over interface growth).
     /// </summary>
-    public object? StartPage() => ResumeStage() switch
+    public object? StartPage()
     {
-        OnboardingStage.Opening => OpeningPage(),
-        OnboardingStage.Brand => BrandPage(),
-        OnboardingStage.GrandmaCar => CarPage(),
-        OnboardingStage.VoiceInfo => VoiceIntroPage(),
-        OnboardingStage.Dialogue => BirthdayPage(),
-        _ => PreferencesPage(),
-    };
+        OnboardingStage stage = ResumeStage();
+        // One boot line that answers "did it resume or start over?" from the
+        // log alone: the page the app is about to paint is the save point.
+        _log.LogInfo($"introduction opens at {stage}");
+        return stage switch
+        {
+            OnboardingStage.Opening => OpeningPage(),
+            OnboardingStage.Brand => BrandPage(),
+            OnboardingStage.GrandmaCar => CarPage(),
+            OnboardingStage.VoiceInfo => VoiceIntroPage(),
+            OnboardingStage.Dialogue => BirthdayPage(),
+            _ => PreferencesPage(),
+        };
+    }
 
     /// <summary>
     /// Pins the tour leg a finished introduction hands over to, so a relaunch
@@ -212,9 +219,13 @@ public sealed class OnboardingFlow : IScreenController
             return _progress.Stage;
         }
 
+        // The errand address is only drawn while the birthday dialogue is
+        // built, so a save that carries one has already been past that page;
+        // the dialogue is then the closest honest resume point. A brand pick
+        // means the voice-info page is next, and the car pick is the walk's
+        // last step, so it never resumes anything.
         if (_progress.MaxStoreAddress is not null) return OnboardingStage.Dialogue;
-        if (_progress.GrandmaCarId is not null) return OnboardingStage.VoiceInfo;
-        if (_progress.FavoriteBrand is not null) return OnboardingStage.GrandmaCar;
+        if (_progress.FavoriteBrand is not null) return OnboardingStage.VoiceInfo;
         return _profile is not null ? OnboardingStage.Brand : OnboardingStage.Preferences;
     }
 
@@ -239,7 +250,8 @@ public sealed class OnboardingFlow : IScreenController
     /// optional reset action adds the settings page's destructive button; the
     /// first-run page passes none, so it never offers to wipe a career.
     /// </summary>
-    public PreferencesScreenViewModel CreateSettingsPage(Action done, Func<bool>? resetGame = null) =>
+    public PreferencesScreenViewModel CreateSettingsPage(
+        Action done, Func<GameResetFailure>? resetGame = null) =>
         new(_preferences, OnPreferencesChanged, done,
             SettingsDoneLabelKey, SettingsVoiceBackLabel, resetGame);
 
@@ -266,13 +278,24 @@ public sealed class OnboardingFlow : IScreenController
         return new BrandScreenViewModel(this, Content.Brands);
     }
 
-    private GrandmaCarScreenViewModel CarPage() => new GrandmaCarScreenViewModel(this, Content.Cars);
+    // One offer, not a picker: grandma_cars.json holds the single car the page
+    // is about, and a second entry would need the page to choose again. Missing
+    // content degrades like the brand page instead of dead-ending the walk.
+    private object? CarPage()
+    {
+        if (Content.Cars.Count == 0)
+        {
+            return _progress.IsComplete ? _host.ControlScreen() : null;
+        }
+
+        return new GrandmaCarScreenViewModel(this, Content.Cars[0]);
+    }
 
     private VoiceInfoScreenViewModel VoiceIntroPage() => new VoiceInfoScreenViewModel(
+        _beat, ShowDialogue,
         Strings.Get("VoiceInfoIntro"),
         Strings.Format("VoiceInfoButtons",
-            Strings.Get("DialogueContinue").ToUpperInvariant()),
-        _beat, ShowDialogue);
+            Strings.Get("DialogueContinue").ToUpperInvariant()));
 
     // Rebuilds the birthday conversation on its own: resuming a page must not
     // replay the voice-info acknowledgment log of the transition into it.
@@ -290,21 +313,17 @@ public sealed class OnboardingFlow : IScreenController
         _progress = _progress with
         {
             FavoriteBrand = brand,
-            Stage = OnboardingStage.GrandmaCar,
+            Stage = OnboardingStage.VoiceInfo,
         };
         _onboarding.Save(_progress);
         _log.LogInfo($"favorite brand: {brand}");
-        _host.ShowScreen(CarPage());
+        _host.ShowScreen(VoiceIntroPage());
     }
 
     public void ChooseCar(string carId)
     {
         if (!Content.Cars.Any(c => c.Id == carId)) return;
-        _progress = _progress with
-        {
-            GrandmaCarId = carId,
-            Stage = OnboardingStage.VoiceInfo,
-        };
+        _progress = _progress with { GrandmaCarId = carId };
         _onboarding.Save(_progress);
         // Unity GrandmaCarScreen: the pick IS the first OwnedCar (odometer 0,
         // no insurance) and the car driven from here on. Walking the
@@ -326,7 +345,25 @@ public sealed class OnboardingFlow : IScreenController
         {
             _saveGarage();
         }
-        _host.ShowScreen(VoiceIntroPage());
+        // The car page is the walk's last page: confirming the pick ends the
+        // introduction and drops the panel onto the mini window, which is
+        // already guiding to the errand grandma asked for.
+        CompleteWalk();
+    }
+
+    // The hand-over the birthday dialogue used to end on, now one page later:
+    // bank the birthday so the menu opens from here on, pin the errand on the
+    // companion and close the panel. The guided tour is still the introduction
+    // and is driven on the HUD (Max, the friends, pancakes, the centre).
+    private void CompleteWalk()
+    {
+        _progress = _progress with { BirthdayDone = true };
+        _onboarding.Save(_progress);
+        HandOverErrand();
+        _log.LogInfo("birthday done: grandma's car picked, main page unlocked");
+        _host.ShowScreen(_host.MenuScreen());
+        _hud?.Reveal();
+        _host.Hide();
     }
 
     public void ShowDialogue()
@@ -366,21 +403,21 @@ public sealed class OnboardingFlow : IScreenController
 
     public void FinishDialogue()
     {
-        _progress = _progress with { BirthdayDone = true };
-        _onboarding.Save(_progress);
-        // The HUD is the reminder of where to drive; pin the errand as the
-        // dialogue hands it over (PORTPLAN 5/24/27). A save that already
-        // carries the story item skips straight to the next phase.
-        HandOverErrand();
-        _log.LogInfo("birthday dialogue done: main page unlocked");
-        // The tour is still the introduction: the player drives Max's errand,
-        // the two friends, pancakes and the community centre on the HUD. Only
-        // the tour's own dialogues and interiors may open the panel before it
-        // ends, so the birthday hand-over closes it instead of leaving the
-        // menu up over the drive.
-        _host.ShowScreen(_host.MenuScreen());
-        _hud?.Reveal();
-        _host.Hide();
+        // Grandma's last line has just handed the errand over ("pick up some
+        // maple syrup"), so the car page follows it: the player only gets
+        // behind the wheel of her car once they know where they are driving to.
+        // Content with no car cannot paint that page, so the walk degrades to
+        // the hand-over instead of dead-ending on it.
+        if (Content.Cars.Count == 0)
+        {
+            _log.LogWarning("no grandma car in the data; skipping the closing page");
+            CompleteWalk();
+            return;
+        }
+
+        SaveStage(OnboardingStage.GrandmaCar);
+        _log.LogInfo("birthday dialogue done: showing grandma's car");
+        _host.ShowScreen(CarPage());
     }
 
     // Unity's PANCAKES! arrival at grandma's house: the first tour stop that
@@ -463,15 +500,13 @@ public sealed class OnboardingFlow : IScreenController
         _onboarding.Save(_progress);
         _poi = null;
         _hud?.SetDestination(null);
-        // First exit from the centre teaches how to call the panel back from
-        // the driver's seat: the wake word, plus the hotkey for a muted mic.
-        // CONTINUE then opens the main menu, the first time the panel appears
-        // on its own since the introduction started.
+        // First exit from the centre: CONTINUE then opens the main menu, the
+        // first time the panel appears on its own since the introduction
+        // started. The wake word and the hotkey reminder live above the menu's
+        // clock, so this closing page only names the next step.
         _host.ShowScreen(new VoiceInfoScreenViewModel(
-            Strings.Format("VoiceInfoWake", _carBrand().ToUpperInvariant()),
-            Strings.Get("VoiceInfoHotkey"),
             _beat, CloseCommunityCentrePage,
-            Strings.Format("VoiceInfoFirstJob",
+            hintText: Strings.Format("VoiceInfoFirstJob",
                 Strings.Get("DialogueContinue").ToUpperInvariant())));
         _log.LogInfo("community centre dialogue done: taxi license signed");
     }
@@ -545,6 +580,11 @@ public sealed class OnboardingFlow : IScreenController
             return;
         }
 
+        // The companion was guiding to this door and the player just walked
+        // in: its task text and ENTER step aside, whatever the arrival does
+        // (an interior, a dialogue, or a door with nothing to open).
+        _hud?.DestinationEntered();
+
         if (_storyArrivals.TryGetValue(poi.Type, out Action<PointOfInterest>? arrive))
         {
             arrive(poi);
@@ -581,6 +621,9 @@ public sealed class OnboardingFlow : IScreenController
             poi, new RelayCommand(() => LeavePoi(poi)), OnPoiChanged);
         _errandStockAtEntry = StockOf(poi);
         _log.LogInfo($"entered {poi.Name} at {AddressFormatter.Format(poi.Address)}");
+        // The page's constructor stamped the one-time visit flag (the bank's
+        // and the three business doors'); the ToDo list reads it here.
+        _host.PoiEntered();
         if (screen is not null)
         {
             _host.Present(screen);

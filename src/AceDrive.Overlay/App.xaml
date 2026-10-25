@@ -37,6 +37,16 @@
                 <TextBlock Grid.Column="1" Text="{Binding Amount}" Margin="10,0,0,0"/>
             </Grid>
         </DataTemplate>
+        <!-- Section hairline: the wallet's 1 px white rule between its account
+             rows and around its sections. Shared here so the receipt pages
+             separate their XP block and standings pair with the same weight
+             instead of copying the border declaration per page. Pages that
+             need a tighter line override the margin locally. -->
+        <Style x:Key="SectionDivider" TargetType="Border">
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="Margin" Value="0,12"/>
+        </Style>
         <!-- Page title band: one style so every page renders its title at the
              same height, no matter how the body below it is aligned. -->
         <Style x:Key="PageTitle" TargetType="TextBlock">
@@ -44,6 +54,15 @@
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+        <!-- Page body paragraph: the line under a page title. Second page needs
+             it, so it lives here instead of being inlined twice. -->
+        <Style x:Key="PageBody" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,0,0,6"/>
         </Style>
         <!-- Stock fill bar (delivery page rows): the platform default paints

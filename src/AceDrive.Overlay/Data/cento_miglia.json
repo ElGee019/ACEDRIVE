@@ -1,0 +1,50 @@
+[
+  {
+    "id": "gentlemen_drivers",
+    "label": "Gentlemen Drivers Club",
+    "description": "Free for all. Perfect place to start building your reputation.",
+    "reputationRequired": 1
+  },
+  {
+    "id": "era_event",
+    "label": "{0}s Era Only",
+    "description": "Exclusive event for vehicles from the same era. Prove your vintage vehicle is the best of its time.",
+    "reputationRequired": 2
+  },
+  {
+    "id": "event3",
+    "label": "Convertibles Club",
+    "description": "Description for Event 3",
+    "reputationRequired": 4
+  },
+  {
+    "id": "event4",
+    "label": "Country Club For All",
+    "description": "Description for Event 4",
+    "reputationRequired": 8
+  },
+  {
+    "id": "event5",
+    "label": "French or Italian",
+    "description": "Description for Event 5",
+    "reputationRequired": 16
+  },
+  {
+    "id": "event6",
+    "label": "Sports",
+    "description": "Description for Event 6",
+    "reputationRequired": 32
+  },
+  {
+    "id": "event7",
+    "label": "The Gran Tourer",
+    "description": "Description for Event 7",
+    "reputationRequired": 64
+  },
+  {
+    "id": "event8",
+    "label": "High Exlusives",
+    "description": "Description for Event 8",
+    "reputationRequired": 128
+  }
+]

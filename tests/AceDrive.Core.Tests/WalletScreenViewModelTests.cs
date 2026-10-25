@@ -51,11 +51,11 @@ public sealed class WalletScreenViewModelTests
         var rivals = new FakeRivals();
         var vm = NewViewModel(new DriverWallet(), rivals);
 
-        Assert.Equal("Your XP world standings is —/—.", vm.Leaderboard.Line);
+        Assert.Equal("Your Global XP Rank is —/—.", vm.Leaderboard.Line);
 
         rivals.Emit(new RivalsResult(7, 41, 3, 10, false));
 
-        Assert.Equal("Your XP world standings is 7th of 41.", vm.Leaderboard.Line);
+        Assert.Equal("Your Global XP Rank is 7th of 41.", vm.Leaderboard.Line);
         Assert.Equal("You gained 3 positions.", vm.Leaderboard.DeltaLine);
         Assert.True(vm.Leaderboard.Changed);
     }
@@ -73,7 +73,7 @@ public sealed class WalletScreenViewModelTests
 
         Assert.True(fired);
         // The page unhooked on the way out, so the leave-time line stays.
-        Assert.Equal("Your XP world standings is 7th of 41.", vm.Leaderboard.Line);
+        Assert.Equal("Your Global XP Rank is 7th of 41.", vm.Leaderboard.Line);
     }
 
     [Fact]

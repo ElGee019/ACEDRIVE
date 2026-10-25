@@ -41,7 +41,7 @@ public sealed class TaxiReceiptScreenTests
     public void Lines_ShowTheSettledRide()
     {
         var (vm, _, _) = Create();
-        Assert.Equal("Distance: 8.2 km", vm.DistanceLine);
+        Assert.Equal("Job distance: 8.2 km", vm.DistanceLine);
         Assert.Equal("Customers: 1. Solo Sohn", vm.CustomerLine);
         Assert.Equal(
             [new ReceiptLine("0.0–2.0 km @ €6.67/km: 2.0 km", "€13.34"),
@@ -217,7 +217,7 @@ public sealed class TaxiReceiptScreenTests
             Result = new RivalsResult(3, 24, 2, 5, false),
         };
         var (vm, _, _) = Create(rivals);
-        Assert.Equal("Your XP world standings is 3rd of 24.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is 3rd of 24.", vm.Standings.Line);
         Assert.Equal("You gained 2 positions.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
     }
@@ -227,7 +227,7 @@ public sealed class TaxiReceiptScreenTests
     {
         var (vm, _, rivals) = Create();
         rivals.Emit(new RivalsResult(4, 40, -1, 3, false));
-        Assert.Equal("Your XP world standings is 4th of 40.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is 4th of 40.", vm.Standings.Line);
         Assert.Equal("You lost 1 position.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
     }
@@ -238,7 +238,7 @@ public sealed class TaxiReceiptScreenTests
         var (vm, _, rivals) = Create();
         rivals.Emit(new RivalsResult(11, 57, 0, 11, false));
         // 11–13 keep the -th suffix; change 0 means no teal, no pulse.
-        Assert.Equal("Your XP world standings is 11th of 57.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is 11th of 57.", vm.Standings.Line);
         Assert.Equal("No change in standings.", vm.Standings.DeltaLine);
         Assert.False(vm.Standings.Changed);
         Assert.Equal(0, vm.Standings.PulseSignal);
@@ -282,12 +282,12 @@ public sealed class TaxiReceiptScreenTests
     {
         var (vm, _, rivals) = Create();
         // Unity's else-branch: —/— with an empty delta, no pulse.
-        Assert.Equal("Your XP world standings is —/—.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is —/—.", vm.Standings.Line);
         Assert.Equal(string.Empty, vm.Standings.DeltaLine);
         Assert.False(vm.Standings.Changed);
         Assert.Equal(0, vm.Standings.PulseSignal);
         rivals.Emit(new RivalsResult(1, 12, 11, 12, true));
-        Assert.Equal("Your XP world standings is 1st of 12.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is 1st of 12.", vm.Standings.Line);
         Assert.Equal("You gained 11 positions.", vm.Standings.DeltaLine);
         Assert.True(vm.Standings.Changed);
         Assert.Equal(1, vm.Standings.PulseSignal);
@@ -302,7 +302,7 @@ public sealed class TaxiReceiptScreenTests
         // Unity unhooks its rivals handler in Hide(); leaving the page must
         // not keep a dead receipt alive on the service event.
         rivals.Emit(new RivalsResult(2, 9, 3, 5, false));
-        Assert.Equal("Your XP world standings is —/—.", vm.Standings.Line);
+        Assert.Equal("Your Global XP Rank is —/—.", vm.Standings.Line);
     }
 
     [Fact]

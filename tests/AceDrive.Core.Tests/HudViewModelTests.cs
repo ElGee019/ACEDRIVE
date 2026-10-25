@@ -408,6 +408,67 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void EnteringTheDestination_HidesTheTaskTextAndEnterButton()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        Assert.True(vm.HasTaskText);
+
+        vm.DestinationEntered();
+
+        Assert.False(vm.HasTaskText);
+        Assert.False(vm.ShowEnterButton);
+        // The car is still parked where it was: the state is the entry, not
+        // a lost position.
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        Assert.False(vm.HasTaskText);
+        Assert.False(vm.ShowEnterButton);
+
+        // The hidden button cannot be clicked or spoken a second time.
+        bool raised = false;
+        vm.EnterRequested += (_, _) => raised = true;
+        vm.EnterCommand.Execute(null);
+        vm.RequestEnter();
+        Assert.False(raised);
+    }
+
+    [Fact]
+    public void LeavingTheEnteredDestination_BringsTheTaskTextBackForTheNextArrival()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        vm.DestinationEntered();
+
+        vm.Update(Sample(position: 0.5f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        Assert.True(vm.HasTaskText);
+        Assert.False(vm.ShowEnterButton);
+        Assert.Equal("Drive to Max's Grocery Store, Street 1 No. 17 in Brands", vm.DestinationText);
+
+        // Coming back to the same door is a fresh arrival: ENTER returns.
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        Assert.True(vm.ShowEnterButton);
+    }
+
+    [Fact]
+    public void PinningANewDestination_ShowsTheTaskTextAgain()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        vm.DestinationEntered();
+
+        vm.SetDestination(new PointOfInterest(
+            "max-grocery", "Max's Grocery Store",
+            new AddressLocation("Street 1", 1, HouseSide.Right)));
+
+        Assert.True(vm.HasTaskText);
+        Assert.Equal("Drive to Max's Grocery Store, Street 1 No. 1 in Brands", vm.DestinationText);
+    }
+
+    [Fact]
     public void EnterCommand_OnlyRaisesAtTheDestination()
     {
         var vm = Create();
@@ -471,10 +532,10 @@ public sealed class HudViewModelTests
 
     private static HudJobGuidance Job(
         string name = "Max", string street = "Street 1", int number = 17,
-        DateTime? speedDeadline = null) =>
+        DateTime? deadline = null, string deadlineKey = "HudSpeedChallengeLeft") =>
         new(name, new AddressLocation(street, number, HouseSide.Right),
             "HudJobPickupDrive", "HudJobPickupArrived", "HudJobPickupAction",
-            25.0, speedDeadline);
+            25.0, deadline, deadlineKey);
 
     private static PointOfInterest Friend() =>
         new(StoryFriends.Justin.Id, StoryFriends.Justin.Name,
@@ -639,6 +700,34 @@ public sealed class HudViewModelTests
         Assert.DoesNotContain("pick up", vm.EnterKeywords);
     }
 
+    // The car's microphone turns a clean "pick up" into one of these two-word
+    // fragments far more often than it lands the phrase, and each miss used to
+    // be dead air the player had to repeat (2026-10-21..25 logs). They stay
+    // pickup words, never drop-off words: the leg still owns its own table.
+    [Theory]
+    [InlineData("the gop")]  // 2026-10-25 09:54:27, 10-24 13:04:30
+    [InlineData("it up")]    // 2026-10-24 14:40:01, 10-25 19:52:09
+    [InlineData("the up")]   // 2026-10-25 19:36:23
+    [InlineData("the top")]  // 2026-10-25 19:52:07
+    [InlineData("he got")]   // 2026-10-25 19:46:08
+    [InlineData("you go")]   // 2026-10-23 19:42:13
+    [InlineData("the cup")]  // 2026-10-22 21:57:19
+    [InlineData("the good")] // 2026-10-23 21:47:21
+    [InlineData("the poop")] // 2026-10-22 22:26:42
+    public void JobGuidance_PickUpAnswersTheLoggedMishearings(string spoken)
+    {
+        var vm = Create();
+        vm.SetJobGuidance(Job());
+
+        Assert.Contains(spoken, vm.EnterKeywords);
+
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Max", new AddressLocation("Street 1", 17, HouseSide.Right),
+            "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction", 25.0));
+
+        Assert.DoesNotContain(spoken, vm.EnterKeywords);
+    }
+
     [Fact]
     public void DeliveryGuidance_HubAndStoreEachAnswerTheirOwnWords()
     {
@@ -793,30 +882,44 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
-    public void SpeedChallenge_CountsDownThenSaysLate()
+    public void Deadline_CountsDownThenSaysLate()
     {
         var clock = new FakeClock();
         var vm = Create(clock: clock);
         vm.SetJobGuidance(Job(
-            speedDeadline: clock.UtcNow.AddSeconds(90)));
+            deadline: clock.UtcNow.AddSeconds(90)));
 
-        Assert.True(vm.HasSpeedChallenge);
-        Assert.Equal("Speed challenge: 1:30", vm.SpeedChallengeText);
-        Assert.False(vm.SpeedChallengeLate);
+        Assert.True(vm.HasDeadline);
+        Assert.Equal("Speed challenge: 1:30", vm.DeadlineText);
+        Assert.False(vm.DeadlineLate);
 
         clock.Advance(TimeSpan.FromSeconds(30));
         vm.Update(Sample(position: 0.5f, speedKmh: 40f), 10.0, gameRunning: true);
-        Assert.Equal("Speed challenge: 1:00", vm.SpeedChallengeText);
+        Assert.Equal("Speed challenge: 1:00", vm.DeadlineText);
 
         clock.Advance(TimeSpan.FromSeconds(61));
         vm.Update(Sample(position: 0.5f, speedKmh: 40f), 10.0, gameRunning: true);
-        Assert.Equal(Strings.Get("HudSpeedChallengeLate"), vm.SpeedChallengeText);
-        Assert.True(vm.SpeedChallengeLate);
+        Assert.Equal(Strings.Get("HudDeadlineLate"), vm.DeadlineText);
+        Assert.True(vm.DeadlineLate);
 
         vm.SetJobGuidance(null);
-        Assert.False(vm.HasSpeedChallenge);
-        Assert.Equal(string.Empty, vm.SpeedChallengeText);
-        Assert.False(vm.SpeedChallengeLate);
+        Assert.False(vm.HasDeadline);
+        Assert.Equal(string.Empty, vm.DeadlineText);
+        Assert.False(vm.DeadlineLate);
+    }
+
+    [Fact]
+    public void Deadline_UsesTheGuidanceLabel_ForAPassengerHurry()
+    {
+        // The same clock counts a passenger's own hurry; the host picks the
+        // wording, the HUD only formats the remaining m:ss.
+        var clock = new FakeClock();
+        var vm = Create(clock: clock);
+        vm.SetJobGuidance(Job(
+            deadline: clock.UtcNow.AddSeconds(60), deadlineKey: "HudHurryLeft"));
+
+        Assert.True(vm.HasDeadline);
+        Assert.Equal("Hurry: 1:00", vm.DeadlineText);
     }
 
     [Fact]

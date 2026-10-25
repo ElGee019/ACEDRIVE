@@ -82,6 +82,21 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
+        <!-- The wake/hotkey reminder (moved off the closing voice page) wears
+             the header's subtitle face, Segoe UI Light, scaled to fit the empty
+             design band above the clock without reaching its digits. -->
+        <Style x:Key="VoiceHint" TargetType="TextBlock">
+            <Setter Property="FontFamily" Value="Segoe UI Light"/>
+            <Setter Property="FontSize" Value="34"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <!-- Block leading, tighter than the default: a longer translation
+                 may wrap the wake line, and three lines still have to clear
+                 the clock's digits under the band. -->
+            <Setter Property="LineHeight" Value="44"/>
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+        </Style>
     </UserControl.Resources>
     <!-- Home page skeleton: viewport-pinned MinHeight like every other page.
          The tile grid is placed with the ontwerpdesign.psd coordinates: the
@@ -117,9 +132,29 @@
              display week. Same width mapping as the tile grid below; the
              Viewbox inside the view keeps both bands on the design's
              proportions. -->
-        <views:GameClockView Grid.Row="0"
-                             ClockText="{Binding ClockText}"
-                             DayWeekText="{Binding DayWeekText}"/>
+        <Grid Grid.Row="0">
+            <views:GameClockView ClockText="{Binding ClockText}"
+                                 DayWeekText="{Binding DayWeekText}"/>
+            <!-- The reminder on how to call the panel back, in the design's
+                 empty band above the clock: flush under the white edge line
+                 and mapped through the same 1080 px Viewbox as the clock, so
+                 both scale together. The band's top edge is the page's top
+                 edge, and the scroll viewport cuts everything above it, so
+                 the block is pulled up into the leading of its own first line
+                 by -10 design px: that blank sliver is the last room between
+                 the glyphs and the edge line. A deeper pull would shave the
+                 caps off at the viewport edge. -->
+            <Viewbox Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
+                <Grid Width="1080" Height="942">
+                    <StackPanel Margin="60,-10,60,0" VerticalAlignment="Top">
+                        <TextBlock Style="{StaticResource VoiceHint}"
+                                   Text="{Binding VoiceWakeText}"/>
+                        <TextBlock Style="{StaticResource VoiceHint}"
+                                   Text="{Binding VoiceHotkeyText}"/>
+                    </StackPanel>
+                </Grid>
+            </Viewbox>
+        </Grid>
         <Viewbox Grid.Row="1" Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
             <Canvas Width="1080" Height="1077">
                 <Button Canvas.Left="105" Canvas.Top="0" Style="{StaticResource MenuTile}"

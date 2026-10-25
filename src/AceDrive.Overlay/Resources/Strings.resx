@@ -67,10 +67,21 @@
        the fine notice when a patrol catches the car over its limit. -->
   <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Speeding fine: €{0:0}</value></data>
-  <!-- Forced speed challenge (PORTPLAN 14): the delivery clock on the
-       companion, in the design's Tourney face. {0} is already m:ss. -->
+  <!-- Forced speed challenge (PORTPLAN 14) and a passenger's own hurry
+       (PORTPLAN 11): the delivery clock on the companion, in the design's
+       Tourney face. {0} is already m:ss. -->
   <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Speed challenge: {0}</value></data>
-  <data name="HudSpeedChallengeLate" xml:space="preserve"><value>TOO LATE — NO TIP</value></data>
+  <data name="HudHurryLeft" xml:space="preserve"><value>Hurry: {0}</value></data>
+  <data name="HudDeadlineLate" xml:space="preserve"><value>TOO LATE — NO TIP</value></data>
+  <!-- Passenger promises (PORTPLAN 11): the one-line reason a live limit
+       voided the tip, shown as a notice. The limits come from the request
+       data and are formatted in. -->
+  <data name="HudPromiseBrake" xml:space="preserve"><value>NO TIP — TOO HARSH ON THE BRAKES</value></data>
+  <data name="HudPromiseThrottle" xml:space="preserve"><value>NO TIP — TOO HARSH ON THE THROTTLE</value></data>
+  <data name="HudPromiseSteering" xml:space="preserve"><value>NO TIP — TOO HARSH ON THE WHEEL</value></data>
+  <data name="HudPromiseRevsLow" xml:space="preserve"><value>NO TIP — KEEP THE REVS OVER {0}</value></data>
+  <data name="HudPromiseRevsHigh" xml:space="preserve"><value>NO TIP — KEEP THE REVS UNDER {0}</value></data>
+  <data name="HudPromiseSpeed" xml:space="preserve"><value>NO TIP — KEEP IT UNDER {0:0} KM/H</value></data>
   <data name="TaxiHeader" xml:space="preserve"><value>TAXI (fake job)</value></data>
   <data name="NoJob" xml:space="preserve"><value>No job. Press New job, then drive.</value></data>
   <data name="JobProposed" xml:space="preserve"><value>Proposed: {0} → {1}. Press PICKUP.</value></data>
@@ -110,18 +121,22 @@
   <data name="SettingsResetGame" xml:space="preserve"><value>RESET GAME</value></data>
   <data name="SettingsResetConfirm" xml:space="preserve"><value>DELETE ALL PROGRESS</value></data>
   <data name="SettingsResetWarning" xml:space="preserve"><value>This deletes your profile, money, cars and every bit of progress. You start over from the introduction.</value></data>
-  <data name="SettingsResetFailed" xml:space="preserve"><value>Could not reset the game. Close AceDrive and try again.</value></data>
+  <data name="SettingsResetFailed" xml:space="preserve"><value>Could not reset the game. Nothing was deleted; try again.</value></data>
+  <data name="SettingsResetFailedInUse" xml:space="preserve"><value>Could not reset the game: {0} is open in another program. Close it and try again.</value></data>
+  <data name="SettingsResetFailedDenied" xml:space="preserve"><value>Could not reset the game: Windows blocked deleting {0}. AceDrive has no write access to its save folder — start it from Explorer or Visual Studio, not from a sandboxed shell.</value></data>
+  <data name="SettingsResetFailedRestart" xml:space="preserve"><value>The saves are deleted, but AceDrive could not start again. Close AceDrive and open it again.</value></data>
   <data name="BrandTitle" xml:space="preserve"><value>WHAT IS YOUR FAVORITE BRAND</value></data>
-  <data name="GrandmaCarTitle" xml:space="preserve"><value>WHAT CAR DOES GRANDMA DRIVE</value></data>
+  <data name="GrandmaCarTitle" xml:space="preserve"><value>240Z</value></data>
+  <!-- The one car the introduction asks for, named as the game's garage does:
+       the player has to sit in it before the overlay's jobs make sense. -->
+  <data name="GrandmaCarInstruction" xml:space="preserve"><value>To be able to play ACEDRIVE change into the 1971 Datsun 240Z.</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
-  <data name="PancakeTitle" xml:space="preserve"><value>PANCAKES AND AN AMERICAN CAR</value></data>
+  <data name="PancakeTitle" xml:space="preserve"><value>PANCAKES</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>COMMUNITY CENTRE</value></data>
   <data name="MaxDialogueTitle" xml:space="preserve"><value>A NEW TURN</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>
   <data name="VoiceInfoIntro" xml:space="preserve"><value>Control navigation with your voice.</value></data>
-  <data name="VoiceInfoWake" xml:space="preserve"><value>Say "HEY {{BRAND}}" to activate the app. For instance "HEY {0}".</value></data>
-  <data name="VoiceInfoHotkey" xml:space="preserve"><value>You can also press CTRL+Shift+C.</value></data>
   <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Click "{0}" and select "JOBS" to start your first taxi shift.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Say a button's text to click that button.
 For instance "{0}".</value></data>
@@ -136,7 +151,7 @@ For instance "{0}".</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>CAR HAULING JOB</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>JOBS</value></data>
-  <data name="ControlTodo" xml:space="preserve"><value>GRANDMA'S TO DO</value></data>
+  <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TODO LIST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>COME BACK ON {0} BETWEEN 8am AND 8pm</value></data>
   <data name="DaySun" xml:space="preserve"><value>Sunday</value></data>
@@ -154,15 +169,44 @@ For instance "{0}".</value></data>
   <data name="DayShortFri" xml:space="preserve"><value>FRI</value></data>
   <data name="DayShortSat" xml:space="preserve"><value>SAT</value></data>
   <data name="EventCentoMiglia" xml:space="preserve"><value>Cento Miglia</value></data>
+  <!-- Cento Miglia page (PORTPLAN 49, Unity CentoMigliaScreen). The tier
+       labels and descriptions are content and live in
+       Data/cento_miglia.json; these are the page's own lines. {1} in
+       CentoEligibilityReputation is the tier's required level, {0} the
+       driver's own - Unity prints both raw, rounded to whole numbers. -->
+  <data name="CentoTitle" xml:space="preserve"><value>CENTO MIGLIA EVENTS</value></data>
+  <data name="CentoWeek" xml:space="preserve"><value>Week {0}, {1}</value></data>
+  <data name="CentoReputation" xml:space="preserve"><value>YOUR CLUB REPUTATION: {0:0.00000}</value></data>
+  <data name="CentoTierRequirement" xml:space="preserve"><value>Requires Reputation Level {0}</value></data>
+  <data name="CentoFreeEntry" xml:space="preserve"><value>Club Reputation: Free entry</value></data>
+  <data name="CentoEligibilityReputation" xml:space="preserve"><value>Club Reputation: {0:0} / {1}</value></data>
+  <data name="CentoOwnsCar" xml:space="preserve"><value>You own {0} car</value></data>
+  <data name="CentoOwnsCars" xml:space="preserve"><value>You own {0} cars</value></data>
+  <data name="CentoCarClass" xml:space="preserve"><value>The car class of your current car: {0}</value></data>
+  <data name="CentoEnter" xml:space="preserve"><value>ENTER EVENT</value></data>
   <data name="EventValuation" xml:space="preserve"><value>Market valuation</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Road test</value></data>
   <data name="EventWilly" xml:space="preserve"><value>Where is Willy</value></data>
   <data name="EventPancakes" xml:space="preserve"><value>Grandma's pancakes</value></data>
   <data name="NoEvent" xml:space="preserve"><value>No event</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Click Max's Grocery Store, drive there and enter the store.</value></data>
+  <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Go to the JOBS page, select DELIVERY JOB and open a career of choice.</value></data>
   <data name="TodoVisitBank" xml:space="preserve"><value>Visit the bank to withdraw some of your savings.</value></data>
   <data name="TodoTaxiJobs" xml:space="preserve"><value>Complete {0} taxi jobs. (currently {1})</value></data>
   <data name="TodoEarnCr" xml:space="preserve"><value>Earn {0} CR in total. (currently {1})</value></data>
+  <data name="TodoEarnXp" xml:space="preserve"><value>Earn {0} XP in total. (currently {1:0.00})</value></data>
+  <data name="TodoBankStandings" xml:space="preserve"><value>Have {0} CR in the bank. (currently {1:0.00})</value></data>
+  <data name="TodoDeliveryJobs" xml:space="preserve"><value>Complete {0} delivery jobs. (currently {1})</value></data>
+  <data name="TodoSetDestinations" xml:space="preserve"><value>Set {0} destinations manually. (currently {1})</value></data>
+  <data name="TodoOperatingZone" xml:space="preserve"><value>Reach an operating zone of {0} km. (currently {1:0.00})</value></data>
+  <data name="TodoOwnCars" xml:space="preserve"><value>Own {0} cars. (currently {1})</value></data>
+  <data name="TodoEnterPoi" xml:space="preserve"><value>Enter {0}.</value></data>
+  <data name="TodoVisitCarWash" xml:space="preserve"><value>Enter the car wash.</value></data>
+  <data name="TodoVisitCarDealer" xml:space="preserve"><value>Enter the car dealer.</value></data>
+  <data name="TodoVisitInsurance" xml:space="preserve"><value>Enter the insurance broker.</value></data>
+  <data name="TodoCompletedHeader" xml:space="preserve"><value>TODOS COMPLETED!</value></data>
+  <data name="TodoCarePackages" xml:space="preserve"><value>Every completed Todo motivates kind-hearted Sonja to arrange a Care Kit for the neighborhood. Collect 5 and deliver to the Community Centre for a guaranteed reward!</value></data>
+  <data name="TodoDeliver" xml:space="preserve"><value>DELIVER CARE PACKAGES</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Credibility Points: {0}</value></data>
   <data name="DeliveryGrowthUp" xml:space="preserve"><value>City growth: ▲ +{0} / hr</value></data>
@@ -202,13 +246,14 @@ For instance "{0}".</value></data>
   <data name="HubOpenCareer" xml:space="preserve"><value>OPEN CAREER</value></data>
   <!-- Taxi job proposal page (PORTPLAN 11, Unity TaxiJobProposalScreen). The
        phrase carries Unity's line layout: {0} the drawn passenger identity,
-       {1} pickup, {2} drop-off. The legs use the address map's real houses
-       (street, number and city); Address A/B stay as the fallback when the
-       map cannot supply two streets. BACK reuses DeliveryBack. -->
+       {1} pickup, {2} drop-off. "need a ride from {1}" stays on one line so
+       the preposition never orphans above the door. The legs use the address
+       map's real houses (street, number and city); Address A/B stay as the
+       fallback when the map cannot supply two streets. BACK reuses
+       DeliveryBack. -->
   <data name="ProposalTitle" xml:space="preserve"><value>TAXI JOB PROPOSAL</value></data>
   <data name="ProposalPhrase" xml:space="preserve"><value>{0}
-need a ride
-from {1}
+need a ride from {1}
 to {2}
 
 Accept this job?</value></data>
@@ -221,10 +266,15 @@ Accept this job?</value></data>
   <data name="ProposalAddressA" xml:space="preserve"><value>Address A</value></data>
   <data name="ProposalAddressB" xml:space="preserve"><value>Address B</value></data>
   <!-- Leg descriptions, Unity TaxiJobGenerator's fromDescription/toDescription:
-       the customer's home reads "home, {address}", the other address is the
-       second resident's family home ("the {0} residence, {1}"). -->
-  <data name="ProposalLegHome" xml:space="preserve"><value>home, {0}</value></data>
-  <data name="ProposalLegResidence" xml:space="preserve"><value>the {0} residence, {1}</value></data>
+       the customer's home and the second resident's family home. The pickup
+       joins its door and address with a line break (the residence leg is long
+       and a wrapped street reads badly); the dropoff keeps the compact
+       "door, address" form. -->
+  <data name="ProposalDoorHome" xml:space="preserve"><value>home</value></data>
+  <data name="ProposalDoorResidence" xml:space="preserve"><value>the {0} residence</value></data>
+  <data name="ProposalPickupLeg" xml:space="preserve"><value>{0},
+{1}</value></data>
+  <data name="ProposalDropoffLeg" xml:space="preserve"><value>{0}, {1}</value></data>
   <data name="ProposalRadiusHint" xml:space="preserve"><value>Limit how far from Grandma's place you're willing to accept taxi jobs by entering a radius below.</value></data>
   <!-- Customer request interstitial (PORTPLAN 11, Unity CustomerRequestScreen):
        the countdown, the two passive/speed answers, the four feedback lines
@@ -254,7 +304,7 @@ Accept this job?</value></data>
        the driven km in that tier; the tier charge is the amount. Money in
        EUR, XP with two decimals like Unity. -->
   <data name="ReceiptTitle" xml:space="preserve"><value>TAXI RECEIPT</value></data>
-  <data name="ReceiptDistance" xml:space="preserve"><value>Distance: {0:0.0} km</value></data>
+  <data name="ReceiptDistance" xml:space="preserve"><value>Job distance: {0:0.0} km</value></data>
   <data name="ReceiptCustomer" xml:space="preserve"><value>Customers: {0}. {1}</value></data>
   <data name="ReceiptTier" xml:space="preserve"><value>{0:0.0}–{1:0.0} km @ €{2:0.00}/km: {3:0.0} km</value></data>
   <data name="ReceiptTierOpen" xml:space="preserve"><value>{0:0.0}+ km @ €{1:0.00}/km: {2:0.0} km</value></data>
@@ -287,11 +337,12 @@ Accept this job?</value></data>
   <data name="ReceiptRarityCommon" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the {1} most commonly used car in the game.</value></data>
   <data name="ReceiptRarityLeast" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the least driven car in the game.</value></data>
   <data name="ReceiptRarityRare" xml:space="preserve"><value>Your car has been driven {0} km by all players combined and is the {1} least driven car in the game.</value></data>
-  <!-- XP world standings (PORTPLAN 60, Unity TaxiReceiptScreen rivals
-       block): {0} is the English ordinal rank, {1} the board size.
-       Translators may reorder, never remove. -->
-  <data name="ReceiptStandings" xml:space="preserve"><value>Your XP world standings is {0} of {1}.</value></data>
-  <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Your XP world standings is —/—.</value></data>
+  <!-- Global XP rank (PORTPLAN 60, Unity TaxiReceiptScreen rivals block):
+       {0} is the English ordinal rank, {1} the board size. Named after the
+       shift page's Global Shift Earnings Rank line. Translators may reorder,
+       never remove. -->
+  <data name="ReceiptStandings" xml:space="preserve"><value>Your Global XP Rank is {0} of {1}.</value></data>
+  <data name="ReceiptStandingsUnknown" xml:space="preserve"><value>Your Global XP Rank is —/—.</value></data>
   <data name="ReceiptStandingsGainedOne" xml:space="preserve"><value>You gained 1 position.</value></data>
   <data name="ReceiptStandingsGained" xml:space="preserve"><value>You gained {0} positions.</value></data>
   <data name="ReceiptStandingsLostOne" xml:space="preserve"><value>You lost 1 position.</value></data>
@@ -311,8 +362,8 @@ Accept this job?</value></data>
   <data name="ShiftEndedLongest" xml:space="preserve"><value>Longest shift: {0} jobs</value></data>
   <data name="ShiftEndedBest" xml:space="preserve"><value>Highest earnings: €{0:0.00}</value></data>
   <data name="ShiftEndedTotal" xml:space="preserve"><value>Total shifts completed: {0}</value></data>
-  <data name="ShiftEndedStandings" xml:space="preserve"><value>Your shift world standings is {0} of {1}.</value></data>
-  <data name="ShiftEndedStandingsUnknown" xml:space="preserve"><value>Your shift world standings is —/—.</value></data>
+  <data name="ShiftEndedStandings" xml:space="preserve"><value>Your Global Shift Earnings Rank is {0} of {1}.</value></data>
+  <data name="ShiftEndedStandingsUnknown" xml:space="preserve"><value>Your Global Shift Earnings Rank is —/—.</value></data>
   <!-- Savings bank (PORTPLAN 48, Unity BankScript copy): saldo/preview
        lines, the withdraw + back buttons and the temporary control-page entry.
        {0} is the 2-decimal CR amount; the CR prefix is Unity's own currency
@@ -551,5 +602,11 @@ Accept this job?</value></data>
        battery itself already shows the fraction. The sign sits on the number
        without a space, like the baked tile labels. Placeholders survive
        translation; translators may reorder, never remove. -->
+  <!-- Menu voice reminder (moved off the voice page): the two ways to call
+       the panel back, shown in the empty band above the clock. {0} is the
+       brand the mic listens for, in caps; {{BRAND}} stays a literal token so
+       the player sees the pattern, not one car only. -->
+  <data name="MenuVoiceWake" xml:space="preserve"><value>To call this screen while driving say "Hey {{BRAND}}". For instance "Hey {0}".</value></data>
+  <data name="MenuVoiceHotkey" xml:space="preserve"><value>You can also press CTRL+Shift+C.</value></data>
   <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
 </root>

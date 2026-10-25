@@ -17,6 +17,13 @@
          PSD's 0.724 x 1.967 text transform, over the abbreviated weekday and
          display week. The menu and the calendar share this one view so both
          pages render the clock identically.
+         Both margins sit the clock's ink (258..805 in the 942 band) in the
+         middle of the band's free space: the reminder's last line ends at 121
+         and the tiles (menu) or the strip (calendar) start at 942, so the
+         block starts 137 px below the reminder and ends 137 px above the
+         buttons. The placement is one fixed offset rather than a centering
+         rule because the calendar carries no reminder and must still show the
+         clock at the menu's height.
          The negative side margin reclaims MainWindow's 22 px chrome (10 px
          padding + 2 px edge + 10 px padding), so 1080 design px map to the
          whole 413.6 px panel like the backdrop; the Viewbox keeps the band on
@@ -32,7 +39,7 @@
                                 ScaleX="0.72432" ScaleY="1.96732"
                                 Stroke="White" StrokeThickness="3"
                                 HorizontalAlignment="Center" VerticalAlignment="Top"
-                                Margin="0,175,0,0"/>
+                                Margin="0,258,0,0"/>
             <!-- The PSD's subtitle face is Neue Haas Grotesk, which is not
                  redistributable: Segoe UI Light at the tuned 68.5 design px
                  matches its width and cap height. -->
@@ -40,7 +47,7 @@
                        FontFamily="Segoe UI Light" FontSize="68.5"
                        Foreground="White"
                        HorizontalAlignment="Center" VerticalAlignment="Top"
-                       Margin="0,641,0,0"/>
+                       Margin="0,724,0,0"/>
         </Grid>
     </Viewbox>
 </UserControl>

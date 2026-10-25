@@ -78,10 +78,11 @@ public sealed class TaxiProposalScreenTests
         string home = Door(job.CustomerHome);
         string residence = Door(job.HomeIsPickup ? job.DropoffAddress : job.PickupAddress);
         string expected = vm.HomeIsPickup
-            ? $"Solo Sohn and some friends\nneed a ride\n"
-                + $"from home, {home}\nto the Sohn residence, {residence}\n\nAccept this job?"
-            : $"Solo Sohn and some friends\nneed a ride\n"
-                + $"from the Sohn residence, {residence}\nto home, {home}\n\nAccept this job?";
+            ? $"Solo Sohn and some friends\nneed a ride from home,\n{home}\n"
+                + $"to the Sohn residence, {residence}\n\nAccept this job?"
+            : $"Solo Sohn and some friends\n"
+                + $"need a ride from the Sohn residence,\n{residence}\n"
+                + $"to home, {home}\n\nAccept this job?";
         Assert.Equal(expected, vm.Phrase.Replace("\r\n", "\n", StringComparison.Ordinal));
         // The formatter is shared with the expectation, so pin the content it
         // must have produced: two different map streets plus the city.
@@ -151,7 +152,7 @@ public sealed class TaxiProposalScreenTests
         // One seat, one customer: the suffix-triggered companion group has no
         // room in this car, so neither the page nor the job names it.
         string phrase = vm.Phrase.Replace("\r\n", "\n", StringComparison.Ordinal);
-        Assert.StartsWith("Solo Sohn\nneed a ride", phrase, StringComparison.Ordinal);
+        Assert.StartsWith("Solo Sohn\nneed a ride from ", phrase, StringComparison.Ordinal);
         Assert.DoesNotContain("and some friends", phrase, StringComparison.Ordinal);
 
         vm.AcceptCommand.Execute(null);

@@ -10,4 +10,5 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed record ControlActions(
     ICommand Taxi,
     ICommand Delivery,
-    ICommand Haul);
+    ICommand Haul,
+    ICommand TodoAcknowledge);
