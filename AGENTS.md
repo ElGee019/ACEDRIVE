@@ -201,6 +201,11 @@ Working code that violates these rules still fails review.
   enforced by `Directory.Build.props` (Recommended analyzers +
   `TreatWarningsAsErrors`). New analyzer errors are fixed, not suppressed;
   a suppression needs a justification comment.
+- Work this repo with full access, not the Windows sandbox: the sandbox grants
+  writes by labeling the tree Low, and an executable carrying that label runs
+  at Low integrity, so a sandboxed build here would produce an overlay that
+  cannot write its saves under `%AppData%`. The sandbox also denies the named
+  pipes that `dotnet test` and a parallel MSBuild need.
 - `dotnet format ACEDRIVE.slnx --verify-no-changes` before committing; CI
   enforces it. Fix findings by hand, never via unattended fixer runs (an
   IDE0005 false positive once deleted a needed using).

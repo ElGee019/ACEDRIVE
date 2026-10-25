@@ -1,20 +1,30 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- An xUnit.net v3 test project is a stand-alone executable: the runner
+         lives inside the test assembly, so no external host loads it and the
+         run needs no named-pipe IPC. WHY that matters here: the Windows
+         sandbox this repo is worked in denies named-pipe clients, which left
+         the VSTest test host unable to reach its runner. -->
+    <OutputType>Exe</OutputType>
     <!-- CA1707 (no underscores) conflicts with the standard xUnit naming
          convention Method_State_Result, which we keep for readability.
          Test-only scope; product code still complies. -->
-    <NoWarn>$(NoWarn);CA1707</NoWarn>
+    <!-- xUnit1051 is a responsiveness hint: thread the test's cancellation
+         token through every call that accepts one. These suites drive
+         in-memory fakes that finish in milliseconds, so the token would be
+         noise at each call site without changing what a test can do. -->
+    <NoWarn>$(NoWarn);CA1707;xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+    <!-- Visual Studio's Test Explorer adapter; `dotnet test` ignores it and
+         runs the executable through Microsoft.Testing.Platform. -->
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
