@@ -546,10 +546,9 @@ public partial class App : Application, IDisposable
     }
 
     // The HUD banks its own placement beside the main window.json so resizing
-    // or moving one never rewrites the other's file.
-    private static JsonSettingsStore HudSettings() => new(Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "AceDrive", "hud.json"));
+    // or moving one never rewrites the other's file. Both live in the profile
+    // folder, so a demo build keeps its own copy.
+    private static JsonSettingsStore HudSettings() => new(DataPaths.UserSave("hud.json"));
 
     // Mic model lookup: %AppData% first (drop the Vosk model folder here),
     // then EVO_VOSK_MODEL, then Data next to the exe. No model = visible
@@ -604,10 +603,7 @@ public partial class App : Application, IDisposable
         Shutdown(1);
     }
 
-    private static string LogPath =>
-        System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "AceDrive", "logs");
+    private static string LogPath => DataPaths.UserLogs;
 
     protected override void OnExit(ExitEventArgs e)
     {

@@ -31,21 +31,36 @@ dotnet publish src/AceDrive.Overlay -p:PublishProfile=win-x64
 The output is one compressed ~85 MB exe plus a loose `Data\` folder (content
 tables, car thumbnails) and `Assets\Fonts\*-OFL.txt`. Send the folder (or a zip
 of it), never the exe alone: the overlay reads `Data\` beside itself. Publish
-also copies two machine-local pieces when they exist, so a fresh PC gets voice
-and the online layer without setup:
+copies the Vosk model from `%APPDATA%\AceDrive\vosk-model` when present
+(~68 MB, voice).
 
-- `%APPDATA%\AceDrive\vosk-model` → `Data\vosk-model` (~68 MB, voice)
-- `%APPDATA%\AceDrive\firebase.json` → `Data\firebase.json` (online layer; the
-  shipped fallback `FirebaseOptions` reads when no per-user config exists)
+The Firebase config is **opt-in**: a publish ships no key unless you name one,
+so a demo build cannot carry the production credential by accident. Without a
+config the overlay is fully playable and the online boards use their offline
+fallbacks (last saved rank, rarity 1, name reservation skipped) — see
+[`FIREBASE.md`](FIREBASE.md).
 
-Neither is ever committed; override the source paths with `-p:VoskModelDir` /
-`-p:FirebaseConfigPath`. The published exe is signed after the single-file
-bundle, because the Build-time signature cannot survive bundling. The
-development certificate is trusted only on the machine that made it, so
-another PC still shows SmartScreen's "Unknown publisher" — trust everywhere
-needs a publicly trusted OV/EV certificate (a PFX in `ACEDRIVE_SIGN_PFX`) or
-Azure Trusted Signing. Until then the tester unblocks the zip, extracts it and
-chooses More info → Run anyway.
+```powershell
+# demo build for a friend: no key in the zip, and its own fresh profile
+dotnet publish src/AceDrive.Overlay -p:PublishProfile=win-x64 -p:DemoBuild=true
+
+# online build: point it at a throwaway project, never the live one
+dotnet publish src/AceDrive.Overlay -p:PublishProfile=win-x64 `
+  -p:FirebaseConfigPath="$env:APPDATA\AceDrive\firebase.test.json"
+```
+
+`DemoBuild` compiles the demo to keep its saves and logs in
+`%APPDATA%\AceDrive-Demo` instead of `%APPDATA%\AceDrive`, so the first run
+always starts at onboarding — even on a machine that already plays AceDrive
+(there is no pre-existing profile to include or overwrite).
+
+The model is never committed; override its path with `-p:VoskModelDir`. The
+published exe is signed after the single-file bundle, because the Build-time
+signature cannot survive bundling. The development certificate is trusted only
+on the machine that made it, so another PC still shows SmartScreen's "Unknown
+publisher" — trust everywhere needs a publicly trusted OV/EV certificate (a
+PFX in `ACEDRIVE_SIGN_PFX`) or Azure Trusted Signing. Until then the tester
+unblocks the zip, extracts it and chooses More info → Run anyway.
 
 `dotnet format ACEDRIVE.slnx --verify-no-changes` must pass before
 committing; CI enforces it. Fix findings by hand — never run unattended
@@ -70,6 +85,11 @@ src/AceDrive.Overlay/   WPF MVVM: Services/ ViewModels/ Localization/
                         Resources/ (Strings.*.resx) Data/ (fares.json)
 tests/                  xUnit, fakes for time/telemetry/log/store
 ```
+
+`Data/*.json` is edited in `src/AceDrive.Overlay/Data/` only. The `Data\` folder
+beside a built or published exe is a copy refreshed from that source (and the
+package ships its own), so a line changed there is a build artifact: it never
+reaches a release, and a clean build overwrites it.
 
 ## Troubleshooting
 

@@ -100,3 +100,25 @@ rank 1 is the most-driven car and the last rank the rarest. A car missing from
 the board answers `carCount + 1` (never driven); an empty key answers 1. While
 the board is unavailable every car answers rarity 1. Unowned free-roam cars
 earn fallback class 1 × rarity 1 and never increment the car board.
+
+## 7. Sending a build to someone
+
+A publish ships the Firebase config only when `-p:FirebaseConfigPath` names it,
+so the default demo build carries no key at all; the overlay runs fully offline.
+That is the right build for someone who just wants to see what the overlay is.
+Add `-p:DemoBuild=true` so it also keeps its saves in
+`%APPDATA%\AceDrive-Demo` and starts at onboarding on any machine.
+
+When the build should show the live boards, do not point it at your own
+`%AppData%\AceDrive\firebase.json`: that is the production key of the project
+the Unity game shares. Use a second Firebase project (anonymous auth, Firestore,
+the same `firestore.rules`) and its own config file:
+
+```powershell
+dotnet publish src/AceDrive.Overlay -p:PublishProfile=win-x64 `
+  -p:FirebaseConfigPath="$env:APPDATA\AceDrive\firebase.test.json"
+```
+
+A client key is not secret by itself — the rules are what protect the data —
+but the production key should not leave your machine, and a second project keeps
+a tester's rows (and any abuse) off the real boards.

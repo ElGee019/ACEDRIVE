@@ -121,9 +121,9 @@ public sealed class FileLogger : ILog, IDisposable
         }
     }
 
-    private static string DefaultDirectory() => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "AceDrive", "logs");
+    // WHY DataPaths and not a literal: a demo build keeps its trace in its own
+    // profile folder, so running the demo never writes into a real player's log.
+    private static string DefaultDirectory() => DataPaths.UserLogs;
 
     // WHY temp: it is the one folder a per-user process can almost always
     // write, so the trace survives a locked or read-only %AppData%.

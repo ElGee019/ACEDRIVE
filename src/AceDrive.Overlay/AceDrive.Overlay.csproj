@@ -13,14 +13,23 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
-  <!-- Tester packaging. The Vosk model (68 MB) and the Firebase client config
-       are machine-local and must never enter git, so a publish copies them
-       from the developer's %AppData%\AceDrive into the output when present.
-       Another machine overrides -p:VoskModelDir / -p:FirebaseConfigPath; a
-       missing source only means the package ships voice-less / offline. -->
+  <!-- A demo package gets its own profile folder (%AppData%\AceDrive-Demo) so a
+       first run starts at onboarding even on a PC that already runs AceDrive,
+       and never reads or writes that player's saves. Normal builds are
+       unchanged: the switch only sets the ACEDRIVE_DEMO compile constant. -->
+  <PropertyGroup Condition="'$(DemoBuild)' == 'true'">
+    <DefineConstants>$(DefineConstants);ACEDRIVE_DEMO</DefineConstants>
+  </PropertyGroup>
+
+  <!-- Tester packaging. The Vosk model (68 MB) is machine-local and must never
+       enter git, so a publish copies it from the developer's %AppData%\AceDrive
+       when present. The Firebase client config is deliberately opt-in: the
+       firebase.json in a developer's AppData carries the production key, so a
+       publish only ships one when -p:FirebaseConfigPath names it. A demo build
+       without it is fully playable; the online boards use their offline
+       fallbacks (see FIREBASE.md). -->
   <PropertyGroup>
     <VoskModelDir Condition="'$(VoskModelDir)' == ''">$(APPDATA)\AceDrive\vosk-model</VoskModelDir>
-    <FirebaseConfigPath Condition="'$(FirebaseConfigPath)' == ''">$(APPDATA)\AceDrive\firebase.json</FirebaseConfigPath>
     <SignSubject Condition="'$(SignSubject)' == ''">CN=AceDrive Development</SignSubject>
   </PropertyGroup>
 
@@ -48,10 +57,10 @@
   </Target>
 
   <!-- The tester content rides beside the exe, like Data/*.json: the model is
-       read from Data\vosk-model (App.CreateVoice's third candidate) and the
-       Firebase config from Data\firebase.json (FirebaseOptions' shipped
-       fallback). Both stay loose so a bug report can be fixed by swapping a
-       file without a rebuild. -->
+       read from Data\vosk-model (App.CreateVoice's third candidate) and, only
+       when the build names one, the Firebase config from Data\firebase.json
+       (FirebaseOptions' shipped fallback). Both stay loose so a bug report can
+       be fixed by swapping a file without a rebuild. -->
   <Target Name="CopyTesterContent" AfterTargets="Publish"
           Condition="'$(PublishSingleFile)' == 'true'">
     <ItemGroup>
@@ -60,8 +69,19 @@
     <Copy SourceFiles="@(VoskModelFile)"
           DestinationFiles="@(VoskModelFile->'$(PublishDir)Data\vosk-model\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
-    <Copy SourceFiles="$(FirebaseConfigPath)" DestinationFolder="$(PublishDir)Data"
-          SkipUnchangedFiles="true" Condition="Exists('$(FirebaseConfigPath)')" />
+    <!-- WHY an unconditional delete before the copy: PublishDir is not cleaned
+         between publishes, so a config copied by an earlier online publish
+         would otherwise survive into a later offline demo build and ship the
+         production key after all. The package must match the flag, not history. -->
+    <Delete Files="$(PublishDir)Data\firebase.json" />
+    <!-- WHY DestinationFiles and not DestinationFolder: the source is often
+         named firebase.test.json (a second project), while the app only ever
+         reads Data\firebase.json. Copying the source name would ship a file
+         FirebaseOptions never looks at and stay silently offline. -->
+    <Copy SourceFiles="$(FirebaseConfigPath)"
+          DestinationFiles="$(PublishDir)Data\firebase.json"
+          SkipUnchangedFiles="true"
+          Condition="'$(FirebaseConfigPath)' != '' and Exists('$(FirebaseConfigPath)')" />
     <!-- WHY delete: the entry project honours DebugType=None, but a dependency
          can still hand its cached PDB to the publish, and a tester build has no
          use for symbols that carry local source paths. -->
@@ -73,10 +93,14 @@
              Text="voice: shipping model $(VoskModelDir)" />
     <Message Importance="high" Condition="!Exists('$(VoskModelDir)')"
              Text="voice: no model at $(VoskModelDir); package ships voice-less" />
-    <Message Importance="high" Condition="Exists('$(FirebaseConfigPath)')"
+    <Message Importance="high"
+             Condition="'$(FirebaseConfigPath)' != '' and Exists('$(FirebaseConfigPath)')"
              Text="online: shipping $(FirebaseConfigPath)" />
-    <Message Importance="high" Condition="!Exists('$(FirebaseConfigPath)')"
-             Text="online: no config at $(FirebaseConfigPath); package ships offline" />
+    <Message Importance="high" Condition="'$(FirebaseConfigPath)' == ''"
+             Text="online: no config named (-p:FirebaseConfigPath); package ships offline" />
+    <Message Importance="high"
+             Condition="'$(FirebaseConfigPath)' != '' and !Exists('$(FirebaseConfigPath)')"
+             Text="online: $(FirebaseConfigPath) not found; package ships offline" />
   </Target>
 
   <ItemGroup>
