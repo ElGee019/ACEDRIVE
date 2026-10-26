@@ -28,6 +28,25 @@ dotnet publish src/AceDrive.Overlay -p:PublishProfile=win-x64
 # → src/AceDrive.Overlay/bin/Release/net10.0-windows/win-x64/publish/
 ```
 
+The output is one compressed ~85 MB exe plus a loose `Data\` folder (content
+tables, car thumbnails) and `Assets\Fonts\*-OFL.txt`. Send the folder (or a zip
+of it), never the exe alone: the overlay reads `Data\` beside itself. Publish
+also copies two machine-local pieces when they exist, so a fresh PC gets voice
+and the online layer without setup:
+
+- `%APPDATA%\AceDrive\vosk-model` → `Data\vosk-model` (~68 MB, voice)
+- `%APPDATA%\AceDrive\firebase.json` → `Data\firebase.json` (online layer; the
+  shipped fallback `FirebaseOptions` reads when no per-user config exists)
+
+Neither is ever committed; override the source paths with `-p:VoskModelDir` /
+`-p:FirebaseConfigPath`. The published exe is signed after the single-file
+bundle, because the Build-time signature cannot survive bundling. The
+development certificate is trusted only on the machine that made it, so
+another PC still shows SmartScreen's "Unknown publisher" — trust everywhere
+needs a publicly trusted OV/EV certificate (a PFX in `ACEDRIVE_SIGN_PFX`) or
+Azure Trusted Signing. Until then the tester unblocks the zip, extracts it and
+chooses More info → Run anyway.
+
 `dotnet format ACEDRIVE.slnx --verify-no-changes` must pass before
 committing; CI enforces it. Fix findings by hand — never run unattended
 fixer passes (one once removed a needed using via an IDE0005 false positive).

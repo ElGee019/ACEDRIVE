@@ -13,13 +13,70 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!-- Tester packaging. The Vosk model (68 MB) and the Firebase client config
+       are machine-local and must never enter git, so a publish copies them
+       from the developer's %AppData%\AceDrive into the output when present.
+       Another machine overrides -p:VoskModelDir / -p:FirebaseConfigPath; a
+       missing source only means the package ships voice-less / offline. -->
+  <PropertyGroup>
+    <VoskModelDir Condition="'$(VoskModelDir)' == ''">$(APPDATA)\AceDrive\vosk-model</VoskModelDir>
+    <FirebaseConfigPath Condition="'$(FirebaseConfigPath)' == ''">$(APPDATA)\AceDrive\firebase.json</FirebaseConfigPath>
+    <SignSubject Condition="'$(SignSubject)' == ''">CN=AceDrive Development</SignSubject>
+  </PropertyGroup>
+
   <!-- Sign the apphost .exe, not $(TargetPath): for an app project TargetPath is
        the managed .dll, and Authenticode on the launcher is what SmartScreen
        reads. ContinueOnError: a machine without the developer certificate (CI,
-       a clean checkout) signs nothing and still builds. -->
-  <Target Name="SignOverlayOutput" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
-    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\tools\Sign-Overlay.ps1&quot; -ExePath &quot;$(TargetDir)$(TargetName).exe&quot;"
+       a clean checkout) signs nothing and still builds. Skipped during a
+       single-file publish: the bundler writes a new exe, which
+       SignPublishedOverlay signs instead. -->
+  <Target Name="SignOverlayOutput" AfterTargets="Build"
+          Condition="'$(OS)' == 'Windows_NT' and '$(PublishSingleFile)' != 'true'">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\tools\Sign-Overlay.ps1&quot; -ExePath &quot;$(TargetDir)$(TargetName).exe&quot; -Subject &quot;$(SignSubject)&quot; -TimestampServer &quot;$(SignTimestampServer)&quot;"
           ContinueOnError="true" />
+  </Target>
+
+  <!-- Single-file publish re-bundles the apphost, so the Build-time signature
+       above does not survive. Sign the exe that is actually shipped. A
+       publicly trusted certificate (PFX, imported into CurrentUser\My, or
+       ACEDRIVE_SIGN_PFX) is what makes the signature trustworthy on another
+       PC; the local development certificate only satisfies this machine. -->
+  <Target Name="SignPublishedOverlay" AfterTargets="Publish"
+          Condition="'$(OS)' == 'Windows_NT' and '$(PublishSingleFile)' == 'true'">
+    <Exec Command="powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildThisFileDirectory)..\..\tools\Sign-Overlay.ps1&quot; -ExePath &quot;$(PublishDir)$(TargetName).exe&quot; -Subject &quot;$(SignSubject)&quot; -TimestampServer &quot;$(SignTimestampServer)&quot;"
+          ContinueOnError="true" />
+  </Target>
+
+  <!-- The tester content rides beside the exe, like Data/*.json: the model is
+       read from Data\vosk-model (App.CreateVoice's third candidate) and the
+       Firebase config from Data\firebase.json (FirebaseOptions' shipped
+       fallback). Both stay loose so a bug report can be fixed by swapping a
+       file without a rebuild. -->
+  <Target Name="CopyTesterContent" AfterTargets="Publish"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <VoskModelFile Include="$(VoskModelDir)\**\*" Condition="Exists('$(VoskModelDir)')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(VoskModelFile)"
+          DestinationFiles="@(VoskModelFile->'$(PublishDir)Data\vosk-model\%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(FirebaseConfigPath)" DestinationFolder="$(PublishDir)Data"
+          SkipUnchangedFiles="true" Condition="Exists('$(FirebaseConfigPath)')" />
+    <!-- WHY delete: the entry project honours DebugType=None, but a dependency
+         can still hand its cached PDB to the publish, and a tester build has no
+         use for symbols that carry local source paths. -->
+    <ItemGroup>
+      <TesterPdb Include="$(PublishDir)*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(TesterPdb)" />
+    <Message Importance="high" Condition="Exists('$(VoskModelDir)')"
+             Text="voice: shipping model $(VoskModelDir)" />
+    <Message Importance="high" Condition="!Exists('$(VoskModelDir)')"
+             Text="voice: no model at $(VoskModelDir); package ships voice-less" />
+    <Message Importance="high" Condition="Exists('$(FirebaseConfigPath)')"
+             Text="online: shipping $(FirebaseConfigPath)" />
+    <Message Importance="high" Condition="!Exists('$(FirebaseConfigPath)')"
+             Text="online: no config at $(FirebaseConfigPath); package ships offline" />
   </Target>
 
   <ItemGroup>

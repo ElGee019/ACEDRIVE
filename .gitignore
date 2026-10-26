@@ -3,3 +3,17 @@ obj/
 .vs/
 *.user
 TestResults/
+
+# Agent/build scratch (never commit)
+/.dsh-write-probe.txt
+/build-*.txt
+/restore-out.txt
+/test-rarity.txt
+/sess-prev*
+
+# Machine-local tester content copied into a publish, never committed
+/src/AceDrive.Overlay/Data/vosk-model/
+/src/AceDrive.Overlay/Data/firebase.json
+
+# Local download packages
+/dist/
