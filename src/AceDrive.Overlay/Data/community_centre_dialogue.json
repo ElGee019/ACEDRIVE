@@ -4,5 +4,5 @@
   {"speaker": "SIGNORE MORO", "text": "Well, you have found the right place. May I have your name, please?"},
   {"speaker": "YOU", "text": "It's [YOU]."},
   {"speaker": "SIGNORE MORO", "text": "That's a mighty fine name, [YOU], please sign below."},
-  {"speaker": "SIGNORE MORO", "text": "Congratulations! You are officially a licensed taxi driver! To launch your career, the local authorities are providing a Starter Business Bonus. Best of luck with your new endeavor!"}
+  {"speaker": "SIGNORE MORO", "text": "Congratulations! You are officially a licensed taxi driver!\n\nTo launch your career, the local authorities are providing a Starter Business Bonus.\nBest of luck with your new endeavor!"}
 ]
