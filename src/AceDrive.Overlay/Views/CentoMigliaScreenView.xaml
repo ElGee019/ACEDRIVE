@@ -76,20 +76,31 @@
                 <TextBlock Style="{StaticResource PageBody}" Text="{Binding DetailDescription}"/>
                 <TextBlock Style="{StaticResource PageBody}" Text="{Binding EligibilityText}" Margin="0,6,0,0"/>
             </StackPanel>
-            <!-- CentoSetup: the ENTER flow (Unity's coroutine): the tier's
-                 registration number and the setup countdown, then the built
-                 event's route. No way out while it runs; BACK returns past it. -->
-            <StackPanel VerticalAlignment="Center"
-                        Visibility="{Binding SetupVisible, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding SetupTitle}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
-                           TextAlignment="Center" Margin="0,0,0,2"/>
-                <TextBlock Style="{StaticResource PageBody}" Text="{Binding DetailLabel}"/>
-                <TextBlock Style="{StaticResource PageBody}" Text="{Binding RegistrationLine}"/>
-                <TextBlock Style="{StaticResource PageBody}" Text="{Binding TimerLine}"
-                           Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVis}}"/>
-                <TextBlock Style="{StaticResource PageBody}" Text="{Binding DistanceLine}"
-                           Visibility="{Binding IsBuilt, Converter={StaticResource BoolToVis}}"/>
-            </StackPanel>
+            <!-- CentoSetup: the ENTER flow (Unity's coroutine). The status
+                 lines stay in a block at the top of the body; the registration
+                 number is the event's identity, so it takes the big type and
+                 sits in the middle of the gap between that block and the bottom
+                 band's button. No way out while it runs; BACK returns past it. -->
+            <Grid Visibility="{Binding SetupVisible, Converter={StaticResource BoolToVis}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="{Binding SetupTitle}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                               TextAlignment="Center" Margin="0,0,0,2"/>
+                    <TextBlock Style="{StaticResource PageBody}" Text="{Binding DetailLabel}"/>
+                    <TextBlock Style="{StaticResource PageBody}" Text="{Binding TimerLine}"
+                               Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVis}}"/>
+                    <TextBlock Style="{StaticResource PageBody}" Text="{Binding DistanceLine}"
+                               Visibility="{Binding IsBuilt, Converter={StaticResource BoolToVis}}"/>
+                </StackPanel>
+                <!-- Double the body size (PageBody is 14), no margin so the
+                     vertical centering inside the leftover row stays exact. -->
+                <TextBlock Grid.Row="1" Style="{StaticResource PageBody}" Text="{Binding RegistrationLine}"
+                           FontSize="28" Margin="0"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Grid>
         </Grid>
         <!-- Bottom band: the picked tier's action above the one way out, both
              flush with the panel edge like every other page. ENTER turns into

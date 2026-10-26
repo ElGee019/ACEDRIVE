@@ -64,15 +64,6 @@ public static class CentoMiglia
     }
 
     /// <summary>
-    /// The event's route length: the longest distance the player's operating
-    /// zone allows, which is the zone itself — a route across every discovered
-    /// street (Unity ranks its discovered street pairs and takes the furthest).
-    /// An unusable zone length answers 0 instead of throwing on the page.
-    /// </summary>
-    public static double LongestDistanceKm(double zoneKm) =>
-        double.IsFinite(zoneKm) && zoneKm > 0.0 ? zoneKm : 0.0;
-
-    /// <summary>
     /// The reputation the page prints: a first-ever driver's raw 0 reads as 1
     /// (Unity's header floor — the race ticker treats 0 the same way).
     /// </summary>

@@ -987,4 +987,115 @@ public sealed class HudViewModelTests
 
         Assert.Equal("Fine", vm.HudLineText);
     }
+
+    // The Cento Miglia race leg: the counter has its own line, the finish stays
+    // pinned in the banner, and the leg offers no button.
+    private static HudJobGuidance CentoFinish() => new(
+        "the Cento Miglia finish",
+        new AddressLocation("Street 2", 1, HouseSide.Right),
+        "HudCentoFinishDrive", "HudCentoFinishArrived", string.Empty, 20.0);
+
+    private const string CentoFinishDrive =
+        "Race to the Cento Miglia finish at Street 2 No. 1 in Brands";
+
+    [Fact]
+    public void SetReputation_PaintsTheCounterOnItsOwnLine()
+    {
+        HudViewModel vm = Create();
+        vm.SetJobGuidance(CentoFinish());
+
+        vm.SetReputation(1.00032);
+
+        Assert.Equal("YOUR CLUB REPUTATION: 1.00032", vm.ReputationText);
+        Assert.True(vm.HasReputation);
+        Assert.Equal(string.Empty, vm.EnterText);
+    }
+
+    [Fact]
+    public void SetReputation_KeepsTheDriveToTaskTextInTheBanner()
+    {
+        HudViewModel vm = Create();
+        vm.SetJobGuidance(CentoFinish());
+
+        vm.SetReputation(1.00032);
+
+        // The whole point of the extra line: the player still reads where to
+        // drive while the race counts the reputation.
+        Assert.Equal(CentoFinishDrive, vm.DestinationText);
+        Assert.Equal(CentoFinishDrive, vm.BannerText);
+    }
+
+    [Fact]
+    public void SetReputation_KeepsTheFinishPinnedAndOffersNoButton()
+    {
+        HudViewModel vm = Create();
+        vm.SetJobGuidance(CentoFinish());
+        vm.SetReputation(1.00032);
+
+        // Parked on the finish door: the arrival state is up, but the leg has
+        // no action, so no ENTER button is offered.
+        vm.Update(Sample(position: 0.5f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        Assert.True(vm.ParkedAtTarget);
+        Assert.False(vm.ShowEnterButton);
+        // The finish stays the pinned leg, so the distance line still counts
+        // down to it (the car is parked on it).
+        Assert.Equal("0 m", vm.HudLineText);
+    }
+
+    [Fact]
+    public void SetReputation_TakesTheCounterLineDownWhenCleared()
+    {
+        HudViewModel vm = Create();
+        vm.SetJobGuidance(CentoFinish());
+        vm.SetReputation(1.00032);
+
+        vm.SetReputation(null);
+
+        Assert.Equal(string.Empty, vm.ReputationText);
+        Assert.False(vm.HasReputation);
+        Assert.Equal(CentoFinishDrive, vm.DestinationText);
+    }
+
+    [Fact]
+    public void SetReputation_RaisesTheLineVisibilityOncePerEdge()
+    {
+        HudViewModel vm = Create();
+        vm.SetJobGuidance(CentoFinish());
+        int changes = 0;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(HudViewModel.HasReputation))
+            {
+                changes++;
+            }
+        };
+
+        vm.SetReputation(1.00001);
+        vm.SetReputation(1.00002);   // still up: no second visibility edge
+        vm.SetReputation(null);
+
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void SetReputation_RepaintsOnlyWhenTheShownDecimalMoves()
+    {
+        HudViewModel vm = Create();
+        vm.SetJobGuidance(CentoFinish());
+        int changes = 0;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(HudViewModel.ReputationText))
+            {
+                changes++;
+            }
+        };
+
+        vm.SetReputation(1.00001);
+        vm.SetReputation(1.000013);   // same 5-decimal reading
+        vm.SetReputation(1.00002);    // the next shown digit
+
+        Assert.Equal(2, changes);
+    }
 }

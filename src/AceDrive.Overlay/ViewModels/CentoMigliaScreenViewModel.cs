@@ -15,11 +15,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// ENTER EVENT builds the event the way Unity's screen does: the tier issues a
 /// registration number (its digit count grows with the club), the page reports
 /// the build countdown for Unity's minimum setup delay and then shows the
-/// built route — the longest distance the player's operating zone allows. No
-/// way out exists while the event is being prepared; past the build, BACK
-/// leaves the page. The race itself (NPC field, finish, receipt) is the next
-/// slice, so the built event travels to the host as one record instead of
-/// starting a drive.
+/// built route — the longest distance the player's operating zone allows, which
+/// the navigator planned over the zone's streets. Past the build, BACK leaves
+/// the page; the built event starts the race flow, which drives the player from
+/// the start door to the finish.
 ///
 /// Unity's weekly one-entry gate is absent with the race: it is written by a
 /// finished race. The header keeps Unity's reputation floor (a raw 0 prints as
@@ -96,6 +95,10 @@ public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IP
             OnPropertyChanged(nameof(DetailDescription));
             OnPropertyChanged(nameof(EligibilityText));
             OnPropertyChanged(nameof(ShowEnter));
+            // ENTER's IsEnabled binds to CanEnter, which flips with the detail
+            // panel: without this notice the button appeared but stayed
+            // disabled, so the click on it did nothing.
+            OnPropertyChanged(nameof(CanEnter));
             RebuildVoice();
         }
     }
@@ -142,8 +145,8 @@ public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IP
         ? Strings.Format("CentoBuildTimer", _remainingSeconds)
         : string.Empty;
 
-    /// <summary>The built route ("Longest distance: 1.9 km"): the whole
-    /// operating zone, which is the longest route it allows.</summary>
+    /// <summary>The built route ("Longest distance: 1.0 km"): the furthest two
+    /// doors the operating zone holds.</summary>
     public string DistanceLine => Strings.Format("CentoEventDistance", _distanceKm);
 
     /// <summary>ENTER's label: Unity swaps it for "SETTING UP…" while the
@@ -280,7 +283,7 @@ public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IP
         }
 
         _registration = CentoMiglia.DrawRegistration(row.Number, _rng);
-        _distanceKm = CentoMiglia.LongestDistanceKm(_facts.ZoneKm);
+        _distanceKm = _facts.Route.DistanceKm;
         _remainingSeconds = CentoMiglia.BuildSeconds;
         _buildDeadline = _clock.UtcNow.AddSeconds(CentoMiglia.BuildSeconds);
         NotifySetupChanged();
@@ -297,7 +300,8 @@ public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IP
         _built = true;
         NotifySetupChanged();
         RebuildVoice();
-        _onBuilt(new CentoMigliaEvent(row.Number, row.Label, _registration, _distanceKm));
+        _onBuilt(new CentoMigliaEvent(
+            row.Number, row.Label, _registration, _facts.Year, _facts.Week, _facts.Route));
     }
 
     // The build swaps the body panel and both bottom-band buttons at once, so

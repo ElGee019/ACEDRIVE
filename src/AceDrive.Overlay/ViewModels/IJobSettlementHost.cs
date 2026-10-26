@@ -44,6 +44,13 @@ public interface IJobSettlementHost
     /// <summary>CONTINUE on a taxi receipt lands on the control page.</summary>
     void GoToControlPage();
 
+    /// <summary>
+    /// CONTINUE on the Cento Miglia receipt lands on the main page (the menu):
+    /// a race is not a job, so finishing one must not drop the player on the
+    /// jobs list it was never started from.
+    /// </summary>
+    void GoToMenuPage();
+
     /// <summary>Re-reads the cached delivery board (filled shelves, new stores).</summary>
     void RefreshDeliveryBoard();
 

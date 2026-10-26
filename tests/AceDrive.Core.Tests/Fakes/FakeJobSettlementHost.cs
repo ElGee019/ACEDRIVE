@@ -27,6 +27,7 @@ internal sealed class FakeJobSettlementHost : IJobSettlementHost
     public int DeliveryBoardRefreshes { get; private set; }
     public int DeliveryRunsCleared { get; private set; }
     public int ControlPages { get; private set; }
+    public int MenuPages { get; private set; }
     public int DeliveryBoardPages { get; private set; }
 
     public void ShowReceipt(object screen) => Receipts.Add(screen);
@@ -50,6 +51,8 @@ internal sealed class FakeJobSettlementHost : IJobSettlementHost
     }
 
     public void GoToControlPage() => ControlPages++;
+
+    public void GoToMenuPage() => MenuPages++;
 
     public void RefreshDeliveryBoard() => DeliveryBoardRefreshes++;
 

@@ -61,6 +61,47 @@ public static class AddressBook
     public static double AverageStreetLengthKm(AddressMap map) =>
         map.Streets is { Count: > 0 } ? MapLengthKm(map) / map.Streets.Count : 0.0;
 
+    /// <summary>
+    /// The streets the operating zone covers, home street first. Interim
+    /// mapping: the zone knows a street COUNT (Unity's discoveredStreets) while
+    /// the placeholder map names its own two streets, so the profile's home
+    /// street leads and the map order fills the rest, capped by the count.
+    /// Once the freeroam map gives every zone street its own identity, this
+    /// lookup reads the map instead and the signature disappears.
+    /// </summary>
+    public static IReadOnlyList<AddressStreet> ZoneStreets(
+        AddressMap map, int discoveredStreets, string? homeStreetId)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        int limit = Math.Min(Math.Max(0, discoveredStreets), map.Streets.Count);
+        if (limit == 0)
+        {
+            return [];
+        }
+
+        var ordered = new List<AddressStreet>(limit);
+        if (!string.IsNullOrWhiteSpace(homeStreetId)
+            && Street(map, homeStreetId) is { } home)
+        {
+            ordered.Add(home);
+        }
+
+        foreach (AddressStreet street in map.Streets)
+        {
+            if (ordered.Count >= limit)
+            {
+                break;
+            }
+
+            if (!ordered.Contains(street))
+            {
+                ordered.Add(street);
+            }
+        }
+
+        return ordered;
+    }
+
     /// <summary>The street whose display name matches, ignoring case.</summary>
     public static AddressStreet? StreetByName(AddressMap map, string? name)
     {

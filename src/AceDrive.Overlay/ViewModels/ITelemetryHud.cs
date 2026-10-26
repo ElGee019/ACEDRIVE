@@ -57,6 +57,23 @@ public interface ITelemetryHud
     void SetJobGuidance(HudJobGuidance? guidance);
 
     /// <summary>
+    /// Paints the live club reputation on the companion's counter line, or
+    /// clears it with null when the race ends. The line is its own, so the
+    /// banner keeps the drive-to sentence of the leg the race pinned. The Cento
+    /// Miglia race owns the value (it starts at the race's green light and
+    /// stops at the finish); the companion only formats the reading it is
+    /// handed, so it never owns a ticker.
+    /// </summary>
+    void SetReputation(double? reputation);
+
+    /// <summary>
+    /// True while the car is parked inside the pinned job leg's arrival radius.
+    /// The race reads it to open the registration page at the start and to
+    /// finish at the finish; the job flows read it through ENTER.
+    /// </summary>
+    bool ParkedAtTarget { get; }
+
+    /// <summary>
     /// Shows a transient line under the banner (a police fine, a refusal
     /// hint). The host formats the text; the HUD expires it on the clock, so
     /// a stalled poll cannot leave it up forever.

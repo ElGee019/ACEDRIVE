@@ -85,6 +85,15 @@
                                     </Style>
                                 </TextBlock.Style>
                             </TextBlock>
+                            <!-- Live club reputation while a Cento Miglia race runs
+                                 (PORTPLAN 49). It has its own line so the banner
+                                 above stays the drive-to sentence: the counter
+                                 must never cost the player the way to the finish. -->
+                            <TextBlock Text="{Binding ReputationText}"
+                                       FontFamily="{StaticResource TourneyThin}"
+                                       FontSize="18" TextTrimming="CharacterEllipsis"
+                                       Foreground="#FFFFFFFF"
+                                       Visibility="{Binding HasReputation, Converter={StaticResource BoolToVis}}"/>
                             <TextBlock Text="{Binding DeadlineText}"
                                        FontFamily="{StaticResource TourneyThin}"
                                        FontSize="22" TextTrimming="CharacterEllipsis"

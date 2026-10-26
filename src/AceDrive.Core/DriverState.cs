@@ -41,7 +41,9 @@ namespace AceDrive.Core;
 /// The Gentlemen Drivers Club reputation (PORTPLAN 49, Unity
 /// PlayerData.clubReputation) starts at Unity's raw 0 — the Cento Miglia page
 /// prints it with Unity's 1.0 floor — and only a finished Cento Miglia moves
-/// it, so the race port owns the writes while the page already reads it.</summary>
+/// it, so the race port owns the writes while the page already reads it.
+/// The Star of the Show win total (Unity PlayerData.starOfTheShowWins) rides
+/// here too: the race prize scales on it (each win pays more than the last).</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -76,7 +78,8 @@ public sealed record DriverState(
     bool VisitedCarWash = false,
     bool VisitedCarDealer = false,
     bool VisitedInsurance = false,
-    double ClubReputation = 0.0)
+    double ClubReputation = 0.0,
+    int StarOfTheShowWins = 0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

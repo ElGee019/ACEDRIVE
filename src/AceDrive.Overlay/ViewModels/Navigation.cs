@@ -68,6 +68,18 @@ public sealed class Navigation
     // startup: content, so the page never reads a file itself.
     private readonly IReadOnlyList<CentoTier> _centoTiers;
 
+    // The route the event page builds is planned here, from the zone's streets
+    // on the shared address map (PORTPLAN 49): the page only reports it.
+    private readonly AddressMap _addressMap;
+
+    // The profile's street id: the home street leads the zone's streets while
+    // the placeholder map has no per-street zone identity.
+    private readonly Func<string?> _playerStreetId;
+
+    // The entry's race flow: the page's built event starts it, and the flow then
+    // owns the drive, the registration check and the finish.
+    private readonly CentoRaceFlow _cento;
+
     // The event page's registration draw, the one randomness its ENTER flow
     // owns: a fresh number per entry, never a shared global.
     private readonly Random _rng;
@@ -111,6 +123,7 @@ public sealed class Navigation
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
+        AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         Func<string> carBrand, Random rng, ILog log)
     {
         _shell = shell;
@@ -139,6 +152,9 @@ public sealed class Navigation
         _day = day;
         _zone = zone;
         _centoTiers = centoTiers;
+        _addressMap = addressMap;
+        _playerStreetId = playerStreetId;
+        _cento = cento;
         _carBrand = carBrand;
         _rng = rng;
         _log = log;
@@ -369,16 +385,25 @@ public sealed class Navigation
     }
 
     // The event page per visit, never cached: the reputation it prints and the
-    // garage size it counts are the driver's current ones, and the zone length
-    // it builds the route from grows between visits. BACK and the built event's
-    // BACK both return to the calendar it was opened from — Unity's race would
-    // start there; the overlay has none yet, so the host logs the built event
-    // and leaves the drive to the race port.
+    // garage size it counts are the driver's current ones, and the route it
+    // plans grows as the zone does. BACK returns to the calendar it was opened
+    // from; the built event starts the race flow, which owns the drive to the
+    // start, the registration check and the finish.
     private void OpenCento()
     {
         // The year is not persisted (PORTPLAN 51): the game's fixed 1924 seed is
         // what every page stamps, and Unity prints the same pair.
         CalendarStamp stamp = CalendarStamp.Default with { Week = _day.DisplayWeek };
+        IReadOnlyList<AddressStreet> streets = CentoStreets();
+        if (CentoRoutePlanner.LongestRoute(_addressMap, streets) is not { } route)
+        {
+            // A map without two doors cannot build a race: refuse the event
+            // instead of opening a page whose ENTER would have no route.
+            _log.LogWarning(
+                $"cento miglia not opened: {streets.Count} zone street(s) hold no two doors");
+            return;
+        }
+
         var facts = new CentoMigliaFacts(
             stamp.Week,
             stamp.Year,
@@ -386,21 +411,22 @@ public sealed class Navigation
             _zone.StreetIds.Count > 0,
             _garage.Cars.Count,
             CurrentCarClass(),
-            _zone.Km);
+            route);
         ShowScreen(new CentoMigliaScreenViewModel(
             _centoTiers, facts, new RelayCommand(() => ShowScreen(CalendarPage())),
-            _clock, _rng, CentoBuilt));
+            _clock, _rng, _cento.Start));
         _log.LogInfo(
             $"cento miglia opened: week {facts.Week}, rep {facts.ClubReputation:0.00}, " +
-            $"{facts.CarsOwned} cars, class {facts.CarClass}, {_centoTiers.Count} tiers");
+            $"{facts.CarsOwned} cars, class {facts.CarClass}, {_centoTiers.Count} tiers, " +
+            $"route {route.DistanceKm:0.000} km over {streets.Count} street(s)");
     }
 
-    // The ENTER flow's outcome: the tier, the registration number it issued and
-    // the longest route the zone allowed. The race port takes this record; until
-    // it exists, the log is the one consumer.
-    private void CentoBuilt(CentoMigliaEvent built) =>
-        _log.LogInfo($"cento miglia built: {built.TierLabel} (tier {built.TierNumber}), " +
-            $"registration #{built.Registration}, {built.DistanceKm:0.0} km");
+    // The zone's streets on the address map, home street first (the interim
+    // mapping AddressBook.ZoneStreets documents). The race is planned over
+    // exactly these, so a fresh one-street career never races on a street it
+    // has not discovered.
+    private IReadOnlyList<AddressStreet> CentoStreets() =>
+        AddressBook.ZoneStreets(_addressMap, _zone.StreetIds.Count, _playerStreetId());
 
     // The class of the car being driven: Unity reads CarData.Get(player.grandmaCar),
     // the car the player took out of the garage — here the garage's current car.

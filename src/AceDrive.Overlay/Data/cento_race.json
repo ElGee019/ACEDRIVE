@@ -1,0 +1,10 @@
+{
+  "placementEarnings": [ 200, 150, 100, 50 ],
+  "starBaseChance": 0.9,
+  "starSteepness": 0.4,
+  "starClassPivot": 12,
+  "starPlacementMultipliers": [ 1.2, 1.0, 0.8, 0.6 ],
+  "starPrizePerWin": 500,
+  "awardItemName": "Star of the Show Award {0} - {1}",
+  "certificateItemName": "Cento Miglia Certificate Week {0} {1} - Tier {2}"
+}

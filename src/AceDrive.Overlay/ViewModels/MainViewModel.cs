@@ -17,7 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class MainViewModel
     : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
-      IPoiWorldHost, INavigationHost, IDayCycleHost, IDisposable
+      ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -43,6 +43,14 @@ public sealed class MainViewModel
     // The delivery run from DELIVER to receipt: owns the live run and the board
     // page; the panel, the HUD line and the settle arrive through IDeliveryHost.
     private readonly DeliveryFlow _delivery;
+    // The Cento Miglia entry from the built event to the receipt: owns the
+    // phases, the registration check and the reputation ticker; the panel, the
+    // companion's line and the settle arrive through ICentoRaceHost.
+    private readonly CentoRaceFlow _cento;
+    // Prices and banks a finished Cento Miglia: the purse, the reputation and
+    // the Star of the Show item. Kept apart from JobSettlement so the job
+    // settles never grow a third, unrelated effect order.
+    private readonly CentoRaceSettlement _centoSettlement;
     // The POI world: the business/store/hub doors and the arrival handlers.
     private readonly PoiWorld _poiWorld;
     // The zone growth at the settle hooks: the introduction gate, the street it
@@ -136,7 +144,8 @@ public sealed class MainViewModel
     // settles, or from DELIVER until the last store is served. The idle-shift
     // rule and the overlay call both read this one definition, so a new leg
     // cannot mean two different things.
-    private bool JobInProgress => _taxi.InProgress || _delivery.InProgress;
+    private bool JobInProgress =>
+        _taxi.InProgress || _delivery.InProgress || _cento.InProgress;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
@@ -150,6 +159,7 @@ public sealed class MainViewModel
         OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
+        CentoRaceFlow cento, CentoRaceSettlement centoSettlement,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
         TodoBoard todos, DestinationPins pins,
         ITelemetryHud? hud = null,
@@ -191,6 +201,8 @@ public sealed class MainViewModel
         _panel = panel;
         _taxi = taxi;
         _delivery = delivery;
+        _cento = cento;
+        _centoSettlement = centoSettlement;
         _poiWorld = poiWorld;
         _zoneGrowth = zoneGrowth;
         // The readout formatter and the session calendar are built by the root
@@ -212,6 +224,7 @@ public sealed class MainViewModel
         // fire a command or enter a door.
         _taxi.Attach(this);
         _delivery.Attach(this);
+        _cento.Attach(this);
         _poiWorld.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications so the bindings stay live.
@@ -353,6 +366,7 @@ public sealed class MainViewModel
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
     void IJobSettlementHost.GoToControlPage() => _nav.ShowControl();
+    void IJobSettlementHost.GoToMenuPage() => _nav.ShowMenuPage();
     void IJobSettlementHost.RefreshDeliveryBoard() => _delivery.RefreshBoard();
     void IJobSettlementHost.ClearDeliveryRun() => _delivery.Stop();
     void IJobSettlementHost.GoToDeliveryBoard() => _nav.ShowDeliveryBoard();
@@ -388,6 +402,23 @@ public sealed class MainViewModel
     }
     void IDeliveryHost.Settle(DeliveryRun run) =>
         _settlement.SettleDeliveryRun(run, HomeCountry, this);
+
+    // The host slice the Cento Miglia entry sees: the flow owns the phases, the
+    // registration check and the reputation ticker; the shell owns the panel,
+    // the companion's line and the settle that prices the receipt.
+    void ICentoRaceHost.ShowPage(object screen) => _nav.ShowScreen(screen);
+    void ICentoRaceHost.RevealPage(object screen) => _panel.PresentJob(screen);
+    void ICentoRaceHost.HidePanel() => _panel.Hide();
+    object ICentoRaceHost.ControlPage() => _nav.ControlPage();
+    void ICentoRaceHost.PinStart(CentoMigliaEvent race) =>
+        _hud?.SetJobGuidance(CentoGuidance(race, start: true));
+    void ICentoRaceHost.PinFinish(CentoMigliaEvent race) =>
+        _hud?.SetJobGuidance(CentoGuidance(race, start: false));
+    void ICentoRaceHost.ClearGuidance() => _hud?.SetJobGuidance(null);
+    void ICentoRaceHost.SetReputation(double? reputation) => _hud?.SetReputation(reputation);
+    bool ICentoRaceHost.ParkedAtTarget => _hud?.ParkedAtTarget ?? false;
+    void ICentoRaceHost.SettleRace(CentoMigliaEvent race, double start, double end) =>
+        _centoSettlement.Settle(race, start, end, this);
 
     // The host slice the POI world sees: the world owns the doors and the
     // board growth; the navigator owns the board page and the dealer's follow-up.
@@ -587,6 +618,11 @@ public sealed class MainViewModel
         _fleet.IntegrateOdometer(s, dt, _story.Done);
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
+        // The entry's own edge rides the same loop: parked at the start opens
+        // the registration page, parked at the finish settles the race, and the
+        // reputation ticker banks the distance this tick covered, so a parked
+        // car grows nothing.
+        _cento.Advance(s, dt);
         if ((now - _saver.LastGarageSave).TotalSeconds >= OdometerSaveSec)
         {
             SaveGarage();
@@ -804,6 +840,18 @@ public sealed class MainViewModel
                 "HudDeliveryStoreDrive", "HudDeliveryStoreArrived", "HudDeliveryStoreAction",
                 _taxiRules.ArrivalRadiusMeters);
     }
+
+    // The companion's two Cento legs: the start door while the player drives to
+    // the registration check, the finish door during the race. Neither offers a
+    // button — the start opens the register page on arrival and the finish
+    // settles itself — so both carry an empty action key.
+    private HudJobGuidance CentoGuidance(CentoMigliaEvent race, bool start) => new(
+        Strings.Get(start ? "CentoStartName" : "CentoFinishName"),
+        start ? race.Route.Start : race.Route.Finish,
+        start ? "HudCentoStartDrive" : "HudCentoFinishDrive",
+        start ? "HudCentoStartArrived" : "HudCentoFinishArrived",
+        string.Empty,
+        _taxiRules.ArrivalRadiusMeters);
 
     // The job, fare and shift lines the formatter paints, plus the two job
     // commands: their can-execute reads the flow's phase, so the same edge that

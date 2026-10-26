@@ -52,6 +52,15 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private bool _entered;
     private bool _wrongCar;
     private bool _isRevealed;
+    // The live club reputation the Cento Miglia race hands over, if any, held
+    // as the 5-decimal reading the counter paints. It keeps its own line so the
+    // banner above stays the drive-to sentence: the player must still read
+    // where the finish is. Null takes the line down again.
+    private double? _reputation;
+    // The reading already painted, so the 10 Hz race counter formats only when
+    // the shown digit actually moves. The sentinel forces the first paint.
+    private long _shownReputation = long.MinValue;
+    private string _reputationText = string.Empty;
     // The customer request currently presented on the companion, if any. The
     // host creates it (it owns the countdown and the outcome); the HUD only
     // paints it in place of the task text and lets its buttons run.
@@ -231,6 +240,20 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     }
 
     /// <summary>
+    /// The live club reputation while a Cento Miglia race runs ("YOUR CLUB
+    /// REPUTATION: 1.00623"), empty when no race is on. It has its own line
+    /// under the distance so the banner keeps the drive-to sentence.
+    /// </summary>
+    public string ReputationText
+    {
+        get => _reputationText;
+        private set => SetField(ref _reputationText, value);
+    }
+
+    /// <summary>True while the race counter has a line of its own.</summary>
+    public bool HasReputation => _reputation is not null;
+
+    /// <summary>
     /// True once the walk's closing car page has handed the errand over. The
     /// window binds its visibility to this so the intro pages own the screen
     /// first.
@@ -300,9 +323,17 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 SetEntered(false);
             }
             OnPropertyChanged(nameof(ShowEnterButton));
+            OnPropertyChanged(nameof(ParkedAtTarget));
             RepaintDestination();
         }
     }
+
+    /// <summary>
+    /// The arrival state under its job name: a leg is "parked at the target"
+    /// for the flow that pinned it. The Cento Miglia race reads it to open the
+    /// registration page at the start and to finish at the finish.
+    /// </summary>
+    public bool ParkedAtTarget => AtDestination;
 
     /// <summary>
     /// True while the task text is up: the drive-to/arrival line, the distance
@@ -312,7 +343,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// </summary>
     public bool HasTaskText => !_entered;
 
-    public bool ShowEnterButton => AtDestination && !_entered;
+    // WHY the label check: a Cento Miglia leg carries no action (the start
+    // opens its own page, the finish settles itself), so the arrival must not
+    // paint an empty button the player can press for nothing.
+    public bool ShowEnterButton => AtDestination && !_entered && _enterText.Length > 0;
 
     /// <summary>
     /// The host entered the pinned door (a shop interior, a story dialogue or
@@ -387,6 +421,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         // leave it stale, so drop it with the old strings.
         SetNoticeText(string.Empty);
         RepaintDestination();
+        RepaintReputation();
         Refresh(_lastSample, _lastOdometerKm, _lastGameRunning, _lastWrongCar, force: true);
     }
 
@@ -448,6 +483,53 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         RepaintDestination();
         UpdateLegDistance(_lastSample, force: true);
         UpdateDeadline(force: true);
+    }
+
+    /// <summary>
+    /// Shows the live club reputation on its own line (the Cento Miglia race
+    /// counter), or takes the line down with null. Only the 5-decimal reading
+    /// is compared, so the race's 10 Hz update formats once per displayed
+    /// change, never once per sample. The banner is left alone: the finish leg
+    /// keeps telling the player where to drive.
+    /// </summary>
+    public void SetReputation(double? reputation)
+    {
+        bool wasUp = HasReputation;
+        if (reputation is not { } value)
+        {
+            if (!wasUp)
+            {
+                return;
+            }
+
+            _reputation = null;
+            _shownReputation = long.MinValue;
+            ReputationText = string.Empty;
+        }
+        else
+        {
+            if (!double.IsFinite(value))
+            {
+                return;
+            }
+
+            long shown = (long)Math.Round(value * 100000.0, MidpointRounding.AwayFromZero);
+            if (shown == _shownReputation)
+            {
+                return;
+            }
+
+            _shownReputation = shown;
+            // WHY the rounded reading: it is exactly the precision the counter
+            // prints, so the guard and the painted digits can never disagree.
+            _reputation = shown / 100000.0;
+            RepaintReputation();
+        }
+
+        if (wasUp != HasReputation)
+        {
+            OnPropertyChanged(nameof(HasReputation));
+        }
     }
 
     /// <summary>
@@ -521,6 +603,15 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     {
         OnPropertyChanged(nameof(BannerText));
         OnPropertyChanged(nameof(HasBanner));
+    }
+
+    // The counter is a sentence with the race's number in it, so a language
+    // switch repaints it from the stored reading like the banner's copy.
+    private void RepaintReputation()
+    {
+        ReputationText = _reputation is { } reading
+            ? Strings.Format("HudCentoReputation", reading)
+            : string.Empty;
     }
 
     // WHY two templates per state: a shop invites the player in for the errand,

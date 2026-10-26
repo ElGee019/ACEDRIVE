@@ -615,4 +615,49 @@ Accept this job?</value></data>
   <data name="MenuVoiceWake" xml:space="preserve"><value>To call this screen while driving say "Hey {{BRAND}}". For instance "Hey {0}".</value></data>
   <data name="MenuVoiceHotkey" xml:space="preserve"><value>You can also press CTRL+Shift+C.</value></data>
   <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
+  <!-- Cento Miglia start-line registration check (PORTPLAN 49, Unity
+       RegisterScreen). The prompt, the selected-number line and the two refusal
+       messages; {0} carries the digits picked so far. The dash placeholder keeps
+       the line readable before the first digit. -->
+  <data name="CentoRegisterTitle" xml:space="preserve"><value>RACE REGISTRATION</value></data>
+  <data name="CentoRegisterPrompt" xml:space="preserve"><value>Enter the registration number the club gave you at the event desk.</value></data>
+  <data name="CentoRegisterSelected" xml:space="preserve"><value>SELECTED: {0}</value></data>
+  <data name="CentoRegisterNoDigits" xml:space="preserve"><value>—</value></data>
+  <data name="CentoRegisterWrong" xml:space="preserve"><value>You got that wrong! Try again.</value></data>
+  <data name="CentoRegisterClosed" xml:space="preserve"><value>Wrong again. You are not allowed to enter.</value></data>
+  <!-- Cento Miglia receipt (Unity CentoMigliaScreen's CentoReceipt panel): the
+       place line (English ordinal suffixes; a translator may reword the whole
+       line), the placement purse, the reputation the race earned, the garage
+       calculation, the Star of the Show outcome and where the item went. The
+       assertivity stat is not ported, so its clause is left out of the
+       calculation sentence; placeholders survive translation. The
+       congratulations line names the event's week (the port replaced Unity's
+       game year with it), {1} the club that issued it. -->
+  <data name="CentoReceiptTitle" xml:space="preserve"><value>CENTO MIGLIA RECEIPT</value></data>
+  <data name="CentoReceiptCongrats" xml:space="preserve"><value>Congratulations you completed the week {0} Cento Miglia for the {1}</value></data>
+  <data name="CentoPlaceFirst" xml:space="preserve"><value>1st PLACE</value></data>
+  <data name="CentoPlaceSecond" xml:space="preserve"><value>2nd PLACE</value></data>
+  <data name="CentoPlaceThird" xml:space="preserve"><value>3rd PLACE</value></data>
+  <data name="CentoPlaceOther" xml:space="preserve"><value>{0}th PLACE</value></data>
+  <data name="CentoReceiptEarnings" xml:space="preserve"><value>+ {0:0.00} CR (Placement Earnings, Tier {1}, Rep x{2:0.0000})</value></data>
+  <data name="CentoReceiptReputation" xml:space="preserve"><value>Participating with the {0} earned you {1:0.00000} Club Reputation.</value></data>
+  <data name="CentoReceiptCalculation" xml:space="preserve"><value>Taken into account the size of your car collection ({0}) and the class of your car ({1}).</value></data>
+  <data name="CentoReceiptStarWon" xml:space="preserve"><value>You have been awarded STAR OF THE SHOW! You receive {0:0.00} CR</value></data>
+  <data name="CentoReceiptStarLost" xml:space="preserve"><value>No STAR OF THE SHOW this time.</value></data>
+  <data name="CentoReceiptAwardStored" xml:space="preserve"><value>Your Star of the Show Award has been added to the trunk of your car.</value></data>
+  <data name="CentoReceiptCertificateStored" xml:space="preserve"><value>Your certificate has been added to the trunk of your car.</value></data>
+  <data name="CentoReceiptTotal" xml:space="preserve"><value>+ {0:0.00} CR</value></data>
+  <data name="CentoReceiptWallet" xml:space="preserve"><value>Wallet: {0:0.00} CR</value></data>
+  <!-- Cento Miglia companion lines (Unity MilleMigliaHandler + MapScreen): the
+       name each leg prints, the drive-to and arrival sentences, and the live
+       club reputation the race shows instead of the drive-to line. The legs
+       carry no action key: the start opens its own page and the finish settles
+       itself. -->
+  <data name="CentoStartName" xml:space="preserve"><value>the Cento Miglia start</value></data>
+  <data name="CentoFinishName" xml:space="preserve"><value>the Cento Miglia finish</value></data>
+  <data name="HudCentoStartDrive" xml:space="preserve"><value>Drive to the Cento Miglia start at {1} No. {2} in {3}</value></data>
+  <data name="HudCentoStartArrived" xml:space="preserve"><value>You reached the Cento Miglia start. The club is checking your registration.</value></data>
+  <data name="HudCentoFinishDrive" xml:space="preserve"><value>Race to the Cento Miglia finish at {1} No. {2} in {3}</value></data>
+  <data name="HudCentoFinishArrived" xml:space="preserve"><value>You have finished the Cento Miglia!</value></data>
+  <data name="HudCentoReputation" xml:space="preserve"><value>YOUR CLUB REPUTATION: {0:0.00000}</value></data>
 </root>

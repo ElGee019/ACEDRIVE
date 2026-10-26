@@ -185,6 +185,12 @@ internal static class TestSession
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
             breakdownsInstance, beat, logger);
+        // The Cento Miglia entry (PORTPLAN 49): its own flow and settle, on the
+        // same wallet, garage and trunk the assertions read.
+        var cento = new CentoRaceFlow(walletInstance, garageInstance, beat, logger);
+        var centoSettlement = new CentoRaceSettlement(
+            walletInstance, garageInstance, trunkInstance, CentoRaceRules.Default,
+            options.Rng ?? new Random(0), beat, logger);
         // The haul settle: the same watcher, pool and wallet the assertions
         // read, and the calendar whose week its checkpoint banks.
         var haul = new CarHaulFlow(
@@ -197,8 +203,9 @@ internal static class TestSession
             saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
-            zoneInstance, options.CentoTiers ?? [], () => brands.Brand,
-            new Random(6), logger);
+            zoneInstance, options.CentoTiers ?? [],
+            map, () => profiles.Load()?.StreetId, cento,
+            () => brands.Brand, new Random(6), logger);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(shell, navigation, taxi, delivery, clock, logger);
@@ -223,7 +230,8 @@ internal static class TestSession
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, poiWorld, navigation, readouts, dayCycle,
+            taxi, delivery, poiWorld, cento, centoSettlement,
+            navigation, readouts, dayCycle,
             todoBoard, pinsInstance,
             options.Hud, options.SaveResets, options.Restarter);
         if (options.CarKsId is not null)

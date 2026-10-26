@@ -50,6 +50,9 @@ public sealed class DriverWallet
         // PlayerData.clubReputation): raw 0 for a fresh driver, exactly like
         // Unity — the Cento Miglia page applies the 1.0 display floor itself.
         ClubReputation = Math.Max(0.0, saved?.ClubReputation ?? 0.0);
+        // The career's Star of the Show wins (Unity starOfTheShowWins): the race
+        // prize scales on the new total, so the file must carry it.
+        StarOfTheShowWins = Math.Max(0, saved?.StarOfTheShowWins ?? 0);
     }
 
     public double Cash { get; private set; }
@@ -60,10 +63,14 @@ public sealed class DriverWallet
     public double CreditEarned { get; private set; }
 
     /// <summary>The Gentlemen Drivers Club reputation the Cento Miglia page
-    /// gates its tiers on (Unity PlayerData.clubReputation). Read-only for the
-    /// overlay today: only a finished race moves it, and that port has not
-    /// landed.</summary>
+    /// gates its tiers on (Unity PlayerData.clubReputation). A finished race
+    /// writes the reading its ticker reached (Unity's
+    /// StopClubReputationTicker), so the next visit gates on the new level.</summary>
     public double ClubReputation { get; private set; }
+
+    /// <summary>Star of the Show wins so far (Unity starOfTheShowWins): each
+    /// new win pays more than the last, so the total is career state.</summary>
+    public int StarOfTheShowWins { get; private set; }
 
     /// <summary>The persisted driver-rating skills (Unity PlayerData's three
     /// driver* fields). Skill events move them through the Add* helpers below;
@@ -233,6 +240,25 @@ public sealed class DriverWallet
         Earn(receipt.TotalEarned);
     }
 
+    /// <summary>
+    /// One finished Cento Miglia (PORTPLAN 49, Unity CentoMigliaScreen's
+    /// ProcessReceiptRewards): the purse — placement earnings plus any Star of
+    /// the Show prize — lands in cash, the reputation the race's ticker reached
+    /// replaces the club level (Unity writes tempClubReputation back on
+    /// arrival), and the win total the prize scales on persists with it.
+    /// </summary>
+    public void AddCentoRace(CentoReceipt receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        Cash = Math.Round(Cash + receipt.TotalEarned, 2, MidpointRounding.AwayFromZero);
+        Earn(receipt.TotalEarned);
+        if (double.IsFinite(receipt.EndReputation) && receipt.EndReputation > 0.0)
+        {
+            ClubReputation = receipt.EndReputation;
+        }
+        StarOfTheShowWins = Math.Max(StarOfTheShowWins, receipt.StarWins);
+    }
+
     public DriverState Snapshot() => new(Cash, Xp)
     {
         Bank = BankBalance,
@@ -244,6 +270,7 @@ public sealed class DriverWallet
         OffTheLine = Rating.OffTheLine,
         CreditEarned = CreditEarned,
         ClubReputation = ClubReputation,
+        StarOfTheShowWins = StarOfTheShowWins,
     };
 
     private void Earn(double amount)

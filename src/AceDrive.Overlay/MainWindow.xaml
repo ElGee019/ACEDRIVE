@@ -53,6 +53,12 @@
         <DataTemplate DataType="{x:Type vm:CentoMigliaScreenViewModel}">
             <views:CentoMigliaScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CentoRegisterScreenViewModel}">
+            <views:CentoRegisterScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CentoReceiptScreenViewModel}">
+            <views:CentoReceiptScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:TrunkScreenViewModel}">
             <views:TrunkScreenView/>
         </DataTemplate>

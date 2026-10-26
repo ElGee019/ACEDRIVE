@@ -114,4 +114,25 @@ public sealed class AddressBookTests
         Assert.False(AddressBook.JobFitsRadius(LongMap, home, far, near, 5));
         Assert.True(AddressBook.JobFitsRadius(LongMap, home, near, near, 5));
     }
+
+    [Fact]
+    public void ZoneStreets_LeadsWithTheHomeStreetAndCapsAtTheDiscoveredCount()
+    {
+        // The interim mapping the Cento Miglia route plans over: the profile's
+        // street joins first, the map order fills the rest, and the zone's
+        // street count is the cap.
+        Assert.Equal(
+            ["Street 2", "Street 1"],
+            AddressBook.ZoneStreets(Map, 2, "street-2").Select(street => street.Name));
+        Assert.Equal(
+            ["Street 2"],
+            AddressBook.ZoneStreets(Map, 1, "street-2").Select(street => street.Name));
+        // No profile yet: the map order answers.
+        Assert.Equal(
+            ["Street 1", "Street 2"],
+            AddressBook.ZoneStreets(Map, 2, null).Select(street => street.Name));
+        // A grown zone never asks for streets the map does not have.
+        Assert.Equal(2, AddressBook.ZoneStreets(Map, 9, "street-1").Count);
+        Assert.Empty(AddressBook.ZoneStreets(Map, 0, "street-1"));
+    }
 }

@@ -1,0 +1,74 @@
+<UserControl x:Class="AceDrive.Overlay.Views.CentoReceiptScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Cento Miglia receipt (PORTPLAN 49, Unity CentoMigliaScreen's
+         CentoReceipt panel): the congratulations, the place, the placement
+         purse, the reputation the race earned, the garage/class calculation, the
+         Star of the Show outcome with where the award went, the purse total and
+         the wallet, then CONTINUE. Unity's final standings stay out until the
+         NPC field lands; nothing on this page is interactive except the exit. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=CentoReceiptTitle}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding CongratsLine}" Foreground="#FFF" FontSize="15"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <TextBlock Text="{Binding PlaceLine}" Foreground="#FFF" FontSize="20"
+                       FontWeight="Bold" TextAlignment="Center" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding EarningsLine}" Foreground="#FFF" FontSize="15"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding ReputationLine}" Foreground="#FFF" FontSize="15"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding CalculationLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+            <Border Style="{StaticResource SectionDivider}"/>
+            <!-- The award turns teal like the other receipts' prize lines; the
+                 line under it says where the item went. -->
+            <TextBlock Text="{Binding RewardLine}" FontSize="16" FontWeight="Bold"
+                       TextAlignment="Center" TextWrapping="Wrap">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Setter Property="Foreground" Value="#FFFFFFFF"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StarWon}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
+            <TextBlock Text="{Binding ItemLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,6"/>
+            <Border Style="{StaticResource SectionDivider}"/>
+            <TextBlock Text="{Binding TotalLine}" Foreground="#FF97EAD2" FontSize="20"
+                       TextAlignment="Center"/>
+            <TextBlock Text="{Binding WalletLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center"/>
+        </StackPanel>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=ReceiptContinue}" Padding="4"
+                    HorizontalAlignment="Stretch" Command="{Binding ContinueCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

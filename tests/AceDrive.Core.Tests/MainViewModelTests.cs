@@ -1764,8 +1764,101 @@ public sealed class MainViewModelTests
         clock.Advance(TimeSpan.FromSeconds(1));
         vm.Poll();
         Assert.True(page.IsBuilt);
+        // The built event starts the race flow, which logs the entry it owns
+        // (tier, registration, the planned route and its distance).
         Assert.Contains(log.Infos, line => line.StartsWith(
-            "cento miglia built: Gentlemen Drivers Club", StringComparison.Ordinal));
+                "cento miglia entry: tier 1", StringComparison.Ordinal)
+            && line.Contains("registration #", StringComparison.Ordinal)
+            && line.Contains("km", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Poll_RunsTheWholeCentoMigliaFromEntryToReceipt()
+    {
+        // The end-to-end race (PORTPLAN 49): build the event, drive to the
+        // start, pass the registration check, race with the live reputation
+        // counter, and settle the receipt. The companion is a fake, so the
+        // parked edges are the test's to set; everything else is the real
+        // graph from TestSession.
+        var log = new TestLog();
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
+        var trunk = new Trunk();
+        var garage = new Garage(TestRoadCars.Pool);
+        garage.Add(TestRoadCars.Pool[0], week: 1);
+        var (vm, clock, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            log: log, hud: hud, wallet: wallet, trunk: trunk, garage: garage,
+            centoTiers:
+            [
+                new CentoTier("gentlemen_drivers", "Gentlemen Drivers Club", "Free for all.", 1),
+            ]);
+        CalendarScreenViewModel calendar = ShowCalendar(vm);
+        clock.Advance(TimeSpan.FromSeconds(
+            ((6 * 24 * 60) + 1) * GameClock.RealSecondsPerGameMinute));
+        vm.Poll();
+        calendar.DayCommand.Execute(ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.CentoMiglia).DayOfWeek);
+
+        var page = Assert.IsType<CentoMigliaScreenViewModel>(vm.CurrentScreen);
+        page.TierCommand.Execute(page.Tiers[0]);
+        page.EnterCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(CentoMiglia.BuildSeconds));
+        vm.Poll();
+
+        // The build handed the event to the race flow: the companion pins the
+        // start door and the page's registration is the number to type.
+        Assert.NotNull(hud.JobGuidance);
+        int registration = int.Parse(
+            page.RegistrationLine.Split('#')[1], CultureInfo.InvariantCulture);
+
+        // Parked at the start: the registration page takes over.
+        hud.AtDestination = true;
+        vm.Poll();
+        var register = Assert.IsType<CentoRegisterScreenViewModel>(vm.CurrentScreen);
+        foreach (char digit in registration.ToString(CultureInfo.InvariantCulture))
+        {
+            register.DigitCommand.Execute(int.Parse(
+                digit.ToString(), CultureInfo.InvariantCulture));
+        }
+        Assert.True(register.ShowContinue);
+
+        // CONTINUE starts the race: the finish is pinned and the counter is up.
+        register.ContinueCommand.Execute(null);
+        Assert.Equal("Street 1", hud.JobGuidance!.Target.StreetName);
+        Assert.Equal(33, hud.JobGuidance.Target.HouseNumber);
+        Assert.Equal(1.0, hud.Reputation!.Value, precision: 6);
+
+        // Driving grows the reputation one tick per 0.01 km covered: sixty
+        // half-second polls at the session's speed, so the ticker sees distance
+        // rather than the wall clock. The finish stays the pinned leg, so the
+        // banner keeps telling the player where to drive.
+        hud.AtDestination = false;
+        for (int i = 0; i < 60; i++)
+        {
+            clock.Advance(TimeSpan.FromSeconds(0.5));
+            vm.Poll();
+        }
+        Assert.True(hud.Reputation is > 1.0);
+        Assert.Equal("Street 1", hud.JobGuidance!.Target.StreetName);
+
+        // Parking on the finish settles the race and opens its receipt.
+        hud.AtDestination = true;
+        vm.Poll();
+
+        var receipt = Assert.IsType<CentoReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("1st PLACE", receipt.PlaceLine);
+        Assert.True(wallet.Cash > 0.0);
+        Assert.True(wallet.ClubReputation > 1.0);
+        Assert.Single(trunk.Items);
+        Assert.Null(hud.Reputation);
+        Assert.Contains(log.Infos, line => line.StartsWith(
+            "cento miglia settled:", StringComparison.Ordinal));
+
+        // CONTINUE leaves the race for the main page, never the jobs list: the
+        // event opened from the menu's calendar, so the menu is where it ends.
+        receipt.ContinueCommand.Execute(null);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     private static string TuesdayButton(CalendarScreenViewModel calendar) =>

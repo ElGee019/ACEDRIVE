@@ -3,8 +3,8 @@ using AceDrive.Core;
 namespace AceDrive.Core.Tests;
 
 /// <summary>The Cento Miglia rules (PORTPLAN 49, Unity CentoMigliaScreen):
-/// the era decade, the reputation floor, the tier gates, the ENTER flow's
-/// registration number and the zone-longest route.</summary>
+/// the era decade, the reputation floor, the tier gates and the ENTER flow's
+/// registration number.</summary>
 public sealed class CentoMigliaTests
 {
     private static CentoTier Tier(string id, int required) =>
@@ -41,17 +41,6 @@ public sealed class CentoMigliaTests
             Assert.InRange(CentoMiglia.DrawRegistration(5, new Random(i)), 100, 999);
             Assert.InRange(CentoMiglia.DrawRegistration(8, new Random(i)), 1000, 9999);
         }
-    }
-
-    [Fact]
-    public void LongestDistanceKm_IsTheWholeZone()
-    {
-        // The event runs every discovered street, so the zone's own length is
-        // the longest route it allows (Unity takes the furthest street pair).
-        Assert.Equal(1.929, CentoMiglia.LongestDistanceKm(1.929), precision: 6);
-        Assert.Equal(0.0, CentoMiglia.LongestDistanceKm(0.0));
-        Assert.Equal(0.0, CentoMiglia.LongestDistanceKm(-2.0));
-        Assert.Equal(0.0, CentoMiglia.LongestDistanceKm(double.NaN));
     }
 
     [Fact]

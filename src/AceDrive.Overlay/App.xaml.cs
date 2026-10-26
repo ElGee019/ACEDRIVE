@@ -52,6 +52,10 @@ public partial class App : Application, IDisposable
         // The Cento Miglia tier table (PORTPLAN 49): shipped content, read once
         // at startup like the fares so no page touches a file.
         IReadOnlyList<CentoTier> centoTiers = new JsonCentoTierStore(_log).Load();
+        // The Cento Miglia race balance (PORTPLAN 49): the placement ladder, the
+        // Star of the Show curve and the generated item names, shipped as
+        // content like the tier table so no rule class carries a number.
+        CentoRaceRules centoRaceRules = new JsonCentoRaceRulesStore(_log).Load();
         // The placeholder address map grounds the HUD, the onboarding home and
         // the taxi job doors; load it before the proposal draw.
         var addressMap = new JsonAddressMapStore(_log).Load();
@@ -406,6 +410,13 @@ public partial class App : Application, IDisposable
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,
             beat, _log);
+        // The Cento Miglia entry (PORTPLAN 49): the drive to the start, the
+        // registration check and the race to the finish, in its own collaborator
+        // so neither job flow grows a third phase machine. Its settle prices the
+        // receipt apart from the taxi/delivery effect order.
+        var cento = new CentoRaceFlow(driver, garage, beat, _log);
+        var centoSettlement = new CentoRaceSettlement(
+            driver, garage, trunk, centoRaceRules, new Random(taxiSeed + 7), beat, _log);
         // The car haul (PORTPLAN 20): settle-only today, so the tap prices the
         // placeholder leg, banks it and hands back the flow's own receipt.
         var haul = new CarHaulFlow(carBrands, cars, driver, dayCycle, saver, beat, _log);
@@ -424,6 +435,7 @@ public partial class App : Application, IDisposable
             driver, garage, rivals, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
+            addressMap, () => profileStore.Load()?.StreetId, cento,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
             () => carBrands.Brand, new Random(taxiSeed + 6), _log);
@@ -462,7 +474,8 @@ public partial class App : Application, IDisposable
             rivals,
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, poiWorld, navigation, readouts, dayCycle,
+            taxi, delivery, poiWorld, cento, centoSettlement,
+            navigation, readouts, dayCycle,
             todoBoard, pins,
             hud,
             saveResets, restarter);

@@ -1,0 +1,88 @@
+<UserControl x:Class="AceDrive.Overlay.Views.CentoRegisterScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Cento Miglia start-line registration check (PORTPLAN 49, Unity
+         RegisterScreen): the prompt, the number selected so far, the 0-9 keypad
+         in Unity's button order, the refusal line under it and CONTINUE/BACK in
+         the bottom band. A key whose digit is part of the picked number prints
+         teal, so the selection reads off the pad; a solved number turns
+         CONTINUE on, a closed entry leaves the keypad dead and BACK as the way
+         out. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=CentoRegisterTitle}"/>
+        <TextBlock Grid.Row="1" Style="{StaticResource PageBody}" Text="{Binding PromptLine}"/>
+        <StackPanel Grid.Row="2" VerticalAlignment="Center">
+            <TextBlock Text="{Binding SelectedLine}" Foreground="#FFF" FontSize="18"
+                       TextAlignment="Center" Margin="0,0,0,8"/>
+            <ItemsControl ItemsSource="{Binding Keys}" Width="300" HorizontalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Columns="5"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Content="{Binding Digit}" FontSize="18" Padding="0,6" Margin="3"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding DataContext.DigitCommand,
+                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding Digit}"
+                                IsEnabled="{Binding DataContext.CanType,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                    <Style.Triggers>
+                                        <!-- The picked digits, in the same teal the
+                                             calm pages use for a selection. -->
+                                        <DataTrigger Binding="{Binding Selected}" Value="True">
+                                            <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+        <!-- Refusal line: a plain wrong number invites another try, the second
+             one closes the entry (Unity's two-attempt rule). -->
+        <TextBlock Grid.Row="3" Text="{Binding FeedbackLine}" Foreground="#FFFF7A7A"
+                   FontSize="13" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"
+                   Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVis}}"/>
+        <StackPanel Grid.Row="4">
+            <Button Content="{loc:Loc Key=ReceiptContinue}" Command="{Binding ContinueCommand}"
+                    Margin="0,0,0,6"
+                    Visibility="{Binding ShowContinue, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

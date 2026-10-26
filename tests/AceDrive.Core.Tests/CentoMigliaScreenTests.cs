@@ -25,8 +25,12 @@ public sealed class CentoMigliaScreenTests
     private static CentoMigliaFacts Facts(
         double reputation = 1.5, bool streets = true,
         int cars = 2, int carClass = 16, int week = 3, int year = 1924,
-        double zoneKm = 1.929) =>
-        new(week, year, reputation, streets, cars, carClass, zoneKm);
+        double routeKm = 0.9645) =>
+        new(week, year, reputation, streets, cars, carClass,
+            new CentoRoutePlan(
+                new AddressLocation("Street 1", 1, HouseSide.Right),
+                new AddressLocation("Street 2", 1, HouseSide.Right),
+                routeKm));
 
     private static Harness Create(
         CentoMigliaFacts? facts = null, IReadOnlyList<CentoTier>? tiers = null)
@@ -129,6 +133,22 @@ public sealed class CentoMigliaScreenTests
     }
 
     [Fact]
+    public void SelectingATier_EnablesTheEnterButton()
+    {
+        // ENTER's IsEnabled binds to CanEnter, so the page has to announce the
+        // flag when the detail opens: a silent flip leaves WPF's button
+        // disabled and swallows every click.
+        Harness h = Create();
+        var raised = new List<string?>();
+        h.Page.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        h.Page.TierCommand.Execute(h.Page.Tiers[0]);
+
+        Assert.True(h.Page.CanEnter);
+        Assert.Contains(nameof(CentoMigliaScreenViewModel.CanEnter), raised);
+    }
+
+    [Fact]
     public void FreeTier_PrintsFreeEntryAndTheSingularCarCount()
     {
         Harness h = Create(Facts(reputation: 0.0, cars: 1, carClass: 0));
@@ -197,9 +217,10 @@ public sealed class CentoMigliaScreenTests
     [Fact]
     public void Build_ShowsTheLongestDistanceTheZoneAllows()
     {
-        // The route is the whole operating zone, so a grown zone is a longer
-        // event (Unity ranks the discovered street pairs, furthest first).
-        Harness h = Entered(Facts(zoneKm: 2.8935));
+        // The route is the furthest two doors the zone holds, so a grown zone is
+        // a longer event (Unity ranks its discovered street pairs, furthest
+        // first). The page reports the planned route's own length.
+        Harness h = Entered(Facts(routeKm: 2.8935));
         h.Clock.Advance(TimeSpan.FromSeconds(4));
         h.Page.Tick(h.Clock.UtcNow);
 
@@ -207,7 +228,9 @@ public sealed class CentoMigliaScreenTests
         CentoMigliaEvent built = Assert.Single(h.Built);
         Assert.Equal(1, built.TierNumber);
         Assert.Equal("Gentlemen Drivers Club", built.TierLabel);
-        Assert.Equal(2.8935, built.DistanceKm, precision: 6);
+        Assert.Equal(2.8935, built.Route.DistanceKm, precision: 6);
+        Assert.Equal(new AddressLocation("Street 1", 1, HouseSide.Right), built.Route.Start);
+        Assert.Equal(new AddressLocation("Street 2", 1, HouseSide.Right), built.Route.Finish);
         Assert.Matches("^[0-9]$", built.Registration.ToString(CultureInfo.InvariantCulture));
     }
 

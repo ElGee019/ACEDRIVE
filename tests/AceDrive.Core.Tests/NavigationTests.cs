@@ -95,6 +95,8 @@ public sealed class NavigationTests
                 brands, new FakeContentSource(TestSession.EmptyContent)),
             game, clock, beat, meter, saver, rivals, breakdowns, null, log);
         var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
+        var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
+        cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(brands, poolCars, wallet, day, saver, beat, log);
         // The ToDo list the jobs page reads: its own ledger over the same
         // state instances, with an in-memory file.
@@ -106,7 +108,8 @@ public sealed class NavigationTests
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
-            zoneInstance, CentoTiers, () => "mazda", new Random(0), log);
+            zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
+            () => "mazda", new Random(0), log);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The proposal page asks the job's host for the player's door on every
@@ -223,10 +226,12 @@ public sealed class NavigationTests
         clock.Advance(TimeSpan.FromSeconds(CentoMiglia.BuildSeconds));
         page.Tick(clock.UtcNow);
         Assert.True(page.IsBuilt);
+        // The built event now starts the race flow, which logs the entry it owns
+        // (tier, registration and the zone's longest route on one street).
         Assert.Contains(
-            log.Infos, line => line.StartsWith("cento miglia built:", StringComparison.Ordinal)
+            log.Infos, line => line.StartsWith("cento miglia entry:", StringComparison.Ordinal)
                 && line.Contains("registration #", StringComparison.Ordinal)
-                && line.Contains("1.9 km", StringComparison.Ordinal));
+                && line.Contains("0.960 km", StringComparison.Ordinal));
     }
 
     [Fact]
