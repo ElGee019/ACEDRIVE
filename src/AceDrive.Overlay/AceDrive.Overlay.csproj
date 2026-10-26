@@ -69,6 +69,19 @@
     <Copy SourceFiles="@(VoskModelFile)"
           DestinationFiles="@(VoskModelFile->'$(PublishDir)Data\vosk-model\%(RecursiveDir)%(Filename)%(Extension)')"
           SkipUnchangedFiles="true" />
+    <!-- WHY explicit re-copy: a repeated publish into the same folder hits the
+         SDK's incremental publish clean (_IncrementalCleanPublishDirectory),
+         which deletes these content files from the publish folder and then
+         skips the copy ("no outputs"), so the package would ship without its
+         tables, thumbnails or font licences. Restore them every publish. -->
+    <ItemGroup>
+      <PublishData Include="$(MSBuildProjectDirectory)\Data\*.json" />
+      <PublishThumbs Include="$(MSBuildProjectDirectory)\Data\Thumbs\*.png" />
+      <PublishFontLicence Include="$(MSBuildProjectDirectory)\Assets\Fonts\*-OFL.txt" />
+    </ItemGroup>
+    <Copy SourceFiles="@(PublishData)" DestinationFolder="$(PublishDir)Data" />
+    <Copy SourceFiles="@(PublishThumbs)" DestinationFolder="$(PublishDir)Data\Thumbs" />
+    <Copy SourceFiles="@(PublishFontLicence)" DestinationFolder="$(PublishDir)Assets\Fonts" />
     <!-- WHY an unconditional delete before the copy: PublishDir is not cleaned
          between publishes, so a config copied by an earlier online publish
          would otherwise survive into a later offline demo build and ship the
