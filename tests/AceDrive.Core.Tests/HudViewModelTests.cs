@@ -728,6 +728,34 @@ public sealed class HudViewModelTests
         Assert.DoesNotContain(spoken, vm.EnterKeywords);
     }
 
+    // The drop-off leg's reading of the phrase misses just as often as the
+    // pickup one: 2026-10-22..26 sessions needed up to five attempts before the
+    // model landed "drop off" (2026-10-26 06:09: "job loss", "drop us", "joke
+    // us", "drop boss", then the clean phrase). Each miss below was dead air
+    // on the parked leg.
+    [Theory]
+    [InlineData("drop offs")] // 2026-10-25 19:47:11
+    [InlineData("drop of")]   // 2026-10-23 19:49:17, :19
+    [InlineData("drop us")]   // 2026-10-22 21:05:41, 10-26 06:09:34
+    [InlineData("drop boss")] // 2026-10-26 06:09:39
+    [InlineData("job loss")]  // 2026-10-25 19:47:06, 10-26 06:09:31
+    [InlineData("joke us")]   // 2026-10-26 06:09:37
+    [InlineData("robles")]    // 2026-10-25 19:47:09
+    [InlineData("troubles")]  // 2026-10-23 18:56:32
+    public void JobGuidance_DropOffAnswersTheLoggedMishearings(string spoken)
+    {
+        var vm = Create();
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Max", new AddressLocation("Street 1", 17, HouseSide.Right),
+            "HudJobDropoffDrive", "HudJobDropoffArrived", "HudJobDropoffAction", 25.0));
+
+        Assert.Contains(spoken, vm.EnterKeywords);
+
+        vm.SetJobGuidance(Job());
+
+        Assert.DoesNotContain(spoken, vm.EnterKeywords);
+    }
+
     [Fact]
     public void DeliveryGuidance_HubAndStoreEachAnswerTheirOwnWords()
     {

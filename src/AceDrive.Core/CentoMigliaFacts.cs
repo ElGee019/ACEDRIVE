@@ -5,9 +5,12 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Everything the Cento Miglia page needs besides its tier table. Unity's
-/// screen reads the same six values straight off PlayerData and CalendarManager;
-/// the port hands them over as one record so the page stays a formatter and the
-/// tests can pin a fresh driver in one line.
+/// screen reads the calendar stamp and the driver readings straight off
+/// PlayerData and CalendarManager; the port hands them over as one record so the
+/// page stays a formatter and the tests can pin a fresh driver in one line. The
+/// zone length rides along because entering a tier builds the longest route the
+/// zone allows (<see cref="CentoMiglia.LongestDistanceKm"/>), so the page never
+/// reads the zone itself.
 /// </summary>
 public sealed record CentoMigliaFacts(
     int Week,
@@ -15,4 +18,5 @@ public sealed record CentoMigliaFacts(
     double ClubReputation,
     bool HasDiscoveredStreets,
     int CarsOwned,
-    int CarClass);
+    int CarClass,
+    double ZoneKm = 0.0);

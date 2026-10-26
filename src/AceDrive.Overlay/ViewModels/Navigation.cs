@@ -68,6 +68,10 @@ public sealed class Navigation
     // startup: content, so the page never reads a file itself.
     private readonly IReadOnlyList<CentoTier> _centoTiers;
 
+    // The event page's registration draw, the one randomness its ENTER flow
+    // owns: a fresh number per entry, never a shared global.
+    private readonly Random _rng;
+
     // The brand the wake word listens for: the menu's reminder reads it live,
     // so the cached menu never names the car the player already sold.
     private readonly Func<string> _carBrand;
@@ -107,7 +111,7 @@ public sealed class Navigation
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
-        Func<string> carBrand, ILog log)
+        Func<string> carBrand, Random rng, ILog log)
     {
         _shell = shell;
         _beat = beat;
@@ -136,6 +140,7 @@ public sealed class Navigation
         _zone = zone;
         _centoTiers = centoTiers;
         _carBrand = carBrand;
+        _rng = rng;
         _log = log;
 
         ControlCommand = new RelayCommand(ShowControl);
@@ -364,10 +369,11 @@ public sealed class Navigation
     }
 
     // The event page per visit, never cached: the reputation it prints and the
-    // garage size it counts are the driver's current ones. BACK and ENTER both
-    // return to the calendar it was opened from — Unity's ENTER would start the
-    // race here; the overlay has none yet, so the page closes like Unity's
-    // screen does and leaves the outcome to the race port.
+    // garage size it counts are the driver's current ones, and the zone length
+    // it builds the route from grows between visits. BACK and the built event's
+    // BACK both return to the calendar it was opened from — Unity's race would
+    // start there; the overlay has none yet, so the host logs the built event
+    // and leaves the drive to the race port.
     private void OpenCento()
     {
         // The year is not persisted (PORTPLAN 51): the game's fixed 1924 seed is
@@ -379,13 +385,22 @@ public sealed class Navigation
             _wallet.ClubReputation,
             _zone.StreetIds.Count > 0,
             _garage.Cars.Count,
-            CurrentCarClass());
+            CurrentCarClass(),
+            _zone.Km);
         ShowScreen(new CentoMigliaScreenViewModel(
-            _centoTiers, facts, new RelayCommand(() => ShowScreen(CalendarPage()))));
+            _centoTiers, facts, new RelayCommand(() => ShowScreen(CalendarPage())),
+            _clock, _rng, CentoBuilt));
         _log.LogInfo(
             $"cento miglia opened: week {facts.Week}, rep {facts.ClubReputation:0.00}, " +
             $"{facts.CarsOwned} cars, class {facts.CarClass}, {_centoTiers.Count} tiers");
     }
+
+    // The ENTER flow's outcome: the tier, the registration number it issued and
+    // the longest route the zone allowed. The race port takes this record; until
+    // it exists, the log is the one consumer.
+    private void CentoBuilt(CentoMigliaEvent built) =>
+        _log.LogInfo($"cento miglia built: {built.TierLabel} (tier {built.TierNumber}), " +
+            $"registration #{built.Registration}, {built.DistanceKm:0.0} km");
 
     // The class of the car being driven: Unity reads CarData.Get(player.grandmaCar),
     // the car the player took out of the garage — here the garage's current car.

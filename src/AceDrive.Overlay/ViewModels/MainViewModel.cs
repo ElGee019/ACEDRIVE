@@ -519,6 +519,14 @@ public sealed class MainViewModel
         // show first rides the same call.
         _taxi.Tick(now);
 
+        // A page with its own wall-clock phase (the Cento Miglia build) advances
+        // on the same loop, whether or not EVO is attached: the countdown must
+        // finish even with the game closed, like the request timer above.
+        if (CurrentScreen is IPolledScreen polled)
+        {
+            polled.Tick(now);
+        }
+
         // The session clock's own work: the idle shift timeout (Unity's 30-min
         // rule) so the taxi button flips back to START even when the player
         // never taps it, the game-day flip with the week it completes, and the

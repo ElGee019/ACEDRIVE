@@ -69,7 +69,8 @@ public sealed class MainViewModelTests
         FakeAppRestarter? restarter = null,
         StoreCatalog? storeCatalog = null,
         FakeClock? clock = null, FakeCarBrandSource? carBrands = null,
-        FakeTelemetry? physics = null) =>
+        FakeTelemetry? physics = null,
+        IReadOnlyList<CentoTier>? centoTiers = null) =>
         TestSession.Create(new TestSessionOptions
         {
             SpeedKmh = speedKmh,
@@ -136,6 +137,7 @@ public sealed class MainViewModelTests
             Clock = clock,
             CarBrands = carBrands,
             Physics = physics,
+            CentoTiers = centoTiers,
         });
 
     // The production way into a business: HOME → ADDRESSES, pin the row, then
@@ -1725,6 +1727,45 @@ public sealed class MainViewModelTests
         clock.Advance(TimeSpan.FromSeconds(2));
         vm.Poll();
         Assert.Equal(2, store.Saved.Count);
+    }
+
+    [Fact]
+    public void Poll_AdvancesTheCentoMigliaBuildToItsReadyEvent()
+    {
+        // The build countdown is the one allowed loop's job: the page owns no
+        // timer, so a tick is what turns the registration number into a ready
+        // event and reports it to the host.
+        var log = new TestLog();
+        var (vm, clock, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            log: log,
+            centoTiers:
+            [
+                new CentoTier("gentlemen_drivers", "Gentlemen Drivers Club", "Free for all.", 1),
+            ]);
+        var calendar = ShowCalendar(vm);
+        clock.Advance(TimeSpan.FromSeconds(
+            ((6 * 24 * 60) + 1) * GameClock.RealSecondsPerGameMinute));
+        vm.Poll();
+        calendar.DayCommand.Execute(ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.CentoMiglia).DayOfWeek);
+
+        var page = Assert.IsType<CentoMigliaScreenViewModel>(vm.CurrentScreen);
+        page.TierCommand.Execute(page.Tiers[0]);
+        page.EnterCommand.Execute(null);
+        Assert.True(page.IsBuilding);
+        Assert.Equal("Starting in 4s", page.TimerLine);
+
+        clock.Advance(TimeSpan.FromSeconds(CentoMiglia.BuildSeconds - 1));
+        vm.Poll();
+        Assert.Equal("Starting in 1s", page.TimerLine);
+        Assert.False(page.IsBuilt);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        vm.Poll();
+        Assert.True(page.IsBuilt);
+        Assert.Contains(log.Infos, line => line.StartsWith(
+            "cento miglia built: Gentlemen Drivers Club", StringComparison.Ordinal));
     }
 
     private static string TuesdayButton(CalendarScreenViewModel calendar) =>

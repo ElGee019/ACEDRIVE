@@ -7,7 +7,7 @@
   },
   {
     "id": "era_event",
-    "label": "{0}s Era Only",
+    "label": "Before 2000s Only",
     "description": "Exclusive event for vehicles from the same era. Prove your vintage vehicle is the best of its time.",
     "reputationRequired": 2
   },

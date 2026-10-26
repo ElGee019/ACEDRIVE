@@ -424,7 +424,9 @@ public partial class App : Application, IDisposable
             driver, garage, rivals, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
-            () => carBrands.Brand, _log);
+            // The Cento Miglia registration draw: a page-local number, seeded
+            // off the same launch seed the other draws use.
+            () => carBrands.Brand, new Random(taxiSeed + 6), _log);
         // The panel's reveal policy: what a call opens, what revealing a POI
         // or a job page does, and hiding. The story flow, the voice router and
         // the coordinator share this one instance, so the root can build the

@@ -30,7 +30,19 @@ internal static class HudVoiceKeywords
         "the gop", "it up", "the up", "the top",
         "he got", "you go", "the cup", "the good", "the poop", "the google",
     ];
-    private static readonly string[] DropOff = ["enter", "drop off", "dropoff"];
+    // WHY the garbles: the model seldom lands the clean phrase on the drop-off
+    // leg either, and every miss below was dead air the player had to repeat
+    // (2026-10-22..26: "drop us" x2, "drop of" x2, "drop offs", "job loss" x2,
+    // "joke us", "drop boss", "robles", "troubles"; today's session needed five
+    // attempts). They are whole-word runs like every other keyword, and only
+    // the drop-off leg exposes this button, so a stray transcript can only tap
+    // the door the player is already parked at.
+    private static readonly string[] DropOff =
+    [
+        "enter", "drop off", "dropoff",
+        "drop offs", "drop of", "drop us", "drop boss",
+        "job loss", "joke us", "robles", "troubles",
+    ];
     // Delivery's two actions: loading the freight and unloading it at a store.
     private static readonly string[] Deliver = ["enter", "deliver", "deliver items"];
     // Grandma's arrival button prints PANCAKES!; the plural, the singular and

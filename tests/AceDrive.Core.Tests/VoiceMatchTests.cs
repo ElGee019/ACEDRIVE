@@ -376,4 +376,27 @@ public sealed class VoiceMatchTests
 
         Assert.Equal(expected, VoiceMatch.MatchLabel(text, labels, confusions));
     }
+
+    // 2026-10-25 menu session: three spoken "back" attempts landed as "buck"
+    // and "burke"; the 2026-10-18/23 sessions read "buck"/"bucks" the same
+    // way. BACK is a one-word label on every page, so the table row is what
+    // makes these readings reach it — the exact hearing keeps its own door.
+    [Theory]
+    [InlineData("buck", "BACK")]
+    [InlineData("bucks", "BACK")]
+    [InlineData("burke", "BACK")]
+    [InlineData("back", "BACK")]     // the exact hearing is untouched
+    [InlineData("blah blah", null)]  // the table never invents a match
+    public void MatchLabel_BackMishearings_ResolveThroughTheTable(string text, string? expected)
+    {
+        var confusions = new Dictionary<string, string>
+        {
+            ["buck"] = "back",
+            ["bucks"] = "back",
+            ["burke"] = "back",
+        };
+        string[] labels = ["BACK", "JOBS"];
+
+        Assert.Equal(expected, VoiceMatch.MatchLabel(text, labels, confusions));
+    }
 }

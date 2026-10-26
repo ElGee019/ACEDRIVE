@@ -3,7 +3,8 @@ using AceDrive.Core;
 namespace AceDrive.Core.Tests;
 
 /// <summary>The Cento Miglia rules (PORTPLAN 49, Unity CentoMigliaScreen):
-/// the era decade, the reputation floor and the tier gates.</summary>
+/// the era decade, the reputation floor, the tier gates, the ENTER flow's
+/// registration number and the zone-longest route.</summary>
 public sealed class CentoMigliaTests
 {
     private static CentoTier Tier(string id, int required) =>
@@ -16,6 +17,42 @@ public sealed class CentoMigliaTests
     [InlineData(2001, 2000)]
     public void EraDecade_RoundsDownToTheDecade(int year, int expected) =>
         Assert.Equal(expected, CentoMiglia.EraDecade(year));
+
+    [Theory]
+    [InlineData(1, 1)]
+    [InlineData(2, 2)]
+    [InlineData(3, 2)]
+    [InlineData(4, 3)]
+    [InlineData(6, 3)]
+    [InlineData(7, 4)]
+    [InlineData(8, 4)]
+    public void RegistrationDigits_GrowWithTheTier(int tierNumber, int expected) =>
+        Assert.Equal(expected, CentoMiglia.RegistrationDigits(tierNumber));
+
+    [Fact]
+    public void DrawRegistration_StaysInsideTheTiersDigits()
+    {
+        // Unity's Random.Range(low, high): the first club can issue 0, every
+        // later one starts at the smallest number of its length.
+        for (int i = 0; i < 500; i++)
+        {
+            Assert.InRange(CentoMiglia.DrawRegistration(1, new Random(i)), 0, 9);
+            Assert.InRange(CentoMiglia.DrawRegistration(2, new Random(i)), 10, 99);
+            Assert.InRange(CentoMiglia.DrawRegistration(5, new Random(i)), 100, 999);
+            Assert.InRange(CentoMiglia.DrawRegistration(8, new Random(i)), 1000, 9999);
+        }
+    }
+
+    [Fact]
+    public void LongestDistanceKm_IsTheWholeZone()
+    {
+        // The event runs every discovered street, so the zone's own length is
+        // the longest route it allows (Unity takes the furthest street pair).
+        Assert.Equal(1.929, CentoMiglia.LongestDistanceKm(1.929), precision: 6);
+        Assert.Equal(0.0, CentoMiglia.LongestDistanceKm(0.0));
+        Assert.Equal(0.0, CentoMiglia.LongestDistanceKm(-2.0));
+        Assert.Equal(0.0, CentoMiglia.LongestDistanceKm(double.NaN));
+    }
 
     [Fact]
     public void DisplayReputation_FloorsAFreshDriverToOne()

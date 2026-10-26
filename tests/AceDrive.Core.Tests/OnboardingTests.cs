@@ -492,6 +492,22 @@ public sealed class OnboardingTests
     }
 
     [Fact]
+    public void ContentLoader_ShippedData_KeepsTheLoggedBackDoor()
+    {
+        // 2026-10-25 menu session: spoken "back" attempts landed as "buck" x2
+        // and "burke"; the 2026-10-18/23 sessions read "buck"/"bucks" the same
+        // way. BACK is a one-word label on every page, so dropping these rows
+        // from the table silently brings the miss back in-game.
+        var log = new TestLog();
+        OnboardingContent loaded = new JsonOnboardingContent(log).Load();
+        Assert.Equal("back", loaded.Confusions!["buck"]);
+        Assert.Equal("back", loaded.Confusions["bucks"]);
+        Assert.Equal("back", loaded.Confusions["burke"]);
+        Assert.Equal("BACK", VoiceMatch.MatchLabel("burke", ["BACK", "JOBS"], loaded.Confusions));
+        Assert.Empty(log.Warnings);
+    }
+
+    [Fact]
     public void ContentLoader_MissingDir_EmptiesWithWarnings()
     {
         var log = new TestLog();

@@ -197,7 +197,8 @@ internal static class TestSession
             saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
-            zoneInstance, [], () => brands.Brand, logger);
+            zoneInstance, options.CentoTiers ?? [], () => brands.Brand,
+            new Random(6), logger);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(shell, navigation, taxi, delivery, clock, logger);

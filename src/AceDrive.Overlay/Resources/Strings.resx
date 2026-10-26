@@ -175,7 +175,7 @@ For instance "{0}".</value></data>
        CentoEligibilityReputation is the tier's required level, {0} the
        driver's own - Unity prints both raw, rounded to whole numbers. -->
   <data name="CentoTitle" xml:space="preserve"><value>CENTO MIGLIA EVENTS</value></data>
-  <data name="CentoWeek" xml:space="preserve"><value>Week {0}, {1}</value></data>
+  <data name="CentoWeek" xml:space="preserve"><value>Week {0}</value></data>
   <data name="CentoReputation" xml:space="preserve"><value>YOUR CLUB REPUTATION: {0:0.00000}</value></data>
   <data name="CentoTierRequirement" xml:space="preserve"><value>Requires Reputation Level {0}</value></data>
   <data name="CentoFreeEntry" xml:space="preserve"><value>Club Reputation: Free entry</value></data>
@@ -184,6 +184,12 @@ For instance "{0}".</value></data>
   <data name="CentoOwnsCars" xml:space="preserve"><value>You own {0} cars</value></data>
   <data name="CentoCarClass" xml:space="preserve"><value>The car class of your current car: {0}</value></data>
   <data name="CentoEnter" xml:space="preserve"><value>ENTER EVENT</value></data>
+  <data name="CentoSettingUp" xml:space="preserve"><value>SETTING UP…</value></data>
+  <data name="CentoBuildingTitle" xml:space="preserve"><value>BUILDING EVENT</value></data>
+  <data name="CentoBuiltTitle" xml:space="preserve"><value>EVENT READY</value></data>
+  <data name="CentoRegistration" xml:space="preserve"><value>Registration #{0}</value></data>
+  <data name="CentoBuildTimer" xml:space="preserve"><value>Starting in {0}s</value></data>
+  <data name="CentoEventDistance" xml:space="preserve"><value>Longest distance: {0:0.0} km</value></data>
   <data name="EventValuation" xml:space="preserve"><value>Market valuation</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Road test</value></data>
   <data name="EventWilly" xml:space="preserve"><value>Where is Willy</value></data>

@@ -79,4 +79,7 @@ internal sealed class TestSessionOptions
     public FakeSaveDataResetter? SaveResets { get; init; }
     public FakeAppRestarter? Restarter { get; init; }
     public StoreCatalog? StoreCatalog { get; init; }
+    // The Cento Miglia page's tier table: empty by default, so only the suites
+    // that drive the event page hand content in (production loads the JSON).
+    public IReadOnlyList<CentoTier>? CentoTiers { get; init; }
 }

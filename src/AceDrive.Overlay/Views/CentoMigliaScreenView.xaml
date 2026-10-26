@@ -5,8 +5,9 @@
     <!-- Cento Miglia page (PORTPLAN 49, Unity CentoMigliaScreen): the same page
          skeleton as the other pages - viewport-pinned MinHeight, title band,
          one body block centered in the leftover height, BACK flush at the
-         bottom. Two panels share the body slot like Unity's CentoA/CentoB:
-         the tier list, then the picked tier's description and eligibility.
+         bottom. Three panels share the body slot like Unity's CentoA/CentoB:
+         the tier list, the picked tier's description and eligibility, then the
+         ENTER flow's build (registration number, countdown, built route).
          A locked tier stays on the page and only loses its ink, exactly like
          Unity's non-interactable button. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
@@ -64,19 +65,42 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
-            <!-- CentoB: the picked club - its description, why the driver does
-                 or does not qualify, and the enter button (Unity's registration
-                 line stays out until a race can hand one out). -->
+            <!-- CentoB: the picked club - its description and why the driver
+                 does or does not qualify (Unity's registration line stays out
+                 until ENTER builds the event). ENTER sits in the bottom band
+                 with BACK, like every other page's primary action. -->
             <StackPanel VerticalAlignment="Center"
                         Visibility="{Binding IsDetail, Converter={StaticResource BoolToVis}}">
                 <TextBlock Text="{Binding DetailLabel}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
                            TextAlignment="Center" Margin="0,0,0,6"/>
                 <TextBlock Style="{StaticResource PageBody}" Text="{Binding DetailDescription}"/>
                 <TextBlock Style="{StaticResource PageBody}" Text="{Binding EligibilityText}" Margin="0,6,0,0"/>
-                <Button Content="{loc:Loc Key=CentoEnter}" Command="{Binding EnterCommand}"
-                        Padding="14,3" Margin="0,14,0,0" HorizontalAlignment="Center"/>
+            </StackPanel>
+            <!-- CentoSetup: the ENTER flow (Unity's coroutine): the tier's
+                 registration number and the setup countdown, then the built
+                 event's route. No way out while it runs; BACK returns past it. -->
+            <StackPanel VerticalAlignment="Center"
+                        Visibility="{Binding SetupVisible, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="{Binding SetupTitle}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                           TextAlignment="Center" Margin="0,0,0,2"/>
+                <TextBlock Style="{StaticResource PageBody}" Text="{Binding DetailLabel}"/>
+                <TextBlock Style="{StaticResource PageBody}" Text="{Binding RegistrationLine}"/>
+                <TextBlock Style="{StaticResource PageBody}" Text="{Binding TimerLine}"
+                           Visibility="{Binding IsBuilding, Converter={StaticResource BoolToVis}}"/>
+                <TextBlock Style="{StaticResource PageBody}" Text="{Binding DistanceLine}"
+                           Visibility="{Binding IsBuilt, Converter={StaticResource BoolToVis}}"/>
             </StackPanel>
         </Grid>
-        <Button Grid.Row="4" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}"/>
+        <!-- Bottom band: the picked tier's action above the one way out, both
+             flush with the panel edge like every other page. ENTER turns into
+             its own status line ("SETTING UP…", disabled) while the event is
+             built, and BACK stays hidden until that build is done. -->
+        <StackPanel Grid.Row="4">
+            <Button Content="{Binding EnterLabel}" Command="{Binding EnterCommand}"
+                    IsEnabled="{Binding CanEnter}" Margin="0,0,0,6"
+                    Visibility="{Binding ShowEnter, Converter={StaticResource BoolToVis}}"/>
+            <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}"
+                    Visibility="{Binding ShowBack, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
     </Grid>
 </UserControl>

@@ -51,7 +51,9 @@ public sealed class NavigationTests
         var onboarding = new FakeOnboardingStore();
         // The zone the Cento Miglia gates read: no street discovered yet, so
         // the event opens with every club locked (Unity's fresh-driver state).
-        var zoneInstance = new OperatingZone(null, seed: 0);
+        // Its length is the placeholder map's, exactly as the root seeds it.
+        var zoneInstance = new OperatingZone(
+            null, seed: 0, AddressBook.MapLengthKm(AddressMap.Default));
         // One instance per service graph: the saver writes the same stores the
         // assertions read.
         var saver = new GameStateSaver(
@@ -104,7 +106,7 @@ public sealed class NavigationTests
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
-            zoneInstance, CentoTiers, () => "mazda", log);
+            zoneInstance, CentoTiers, () => "mazda", new Random(0), log);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The proposal page asks the job's host for the player's door on every
@@ -189,12 +191,42 @@ public sealed class NavigationTests
         // The tap opens the event page on the calendar's week; BACK lands on the
         // same cached calendar page it left (Unity's screen pops back to jobs).
         var page = Assert.IsType<CentoMigliaScreenViewModel>(shell.CurrentScreen);
-        Assert.Equal("Week 1, 1924", page.WeekLine);
+        Assert.Equal("Week 1", page.WeekLine);
         Assert.Equal(CentoTiers.Length, page.Tiers.Count);
         page.BackCommand.Execute(null);
         Assert.Same(calendar, shell.CurrentScreen);
         Assert.Contains(
             log.Infos, line => line.StartsWith("cento miglia opened:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CentoEnter_BuildsTheEventAndReportsIt()
+    {
+        var (nav, shell, _, clock, _, _, _, _, _, _, log) = Create();
+        nav.ShowMenuPage();
+        Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(
+            ((6 * 24 * 60) + 1) * GameClock.RealSecondsPerGameMinute));
+        nav.Tick();
+        int centoDay = ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.CentoMiglia).DayOfWeek;
+        Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen)
+            .DayCommand.Execute(centoDay);
+
+        var page = Assert.IsType<CentoMigliaScreenViewModel>(shell.CurrentScreen);
+        page.TierCommand.Execute(page.Tiers[0]);
+        page.EnterCommand.Execute(null);
+        Assert.True(page.IsBuilding);
+
+        // The host's poll is what advances the build; the page itself only
+        // formats the seconds it is handed.
+        clock.Advance(TimeSpan.FromSeconds(CentoMiglia.BuildSeconds));
+        page.Tick(clock.UtcNow);
+        Assert.True(page.IsBuilt);
+        Assert.Contains(
+            log.Infos, line => line.StartsWith("cento miglia built:", StringComparison.Ordinal)
+                && line.Contains("registration #", StringComparison.Ordinal)
+                && line.Contains("1.9 km", StringComparison.Ordinal));
     }
 
     [Fact]
