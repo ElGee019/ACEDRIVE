@@ -116,36 +116,57 @@
                            TextAlignment="Center"/>
             </StackPanel>
         </StackPanel>
-        <!-- Button bar: one slot each for the entry phase's BACK and ENTER and
-             the comparison phase's CONTINUE, so the surviving button keeps its
-             place instead of jumping. Teal is the shared voice-ack highlight. -->
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="0" Content="{loc:Loc Key=ValuationBack}"
-                    Command="{Binding BackCommand}" Padding="4"
-                    Visibility="{Binding ShowBack, Converter={StaticResource BoolToVis}}">
+        <!-- Bottom band: the page's verb above the one way out, both flush
+             with the panel edge like every other page (Cento precedent). ENTER
+             rides above BACK while the picker is up; once the comparison
+             starts, CONTINUE takes the bottom slot BACK held, so the page's
+             surviving verb never jumps. Teal is the shared voice-ack
+             highlight, one flash per button. -->
+        <StackPanel Grid.Row="3">
+            <Button Content="{Binding EnterLabel}" Command="{Binding EnterCommand}"
+                    Padding="4" Margin="0,0,0,6"
+                    HorizontalAlignment="Stretch"
+                    Visibility="{Binding IsEntry, Converter={StaticResource BoolToVis}}">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                            <DataTrigger Binding="{Binding EnterFlash}" Value="True">
                                 <Setter Property="Foreground" Value="#FF97EAD2"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
                 </Button.Style>
             </Button>
-            <Button Grid.Column="1" Content="{Binding EnterLabel}"
-                    Command="{Binding EnterCommand}" Padding="4"
-                    HorizontalAlignment="Stretch"
-                    Visibility="{Binding IsEntry, Converter={StaticResource BoolToVis}}"/>
-            <Button Grid.Column="1" Content="{Binding ContinueLabel}"
-                    Command="{Binding ContinueCommand}" Padding="4"
-                    HorizontalAlignment="Stretch"
-                    Visibility="{Binding HasCompetitor, Converter={StaticResource BoolToVis}}"/>
-        </Grid>
+            <!-- The bottom slot holds exactly one button per phase: BACK while
+                 the picker is up, CONTINUE once the verdict landed. -->
+            <Grid>
+                <Button Content="{loc:Loc Key=ValuationBack}" Command="{Binding BackCommand}"
+                        Padding="4" HorizontalAlignment="Stretch"
+                        Visibility="{Binding ShowBack, Converter={StaticResource BoolToVis}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <Button Content="{Binding ContinueLabel}" Command="{Binding ContinueCommand}"
+                        Padding="4" HorizontalAlignment="Stretch"
+                        Visibility="{Binding HasCompetitor, Converter={StaticResource BoolToVis}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </StackPanel>
     </Grid>
 </UserControl>

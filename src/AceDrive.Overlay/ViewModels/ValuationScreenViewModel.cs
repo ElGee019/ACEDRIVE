@@ -7,11 +7,11 @@ namespace AceDrive.Overlay.ViewModels;
 /// <summary>
 /// The weekly market-valuation page (PORTPLAN item 49, Unity ValuationScreen):
 /// the same car picker as the garage, then the jury's comparison. The entry
-/// phase lists every owned car and ENTER WITH {car} submits the pick; the
-/// comparison phase shows the player's car and score beside a drawn competitor
-/// and the verdict, and CONTINUE pays the verdict XP. The page never talks to
-/// the board or the wallet: it reports the pick and the continuation to the
-/// flow, which owns the entry, the draw and the payout.
+/// phase lists every owned car and ENTER submits the pick; the comparison phase
+/// shows the player's car and score beside a drawn competitor and the verdict,
+/// and CONTINUE pays the verdict XP. The page never talks to the board or the
+/// wallet: it reports the pick and the continuation to the flow, which owns the
+/// entry, the draw and the payout.
 /// </summary>
 public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {
@@ -32,6 +32,8 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
     private ValuationVerdict? _verdict;
     private GarageRow? _selected;
     private IReadOnlyList<GarageStatRow> _stats = [];
+    private bool _enterFlash;
+    private bool _continueFlash;
     private bool _backFlash;
 
     public ValuationScreenViewModel(
@@ -115,9 +117,13 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
     /// <summary>BACK only exists on the entry phase; CONTINUE is the way out after.</summary>
     public bool ShowBack => IsEntry;
 
-    /// <summary>ENTER's label: "ENTER WITH {car}".</summary>
-    public string EnterLabel =>
-        _selected is { } row ? Strings.Format("ValuationEnter", row.Title) : Strings.Get("ValuationEnterEmpty");
+    /// <summary>
+    /// ENTER's label: plain "ENTER", never "ENTER WITH {car}". WHY: the label
+    /// is also the voice key, and Vosk never hears a car title inside a button,
+    /// so the long form made the tap unreachable by voice. The picked car stays
+    /// visible in the picker, the stats block and the comparison.
+    /// </summary>
+    public string EnterLabel { get; } = Strings.Get("ValuationEnter");
 
     /// <summary>ENTER is live only with a pick on the entry phase.</summary>
     public bool CanEnter => IsEntry && _selected is not null;
@@ -186,6 +192,20 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
         private set => SetField(ref _backFlash, value);
     }
 
+    /// <summary>Teal-glow acknowledgment for the ENTER voice tap.</summary>
+    public bool EnterFlash
+    {
+        get => _enterFlash;
+        private set => SetField(ref _enterFlash, value);
+    }
+
+    /// <summary>Teal-glow acknowledgment for the CONTINUE voice tap.</summary>
+    public bool ContinueFlash
+    {
+        get => _continueFlash;
+        private set => SetField(ref _continueFlash, value);
+    }
+
     /// <summary>Spoken labels for both phases; cars answer by title.</summary>
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
@@ -201,6 +221,7 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
         {
             return;
         }
+        EnterFlash = false;
         _beat.Cancel();
         // The flow computes the score and calls ShowWaiting itself; the page
         // must not guess a score before the entry has been recorded.
@@ -242,6 +263,7 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
         {
             return;
         }
+        ContinueFlash = false;
         double payout = _pendingXp;
         _pendingXp = 0.0;
         _onContinue(payout);
@@ -255,11 +277,31 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
         _closeCommand.Execute(null);
     }
 
+    // Voice taps glow first and act at the end of the shared beat, like every
+    // other page's buttons: the mic's acknowledgment stays visible before the
+    // phase flips or the page leaves.
+    private void FlashThenEnter()
+    {
+        EnterFlash = true;
+        _beat.Defer(Enter);
+    }
+
+    private void FlashThenContinue()
+    {
+        ContinueFlash = true;
+        _beat.Defer(Continue);
+    }
+
+    private void FlashThenBack()
+    {
+        BackFlash = true;
+        _beat.Defer(Back);
+    }
+
     private void Reload()
     {
         CarSpec? spec = _selected is null ? null : SpecOf(_selected.Key);
         Stats = BuildStats(spec);
-        OnPropertyChanged(nameof(EnterLabel));
         OnPropertyChanged(nameof(CanEnter));
         // The picker's selection drives ENTER's can-execute, so the button
         // re-arms the moment a car is chosen instead of on the next paint.
@@ -355,16 +397,12 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
 
         if (IsEntry)
         {
-            actions[EnterLabel] = Enter;
-            actions[Strings.Get("ValuationBack")] = () =>
-            {
-                BackFlash = true;
-                _beat.Defer(Back);
-            };
+            actions[EnterLabel] = FlashThenEnter;
+            actions[Strings.Get("ValuationBack")] = FlashThenBack;
         }
         else if (HasCompetitor)
         {
-            actions[ContinueLabel] = Continue;
+            actions[ContinueLabel] = FlashThenContinue;
         }
         VoiceActions = actions;
     }

@@ -679,8 +679,10 @@ Accept this job?</value></data>
   <data name="ValuationIntro" xml:space="preserve"><value>Choose the car you want the jury to value this week.</value></data>
   <data name="ValuationSelect" xml:space="preserve"><value>Select car</value></data>
   <data name="ValuationNoCars" xml:space="preserve"><value>There is no car in the garage to enter.</value></data>
-  <data name="ValuationEnter" xml:space="preserve"><value>ENTER WITH {0}</value></data>
-  <data name="ValuationEnterEmpty" xml:space="preserve"><value>ENTER</value></data>
+  <!-- Plain ENTER: the label doubles as the voice key, and Vosk never hears a
+       car title inside a button, so the old "ENTER WITH {0}" made the tap
+       unreachable by voice. The car stays visible in the picker and stats. -->
+  <data name="ValuationEnter" xml:space="preserve"><value>ENTER</value></data>
   <data name="ValuationBack" xml:space="preserve"><value>BACK</value></data>
   <data name="ValuationContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="ValuationOwnScore" xml:space="preserve"><value>YOUR SCORE: {0}</value></data>
