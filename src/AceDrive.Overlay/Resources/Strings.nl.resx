@@ -188,7 +188,8 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="TodoVisitCarDealer" xml:space="preserve"><value>Ga de autodealer binnen.</value></data>
   <data name="TodoVisitInsurance" xml:space="preserve"><value>Ga naar de verzekeringsmakelaar.</value></data>
   <data name="TodoCompletedHeader" xml:space="preserve"><value>TAKEN VOLTOOID!</value></data>
-  <data name="TodoCarePackages" xml:space="preserve"><value>Elke voltooide taak zet de goedhartige Sonja ertoe aan een zorgpakket voor de wijk te regelen. Verzamel er 5 en bezorg ze bij het buurtcentrum voor een gegarandeerde beloning!</value></data>
+  <data name="TodoCompletedLine" xml:space="preserve"><value>{0}. {1}</value></data>
+  <data name="TodoCarePackages" xml:space="preserve"><value>Voor elke voltooide taak regelt Sonja een zorgpakket voor de wijk. Verzamel er 5 en bezorg ze bij het buurtcentrum voor een gegarandeerde beloning!</value></data>
   <data name="TodoDeliver" xml:space="preserve"><value>ZORGPAKKETTEN BEZORGEN</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Vertrouwenspunten: {0}</value></data>
@@ -313,15 +314,44 @@ Deze klus aannemen?</value></data>
   <data name="WalletCornering" xml:space="preserve"><value>Bochten: {0:0}%</value></data>
   <data name="WalletOffTheLine" xml:space="preserve"><value>Startreactie: {0:0}%</value></data>
   <data name="WalletBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="ZoneExpansionTitle" xml:space="preserve"><value>WERKGEBIED UITGEBREID</value></data>
+  <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>Nieuwe straat ontdekt</value></data>
+  <data name="ZoneExpansionZoneLine" xml:space="preserve"><value>Werkgebied: {0} straten</value></data>
+  <data name="ZoneExpansionPreviousArea" xml:space="preserve"><value>Vorige oppervlakte: {0:0.0} km</value></data>
+  <data name="ZoneExpansionNewArea" xml:space="preserve"><value>Nieuwe totale oppervlakte: {0:0.0} km</value></data>
+  <data name="ZoneExpansionJobsToNext" xml:space="preserve"><value>Nog {0} klussen tot de volgende uitbreiding</value></data>
+  <data name="ZoneExpansionNewBusinesses" xml:space="preserve"><value>Nieuwe bedrijven beschikbaar</value></data>
+  <data name="ZoneExpansionPoiLine" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ZoneExpansionContinue" xml:space="preserve"><value>VERDER</value></data>
+  <data name="ZoneExpansionFindStreet" xml:space="preserve"><value>ZOEK STRAAT</value></data>
+  <data name="ZoneStandingsLabel" xml:space="preserve"><value>Wereldranglijst langste werkgebied</value></data>
+  <data name="ZoneStandingsRank" xml:space="preserve"><value>{0} van {1}.</value></data>
+  <data name="ZoneStandingsUnknown" xml:space="preserve"><value>—/—</value></data>
+  <data name="PoiTypeCarWash" xml:space="preserve"><value>Carwash</value></data>
+  <data name="PoiTypeBank" xml:space="preserve"><value>Bank</value></data>
+  <data name="PoiTypeInsurance" xml:space="preserve"><value>Verzekering</value></data>
+  <data name="PoiTypeDealer" xml:space="preserve"><value>Autodealer</value></data>
+  <data name="PoiTypeMechanic" xml:space="preserve"><value>Monteur</value></data>
+  <data name="PoiTypeGrocery" xml:space="preserve"><value>Supermarkt</value></data>
+  <data name="PoiTypeCoffee" xml:space="preserve"><value>Koffiebar</value></data>
   <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
   <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
   <data name="HomeAddresses" xml:space="preserve"><value>ADRESSEN</value></data>
   <data name="HomeBack" xml:space="preserve"><value>TERUG</value></data>
-  <!-- Adressenpagina (PORTPLAN 24/27): elke ontdekte POI op naam, de tijdelijke
-       vervanger van markers op de kaart. Een rij zet de ritregel van de HUD;
-       {0} = POI-naam, {1} = straat en huisnummer. Placeholders blijven bij
-       vertaling bestaan; vertalers mogen herordenen, nooit verwijderen. -->
+  <!-- Adressenpagina (PORTPLAN 24/27 + TOZONES §3.5): eerst de weergave van
+       het werkgebied — aantal straten met de oppervlakte, de klussen tot de
+       volgende uitbreiding (of de compleetregel als de stratenpool op is) en
+       de ontdekte straatnamen — dan elke ontdekte POI op naam, de tijdelijke
+       vervanger van markers op de kaart. Een rij zet de ritregel van de HUD.
+       {0}/{1:0.0} = aantal straten en km van het werkgebied, {0} = de nog
+       nodige klussen, en op de geselecteerde regel {0} = POI-naam,
+       {1} = straat en huisnummer. Placeholders blijven bij vertaling bestaan;
+       vertalers mogen herordenen, nooit verwijderen. -->
   <data name="AddressesTitle" xml:space="preserve"><value>ADRESSEN</value></data>
+  <data name="AddressesZoneLine" xml:space="preserve"><value>Werkgebied: {0} straten · {1:0.0} km</value></data>
+  <data name="AddressesZoneNext" xml:space="preserve"><value>Nog {0} klussen tot de volgende uitbreiding</value></data>
+  <data name="AddressesZoneComplete" xml:space="preserve"><value>Werkgebied compleet — elke straat ontdekt</value></data>
+  <data name="AddressesStreetsLabel" xml:space="preserve"><value>STRATEN</value></data>
   <data name="AddressesEmpty" xml:space="preserve"><value>Nog geen adressen ontdekt.</value></data>
   <data name="AddressesSelect" xml:space="preserve"><value>KIES EEN ADRES</value></data>
   <data name="AddressesSelected" xml:space="preserve"><value>Opdracht ingesteld: rijd naar {0} op {1}</value></data>
@@ -385,7 +415,7 @@ Deze klus aannemen?</value></data>
   <data name="DelReceiptTotalCr" xml:space="preserve"><value>Totaal CR: €{0:0.00}</value></data>
   <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points verdiend: {0}</value></data>
   <data name="DelReceiptCredPTotal" xml:space="preserve"><value>Totaal Credibility Points: {0}</value></data>
-  <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km) / 100 × straatkennis {1}%</value></data>
+  <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × klasse {1} × zeldzaamheid {2}) / 500 × straatkennis {3}%</value></data>
   <!-- Autobontraansport: betaling is tijdbasis (klasseband schaalt de
        rijrating naar een tarief per minuut, de rijminuten prijsen het
        totaal). Geen XP of wereldstand — Unity boekt alleen het geld.
@@ -492,6 +522,8 @@ Deze klus aannemen?</value></data>
   <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
   <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
   <data name="TrunkEat" xml:space="preserve"><value>ETEN</value></data>
+  <data name="TrunkGloveTitle" xml:space="preserve"><value>HANDSCHOENENKASTJE</value></data>
+  <data name="TrunkGloveEmpty" xml:space="preserve"><value>Je handschoenenkastje is leeg.</value></data>
   <data name="TrunkBack" xml:space="preserve"><value>TERUG</value></data>
   <!-- Menu-metertegels (PORTPLAN 26/33): een tik wisselt de getekende accu
        voor de stand. {0} is een heel percentage; het teken staat direct op
@@ -512,7 +544,13 @@ Deze klus aannemen?</value></data>
        XP-bedrag, zodat een vertaler mag herordenen en nooit mag weglaten. -->
   <data name="ValuationTitle" xml:space="preserve"><value>MARKTWAARDERING</value></data>
   <data name="ValuationVenueLine" xml:space="preserve"><value>De locatie van deze week: {0}</value></data>
-  <data name="ValuationIntro" xml:space="preserve"><value>Kies de auto die de jury deze week moet waarderen.</value></data>
+  <!-- Twee alinea's in één waarde: de vraag van de pagina (Unity's regel) en de
+       termen die de jury weegt. De lege regel hoort bij de tekst, dus een
+       vertaler behoudt hem in plaats van de view de onderbreking te laten
+       verzinnen. -->
+  <data name="ValuationIntro" xml:space="preserve"><value>Kies de auto die de jury deze week moet waarderen.
+
+De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Motorconditie en Ranglijstpositie</value></data>
   <data name="ValuationSelect" xml:space="preserve"><value>Kies auto</value></data>
   <data name="ValuationNoCars" xml:space="preserve"><value>Er staat geen auto in de garage om in te zetten.</value></data>
   <data name="ValuationEnter" xml:space="preserve"><value>MEEDOEN</value></data>
@@ -528,16 +566,17 @@ Deze klus aannemen?</value></data>
   <data name="ValuationJuryLost" xml:space="preserve"><value>De Internationale Automobieljury waardeert je auto lager dan die van je tegenstander!</value></data>
   <data name="ValuationXp" xml:space="preserve"><value>Je ontvangt {0:0.000} XP</value></data>
   <data name="ValuationYou" xml:space="preserve"><value>Jij</value></data>
-  <data name="ValuationTopSpeedLabel" xml:space="preserve"><value>Topsnelheid</value></data>
+  <data name="ValuationTopSpeedLabel" xml:space="preserve"><value>TOPSNELHEID</value></data>
   <data name="ValuationAccelerationLabel" xml:space="preserve"><value>0-60</value></data>
-  <data name="ValuationClassLabel" xml:space="preserve"><value>Klasse</value></data>
+  <data name="ValuationClassLabel" xml:space="preserve"><value>KLASSE</value></data>
+  <data name="ValuationLeaderboardLabel" xml:space="preserve"><value>RANGLIJSTPOSITIE</value></data>
   <data name="ValuationTopSpeed" xml:space="preserve"><value>{0} km/h</value></data>
   <data name="ValuationAcceleration" xml:space="preserve"><value>{0:0.#}s</value></data>
   <data name="ValuationClass" xml:space="preserve"><value>{0}</value></data>
+  <data name="ValuationLeaderboard" xml:space="preserve"><value>{0:0.##}</value></data>
   <data name="HudValuationDrive" xml:space="preserve"><value>Rijd naar {0}: {1} {2}, {3} om je auto in te zetten voor de wekelijkse klassenranglijst.</value></data>
-  <data name="HudValuationArrived" xml:space="preserve"><value>Marktwaardering: parkeer hier om je auto in te zetten.</value></data>
   <data name="ValuationNoticeWin" xml:space="preserve"><value>Je won een marktwaarderingsronde van {0} en ontving {1:0.000}XP</value></data>
-  <data name="ValuationNoticeLoss" xml:space="preserve"><value>Je verloor zojuist een marktwaarderingsronde van {0}.</value></data>
+  <data name="ValuationNoticeLoss" xml:space="preserve"><value>Je verloor zojuist een marktwaarderingsronde van {0} (+{1:0.00} XP).</value></data>
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>Terwijl je weg was won je {0} marktwaarderingsrondes en kreeg je {1:0.000} XP</value></data>
 
   <!-- Wekelijkse vermiste-persoonrit (ToWhereIsWilly.md §3.5). -->
@@ -549,7 +588,7 @@ Deze klus aannemen?</value></data>
   <!-- De speurpagina (de kaartvervanger): titel, de twee Unity-taken, de hint
        na een misse winkel, de vondstzin en de twee werkwoorden. -->
   <data name="WillyTitle" xml:space="preserve"><value>WAAR IS WILLY</value></data>
-  <data name="WillyIntro" xml:space="preserve"><value>De oude {0} wordt vermist! Kun je onze lieve oudere in een van de koffiebars vinden en {1} naar huis brengen? Klik op een koffiebar in {2} om te zien of {1} daar is.</value></data>
+  <data name="WillyIntro" xml:space="preserve"><value>De oude {0} wordt vermist! Kun je onze lieve oudere in een van de koffiebars vinden en {1} naar huis brengen? Selecteer een koffiebar in {2} om uit te zoeken of {1} daar is.</value></data>
   <data name="WillyNotHere" xml:space="preserve"><value>Ze zijn hier niet. Rijd naar een andere koffiebar op de kaart, of geef het op.</value></data>
   <data name="WillyGiveUp" xml:space="preserve"><value>ZOEKTOCHT OPGEVEN</value></data>
   <data name="WillyFound" xml:space="preserve"><value>Gelukkig maar, alles goed en wel! Vermiste gevonden! Selecteer {0} om {1} naar huis te brengen.</value></data>

@@ -110,10 +110,12 @@ public sealed class TaxiJobProposerTests
     }
 
     [Fact]
-    public void MapWithoutTwoStreets_StillDrawsNames_ButNoDoors()
+    public void MapWithoutHouses_StillDrawsNames_ButNoDoors()
     {
+        // A map with no house number cannot place either leg, but the proposal
+        // must still name the passenger and the second resident.
         var map = new AddressMap(
-            "Germany", "Test", 1_929.0, 30.0,
+            "Germany", "Test", 1_929.0, 0.0,
             [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
         var store = new FakeResidentStore();
         var proposer = TaxiTestData.Proposer(
@@ -125,6 +127,58 @@ public sealed class TaxiJobProposerTests
         Assert.Null(proposal.SecondResidence);
         Assert.False(string.IsNullOrWhiteSpace(proposal.Customer.FirstName));
         Assert.Empty(store.Residents);
+    }
+
+    [Fact]
+    public void Draw_StaysInsideTheDiscoveredStreets()
+    {
+        // The zone has discovered Street 1 only; the map carries the whole
+        // fictional pool. No proposal may send the player to a street the zone
+        // has not reached (TOZONES §4.7).
+        var map = new AddressMap(
+            "Germany", "Test", 1_929.0, 30.0,
+            [
+                new AddressStreet("street-1", "Street 1", 0.0, 0.5),
+                new AddressStreet("street-2", "Street 2", 0.5, 1.0),
+                new AddressStreet("street-3", "Street 3", 0.0, 0.5, Fictional: true),
+            ]);
+        var zone = new OperatingZone(null, seed: 0, map);
+        var proposer = TaxiTestData.Proposer(zone: zone, table: Table, seed: 5);
+
+        foreach (int _ in Enumerable.Range(0, 40))
+        {
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4);
+            AddressLocation home = proposal.CustomerHome!.Value;
+            AddressLocation second = proposal.SecondResidence!.Value;
+
+            Assert.Equal("Street 1", home.StreetName);
+            Assert.Equal("Street 1", second.StreetName);
+            Assert.NotEqual(home.HouseNumber, second.HouseNumber);
+        }
+    }
+
+    [Fact]
+    public void OneStreetZone_KeepsBothLegsOnThatStreet()
+    {
+        // One discovered street: Unity's two-street draw would fail here, so
+        // the second residence is another house on the same street and the
+        // proposal stays playable (TOZONES §4.7, §10).
+        var map = new AddressMap(
+            "Germany", "Test", 1_929.0, 30.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var proposer = TaxiTestData.Proposer(
+            zone: TaxiTestData.FullZone(map), table: Table, seed: 3);
+
+        foreach (int _ in Enumerable.Range(0, 25))
+        {
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4);
+            AddressLocation home = proposal.CustomerHome!.Value;
+            AddressLocation second = proposal.SecondResidence!.Value;
+
+            Assert.Equal("Only Street", home.StreetName);
+            Assert.Equal(home.StreetName, second.StreetName);
+            Assert.NotEqual(home.HouseNumber, second.HouseNumber);
+        }
     }
 
     [Fact]

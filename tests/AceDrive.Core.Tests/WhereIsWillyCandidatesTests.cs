@@ -26,9 +26,30 @@ public sealed class WhereIsWillyCandidatesTests
             new("c3", "Broken", default, PoiTypes.CoffeeShop),
         ];
 
-        IReadOnlyList<PointOfInterest> shops = WhereIsWillyCandidates.CoffeeShops(doors);
+        IReadOnlyList<PointOfInterest> shops =
+            WhereIsWillyCandidates.CoffeeShops(doors, AddressMap.Default);
 
         Assert.Equal(CoffeeIds, shops.Select(s => s.Id));
+    }
+
+    [Fact]
+    public void CoffeeShops_DropDoorsOnUndiscoveredStreets()
+    {
+        // The zone has discovered Street 1 only: a shop on a fictional street
+        // is not part of the search yet (TOZONES §4.7).
+        AddressMap zoneMap = new(
+            "Germany", "Brands", 1929.0, 30.0,
+            [new AddressStreet("street-1", "Street 1", 0.0, 0.5)]);
+        PointOfInterest[] doors =
+        [
+            Shop("c1", PoiTypes.CoffeeShop, 1),
+            new("c2", "Off Zone", Door("Street 3", 4), PoiTypes.CoffeeShop),
+        ];
+
+        IReadOnlyList<PointOfInterest> shops =
+            WhereIsWillyCandidates.CoffeeShops(doors, zoneMap);
+
+        Assert.Equal(["c1"], shops.Select(s => s.Id));
     }
 
     [Fact]

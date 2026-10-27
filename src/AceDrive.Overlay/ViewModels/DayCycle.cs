@@ -98,7 +98,9 @@ public sealed class DayCycle
     /// Ends a shift that already timed out (Unity chains the stats page before
     /// the map, so a shift is never silently over): banks the closed state, the
     /// lifetime record and the world push, then opens the page. Both timeout
-    /// sites and the stale tap land here.
+    /// sites and the stale tap land here. The page's CONTINUE hands the player
+    /// back to whatever the timeout interrupted, so the report never costs
+    /// them their place.
     /// </summary>
     public void EndShift(TimeSpan idle)
     {
@@ -136,7 +138,7 @@ public sealed class DayCycle
         _host.ReadoutsChanged();
         _host.ShowShiftEnded(new ShiftEndedScreenViewModel(
             summary, _records, _standings, _beat,
-            new RelayCommand(_host.GoToMainPage)));
+            new RelayCommand(_host.ResumeAfterShiftEnded)));
     }
 
     // Game-day flip: the calendar highlight moved. One int compare per tick,

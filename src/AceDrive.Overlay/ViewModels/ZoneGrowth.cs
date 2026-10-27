@@ -30,6 +30,9 @@ public sealed class ZoneGrowth
     private readonly IProfileStore _profiles;
     private readonly IPlayerTelemetry _online;
     private readonly ILog _log;
+    // The fixed street pool is finite, so exhaustion is a one-time state
+    // transition, not a per-settle event (AGENTS › hot-path logging).
+    private bool _poolExhaustedLogged;
 
     public ZoneGrowth(
         OperatingZone zone, AddressMap map, IOnboardingStore onboarding,
@@ -45,29 +48,47 @@ public sealed class ZoneGrowth
 
     /// <summary>
     /// Registers the next street when the settled jobs already reached the
-    /// curve. Call it after a job's progress was banked — the counter is bumped
-    /// there — and never from the poll: the onboarding gate is a disk read.
+    /// curve and answers what joined, or null when nothing did (introduction
+    /// unfinished, curve not reached, street pool exhausted). Call it after a
+    /// job's progress was banked — the counter is bumped there — and never
+    /// from the poll: the onboarding gate is a disk read.
     /// </summary>
-    public void Expand()
+    public ZoneExpansion? Expand()
     {
         // Unity's firstSceneComplete gate: a fresh career is still in the
         // introduction, so the zone keeps its home street until it ends.
         if (!_onboarding.Load().IsComplete || !_zone.ExpansionDue)
         {
-            return;
+            return null;
         }
 
-        // Interim ids: the concrete Eifel street table (PORTPLAN Step 1) is
-        // still pending, so the nth expansion claims "s{n}".
-        string streetId = $"s{_zone.ExpansionCount + 1}";
-        if (!_zone.TryExpand(streetId, AddressBook.AverageStreetLengthKm(_map)))
+        // The map is the fixed street pool: once every row is in the zone
+        // there is nothing left to name, and the counter stays due. Log the
+        // completion once, not on every later settle.
+        if (_zone.NextStreet is not { } street)
         {
-            return;
+            if (!_poolExhaustedLogged)
+            {
+                _poolExhaustedLogged = true;
+                _log.LogInfo($"[Zone] street pool complete " +
+                    $"({_zone.StreetIds.Count} streets); no further expansion");
+            }
+            return null;
         }
 
-        _log.LogInfo($"[Zone] expanded: {streetId} joins " +
-            $"(zone {_zone.StreetIds.Count} streets, {_zone.Km:0.0} km)");
+        double previousKm = _zone.Km;
+        if (!_zone.TryExpand(street.Id, AddressBook.StreetLengthKm(_map, street)))
+        {
+            return null;
+        }
+
+        var expansion = new ZoneExpansion(
+            street.Name, _zone.StreetIds.Count, previousKm, _zone.Km,
+            _zone.JobsUntilNext);
+        _log.LogInfo($"[Zone] expanded: {expansion.StreetName} joins " +
+            $"(zone {expansion.StreetCount} streets, {expansion.NewKm:0.0} km)");
         _online.PushZoneKm(_zone.Km, PlayerName());
+        return expansion;
     }
 
     // The opening screen supplies the display name; before it is confirmed the

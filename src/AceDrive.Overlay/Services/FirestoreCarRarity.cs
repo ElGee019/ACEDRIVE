@@ -11,6 +11,7 @@ namespace AceDrive.Overlay.Services;
 public sealed class FirestoreCarRarity : ICarRaritySource
 {
     private readonly FirestoreCars _cars;
+    private readonly int _catalogSize;
     private readonly ILog _log;
     private readonly CancellationToken _stopToken;
     private CarRarityTable _table = CarRarityTable.Empty;
@@ -18,9 +19,10 @@ public sealed class FirestoreCarRarity : ICarRaritySource
     private bool _pushWarning;
 
     public FirestoreCarRarity(
-        FirestoreCars cars, ILog log, CancellationToken stopToken)
+        FirestoreCars cars, int catalogSize, ILog log, CancellationToken stopToken)
     {
         _cars = cars;
+        _catalogSize = Math.Max(1, catalogSize);
         _log = log;
         _stopToken = stopToken;
     }
@@ -82,7 +84,7 @@ public sealed class FirestoreCarRarity : ICarRaritySource
                 _log.LogWarning("firebase: car rarity board unavailable");
                 return;
             }
-            CarRarityTable table = CarRarityTable.From(rows);
+            CarRarityTable table = CarRarityTable.From(rows, _catalogSize);
             Volatile.Write(ref _table, table);
             _log.LogInfo($"firebase: car rarity board ready ({table.CarCount} cars)");
         }

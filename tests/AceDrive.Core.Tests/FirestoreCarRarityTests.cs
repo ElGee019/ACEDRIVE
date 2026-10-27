@@ -19,7 +19,8 @@ public sealed class FirestoreCarRarityTests
         db.Collections[FirestoreCollections.Cars] =
             [Car("ks_a", 300), Car("ks_b", 100), Car("ks_c", 50)];
         var rarity = new FirestoreCarRarity(
-            new FirestoreCars(db, new FakeClock()), new NullLogger(), CancellationToken.None);
+            new FirestoreCars(db, new FakeClock()), catalogSize: 100,
+            new NullLogger(), CancellationToken.None);
 
         await rarity.RefreshAsync();
 
@@ -35,7 +36,8 @@ public sealed class FirestoreCarRarityTests
     {
         var db = new FakeFirestoreDatabase { ListFails = true };
         var rarity = new FirestoreCarRarity(
-            new FirestoreCars(db, new FakeClock()), new NullLogger(), CancellationToken.None);
+            new FirestoreCars(db, new FakeClock()), catalogSize: 100,
+            new NullLogger(), CancellationToken.None);
 
         await rarity.RefreshAsync();
 
@@ -49,7 +51,8 @@ public sealed class FirestoreCarRarityTests
         var db = new FakeFirestoreDatabase();
         db.Collections[FirestoreCollections.Cars] = [Car("ks_a", 100)];
         var rarity = new FirestoreCarRarity(
-            new FirestoreCars(db, new FakeClock()), new NullLogger(), CancellationToken.None);
+            new FirestoreCars(db, new FakeClock()), catalogSize: 100,
+            new NullLogger(), CancellationToken.None);
 
         await rarity.RecordKmAsync("ks_a", 8);
 
@@ -66,7 +69,8 @@ public sealed class FirestoreCarRarityTests
     {
         var db = new FakeFirestoreDatabase();
         var rarity = new FirestoreCarRarity(
-            new FirestoreCars(db, new FakeClock()), new NullLogger(), CancellationToken.None);
+            new FirestoreCars(db, new FakeClock()), catalogSize: 100,
+            new NullLogger(), CancellationToken.None);
 
         await rarity.RecordKmAsync("", 8);
 

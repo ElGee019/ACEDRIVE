@@ -21,6 +21,12 @@ public partial class App : Application, IDisposable
     private FirestoreValuationBoard? _valuationBoard;
     private bool _disposed;
 
+    // TEMPORARY (testing): keeps every calendar event playable on any day and
+    // hour and lets the one-shot events (the missing-person run, the market
+    // valuation) be replayed. Flip to false to restore the shipping gates; the
+    // flag and the three arguments it feeds are deleted once the playtest ends.
+    private const bool IgnoreEventGatesForTesting = true;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -78,7 +84,6 @@ public partial class App : Application, IDisposable
             new ProceduralNameGenerator(namePools, taxiSeed),
             _log);
         var poiNames = new ProceduralNameGenerator(namePools, taxiSeed + 4);
-        var taxiProposals = new TaxiJobProposer(addressMap, residents, taxiSeed + 1);
         var content = new JsonOnboardingContent(_log);
         // WHY touch Content once at startup: the same eager first read (and
         // "content:" log line) the old Load() call gave, so a missing/corrupt
@@ -93,6 +98,9 @@ public partial class App : Application, IDisposable
         // flow banks each random house on its first draw and reuses it, so the
         // generator only seeds the doors that do not exist yet. WHY TickCount:
         // its own seeded instance, never the shared global; tests pin the seed.
+        // WHY the whole map and not the zone: the introduction's errand and the
+        // friends' doors are scripted onboarding content, not zone draws
+        // (TOZONES §4.7), and their tests pin the distribution.
         var poiTable = new JsonPoiStore(_log).Load();
         var poiGenerator = new PoiGenerator(addressMap, poiTable, Environment.TickCount);
         // The business POIs (PORTPLAN 24): no door exists on a new career. The
@@ -100,7 +108,7 @@ public partial class App : Application, IDisposable
         // free houses as the operating zone and the settled-job count cross
         // Unity's thresholds; the host checks it at boot and on every settle.
         // Separate seeded stream so a spawn never reshuffles a resident name.
-        var poiSpawner = new PoiSpawner(addressMap, poiTable, poiNames, taxiSeed + 4);
+        var poiSpawner = new PoiSpawner(poiTable, poiNames, taxiSeed + 4);
         // The addresses page (PORTPLAN 24/27): every discovered door lands in
         // one banked directory. Story doors arrive first, then the spawned
         // businesses; both survive a restart.
@@ -248,10 +256,19 @@ public partial class App : Application, IDisposable
         // The operating zone (PORTPLAN 58): the street-growth counters resume
         // from the last session; the threshold curve re-draws its seeded
         // lottery per launch, Unity GetNextExpansionThreshold parity.
-        // The placeholder map supplies the interim zone length: a 0 km zone
-        // would pin the business starter bonus at 100% (PORTPLAN 47/58).
+        // The profile's home street leads the discovered order, so the first
+        // expansion claims the other base street before the fictional pool.
+        // The placeholder's base streets supply the interim zone length: a
+        // 0 km zone would pin the business starter bonus at 100% (47/58).
         var zone = new OperatingZone(
-            savedDriver, Environment.TickCount, AddressBook.MapLengthKm(addressMap));
+            savedDriver, Environment.TickCount, addressMap,
+            homeStreetId: profileStore.Load()?.StreetId,
+            initialKm: AddressBook.MapLengthKm(addressMap));
+        // The taxi proposal draw reads the zone's own map, never the whole
+        // address file: a fictional street the zone has not discovered yet must
+        // never be offered as a destination (TOZONES §4.7). Hence it is built
+        // after the zone.
+        var taxiProposals = new TaxiJobProposer(zone, residents, taxiSeed + 1);
         // XP world standings (PORTPLAN 60): the live Firestore board when a
         // config exists, otherwise the offline null-object. The saved rank
         // snapshot restores either way (Unity's LoadFromPlayerData), so the
@@ -260,6 +277,7 @@ public partial class App : Application, IDisposable
         ICarRaritySource rarity;
         IPlayerTelemetry telemetry;
         IShiftStandings shiftStandings;
+        IZoneStandings zoneStandings;
         IPlayerNameRegistry playerNames;
         IValuationBoard valuationBoard;
         FirebaseOptions? firebaseOptions = FirebaseOptions.TryLoad(_log);
@@ -276,8 +294,12 @@ public partial class App : Application, IDisposable
             liveRivals.Start();
             liveRivals.Refresh(driver.Xp);
 
+            // The catalogue size bounds the rarity multiplier (half the car
+            // list), so the cap is derived from the shipped cars, not from
+            // how many cars the global board happens to hold today.
             var liveRarity = new FirestoreCarRarity(
-                new FirestoreCars(_firebase.Database, wall), _log, _firebase.StopToken);
+                new FirestoreCars(_firebase.Database, wall), cars.Count,
+                _log, _firebase.StopToken);
             liveRarity.Start();
 
             var liveShiftBoard = new FirestoreShiftStandings(
@@ -287,9 +309,19 @@ public partial class App : Application, IDisposable
             liveShiftBoard.RestoreSnapshot(savedDriver);
             liveShiftBoard.Start();
 
+            // The longest-operating-zone board (PORTPLAN 58): the expansion
+            // page's rank, on the same players collection and stop token as the
+            // other live boards. Its own write is the settle's
+            // PushZoneKm, so the board class only reads and ranks.
+            var liveZoneBoard = new FirestoreZoneStandings(
+                onlinePlayers, () => _firebase?.Session.Uid,
+                () => profileStore.Load()?.DisplayName,
+                _log, _firebase.StopToken);
+
             rivals = liveRivals;
             rarity = liveRarity;
             shiftStandings = liveShiftBoard;
+            zoneStandings = liveZoneBoard;
             // WHY UidAsync: the boot poll can end a shift that timed out while
             // the game was closed before anonymous auth has finished, and the
             // shift push has no later retry of its own.
@@ -319,11 +351,16 @@ public partial class App : Application, IDisposable
             var offlineShiftBoard = new OfflineShiftStandings();
             offlineShiftBoard.RestoreSnapshot(savedDriver);
             shiftStandings = offlineShiftBoard;
+            // No backend: the expansion page hides its standings block.
+            zoneStandings = new OfflineZoneStandings();
             playerNames = new OfflinePlayerNameRegistry();
             // No backend: the list is empty and the house entry is the only
             // opponent, exactly like Unity's unconfigured build.
             valuationBoard = new OfflineValuationBoard();
         }
+        // The zone board loads in the background from boot, so the first
+        // expansion page already has a rank (the offline null-object no-ops).
+        zoneStandings.Start();
         // Familiarity (PORTPLAN 45): one persisted level per resident, so a
         // restart reopens the same friendships instead of resetting them.
         var friendships = new JsonFriendshipStore(_log);
@@ -340,7 +377,9 @@ public partial class App : Application, IDisposable
         var requestTable = new JsonCustomerRequestStore(_log).Load();
         var requests = new CustomerRequestRoller(cars, requestTable, taxiSeed + 2);
         // Speed-challenge patrols (Phase C): one seeded plan per accepted job,
-        // offset from the other draws so it never reshuffles them.
+        // offset from the other draws so it never reshuffles them. WHY the
+        // whole map and not the zone: patrols are road events around the
+        // player's own position, not destinations inside it (TOZONES §4.7).
         var policeRules = new JsonPoliceRulesStore(_log).Load();
         var police = new PolicePatrolPlanner(addressMap, policeRules, taxiSeed + 3);
         var hud = new HudViewModel(addressMap, preferences, beat, wall, taxiRules);
@@ -390,9 +429,10 @@ public partial class App : Application, IDisposable
         // the coordinator only forwards the calendar tap, the poll and the one
         // ENTER the HUD raises. Draws get their own seeded stream.
         var willyFlow = new WhereIsWillyFlow(
-            addressMap, game, poiGenerator, poiDirectory, residents, garage, cars,
+            zone, game, poiGenerator, poiDirectory, residents, garage, cars,
             willyRules, willyLedger, friendships, trunk, driver, hud, saver,
-            rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log);
+            rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log,
+            ignoreEventGates: IgnoreEventGatesForTesting);
         // The quest's marker handler joins the typed arrival list first, so a
         // Willy marker can never fall through to a business interior.
         IPoiArrivalHandler[] poiHandlers =
@@ -432,7 +472,6 @@ public partial class App : Application, IDisposable
         var poiWorld = new PoiWorld(
             poiSpawner, poiDirectory, poiStore, deliveryBoard, deliveryCareer,
             city, storeCatalog, zone, jobs, onboardingStore, shops, dayCycle, _log);
-        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(poiHandlers));
         // The trip-start breakdown roll (PORTPLAN 39): one seeded instance,
         // never the shared global (AGENTS.md), read by both job flows.
         var breakdowns = new TripBreakdowns(
@@ -460,12 +499,18 @@ public partial class App : Application, IDisposable
         var haul = new CarHaulFlow(carBrands, cars, driver, dayCycle, saver, beat, _log);
         // The weekly market valuation (PORTPLAN 49): its own flow owns the
         // Monday week, the venue leg and the live/offline comparison, so the
-        // coordinator only forwards the calendar tap, the poll and the arrival
-        // edge. Its draws get their own seeded stream, offset from the other
-        // launch draws.
+        // coordinator only forwards the calendar tap, the poll and the one
+        // ENTER the HUD raises at the venue. Its draws get their own seeded
+        // stream, offset from the other launch draws.
         var valuationFlow = new ValuationFlow(
-            addressMap, game, valuation, valuationBoard, garage, cars, driver,
-            profileStore, hud, saver, rivals, beat, new Random(taxiSeed + 8), _log);
+            zone, game, wall, valuation, valuationBoard, garage, cars, driver,
+            profileStore, hud, saver, rivals, beat, new Random(taxiSeed + 8), _log,
+            ignoreEventGates: IgnoreEventGatesForTesting);
+        // The venue is a temporary door like the quest's markers: it joins the
+        // typed list once its flow exists, so ENTER opens the showcase instead
+        // of falling through to a business interior.
+        poiHandlers = [.. poiHandlers, new ValuationPoiHandler(valuationFlow)];
+        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(poiHandlers));
         // The page graph: the control page, the menu and every tile behind
         // them, with their own caches. It takes the flows (their pages are
         // theirs) and the session's data; the coordinator attaches as its host
@@ -478,14 +523,15 @@ public partial class App : Application, IDisposable
             garage, pins, visits, deliveryCareer, _log);
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todoBoard, roadTests, saver,
-            driver, garage, rivals, trunk, hunger, storeCatalog,
+            driver, garage, rivals, zoneStandings, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
             valuationFlow, willyFlow, willyLedger,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
-            () => carBrands.Brand, new Random(taxiSeed + 6), _log);
+            () => carBrands.Brand, new Random(taxiSeed + 6), _log,
+            ignoreEventGates: IgnoreEventGatesForTesting);
         // The panel's reveal policy: what a call opens, what revealing a POI
         // or a job page does, and hiding. The story flow, the voice router and
         // the coordinator share this one instance, so the root can build the

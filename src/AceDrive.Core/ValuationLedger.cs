@@ -8,8 +8,11 @@ namespace AceDrive.Core;
 /// <summary>
 /// State one restart must reopen for the weekly market valuation (PORTPLAN
 /// item 49): the preloaded venue, the in-flight drive, the week's entry
-/// (score + car + week), the seen-uid set the live/offline comparison pays
-/// from, the lifetime completed-event count and the last reset week.
+/// (score + car + week + the real-world moment it was made), the seen-uid set
+/// the live/offline comparison pays from, the lifetime completed-event count
+/// and the last reset week. The entry's two-real-day window is derived from
+/// the stamp, so the away-earning cap survives a restart; the flow owns the
+/// timing, this class owns the state.
 /// </summary>
 public sealed class ValuationLedger
 {
@@ -33,6 +36,7 @@ public sealed class ValuationLedger
         OwnScore = double.IsFinite(saved?.ValuationOwnScore ?? 0.0)
             ? Math.Max(0.0, saved?.ValuationOwnScore ?? 0.0)
             : 0.0;
+        EnteredAtUtc = saved?.ValuationEnteredAtUtc;
         LastResetWeek = saved?.LastValuationResetWeek ?? NoWeek;
         _seen = CleanSeen(saved?.ValuationSeenUids);
     }
@@ -58,6 +62,10 @@ public sealed class ValuationLedger
     /// <summary>The score pushed with this week's entry, fixed until the reset.</summary>
     public double OwnScore { get; private set; }
 
+    /// <summary>The real-world moment the entry was made, null when the entry
+    /// predates the stamp (or there is none).</summary>
+    public DateTime? EnteredAtUtc { get; private set; }
+
     /// <summary>Every uid settled for the current week's entry.</summary>
     public IReadOnlyList<string> SeenUids => _seen;
 
@@ -66,6 +74,28 @@ public sealed class ValuationLedger
 
     /// <summary>True when the given week has an entry (the live/offline comparison gate).</summary>
     public bool HasEntry(int week) => EntryWeek == week && !string.IsNullOrEmpty(EntryCarKey);
+
+    /// <summary>
+    /// When the entry's two-real-day window closes, null when there is no
+    /// entry. An entry saved before the stamp existed answers
+    /// <see cref="DateTime.MinValue"/>: with no moment to count from, the cap
+    /// cannot be shown to hold, so the next tick forgets it — the window is
+    /// the rule, not a bonus for old saves.
+    /// </summary>
+    public DateTime? ExpiresAtUtc =>
+        EntryCarKey is null
+            ? null
+            : EnteredAtUtc is { } enteredAt
+                ? ValuationRules.ComputeExpiryUtc(enteredAt)
+                : DateTime.MinValue;
+
+    /// <summary>True once the entry's two-day window has passed. An entry
+    /// saved before the stamp existed counts as expired: with no moment to
+    /// count from, the cap cannot be shown to hold.</summary>
+    public bool IsExpired(DateTime nowUtc) =>
+        EntryCarKey is not null
+        && (EnteredAtUtc is not { } enteredAt
+            || ValuationRules.IsEntryExpired(enteredAt, nowUtc));
 
     /// <summary>True when a venue is stored (Unity IsPreloaded).</summary>
     public bool HasVenue =>
@@ -100,12 +130,16 @@ public sealed class ValuationLedger
         ClearVenue();
     }
 
-    /// <summary>Records this week's entry and its fixed score.</summary>
-    public void MarkEntry(string carKey, double score, int week)
+    /// <summary>Records this week's entry, its fixed score and the real-world
+    /// moment the two-day window opens.</summary>
+    public void MarkEntry(string carKey, double score, int week, DateTime enteredAtUtc)
     {
         EntryCarKey = string.IsNullOrWhiteSpace(carKey) ? null : carKey;
         OwnScore = double.IsFinite(score) ? Math.Max(0.0, score) : 0.0;
         EntryWeek = week;
+        EnteredAtUtc = enteredAtUtc.Kind == DateTimeKind.Utc
+            ? enteredAtUtc
+            : enteredAtUtc.ToUniversalTime();
     }
 
     /// <summary>
@@ -119,6 +153,7 @@ public sealed class ValuationLedger
         EntryCarKey = null;
         OwnScore = 0.0;
         EntryWeek = NoWeek;
+        EnteredAtUtc = null;
     }
 
     /// <summary>Adds uids to the settled set (union, never shrink).</summary>

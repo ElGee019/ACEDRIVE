@@ -36,7 +36,9 @@
          port's stand-in for Unity's map while the search runs: the search lists
          the town's coffee shops, the found phase names the elder's home address
          and offers the one DRIVE HOME row. Same skeleton as the addresses page:
-         title band, body, BACK flush at the bottom. -->
+         title band, body, BACK flush at the bottom. The body takes the middle
+         of the panel (the valuation page's shape) because two shop rows under a
+         top-aligned intro would leave the panel's lower half empty. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -47,7 +49,7 @@
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
                    Text="{Binding Title}"/>
 
-        <StackPanel Grid.Row="1" VerticalAlignment="Top" Margin="16,0">
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
             <!-- Search phase: Unity's intro sentence, the town's coffee shops,
                  the failed-visit hint and GIVE UP once a visit has failed. -->
             <StackPanel Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}">

@@ -5,13 +5,18 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// Draws a whole proposal like Unity's TaxiJobGenerator: two houses on
-/// different streets (the customer's home and the second residence, filtered
-/// by the radius around the player's home), the residents at those doors from
-/// the persisted resident book, and the pickup/drop-off coin flip. Seeded like
-/// the ledger, so the proposal sequence replays deterministically in tests.
+/// Draws a whole proposal like Unity's TaxiJobGenerator: two houses on the
+/// operating zone's streets (the customer's home and the second residence,
+/// filtered by the radius around the player's home), the residents at those
+/// doors from the persisted resident book, and the pickup/drop-off coin flip.
+/// Seeded like the ledger, so the proposal sequence replays deterministically
+/// in tests.
+///
+/// The draw reads <see cref="OperatingZone.ZoneMap"/>, never the whole map: a
+/// fictional street the zone has not discovered yet must never be offered as a
+/// destination (TOZONES §4.7).
 /// </summary>
-public sealed class TaxiJobProposer(AddressMap map, ResidentBook residents, int seed)
+public sealed class TaxiJobProposer(OperatingZone zone, ResidentBook residents, int seed)
 {
     private readonly Random _rng = new(seed);
 
@@ -19,7 +24,7 @@ public sealed class TaxiJobProposer(AddressMap map, ResidentBook residents, int 
         int passengerCapacity, AddressLocation? home = null, int radiusKm = 0)
     {
         bool hasAddresses = TaxiAddressPlan.TryDraw(
-            map, _rng, home, radiusKm,
+            zone.ZoneMap, _rng, home, radiusKm,
             out AddressLocation customerHome, out AddressLocation secondResidence);
 
         // Unity resolves the residents before the flip, so a fixed seed sees

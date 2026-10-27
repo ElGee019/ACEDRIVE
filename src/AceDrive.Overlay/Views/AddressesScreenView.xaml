@@ -44,11 +44,12 @@
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <!-- Addresses page (PORTPLAN 24/27): the discovered POIs alphabetical by
-         name, the temporary stand-in for markers on the map. Picking a row
-         pins the HUD's drive-to line; driving there puts ENTER up on the
-         companion so the place can be entered. Same page skeleton as the
-         wallet page: title band, body, BACK flush at the bottom. -->
+    <!-- Addresses page (PORTPLAN 24/27 + TOZONES §3.5): the operating zone's
+         readout on top, then the discovered POIs alphabetical by name, the
+         temporary stand-in for markers on the map. Picking a row pins the HUD's
+         drive-to line; driving there puts ENTER up on the companion so the
+         place can be entered. Same page skeleton as the wallet page: title
+         band, body, BACK flush at the bottom. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -60,6 +61,37 @@
                    Text="{loc:Loc Key=AddressesTitle}"/>
 
         <StackPanel Grid.Row="1" VerticalAlignment="Top" Margin="16,0">
+            <!-- Operating-zone readout (TOZONES §3.5): the port's stand-in for
+                 Unity's map HUD line — streets, area, the jobs the next
+                 expansion still needs and the streets themselves. It stays
+                 above the list because it is the page's context, not one more
+                 address; the rule matches the wallet's section hairline. -->
+            <Border BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1"
+                    Padding="0,0,0,6" Margin="0,0,0,8">
+                <StackPanel>
+                    <TextBlock Text="{Binding ZoneLine}" Foreground="#FFF" FontSize="14"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding NextExpansionLine}" Foreground="#FFBFC4C9"
+                               FontSize="12" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    <TextBlock Style="{StaticResource FormLabel}" Text="{Binding StreetsLabel}"
+                               Margin="0,8,0,0"/>
+                    <!-- The names wrap instead of scrolling: a complete zone is
+                         ten rows, still one glance. -->
+                    <ItemsControl ItemsSource="{Binding StreetNames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Foreground="#FFBFC4C9"
+                                           FontSize="12" Margin="0,3,10,0"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
             <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" Margin="0,6"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>

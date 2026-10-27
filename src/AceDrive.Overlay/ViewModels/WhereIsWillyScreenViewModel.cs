@@ -46,7 +46,10 @@ public sealed class WhereIsWillyScreenViewModel : ViewModelBase, IVoiceScreen
         _backCommand = backCommand;
         _beat = beat;
         _firstName = person.Name.FirstName;
-        IntroLine = Strings.Format("WillyIntro", person.Name.Full, _firstName, town);
+        // WHY BaseName and not Full: a resident's drawn identity can still carry
+        // the ride's companion suffix ("and some friends"), and a missing-person
+        // sentence about one elder must not claim a whole group vanished.
+        IntroLine = Strings.Format("WillyIntro", person.Name.BaseName, _firstName, town);
         FoundLine = Strings.Format("WillyFound", HomeAddress(home, town), _firstName);
         Shops = BuildRows(shops);
         ShowNotHere = showNotHere && IsSearching;

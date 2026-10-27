@@ -13,7 +13,8 @@ public sealed class CalendarScreenTests
         FakeClock? clock = null, RoadTestLedger? roads = null, VoiceBeat? beat = null,
         DateTime? gameStart = null, int week = 1,
         Action<int>? openDay = null, Action? back = null,
-        WhereIsWillyLedger? willy = null, bool coffeeCareer = true)
+        WhereIsWillyLedger? willy = null, bool coffeeCareer = true,
+        bool ignoreGates = false)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
@@ -25,7 +26,7 @@ public sealed class CalendarScreenTests
             CalendarStamp.Default with { Week = week },
             new ParameterizedCommand<int>(day => openDay?.Invoke(day)),
             new RelayCommand(() => back?.Invoke()),
-            willy ?? new WhereIsWillyLedger(), () => coffeeCareer);
+            willy ?? new WhereIsWillyLedger(), () => coffeeCareer, ignoreGates);
     }
 
     [Fact]
@@ -323,6 +324,45 @@ public sealed class CalendarScreenTests
         Assert.Equal(
             "UNLOCK COFFEE BEANS CAREER FIRST",
             Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
+    }
+
+    [Fact]
+    public void Tap_WithGatesIgnored_OpensAnyDayAtAnyHour()
+    {
+        // TEMPORARY (testing): the tester switch the app passes, so every row
+        // answers: Sunday's Cento Miglia opens on a Monday night.
+        int opened = -1;
+        var vm = Create(
+            gameStart: new DateTime(2026, 10, 12, 21, 0, 0, DateTimeKind.Utc),
+            openDay: day => opened = day,
+            ignoreGates: true);
+
+        vm.DayCommand.Execute(1);
+
+        Assert.Equal(1, opened);
+        CalendarRow sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
+        Assert.True(sunday.IsOpen);
+        Assert.True(sunday.Flash);
+        Assert.Equal("Cento Miglia", sunday.EventLabel);
+    }
+
+    [Fact]
+    public void WillyRow_WithGatesIgnored_ReadsOpenDespiteTheStampAndTheCareer()
+    {
+        // TEMPORARY (testing): the stamp and the closed coffee career must not
+        // grey the row out while the gates are open.
+        var vm = Create(
+            gameStart: new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc),
+            willy: new WhereIsWillyLedger(
+                DriverState.Fresh with { LastWillyDate = "2026-10-14" }),
+            coffeeCareer: false,
+            ignoreGates: true);
+
+        CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
+
+        Assert.False(willy.Completed);
+        Assert.False(willy.Locked);
+        Assert.Equal("Where is Willy", willy.EventLabel);
     }
 
     [Fact]

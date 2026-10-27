@@ -6,16 +6,21 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Unity's address draw: filter the map's houses by the radius, group them by
-/// street, require at least two streets, then pick one street and one house
-/// for each leg. The two legs always sit on different streets, so the phrase
-/// can say "home" at one door and "the {surname} residence" at the other.
+/// street, then pick the customer's home and a second residence. The two legs
+/// sit on different streets whenever the map offers a second one, so the
+/// phrase can say "home" at one door and "the {surname} residence" at the
+/// other. A zone that has discovered a single street falls back to a second
+/// house on that same street — the copy already reads naturally for a
+/// neighbour ("the {surname} residence" two doors down) and a one-street zone
+/// must still propose jobs (TOZONES §4.7).
 /// </summary>
 public static class TaxiAddressPlan
 {
     /// <summary>
-    /// False when the map has fewer than two streets with a usable house
-    /// inside the radius; the caller then keeps the page's fallback copy.
-    /// Never throws for an invalid map or geometry.
+    /// False when the map has no street with a usable house inside the radius,
+    /// or when a single-street map cannot offer a second house on it. The
+    /// caller then keeps the page's fallback copy. Never throws for an invalid
+    /// map or geometry.
     /// </summary>
     public static bool TryDraw(
         AddressMap map, Random rng, AddressLocation? home, int radiusKm,
@@ -56,22 +61,43 @@ public static class TaxiAddressPlan
             }
         }
 
-        if (streets.Count < 2)
+        if (streets.Count == 0)
         {
             return false;
         }
 
         int firstStreet = rng.Next(streets.Count);
-        int firstNumber = houses[firstStreet][rng.Next(houses[firstStreet].Count)];
+        List<int> firstHouses = houses[firstStreet];
+        int firstIndex = rng.Next(firstHouses.Count);
+        int firstNumber = firstHouses[firstIndex];
 
-        // Pick uniformly among the OTHER streets; the shift avoids a retry
-        // loop and keeps the same distribution as Unity's do/while.
-        int secondStreet = rng.Next(streets.Count - 1);
-        if (secondStreet >= firstStreet)
+        int secondStreet;
+        int secondNumber;
+        if (streets.Count >= 2)
         {
-            secondStreet++;
+            // Pick uniformly among the OTHER streets; the shift avoids a retry
+            // loop and keeps the same distribution as Unity's do/while.
+            secondStreet = rng.Next(streets.Count - 1);
+            if (secondStreet >= firstStreet)
+            {
+                secondStreet++;
+            }
+            List<int> secondHouses = houses[secondStreet];
+            secondNumber = secondHouses[rng.Next(secondHouses.Count)];
         }
-        int secondNumber = houses[secondStreet][rng.Next(houses[secondStreet].Count)];
+        else
+        {
+            // One discovered street: the second door must be another house, or
+            // the proposal would send the passenger to the address they are
+            // standing at. A street with a single valid door cannot supply it.
+            if (firstHouses.Count < 2)
+            {
+                return false;
+            }
+            int slot = rng.Next(firstHouses.Count - 1);
+            secondStreet = firstStreet;
+            secondNumber = firstHouses[slot >= firstIndex ? slot + 1 : slot];
+        }
 
         customerHome = new AddressLocation(
             streets[firstStreet].Name, firstNumber, HouseNumberPlan.SideOf(firstNumber));

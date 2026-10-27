@@ -66,22 +66,28 @@ public sealed class PoiWorld
     /// <summary>
     /// The business/store side of the marker network (Unity's CarWash/Bank/
     /// Insurance/Dealer/Mechanic generators plus the hub store backfill):
-    /// every unlocked place opens on a free house. Cold path only (boot +
-    /// settle + hub close), never the 10 Hz poll. The directory only grows, so
-    /// a door the player already knows never moves. A fresh career is still in
-    /// the introduction, and Unity's firstSceneComplete gate keeps the list
-    /// empty until it ends.
+    /// every unlocked place opens on a free house on a street the zone already
+    /// discovered. Cold path only (boot + settle + hub close), never the 10 Hz
+    /// poll. The directory only grows, so a door the player already knows never
+    /// moves. A fresh career is still in the introduction, and Unity's
+    /// firstSceneComplete gate keeps the list empty until it ends.
+    /// <paramref name="expansion"/> is the settle hook's growth report: its
+    /// street receives the first new door (Unity's FinishExpandCoroutine), and
+    /// the returned doors are the ones this call banked, so the expansion page
+    /// can list the businesses that just opened. Stores are adopted into the
+    /// board and the town before returning.
     /// </summary>
-    public void Grow()
+    public IReadOnlyList<PointOfInterest> Grow(ZoneExpansion? expansion = null)
     {
         if (!_onboarding.Load().IsComplete)
         {
-            return;
+            return [];
         }
 
         IReadOnlyList<PointOfInterest> grown = _growth.Spawn(
-            _zone.StreetIds.Count, _jobs.Completed, _directory, _career.OwnsCategory);
-        bool banked = false;
+            _zone.StreetIds.Count, _jobs.Completed, _directory, _zone.ZoneMap,
+            expansion?.StreetName, _career.OwnsCategory);
+        var banked = new List<PointOfInterest>(grown.Count);
         foreach (PointOfInterest poi in grown)
         {
             if (!_directory.Add(poi))
@@ -89,12 +95,12 @@ public sealed class PoiWorld
                 continue;
             }
 
-            banked = true;
+            banked.Add(poi);
             _log.LogInfo($"[Poi] opened {poi.Name} at " +
                 AddressFormatter.Format(poi.Address));
         }
 
-        if (banked)
+        if (banked.Count > 0)
         {
             _store.Save(_directory.All);
         }
@@ -104,11 +110,14 @@ public sealed class PoiWorld
         // and the board gain the store together. Max's story grocery is the
         // career's first real grocery; adopting every known shop door also
         // covers the session where onboarding drew it after the catalog was
-        // built at boot.
-        if (AdoptDoors() || banked)
+        // built at boot. This runs before the expansion report reaches the
+        // page, so a shop listed there is already on the delivery board.
+        if (AdoptDoors() || banked.Count > 0)
         {
             _host.RefreshBoard();
         }
+
+        return banked;
     }
 
     /// <summary>
@@ -183,10 +192,10 @@ public sealed class PoiWorld
             : _board.Catalog.Find(leg.Key)?.Address;
 
     /// <summary>
-    /// The host's map side of a hub purchase: place its pickup door in the
-    /// free-house pool before the backfilled stores draw their addresses, then
-    /// bank the directory. A failed placement logs and leaves the pickup leg
-    /// skipped; the rest of the run still works.
+    /// The host's map side of a hub purchase: place its pickup door on a street
+    /// the zone already discovered, before the backfilled stores draw their
+    /// addresses, then bank the directory. A failed placement logs and leaves
+    /// the pickup leg skipped; the rest of the run still works.
     /// </summary>
     public void PlaceHubDoor(OwnedHub hub) => _ = EnsureHubDoor(hub);
 
@@ -210,7 +219,8 @@ public sealed class PoiWorld
         }
 
         PointOfInterest? door = _growth.Place(
-            hub.Key, hub.Name, PoiTypes.Hub, hub.OwnerName, hub.Category, _directory);
+            hub.Key, hub.Name, PoiTypes.Hub, hub.OwnerName, hub.Category, _directory,
+            _zone.ZoneMap);
         if (door is null || !_directory.Add(door))
         {
             _log.LogWarning($"hub door not placed: {hub.Name} ({hub.Key})");

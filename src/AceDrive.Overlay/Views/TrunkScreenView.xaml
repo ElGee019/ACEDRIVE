@@ -3,25 +3,63 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <UserControl.Resources>
-        <!-- EAT is the row's only action: compact, and visibly dimmed when the
-             catalogue no longer defines the stack (it cannot feed a value the
-             data does not have). -->
+        <!-- EAT is the row's only action: compact, because the name, the count
+             and the hunger it feeds share the same line. -->
         <Style x:Key="EatButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="Padding" Value="8,1"/>
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Opacity" Value="0.4"/>
-                </Trigger>
-            </Style.Triggers>
         </Style>
+        <!-- Empty-section hint: one muted line for a trunk holding no food and a
+             glove compartment holding no keepsakes, so neither section reads as
+             broken when it has nothing to list. -->
+        <Style x:Key="EmptyHint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFBFC4C9"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,6"/>
+        </Style>
+        <!-- One carried-stack row shape for both halves of the page. A food
+             stack shows the hunger its bite removes and its EAT tap; a glove-
+             compartment stack (award, certificate) shows only its name and
+             count, because CanEat is the page's food test and nothing there can
+             be eaten. -->
+        <DataTemplate x:Key="CarriedRow">
+            <Border BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1"
+                    Padding="2,3">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="{Binding Name}"
+                               Foreground="#FFF" FontSize="13"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Grid.Column="1" Text="{Binding QuantityLine}"
+                               Foreground="#FFBFC4C9" FontSize="12"
+                               Margin="8,0" VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="2" Text="{Binding HungerLine}"
+                               Foreground="#FFBFC4C9" FontSize="12"
+                               Margin="0,0,8,0" VerticalAlignment="Center"/>
+                    <Button Grid.Column="3" Content="{loc:Loc Key=TrunkEat}"
+                            Style="{StaticResource EatButton}"
+                            Command="{Binding DataContext.EatCommand,
+                                      RelativeSource={RelativeSource AncestorType=UserControl}}"
+                            CommandParameter="{Binding}"
+                            Visibility="{Binding CanEat, Converter={StaticResource BoolToVis}}"/>
+                </Grid>
+            </Border>
+        </DataTemplate>
     </UserControl.Resources>
     <!-- Trunk page (PORTPLAN item 26, port of Unity YouScreen's TrunkScreen):
          the driven car's free space over its capacity, the appetite reading
          (amber inside Unity's band) and one row per carried stack with its
-         quantity, the hunger a bite removes and the EAT tap. The glove
-         compartment and the reward-card slots Unity lists below are not part
-         of this port yet (PORTPLAN 61), so the page stops after the trunk.
+         quantity, the hunger a bite removes and the EAT tap. Unity's glove
+         compartment follows under its own title, split from the trunk by the
+         wallet's white rule: everything the catalogue does not define as food
+         (race awards, certificates) is carried there and cannot be eaten.
          Same page skeleton as the bank page: title band, body, BACK flush
          with the bottom edge. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
@@ -39,7 +77,7 @@
                        TextAlignment="Center" Margin="0,2,0,2"/>
             <!-- Unity colours this label orange inside the amber band and calm
                  teal elsewhere; the band itself is Core data, not view copy. -->
-            <TextBlock Text="{Binding HungerLine}" FontSize="13" FontWeight="Bold"
+            <TextBlock Text="{Binding HungerLine}" FontSize="16" FontWeight="Bold"
                        TextAlignment="Center" Margin="0,0,0,8">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
@@ -53,43 +91,28 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="13"
-                       TextAlignment="Center" Margin="0,6,0,6"
-                       Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Style="{StaticResource EmptyHint}" Text="{Binding TrunkEmptyLine}"
+                       Visibility="{Binding IsTrunkEmpty, Converter={StaticResource BoolToVis}}"/>
 
-            <ItemsControl ItemsSource="{Binding Rows}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate>
-                        <Border BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1"
-                                Padding="2,3">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                           Foreground="#FFF" FontSize="13"
-                                           VerticalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis"/>
-                                <TextBlock Grid.Column="1" Text="{Binding QuantityLine}"
-                                           Foreground="#FFBFC4C9" FontSize="12"
-                                           Margin="8,0" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="{Binding HungerLine}"
-                                           Foreground="#FFBFC4C9" FontSize="12"
-                                           Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                <Button Grid.Column="3" Content="{loc:Loc Key=TrunkEat}"
-                                        Style="{StaticResource EatButton}"
-                                        Command="{Binding DataContext.EatCommand,
-                                                  RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                        CommandParameter="{Binding}"
-                                        IsEnabled="{Binding CanEat}"/>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <!-- One body line of clearance: the first stack starts a line below
+                 the appetite reading so the reading keeps its header role
+                 instead of reading as the first row. -->
+            <ItemsControl ItemsSource="{Binding Rows}"
+                          ItemTemplate="{StaticResource CarriedRow}" Margin="0,17,0,0"/>
+
+            <!-- The glove compartment sits on the far side of the wallet's
+                 hairline and wears the page title's face, so the two halves
+                 read as two sections of one page rather than two pages. -->
+            <Border Style="{StaticResource SectionDivider}" Margin="0,10,0,8"/>
+
+            <TextBlock Style="{StaticResource PageTitle}" FontSize="20"
+                       Text="{loc:Loc Key=TrunkGloveTitle}"/>
+
+            <TextBlock Style="{StaticResource EmptyHint}" Text="{Binding CompartmentEmptyLine}"
+                       Visibility="{Binding IsCompartmentEmpty, Converter={StaticResource BoolToVis}}"/>
+
+            <ItemsControl ItemsSource="{Binding CompartmentRows}"
+                          ItemTemplate="{StaticResource CarriedRow}" Margin="0,4,0,0"/>
         </StackPanel>
 
         <!-- Button bar: BACK stretches the full panel width in its own bottom

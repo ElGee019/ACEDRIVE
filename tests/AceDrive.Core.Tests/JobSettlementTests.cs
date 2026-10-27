@@ -113,7 +113,7 @@ public sealed class JobSettlementTests
         var fleet = new FleetService(
             garage, [], game, wallet, InsuranceRules.Default, new NullLogger(),
             brands, new FakeContentSource(TestSession.EmptyContent));
-        var zone = new OperatingZone(null, seed: 0);
+        var zone = new OperatingZone(null, seed: 0, AddressMap.Default);
         var jobs = new JobLedger();
         var online = new FakePlayerTelemetry();
         var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);

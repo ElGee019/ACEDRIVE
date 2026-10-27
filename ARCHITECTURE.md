@@ -1,9 +1,13 @@
 # Overlay architecture — the session split
 
-How the overlay's session layer is meant to be shaped, and the order to get
+How the overlay's session layer is meant to be shaped, and the record of getting
 there. `AGENTS.md` states the rules; this file states the target those rules
 point at, so each slice can be judged against something instead of against
 "smaller than before".
+
+**Status: complete.** All eleven slices (S1–S11) are extracted and green; §11
+records where the architecture stands today and what is left, which is gameplay
+scope rather than architecture.
 
 Scope: `src/AceDrive.Overlay/ViewModels` and the composition root
 (`App.OnStartup`). `AceDrive.Core` is untouched by this plan.
@@ -23,8 +27,9 @@ route intent into them. Only then can `App.OnStartup` build everything.
 
 ## 2. Where the split stands
 
-Extracted, each verified (build 0 warnings, 1723 tests, format clean); S1–S4 are
-pushed, S5–S11 are green locally:
+All eleven slices are extracted, each verified (build 0 warnings, all tests
+green, format clean); S1–S4 are pushed, S5–S11 are green locally and since
+committed:
 
 | Slice | Result |
 |---|---|
@@ -46,10 +51,13 @@ pushed, S5–S11 are green locally:
 | S10 | The car haul → `CarHaulFlow` (the tap's settle, the receipt it builds and its calendar checkpoint); the coordinator loses the job, its placeholder constants and the car pool, −58 lines and one constructor parameter |
 | S11 | The onboarding forwarding leaves the coordinator: `ChooseBrand`/`ChooseCar`/`ShowDialogue`/`FinishDialogue` and the five page/tour flags are the story flow's, read where they live; `IJobsScreen` and `OverlayShell.ScreenChanged` were only there for them, −35 lines |
 
-`MainViewModel`: 2658 → 764 lines. `Poll` is 40 code lines (150 with its
-rationale): what is left is the idle-hide policy, the wall-clock bank and the
-telemetry feed — the world rules answer one question per tick. The coordinator
-now takes 32 named parameters (29 required, 3 optional), all of them finished
+`MainViewModel`: 2658 → 764 lines at S11, 961 today. The split took 1,894 lines
+out; the work since — job types like the Cento Miglia and its settlement, the
+weekly market valuation and the missing-person run, plus the TOZONES zone report
+— added 197 back, each as a finished collaborator or page rather than logic in
+the coordinator. `Poll` is 144 lines with its rationale (121 at S11): the later
+job types ride it as one call each, never as new policy. The coordinator now
+takes 39 named parameters (35 required, 4 optional), all of them finished
 services: the root does every `new`, and nothing on the list is a leftover
 waiting for its own slice.
 
@@ -96,17 +104,17 @@ coordinator. Pages take commands from the domain that owns them.
 | `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
 | `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
-| `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow()`, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, bought-car page |
-| `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay` | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (3 members) |
+| `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow(expansion)` → the doors it banked, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, bought-car page |
+| `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay` | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ShowZoneExpansion`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (3 members) |
 | `TelemetryReadouts` ✅ | the seven painted strings' caches (`_lastPacketId`, speed, gear, rpm/throttle/brake, the waiting key) | `Paint(sample, gameRunning)`, `PaintWaiting(gameRunning)`, `PaintJob(job, shift, now)` → `ReadoutPaint` | none: the coordinator's `Apply` copies the record |
-| `DayCycle` ✅ | `_lastDay`, `_lastShiftSecs`, the display week | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `GoToControlPage` |
+| `DayCycle` ✅ | `_lastDay`, `_lastShiftSecs`, the display week | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `ResumeAfterShiftEnded` |
 | `WorldTicks` ✅ | the hunger-block latch | `Tick(onboardingDone)` → whether the town moved | none: the movement returns to the coordinator, which owns the cached board page |
 | `DriverCatchUp` ✅ | none: the streak counter and the garage are the services' state; it runs once and exits | `Run(displayWeek)` | none: it banks through `GameStateSaver` and never reaches back into the panel |
-| `ZoneGrowth` ✅ | none: the zone's counters are the services' state | `Expand()` | none: the settle hook calls it, then `PoiWorld.Grow` |
+| `ZoneGrowth` ✅ | none: the zone's counters are the services' state | `Expand()` → the `ZoneExpansion` report (street, count, km, jobs to next) or null | none: the settle hook calls it, `PoiWorld.Grow(expansion)` banks the doors, and the coordinator keeps the report until the receipt's CONTINUE shows it |
 | `JobSettlement` ✅ | — | `SettleTaxiRide`, `SettleDeliveryRun` | `IJobSettlementHost` |
 | `ShopInteriors` ✅ | — | `Bank`, `Dealer`, `CarWash`, `Mechanic`, `Insurance` | none |
 | `FleetService` ✅, `GameStateSaver` ✅ | their own | — | none |
-| `PanelPresenter` ✅ | — (`_introShown` became `OverlayShell.HasBeenShown`) | `Show`, `Hide`, `Present`, `PresentJob`, `ShowMenu`, `RecordActivity`, `IsShown`, `CurrentScreen` | none: it *is* the reporting host for the panel |
+| `PanelPresenter` ✅ | the page + visibility one interruption took away (one slot) | `Show`, `Hide`, `Present`, `PresentJob`, `PresentInterruption`, `ResumeInterrupted`, `ShowMenu`, `RecordActivity`, `IsShown`, `CurrentScreen` | none: it *is* the reporting host for the panel |
 | `StoryHost` ✅ | — | the `IStoryHost` members | `IStoryHost` ← `Navigation` + `PanelPresenter` + `GameStateSaver` |
 | `OnboardingFlow` ✅ | walk progress, profile, errand POI | pages + `Done`/`Intro*` | `IStoryHost` (read where it lives: the coordinator, the window and the root take the flow's own values) |
 | `VoiceRouter` ✅ | mute state | `Handle`, `ResetMute` | none: `PanelPresenter` + `ICarBrandSource` + `IContentSource` (the `IVoiceHost` interface is deleted) |
@@ -116,8 +124,9 @@ coordinator. Pages take commands from the domain that owns them.
 After the split `MainViewModel` is a coordinator, not an owner:
 
 - lifecycle: `Start`, `Poll`, `Dispose`, the timer;
-- the 10 Hz loop: feed the meter, tick `TaxiJobFlow`, tick `DayCycle`, tick
-  `WorldTicks`, apply `ReadoutPaint` — 40 code lines, not 229;
+- the 10 Hz loop: feed the meter, tick `TaxiJobFlow`, `DayCycle`, `WorldTicks`,
+  the Cento entry, the valuation and the missing-person run, apply
+  `ReadoutPaint` — 59 code lines, not 229;
 - intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
 - the panel policy's *call sites*: the navigator's page reports route into
   `PanelPresenter`, which owns the mid-job call gate, which page a call opens
@@ -127,13 +136,16 @@ After the split `MainViewModel` is a coordinator, not an owner:
   reset, app restart, HUD wiring, `SkipShutdownSave`;
 - the bindable readout properties (the target of `ReadoutPaint`).
 
-Constructor: 32 parameters (29 required, 3 optional), all of them finished
+Constructor: 39 parameters (35 required, 4 optional), all of them finished
 services — the root does every `new`. No `MainViewModelDependencies` god record:
 each collaborator takes its own dependencies, which is what makes it testable.
 The game-clock world left in S7, the boot catch-up in S8, the zone expansion in
 S9 and the haul in S10; S11 took the last non-service convenience off the
 surface, so the list is now exactly the collaborators and the view plumbing,
-with nothing waiting for its own slice.
+with nothing waiting for its own slice. The job types and surfaces that landed
+since (Cento race + settle, valuation, Willy, the zone report) joined as finished
+collaborators, which is why the count grew without the coordinator taking on
+logic.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -155,7 +167,7 @@ stores + saved state
       └ DeliveryFlow (board, career, city, meter, breakdowns)
       └ CarHaulFlow (watcher, pool, wallet, DayCycle, saver; the legs come later)
       └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
-          └ Navigation (flows' pages, page data, saver, DayCycle's week)
+          └ Navigation (flows' pages, page data, saver, zone standings, DayCycle's week)
               └ PanelPresenter (shell, pages, the two flows' InProgress)
                   └ StoryHost (panel, pages, saver, standings)
                       └ OnboardingFlow (story host, pages, brand, week)
@@ -269,10 +281,13 @@ page); the second cannot move to the navigator without closing a cycle
 - `DayCycle` reads the confirmed name off `IProfileStore` for the shift push
   (the story flow's live profile is still coordinator-built until S6), so the
   push keeps naming the driver without a host getter.
-- `GoToMainPage` joined `IDayCycleHost` (originally `GoToControlPage`): the
-  shift-ended page is the cycle's, so it builds it and the host only reveals
-  it — the same split `IJobSettlementHost.ShowReceipt` already uses. Its
-  CONTINUE lands on the menu, not the jobs list, like the Cento receipt.
+- `ResumeAfterShiftEnded` joined `IDayCycleHost` (originally `GoToMainPage`):
+  the shift-ended page is the cycle's, so it builds it and the host only
+  reveals it — the same split `IJobSettlementHost.ShowReceipt` already uses.
+  Its CONTINUE hands the player back to the page and visibility the timeout
+  interrupted (see `PanelPresenter.PresentInterruption`), so an unwanted
+  interruption never moves them: a hidden panel stays on the road and a page
+  that was up comes back instead of the menu the old rule opened.
 
 **S6 — `App.OnStartup` rewrite.** ✅ (−184 lines in the coordinator): the root
 now builds the whole DAG, including `PanelPresenter`, `StoryHost`,
@@ -378,6 +393,12 @@ push went with the collaborator.
 - No host at all: `OnProgressBanked` calls `Expand()` and the next line is
   `PoiWorld.Grow()`. The zone's counters and km are banked by the settle's own
   driver save, so the collaborator has nothing to report.
+- The TOZONES expansion port changed that last point since: `Expand()` now
+  returns the `ZoneExpansion` report and `PoiWorld.Grow(expansion)` banks the
+  doors, so the settle hook hands both — the Core facts and the new doors — to
+  the receipt's CONTINUE, which opens the expansion page before the page the
+  receipt would have shown. Still no host: the coordinator holds the report for
+  one field's lifetime.
 
 **S10 — `CarHaulFlow`.** ✅ (−58 lines in the coordinator, one net constructor
 parameter): the haul the control page's tap settled inline is its own job
@@ -489,9 +510,10 @@ dictionary. If a slice adds a cache, it adds its row here.
 | `_current` profile | `JsonProfileStore` | — | `Save` replaces it | one row |
 | `_km`, `_levels`, `_index`, `_byId`, `_live` … | the `Json*`/`*` store that owns the file | id | `Save` after each mutation | one file's rows |
 | token cache | `FirebaseSession` | — | `Invalidate`/expiry | one token |
-| board/standings cache | `FirestoreRivals`, `FirestoreShiftStandings`, `FirestoreCarRarity` | board | `Refresh()` | one board |
+| board/standings cache | `FirestoreRivals`, `FirestoreShiftStandings`, `FirestoreCarRarity`, `FirestoreZoneStandings` | board | `Refresh()` | one board |
 | `_lastDay`, `_lastShiftSecs` | `DayCycle` | — | the day/time changing | 2 values |
 | `_lastPacketId` | `TelemetryReadouts` | — | packet id change | 1 value |
+| `_zoneMap` (the discovered streets, home first, as an `AddressMap`) | `OperatingZone` | discovered street count (`StreetIds`), ordered once at construct | `TryExpand` rebuilds it in the same call — the cache's only writer | at most the map's street rows |
 | `_houseEntry`, `_snapshots`, `_results` | `ValuationFlow` | week / arrival order | `ResetWeek` drops the house entry; a snapshot or result is dequeued once | one house entry, one drain pass per poll |
 
 Two rules the table makes checkable: **no row's owner is a View or the
@@ -609,22 +631,25 @@ second read).
   code without shrinking either, it is not a slice — stop and reconsider.
 - The commit message names what unblocked, not only what moved.
 
-## 11. Resume here
+## 11. Status: complete
 
-State: S1 pushed as `4d4c0e2`; S2, S3 and S4 pushed; S5–S11 are green locally.
-`MainViewModel` 764 lines (was 799 after S10), −35 lines: the onboarding
-forwarding (the four verbs and the five page/tour flags) left for the story
-flow, and `IJobsScreen`/`OverlayShell.ScreenChanged` went with it. The injected
-field list is 32, the constructor 32 parameters (29 required, 3 optional). 1723
-tests green: S11 is a surface slice, so the count is unchanged.
+**The split is done.** S1 is `4d4c0e2`; S2–S4 are pushed; S5–S11 are green
+locally and since committed. Every slice after S11 — the Cento Miglia and its
+settlement, the weekly market valuation, the missing-person run and the TOZONES
+zone/POI port — was built on the surface the split produced, each as its own
+collaborator or page VM. No candidate remains from the split plan.
 
-Next: no candidate is left from the split plan itself. The open decisions that
-remain are gameplay scope (PORTPLAN), not architecture:
+State today: `MainViewModel` 961 lines (764 at S11), 39 constructor parameters
+(35 required, 4 optional) and the same 39 injected fields; all tests green at
+the time of writing.
+
+What is left is gameplay scope (PORTPLAN), not architecture:
 
 - `Poll` still owns the idle-hide policy (§9 decision 5): a `SessionLoop` is only
   worth it if a second host (tests, a headless run) needs the tick.
-- A new job type (a driving slice, `OnCarHaul`'s legs) is a new collaborator by
-  §7 rule 5, and the haul's legs now have their home.
+- A new job type is a new collaborator by §7 rule 5: the next one (a driving
+  slice, the haul's legs) follows the same shape rather than growing the
+  coordinator.
 
 Working agreements earned so far:
 
@@ -640,7 +665,9 @@ Working agreements earned so far:
   `TripBreakdowns.Interrupt` charges the tow and returns the page, and the
   caller's own host puts it up with its own BACK command. The opposite case
   (`DayCycle`'s shift-ended page) takes one report for its CONTINUE instead, so
-  the page stays the cycle's and the panel policy stays the presenter's.
+  the page stays the cycle's and the panel policy stays the presenter's — the
+  presenter captures the interrupted page and visibility before revealing it,
+  and the report hands them back.
   `CarHaulFlow.Settle(back)` is the same shape: the receipt it just priced goes
   back to the navigator, which shows it with its own control command.
 - Collaborators take the saver, watcher and rivals directly; the host only
@@ -670,8 +697,9 @@ Working agreements earned so far:
   interface for one transition that only one caller consumes.
 - A settle-hook collaborator needs no host either: `ZoneGrowth.Expand()` is
   called by `OnProgressBanked`, the state it changed is banked by the settle's
-  driver save on the next line, and `PoiWorld.Grow()` follows. The coordinator
-  keeps the one call and nothing else about the zone.
+  driver save on the next line, and `PoiWorld.Grow(expansion)` follows. The
+  coordinator keeps the one call, the returned report until the receipt's
+  CONTINUE shows the expansion page, and nothing else about the zone.
 - A collaborator's own value is read where it lives, never forwarded: the
   coordinator reads `_story.Done`/`Intro*` at its three gates, `App` reads the
   tour gate, and `MainWindow` takes the placement gate as a constructor value.

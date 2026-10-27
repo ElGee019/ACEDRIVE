@@ -15,6 +15,62 @@
       "name": "Street 2",
       "fromFraction": 0.5,
       "toFraction": 1.0
+    },
+    {
+      "id": "street-3",
+      "name": "Street 3",
+      "fromFraction": 0.0,
+      "toFraction": 0.5,
+      "fictional": true
+    },
+    {
+      "id": "street-4",
+      "name": "Street 4",
+      "fromFraction": 0.5,
+      "toFraction": 1.0,
+      "fictional": true
+    },
+    {
+      "id": "street-5",
+      "name": "Street 5",
+      "fromFraction": 0.0,
+      "toFraction": 0.5,
+      "fictional": true
+    },
+    {
+      "id": "street-6",
+      "name": "Street 6",
+      "fromFraction": 0.5,
+      "toFraction": 1.0,
+      "fictional": true
+    },
+    {
+      "id": "street-7",
+      "name": "Street 7",
+      "fromFraction": 0.0,
+      "toFraction": 0.5,
+      "fictional": true
+    },
+    {
+      "id": "street-8",
+      "name": "Street 8",
+      "fromFraction": 0.5,
+      "toFraction": 1.0,
+      "fictional": true
+    },
+    {
+      "id": "street-9",
+      "name": "Street 9",
+      "fromFraction": 0.0,
+      "toFraction": 0.5,
+      "fictional": true
+    },
+    {
+      "id": "street-10",
+      "name": "Street 10",
+      "fromFraction": 0.5,
+      "toFraction": 1.0,
+      "fictional": true
     }
   ]
 }

@@ -50,7 +50,7 @@ public sealed class DriverCatchUpTests
             clock, new GameClock(clock, clock.UtcNow),
             new FakeGameClockStore(), drivers, garages, new FakeCityStore(),
             new FakeHungerStore(), new FakeRoadTestStore(), new FakeShiftStore(),
-            wallet, streak, new OperatingZone(null, seed: 0), new Trunk(), garage,
+            wallet, streak, new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage,
             new CityEconomy(DeliveryCatalog.Default.Stores, CityRules.Default),
             new Hunger(HungerRules.Default), TestRoadCars.Ledger(), new TaxiShift(),
             new ShiftRecord(null), new JobLedger(), new DestinationPins(), new VisitLedger(),

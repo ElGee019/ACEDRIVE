@@ -7,24 +7,22 @@ namespace AceDrive.Core;
 /// <summary>
 /// Grows the POI directory from the career's progress. Each definition that
 /// carries a <see cref="PoiSpawnRule"/> is compared against the saved
-/// progress; every missing door is drawn on a random street at a house no
-/// known POI uses, with a procedural owner name. Business families gate on
-/// streets/jobs, store families on an owned hub category. Randomness is a
-/// seeded instance, never the shared global (AGENTS), so tests pin the
-/// addresses.
+/// progress; every missing door is drawn on a street the operating zone has
+/// already discovered, at a house no known POI uses, with a procedural owner
+/// name. Business families gate on streets/jobs, store families on an owned
+/// hub category. Randomness is a seeded instance, never the shared global
+/// (AGENTS), so tests pin the addresses.
 /// </summary>
 public sealed class PoiSpawner
 {
-    private readonly AddressMap _map;
     private readonly IReadOnlyList<PoiDefinition> _definitions;
     private readonly ProceduralNameGenerator _names;
     private readonly Random _rng;
 
     public PoiSpawner(
-        AddressMap map, IReadOnlyList<PoiDefinition> definitions,
+        IReadOnlyList<PoiDefinition> definitions,
         ProceduralNameGenerator names, int seed)
     {
-        _map = map ?? throw new ArgumentNullException(nameof(map));
         _definitions = definitions ?? [];
         _names = names ?? throw new ArgumentNullException(nameof(names));
         _rng = new Random(seed);
@@ -34,16 +32,23 @@ public sealed class PoiSpawner
     /// The doors the saved progress has unlocked and <paramref name="known"/>
     /// does not have yet, in definition order. The caller adds them to the
     /// directory and banks the file. Empty when no threshold is crossed or the
-    /// map has no free house; never throws, never returns a duplicate id or a
-    /// used address. <paramref name="ownsCategory"/> gates the store families:
-    /// no owned grocery/coffee hub means no store door.
+    /// addressable map has no free house; never throws, never returns a
+    /// duplicate id or a used address. <paramref name="addressable"/> is the
+    /// operating zone's map, so no generated business can land on a street the
+    /// player has not discovered. <paramref name="openedStreet"/> is the street
+    /// an expansion just added: the first new door of that call opens there
+    /// (Unity's FinishExpandCoroutine), while the rest draw over the whole
+    /// discovered map. <paramref name="ownsCategory"/> gates the store
+    /// families: no owned grocery/coffee hub means no store door.
     /// </summary>
     public IReadOnlyList<PointOfInterest> Spawn(
         int discoveredStreets, int settledJobs, PoiDirectory known,
+        AddressMap addressable, string? openedStreet = null,
         Predicate<string>? ownsCategory = null)
     {
+        ArgumentNullException.ThrowIfNull(addressable);
         var added = new List<PointOfInterest>();
-        if (known is null || _map.Streets is not { Count: > 0 })
+        if (known is null || addressable.Streets is not { Count: > 0 })
         {
             return added;
         }
@@ -66,7 +71,11 @@ public sealed class PoiSpawner
                 discoveredStreets, settledJobs, categoryOwned);
             while (existing < expected)
             {
-                PointOfInterest? poi = SpawnOne(definition, existing, known, added);
+                // The first missing door of the whole call is the expansion's
+                // new door; only that one is forced onto the opened street.
+                PointOfInterest? poi = SpawnOne(
+                    definition, existing, known, added, addressable,
+                    added.Count == 0 ? openedStreet : null);
                 if (poi is null)
                 {
                     // The map is full: stop this family, leave the rest alone.
@@ -84,14 +93,17 @@ public sealed class PoiSpawner
     /// <summary>
     /// Places a door the career owns rather than a paced family: a wholesale
     /// hub bought on the career page (Unity PlaceHubOnExistingStreet). The
-    /// address is drawn from the same free-house pool as every other business,
-    /// so it can never land on a known door. Answers null when the id already
-    /// exists or the map has no free house; the caller decides the fallback.
+    /// address is drawn from the same free-house pool on
+    /// <paramref name="addressable"/> as every other business, so it can never
+    /// land on a known door or an undiscovered street. Answers null when the
+    /// id already exists or the map has no free house; the caller decides the
+    /// fallback.
     /// </summary>
     public PointOfInterest? Place(
         string id, string name, string type, string ownerName,
-        string category, PoiDirectory known)
+        string category, PoiDirectory known, AddressMap addressable)
     {
+        ArgumentNullException.ThrowIfNull(addressable);
         if (known is null
             || string.IsNullOrWhiteSpace(id)
             || string.IsNullOrWhiteSpace(name)
@@ -100,16 +112,26 @@ public sealed class PoiSpawner
             return null;
         }
 
-        return DrawFreeAddress(known, []) is { } door
+        return DrawFreeAddress(addressable, known, []) is { } door
             ? new PointOfInterest(id, name, door, type, ownerName, category)
             : null;
     }
 
     private PointOfInterest? SpawnOne(
-        PoiDefinition definition, int index,
-        PoiDirectory known, List<PointOfInterest> added)
+        PoiDefinition definition, int index, PoiDirectory known,
+        List<PointOfInterest> added, AddressMap addressable, string? openedStreet)
     {
-        if (DrawFreeAddress(known, added) is not { } door)
+        AddressLocation? door = null;
+        if (!string.IsNullOrWhiteSpace(openedStreet)
+            && AddressBook.StreetByName(addressable, openedStreet) is { } opened)
+        {
+            door = DrawFreeAddressOn(opened, addressable, known, added);
+        }
+
+        // A full opened street is no reason to skip the spawn: the walk then
+        // falls back over every discovered street.
+        door ??= DrawFreeAddress(addressable, known, added);
+        if (door is not { } address)
         {
             return null;
         }
@@ -120,7 +142,7 @@ public sealed class PoiSpawner
         return new PointOfInterest(
             UniqueId(definition.Type, index, known, added),
             name,
-            door,
+            address,
             definition.Type,
             owner.BaseName,
             definition.Category,
@@ -151,39 +173,54 @@ public sealed class PoiSpawner
         }
     }
 
-    // A street is picked at random, then a free number on it: the same even
-    // spread the map uses everywhere, with known doors (story and generated)
-    // excluded so two businesses never share an address.
+    // A discovered street is picked at random, then a free number on it: the
+    // same even spread the map uses everywhere, with known doors (story and
+    // generated) excluded so two businesses never share an address.
     private AddressLocation? DrawFreeAddress(
-        PoiDirectory known, List<PointOfInterest> added)
+        AddressMap map, PoiDirectory known, List<PointOfInterest> added)
     {
-        int streetCount = _map.Streets.Count;
+        int streetCount = map.Streets.Count;
+        if (streetCount == 0)
+        {
+            return null;
+        }
+
         int start = _rng.Next(streetCount);
         for (int step = 0; step < streetCount; step++)
         {
-            AddressStreet street = _map.Streets[(start + step) % streetCount];
-            int houses = HouseNumberPlan.Count(street, _map);
-            if (houses <= 0)
+            AddressStreet street = map.Streets[(start + step) % streetCount];
+            if (DrawFreeAddressOn(street, map, known, added) is { } door)
             {
-                continue;
-            }
-
-            int[] taken = TakenNumbers(street.Name, houses, known, added);
-            int free = houses - taken.Length;
-            if (free <= 0)
-            {
-                continue;
-            }
-
-            int number = FreeNumber(_rng.Next(free), houses, taken);
-            if (number > 0)
-            {
-                return new AddressLocation(
-                    street.Name, number, HouseNumberPlan.SideOf(number));
+                return door;
             }
         }
 
         return null;
+    }
+
+    // One street's free house, or null when it is full: the expansion's forced
+    // street uses this directly, and a full one falls back to the walk.
+    private AddressLocation? DrawFreeAddressOn(
+        AddressStreet street, AddressMap map,
+        PoiDirectory known, List<PointOfInterest> added)
+    {
+        int houses = HouseNumberPlan.Count(street, map);
+        if (houses <= 0)
+        {
+            return null;
+        }
+
+        int[] taken = TakenNumbers(street.Name, houses, known, added);
+        int free = houses - taken.Length;
+        if (free <= 0)
+        {
+            return null;
+        }
+
+        int number = FreeNumber(_rng.Next(free), houses, taken);
+        return number > 0
+            ? new AddressLocation(street.Name, number, HouseNumberPlan.SideOf(number))
+            : null;
     }
 
     private static int[] TakenNumbers(

@@ -16,7 +16,9 @@ public sealed record GarageState(
 /// AskedCategories is the car-stat quiz history; a save written before the
 /// request slice has none and loads as empty. JobsCompleted is the valuation
 /// score's per-car job term (Unity CarJobsService): a save before the market
-/// slice loads as zero.</summary>
+/// slice loads as zero. LeaderboardRanking is the valuation's stretch-board
+/// term: a save before it existed loads on the top-percentile placeholder, and
+/// the future boards overwrite it with the computed 0..1 value.</summary>
 public sealed record OwnedCarState(
     string Key,
     int PurchaseWeek = 0,
@@ -26,7 +28,8 @@ public sealed record OwnedCarState(
     IReadOnlyList<MaintenancePartState>? Parts = null,
     EngineConditionState? Engine = null,
     IReadOnlyList<string>? AskedCategories = null,
-    int JobsCompleted = 0);
+    int JobsCompleted = 0,
+    double LeaderboardRanking = OwnedCar.DefaultLeaderboardRanking);
 
 /// <summary>One part's baseline (Unity CarMaintenancePart: partKey +
 /// lastServiceOdometer).</summary>

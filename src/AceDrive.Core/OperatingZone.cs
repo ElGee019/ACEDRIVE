@@ -14,6 +14,12 @@ namespace AceDrive.Core;
 /// street (Unity's expansion pipeline) and resets the counter. The bank's
 /// interest rate reads the street COUNT, so the count must reach Unity
 /// semantics before the bank port wires in.
+///
+/// The zone is also the owner of the addressable area: <see cref="ZoneMap"/>
+/// names the streets it covers (home first, then map order) and
+/// <see cref="NextStreet"/> is the row the next expansion would add. Draws
+/// that must stay inside the discovered pool read <see cref="ZoneMap"/>
+/// instead of the whole map.
 /// </summary>
 public sealed class OperatingZone
 {
@@ -21,17 +27,28 @@ public sealed class OperatingZone
     /// Grandma onboarding dialogue completes, so a fresh driver answers day
     /// one with count 1. Until the Step-1 Eifel table names real streets,
     /// the placeholder keeps the count (and thus the interest factor)
-    /// Unity-exact.</summary>
+    /// Unity-exact, and only the count is ever read back from a save.</summary>
     public const string HomeStreetId = "home";
 
     private readonly Random _rng;
+    private readonly AddressMap _map;
+    // Home street first, then map order: one cached order feeds both the
+    // discovered prefix (ZoneMap) and the row after it (NextStreet), so the
+    // two lookups can never disagree.
+    private readonly IReadOnlyList<AddressStreet> _orderedStreets;
     private readonly List<string> _streets = [];
+    private AddressMap _zoneMap;
     private int _jobs;
     private int _expansions;
     private double _km;
 
-    public OperatingZone(DriverState? saved, int seed, double initialKm = 0.0)
+    public OperatingZone(
+        DriverState? saved, int seed, AddressMap map,
+        string? homeStreetId = null, double initialKm = 0.0)
     {
+        ArgumentNullException.ThrowIfNull(map);
+        _map = map;
+        _orderedStreets = AddressBook.ZoneStreets(map, int.MaxValue, homeStreetId);
         _rng = new Random(seed);
         int jobs = Math.Max(0, saved?.ExpansionJobs ?? 0);
         int expansions = Math.Max(0, saved?.ExpansionCount ?? 0);
@@ -57,6 +74,7 @@ public sealed class OperatingZone
         }
         _jobs = jobs;
         _expansions = expansions;
+        _zoneMap = BuildZoneMap();
     }
 
     /// <summary>Jobs counted toward the pending expansion (Unity
@@ -68,8 +86,24 @@ public sealed class OperatingZone
     public int ExpansionCount => _expansions;
 
     /// <summary>Discovered streets, oldest first (Unity discoveredStreets
-    /// order; the home street leads).</summary>
+    /// order; the home street leads). Only the COUNT is meaningful: legacy
+    /// saves carry the interim ids ("home", "s1", …), while the map names the
+    /// streets through <see cref="ZoneMap"/>.</summary>
     public IReadOnlyList<string> StreetIds => _streets;
+
+    /// <summary>The discovered streets as an address map, home street first.
+    /// Every new draw (taxi proposal, venue, generated business, Willy) reads
+    /// this so nothing can land on a street the zone has not reached. Rebuilt
+    /// by <see cref="TryExpand"/> — the cache's only writer.</summary>
+    public AddressMap ZoneMap => _zoneMap;
+
+    /// <summary>The street the next expansion would add, or null once the map's
+    /// pool is exhausted. Read from the cached home-first order at the zone's
+    /// street count, so a legacy save needs no migration.</summary>
+    public AddressStreet? NextStreet =>
+        _streets.Count < _orderedStreets.Count
+            ? _orderedStreets[_streets.Count]
+            : null;
 
     /// <summary>Total discovered street length in km (Unity
     /// currentOperatingZone); seeded from the placeholder map until real
@@ -119,7 +153,21 @@ public sealed class OperatingZone
         _km += Math.Max(0.0, lengthKm);
         _jobs = 0;
         _expansions++;
+        _zoneMap = BuildZoneMap();
         return true;
+    }
+
+    // The discovered streets are the prefix of the cached home-first order:
+    // the count is the save's authority, the map supplies the identities.
+    private AddressMap BuildZoneMap()
+    {
+        int count = Math.Min(_streets.Count, _orderedStreets.Count);
+        var streets = new List<AddressStreet>(count);
+        for (int i = 0; i < count; i++)
+        {
+            streets.Add(_orderedStreets[i]);
+        }
+        return _map with { Streets = streets };
     }
 
     /// <summary>Unity GetNextExpansionThreshold: 2 for the first expansion,

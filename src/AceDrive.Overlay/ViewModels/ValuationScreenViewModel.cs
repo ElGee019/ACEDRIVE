@@ -92,7 +92,11 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
         }
     }
 
-    /// <summary>The picked car's spec rows (price, engine, power, top speed, 0-60, class).</summary>
+    /// <summary>
+    /// The picked car's stats rows: the catalogue terms (price, engine, power,
+    /// top speed, 0-60, class) plus the owned car's leaderboard ranking, which
+    /// is per car rather than per model.
+    /// </summary>
     public IReadOnlyList<GarageStatRow> Stats
     {
         get => _stats;
@@ -301,7 +305,10 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
     private void Reload()
     {
         CarSpec? spec = _selected is null ? null : SpecOf(_selected.Key);
-        Stats = BuildStats(spec);
+        // The ranking lives on the owned car, not on the catalogue row, so the
+        // stats block reads both halves of the pick.
+        OwnedCar? owned = _selected is null ? null : _garage.Find(_selected.Key);
+        Stats = BuildStats(spec, owned);
         OnPropertyChanged(nameof(CanEnter));
         // The picker's selection drives ENTER's can-execute, so the button
         // re-arms the moment a car is chosen instead of on the next paint.
@@ -369,7 +376,7 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
         return _garage.Find(key) is { } car ? _garage.SpecOf(car) : null;
     }
 
-    private static IReadOnlyList<GarageStatRow> BuildStats(CarSpec? spec)
+    private static IReadOnlyList<GarageStatRow> BuildStats(CarSpec? spec, OwnedCar? owned)
     {
         if (spec is null)
         {
@@ -383,6 +390,8 @@ public sealed class ValuationScreenViewModel : ViewModelBase, IVoiceScreen, IKee
             new(Strings.Get("ValuationTopSpeedLabel"), Strings.Format("ValuationTopSpeed", spec.TopSpeedKmh)),
             new(Strings.Get("ValuationAccelerationLabel"), Strings.Format("ValuationAcceleration", spec.Acceleration)),
             new(Strings.Get("ValuationClassLabel"), Strings.Format("ValuationClass", spec.Class)),
+            new(Strings.Get("ValuationLeaderboardLabel"),
+                Strings.Format("ValuationLeaderboard", owned?.LeaderboardRanking ?? 0.0)),
         ];
     }
 

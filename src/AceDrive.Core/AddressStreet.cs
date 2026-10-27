@@ -4,9 +4,16 @@
 // any view code.
 namespace AceDrive.Core;
 
-/// <summary>One named street on the placeholder map.</summary>
+/// <summary>
+/// One named street on the placeholder map. <paramref name="Fictional"/> marks
+/// an authored street that exists only as a label on the lap (the street pool
+/// is fixed content: nothing fetches or grows it at runtime). It can be
+/// discovered and drawn on, but it does not grow the base area the zone and the
+/// starter bonus seed from.
+/// </summary>
 public sealed record AddressStreet(
     string Id,
     string Name,
     double FromFraction,
-    double ToFraction);
+    double ToFraction,
+    bool Fictional = false);

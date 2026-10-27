@@ -32,34 +32,62 @@ public static class AddressBook
     }
 
     /// <summary>
-    /// Total drivable length of the placeholder map's streets in km. The
-    /// interim operating-zone seed until real Eifel street lengths arrive
-    /// (PORTPLAN 58): a 0 km zone would pin the starter bonus at 100%.
+    /// Total drivable length of the placeholder map's base (non-fictional)
+    /// streets in km. The interim operating-zone seed until real Eifel street
+    /// lengths arrive (PORTPLAN 58): a 0 km zone would pin the starter bonus at
+    /// 100%. Fictional rows are the zone's extra labels onto the same lap, so
+    /// counting them would inflate the base area.
     /// </summary>
     public static double MapLengthKm(AddressMap map)
     {
-        double trackKm = double.IsFinite(map.TrackLengthMeters)
-            ? Math.Max(0.0, map.TrackLengthMeters) / 1000.0
-            : 0.0;
-        double spans = 0.0;
+        ArgumentNullException.ThrowIfNull(map);
+        double total = 0.0;
         foreach (AddressStreet street in map.Streets)
         {
-            double span = street.ToFraction - street.FromFraction;
-            if (double.IsFinite(span) && span > 0.0)
+            if (!street.Fictional)
             {
-                spans += Math.Min(span, 1.0);
+                total += StreetLengthKm(map, street);
             }
         }
-        return spans * trackKm;
+        return total;
     }
 
     /// <summary>
-    /// Mean street length in km: the interim length one zone expansion adds
-    /// while street metadata is pending, so the zone (and the starter bonus)
-    /// still decays with every expansion. Zero for an empty map.
+    /// One street's own drivable length in km: the span it covers of the lap.
+    /// A zone expansion adds exactly this to the zone's area, so a street that
+    /// covers less of the lap grows the zone less.
     /// </summary>
-    public static double AverageStreetLengthKm(AddressMap map) =>
-        map.Streets is { Count: > 0 } ? MapLengthKm(map) / map.Streets.Count : 0.0;
+    public static double StreetLengthKm(AddressMap map, AddressStreet street)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(street);
+        double trackKm = double.IsFinite(map.TrackLengthMeters)
+            ? Math.Max(0.0, map.TrackLengthMeters) / 1000.0
+            : 0.0;
+        double span = street.ToFraction - street.FromFraction;
+        return double.IsFinite(span) && span > 0.0
+            ? Math.Min(span, 1.0) * trackKm
+            : 0.0;
+    }
+
+    /// <summary>
+    /// Mean base-street length in km: the interim length one zone expansion
+    /// adds while street metadata is pending, so the zone (and the starter
+    /// bonus) still decays with every expansion. Zero for an empty map.
+    /// </summary>
+    public static double AverageStreetLengthKm(AddressMap map)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        int baseStreets = 0;
+        foreach (AddressStreet street in map.Streets)
+        {
+            if (!street.Fictional)
+            {
+                baseStreets++;
+            }
+        }
+        return baseStreets > 0 ? MapLengthKm(map) / baseStreets : 0.0;
+    }
 
     /// <summary>
     /// The streets the operating zone covers, home street first. Interim

@@ -38,8 +38,14 @@
         <!-- Entry phase -->
         <StackPanel Grid.Row="2" VerticalAlignment="Center" Margin="16,0"
                     Visibility="{Binding IsEntry, Converter={StaticResource BoolToVis}}">
-            <TextBlock Text="{Binding IntroLine}" Foreground="#FFBFC4C9" FontSize="14"
+            <!-- White at the picker's own size: the instruction reads as part of
+                 the page's body, not as a dim caption above the card. -->
+            <TextBlock Text="{Binding IntroLine}" Foreground="#FFF" FontSize="14"
                        TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <!-- The shared hairline closes the instruction off from the card
+                 below it, so the terms of the score read as a preamble instead
+                 of as the picker's caption. -->
+            <Border Style="{StaticResource SectionDivider}" Margin="0,0,0,12"/>
             <!-- The empty-garage hint keeps the page honest instead of showing
                  a picker with nothing in it. -->
             <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
@@ -77,7 +83,11 @@
                         <DataTemplate>
                             <Grid Style="{StaticResource StatsRow}">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="120"/>
+                                    <!-- Wider than the garage's column: the
+                                         page's longest caption is LEADERBOARD
+                                         RANKING, which measures ~140 px in the
+                                         bold label face before its 8 px gap. -->
+                                    <ColumnDefinition Width="160"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="{Binding Label}" Style="{StaticResource FormLabel}"/>

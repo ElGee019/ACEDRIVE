@@ -94,7 +94,9 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     public IReadOnlyList<string> TodoLines { get => _todoLines; private set => SetField(ref _todoLines, value); }
     private IReadOnlyList<string> _todoLines = [];
 
-    /// <summary>The completed tips the popup block lists (Unity's TodoFinishedPopup).</summary>
+    /// <summary>The completed tips the popup block lists, numbered from 1
+    /// (Unity's TodoFinishedPopup has no count; the page shows the player how
+    /// many kits the five-kit threshold still waits on).</summary>
     public IReadOnlyList<string> CompletedTodoLines { get => _completedTodoLines; private set => SetField(ref _completedTodoLines, value); }
     private IReadOnlyList<string> _completedTodoLines = [];
 
@@ -172,8 +174,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         _shiftOffered = shiftStarted;
         _todoVersion = _todos.Version;
 
-        TodoLines = BuildLines(_todos.Slots);
-        CompletedTodoLines = BuildLines(_todos.CompletedLines);
+        TodoLines = BuildLines(_todos.Slots, numbered: false);
+        CompletedTodoLines = BuildLines(_todos.CompletedLines, numbered: true);
         HasCompletedTodos = _todos.HasCompleted;
         ShowDeliverCarePackages = _todos.CompletedCount >= DeliverThreshold;
         SyncTaxiLabel();
@@ -197,15 +199,19 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // A visit tip carries the door name in {0}; every progressive tip carries
     // the target in {0} and the career reading in {1}. The copy's own format
     // specifiers decide the decimals, so no number formatting lives here.
-    private static string[] BuildLines(IReadOnlyList<TodoLine> lines)
+    private static string[] BuildLines(IReadOnlyList<TodoLine> lines, bool numbered)
     {
         var texts = new string[lines.Count];
         for (int i = 0; i < texts.Length; i++)
         {
             TodoLine line = lines[i];
-            texts[i] = line.Placeholder is null
+            string text = line.Placeholder is null
                 ? Strings.Format(line.CopyKey, line.Target, line.Current)
                 : Strings.Format(line.CopyKey, line.Placeholder);
+            // The completed block counts its tips so the player can see how
+            // many kits the five-kit threshold still waits on. The marker is a
+            // resx format, not a hardcoded "n.", so a translation can word it.
+            texts[i] = numbered ? Strings.Format("TodoCompletedLine", i + 1, text) : text;
         }
         return texts;
     }

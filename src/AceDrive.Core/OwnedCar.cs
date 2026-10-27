@@ -13,6 +13,14 @@ namespace AceDrive.Core;
 /// </summary>
 public sealed class OwnedCar
 {
+    /// <summary>
+    /// The ranking a car starts on before the stretch leaderboards can measure
+    /// it: the top percentile, so the placeholder never penalises a car. Once
+    /// the boards exist the computed ranking (<see cref="ValuationRules.LeaderboardRanking"/>)
+    /// replaces it — this constant is only the starting value.
+    /// </summary>
+    public const double DefaultLeaderboardRanking = 1.0;
+
     // WHY the rules ride in: the filth cap (filth_rules.json), the part
     // intervals/prices and the engine bands (maintenance_rules.json) are data,
     // so each reading needs the rule record its garage was built with. The
@@ -34,6 +42,7 @@ public sealed class OwnedCar
         Engine = new EngineHealth(maintenance, saved?.Engine, Odometer, seed);
         _askedCategories = CleanAsked(saved?.AskedCategories);
         JobsCompleted = Math.Max(0, saved?.JobsCompleted ?? 0);
+        LeaderboardRanking = CleanRanking(saved?.LeaderboardRanking ?? DefaultLeaderboardRanking);
     }
 
     /// <summary>Catalogue key of the bought car (<see cref="CarSpec.Key"/>).</summary>
@@ -51,6 +60,17 @@ public sealed class OwnedCar
     /// job, so the count rides the garage save.
     /// </summary>
     public int JobsCompleted { get; private set; }
+
+    /// <summary>
+    /// The car's stretch leaderboard ranking, 0..1 where 1 is the top
+    /// percentile of its model's board. The weekly valuation scores it as
+    /// ranking² × 150 (<see cref="ValuationRules.LeaderboardPoints"/>); until
+    /// the stretch leaderboards land it stays on
+    /// <see cref="DefaultLeaderboardRanking"/>, and the future board source
+    /// writes the computed value through <see cref="SetLeaderboardRanking"/>.
+    /// Per owned car, so two copies of one model each carry their own value.
+    /// </summary>
+    public double LeaderboardRanking { get; private set; }
 
     /// <summary>Whether the daily premium covers this car (Unity OwnedCar.hasInsurance).</summary>
     public bool HasInsurance { get; private set; }
@@ -102,13 +122,30 @@ public sealed class OwnedCar
     /// </summary>
     public void RegisterJob() => JobsCompleted++;
 
+    /// <summary>
+    /// Records the ranking the stretch leaderboards computed for this car's
+    /// model (0..1). A non-finite value keeps the placeholder instead of
+    /// poisoning the valuation score with NaN.
+    /// </summary>
+    public void SetLeaderboardRanking(double ranking) =>
+        LeaderboardRanking = CleanRanking(ranking);
+
     /// <summary>Unity ReplaceEngine's odometer reset ("a new engine resets car
     /// km to 0"): the caller resets the part baselines too (<see cref="CarCondition.ResetAll"/>).</summary>
     public void ResetOdometer() => Odometer = 0.0;
 
     public OwnedCarState Snapshot() => new(
         Key, PurchaseWeek, Odometer, HasInsurance, Filth.Value,
-        Condition.Snapshot(), Engine.Snapshot(), _askedCategories, JobsCompleted);
+        Condition.Snapshot(), Engine.Snapshot(), _askedCategories, JobsCompleted,
+        LeaderboardRanking);
+
+    // A hand-edited or NaN ranking would make the valuation score unusable, so
+    // the reading clamps into the 0..1 band the curve expects; a non-finite one
+    // falls back to the placeholder the car starts on.
+    private static double CleanRanking(double ranking) =>
+        double.IsFinite(ranking)
+            ? Math.Clamp(ranking, 0.0, 1.0)
+            : DefaultLeaderboardRanking;
 
     private static List<string> CleanAsked(IReadOnlyList<string>? saved)
     {

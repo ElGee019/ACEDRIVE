@@ -46,7 +46,9 @@ namespace AceDrive.Core;
 /// here too: the race prize scales on it (each win pays more than the last).
 /// The weekly market valuation (PORTPLAN 49, Unity PlayerData.valuation*)
 /// keeps its venue, in-flight drive, week's entry, settled uid set and last
-/// reset week here, so a restart reopens the same showcase week.
+/// reset week here, so a restart reopens the same showcase week. The entry's
+/// real-world stamp rides along because the two-day away-earning cap is
+/// measured in real hours, not game weeks.
 /// The weekly missing-person run (ToWhereIsWilly.md §2.9, Unity
 /// PlayerData.lastWillyGameDay + lastWillyYear) keeps only its completion
 /// date here: the search itself is session state and never resumes.</summary>
@@ -95,7 +97,8 @@ public sealed record DriverState(
     double ValuationOwnScore = 0.0,
     IReadOnlyList<string>? ValuationSeenUids = null,
     int LastValuationResetWeek = -1,
-    string? LastWillyDate = null)
+    string? LastWillyDate = null,
+    DateTime? ValuationEnteredAtUtc = null)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

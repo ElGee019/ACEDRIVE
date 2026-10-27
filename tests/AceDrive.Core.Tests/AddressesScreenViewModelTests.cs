@@ -1,11 +1,13 @@
 using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>The addresses page: discovered POIs alphabetical, a tap pins the
-/// HUD's drive-to line, and BACK returns with the shared voice beat.</summary>
+/// <summary>The addresses page: the operating zone's readout on top, the
+/// discovered POIs alphabetical under it, a tap pins the HUD's drive-to line,
+/// and BACK returns with the shared voice beat.</summary>
 public sealed class AddressesScreenViewModelTests
 {
     public AddressesScreenViewModelTests()
@@ -16,14 +18,64 @@ public sealed class AddressesScreenViewModelTests
     private static PointOfInterest Poi(string id, string name, int house = 4) =>
         new(id, name, new AddressLocation("Street 1", house, HouseSide.Right));
 
+    // The zone the root composes for a fresh profile: the placeholder map with
+    // only the home street registered and the interim area seeded.
+    private static OperatingZone FreshZone()
+    {
+        AddressMap map = AddressMap.Default;
+        return new OperatingZone(
+            null, seed: 0, map, initialKm: AddressBook.MapLengthKm(map));
+    }
+
     private static AddressesScreenViewModel Create(
         PoiDirectory directory, FakeTelemetryHud? hud = null,
-        FakeClock? clock = null, Action? back = null)
+        FakeClock? clock = null, Action? back = null, OperatingZone? zone = null)
     {
         clock ??= new FakeClock();
         return new AddressesScreenViewModel(
-            directory, hud, new RelayCommand(back ?? (() => { })),
-            new VoiceBeat(clock));
+            directory, zone ?? FreshZone(), hud,
+            new RelayCommand(back ?? (() => { })), new VoiceBeat(clock));
+    }
+
+    [Fact]
+    public void Zone_ShowsTheStreetCountTheAreaAndTheJobsToTheNextExpansion()
+    {
+        var vm = Create(new PoiDirectory());
+
+        Assert.Equal(Strings.Format("AddressesZoneLine", 1, 1.929), vm.ZoneLine);
+        Assert.Contains("1 streets", vm.ZoneLine, StringComparison.Ordinal);
+        Assert.Contains("1.9 km", vm.ZoneLine, StringComparison.Ordinal);
+        Assert.Equal(["Street 1"], vm.StreetNames);
+        Assert.Equal(Strings.Format("AddressesZoneNext", 2), vm.NextExpansionLine);
+        Assert.Equal(Strings.Get("AddressesStreetsLabel"), vm.StreetsLabel);
+    }
+
+    [Fact]
+    public void Zone_ListsTheStreetsInTheZoneOrder_NotTheMapOrder()
+    {
+        // Legacy save ids ("home", "s1") only supply the count; the profile's
+        // home street leads the list exactly like the zone's draws.
+        var zone = new OperatingZone(
+            new DriverState(0.0, 0.0, StreetIds: ["home", "s1"], ZoneKm: 2.8935),
+            seed: 0, AddressMap.Default, homeStreetId: "street-2");
+
+        var vm = Create(new PoiDirectory(), zone: zone);
+
+        Assert.Equal(["Street 2", "Street 1"], vm.StreetNames);
+        Assert.Equal(Strings.Format("AddressesZoneLine", 2, 2.8935), vm.ZoneLine);
+    }
+
+    [Fact]
+    public void Zone_CompletePool_NamesTheCompletionInsteadOfMoreJobs()
+    {
+        var zone = new OperatingZone(
+            new DriverState(0.0, 0.0, StreetIds: ["street-1", "street-2"], ZoneKm: 3.858),
+            seed: 0, AddressMap.Default);
+
+        var vm = Create(new PoiDirectory(), zone: zone);
+
+        Assert.Equal(["Street 1", "Street 2"], vm.StreetNames);
+        Assert.Equal(Strings.Get("AddressesZoneComplete"), vm.NextExpansionLine);
     }
 
     [Fact]
@@ -84,7 +136,8 @@ public sealed class AddressesScreenViewModelTests
         var beat = new VoiceBeat(clock);
         bool backed = false;
         var vm = new AddressesScreenViewModel(
-            new PoiDirectory(), null, new RelayCommand(() => backed = true), beat);
+            new PoiDirectory(), FreshZone(), null,
+            new RelayCommand(() => backed = true), beat);
 
         vm.VoiceActions["BACK"].Invoke();
         Assert.True(vm.BackFlash);
@@ -106,7 +159,7 @@ public sealed class AddressesScreenViewModelTests
         var directory = new PoiDirectory();
         directory.Add(Poi("bank", "Bank"));
         var vm = new AddressesScreenViewModel(
-            directory, new FakeTelemetryHud(),
+            directory, FreshZone(), new FakeTelemetryHud(),
             new RelayCommand(() => backed = true), beat);
 
         vm.VoiceActions["BACK"].Invoke();

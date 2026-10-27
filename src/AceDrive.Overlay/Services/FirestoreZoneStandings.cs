@@ -3,13 +3,14 @@ using AceDrive.Core;
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// Operating-zone world standings (PORTPLAN item 58, Unity
-/// ZoneStandingsService). Backend parity: the board is loaded and ranked
-/// here; no ACEDRIVE screen consumes the result yet. Only the CURRENT
-/// username row is excluded, so an earlier username of the same player stays
-/// a rival.
+/// Live operating-zone world standings (PORTPLAN item 58, Unity
+/// ZoneStandingsService): the board is read once from <c>acevo_players</c> and
+/// cached, and <see cref="Refresh"/> stays synchronous so the expansion page
+/// can render immediately while the network load runs in the background. Only
+/// the CURRENT username row is excluded, so an earlier username of the same
+/// player stays a rival.
 /// </summary>
-public sealed class FirestoreZoneStandings
+public sealed class FirestoreZoneStandings : IZoneStandings
 {
     private readonly FirestorePlayers _players;
     private readonly Func<string?> _uid;
@@ -36,9 +37,13 @@ public sealed class FirestoreZoneStandings
 
     public ZoneStandingsResult? LastResult => Volatile.Read(ref _last);
 
+    public event Action<ZoneStandingsResult>? ResultUpdated;
+
+    public bool IsAvailable => true;
+
     public void Start() => EnsureBoardLoad();
 
-    public ZoneStandingsResult? Refresh(double zoneKm)
+    public void Refresh(double zoneKm)
     {
         Volatile.Write(ref _lastZoneKm, zoneKm);
         Volatile.Write(ref _hasValue, 1);
@@ -46,28 +51,17 @@ public sealed class FirestoreZoneStandings
         if (Volatile.Read(ref _boardLoaded) == 0)
         {
             EnsureBoardLoad();
-            return ZoneStandings.Refresh(
-                zoneKm, otherKm: null, boardLoaded: false, last: LastResult);
+            return;
         }
 
         IReadOnlyList<FirestoreDocument>? documents = Volatile.Read(ref _documents);
         if (documents is null)
         {
-            return LastResult;
+            return;
         }
 
-        ZoneStandingsResult? result = ZoneStandings.Refresh(
-            zoneKm, OtherKm(documents), boardLoaded: true, last: LastResult);
-        Publish(result);
-        return result;
-    }
-
-    public void Push(double zoneKm, string displayName)
-    {
-        if (_uid() is not { Length: > 0 } uid) return;
-        SafeTask.Forget(
-            _players.SetZoneKmAsync(uid, zoneKm, displayName, _stopToken),
-            _log, "zone km push");
+        Publish(ZoneStandings.Refresh(
+            zoneKm, OtherKm(documents), boardLoaded: true, last: LastResult));
     }
 
     private void EnsureBoardLoad()
@@ -116,5 +110,6 @@ public sealed class FirestoreZoneStandings
     {
         if (result is null) return;
         Volatile.Write(ref _last, result);
+        ResultUpdated?.Invoke(result);
     }
 }

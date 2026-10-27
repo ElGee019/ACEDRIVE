@@ -18,9 +18,11 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class CentoRaceSettlement
 {
-    // Unity stores the award in the glove compartment (no capacity). The port
-    // has no glove compartment yet (PORTPLAN 61), so the item joins the trunk,
-    // which is capacity-measured: a tenth of a litre keeps it out of the way.
+    // Unity stores the award in the glove compartment (no capacity). The port's
+    // glove compartment is a section of the trunk page over the same carried
+    // list, so the stack still has to fit somewhere: a tenth of a litre keeps
+    // it out of the food's way, and the page files it under the compartment
+    // because the catalogue defines no bite for it.
     private const double ItemVolumeLitres = 0.1;
     private const int SoloPlacement = 1;
 

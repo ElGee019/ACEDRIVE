@@ -80,8 +80,9 @@ public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, I
         ? Strings.Format("CentoReceiptStarWon", _receipt.StarPrize)
         : Strings.Get("CentoReceiptStarLost");
 
-    /// <summary>Where the award/certificate went: the car's trunk, the port's
-    /// in-car storage until the glove compartment (PORTPLAN 61) lands.</summary>
+    /// <summary>Where the award/certificate went: the car's carried list, which
+    /// the trunk page shows under its glove compartment because the catalogue
+    /// defines no bite for it.</summary>
     public string ItemLine => _receipt.StarWon
         ? Strings.Get("CentoReceiptAwardStored")
         : Strings.Get("CentoReceiptCertificateStored");

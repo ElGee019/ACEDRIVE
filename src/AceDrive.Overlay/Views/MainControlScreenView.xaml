@@ -18,6 +18,12 @@
         <Style x:Key="JobsTodoSpacer" TargetType="Border">
             <Setter Property="Height" Value="57"/>
         </Style>
+        <!-- One blank text line (19 px, same scale as JobsTodoSpacer) between
+             Sonja's rule and the completed block: the tips just finished need a
+             beat of air so the header does not weld onto the rule above it. -->
+        <Style x:Key="CompletedTodosSpacer" TargetType="Border">
+            <Setter Property="Height" Value="19"/>
+        </Style>
     </UserControl.Resources>
     <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
          title band on top, BACK in the bottom band. The body is one centred
@@ -95,11 +101,15 @@
                 </StackPanel>
             </Border>
             <!-- The tips just completed, below Sonja's list: the care-package
-                 copy explains what they earn, and DELIVER CARE PACKAGES offers
-                 itself once five kits wait (Unity's bag threshold). -->
+                 copy leads the block so the earned kits are explained before
+                 the tips listed, and DELIVER CARE PACKAGES offers itself once
+                 five kits wait (Unity's bag threshold). -->
             <StackPanel Visibility="{Binding HasCompletedTodos, Converter={StaticResource BoolToVis}}">
+                <Border Style="{StaticResource CompletedTodosSpacer}"/>
                 <TextBlock Text="{loc:Loc Key=TodoCompletedHeader}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
                            HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                <TextBlock Text="{loc:Loc Key=TodoCarePackages}" Foreground="#FFF" FontSize="13"
+                           TextWrapping="Wrap" Margin="0,0,0,6"/>
                 <ItemsControl ItemsSource="{Binding CompletedTodoLines}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -108,8 +118,6 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="{loc:Loc Key=TodoCarePackages}" Foreground="#FFBFC4C9" FontSize="13"
-                           TextWrapping="Wrap" Margin="0,6,0,0"/>
                 <Button Content="{loc:Loc Key=TodoDeliver}" Command="{Binding TodoAcknowledgeCommand}"
                         Margin="0,6,0,0"
                         Visibility="{Binding ShowDeliverCarePackages, Converter={StaticResource BoolToVis}}"/>

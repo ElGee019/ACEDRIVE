@@ -202,6 +202,30 @@ public sealed class GarageTests
     }
 
     [Fact]
+    public void LeaderboardRanking_StartsOnTheTopPlaceholderAndRidesTheSnapshot()
+    {
+        // The valuation's stretch-board term is per owned car: it starts on the
+        // top percentile (no board can measure the car yet), survives a restart
+        // and clamps whatever a future board writes.
+        var garage = New();
+        OwnedCar car = garage.Add(Mx5, week: 1);
+        Assert.Equal(OwnedCar.DefaultLeaderboardRanking, car.LeaderboardRanking);
+
+        car.SetLeaderboardRanking(0.42);
+        var resumed = New(garage.Snapshot());
+
+        Assert.Equal(0.42, resumed.Find(Mx5.Key)!.LeaderboardRanking, 6);
+        // Two copies of one model keep their own value; a bad write degrades to
+        // the band the score curve expects.
+        OwnedCar variant = resumed.Add(Mx5Variant, week: 2);
+        Assert.Equal(OwnedCar.DefaultLeaderboardRanking, variant.LeaderboardRanking);
+        variant.SetLeaderboardRanking(4.0);
+        Assert.Equal(1.0, variant.LeaderboardRanking);
+        variant.SetLeaderboardRanking(double.NaN);
+        Assert.Equal(OwnedCar.DefaultLeaderboardRanking, variant.LeaderboardRanking);
+    }
+
+    [Fact]
     public void Resume_DropsBrokenRowsAndFixesTheCurrentKey()
     {
         // A hand-edited file (or a store that let something through) degrades

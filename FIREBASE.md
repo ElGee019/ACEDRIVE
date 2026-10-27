@@ -56,10 +56,14 @@ firebase deploy --only firestore:rules
 file that only contains `acevo_*`.
 
 The weekly valuation list can additionally use a Firestore TTL policy on
-`acevo_enteredForValuation.expiresAt` (48 h). The client-side Monday wipe stays
-the source of truth, and it deletes **only the player's own doc**
-(`FirestoreValuationEntries.WipeOwnAsync`): rivals' docs leave through the TTL,
-never through another player's wipe. The legacy cloud `house-entry` doc is
+`acevo_enteredForValuation.expiresAt` (48 h). The 48 h window is enforced by the
+client as well (`ValuationFlow`): an entry that outlives it settles the
+newcomers who arrived inside the window, deletes the player's own doc and is
+forgotten, so a driver who is not playing cannot keep earning. The TTL is the
+backstop that removes docs while the overlay is closed, and the Monday wipe
+stays the source of truth for the week. Both delete **only the player's own
+doc** (`FirestoreValuationEntries.WipeOwnAsync`): rivals' docs leave through the
+TTL, never through another player's wipe. The legacy cloud `house-entry` doc is
 filtered client-side, because the house entry is drawn locally.
 
 ## 4. Collections
@@ -107,9 +111,14 @@ road-test time/brake boards, cloud car sprites.
 
 `CarRarityService` parity: `acevo_cars` is sorted by `totalKmDriven` descending,
 rank 1 is the most-driven car and the last rank the rarest. A car missing from
-the board answers `carCount + 1` (never driven); an empty key answers 1. While
-the board is unavailable every car answers rarity 1. Unowned free-roam cars
-earn fallback class 1 × rarity 1 and never increment the car board.
+the board answers `carCount + 1` (never driven); an empty key answers 1. Every
+reading is capped at half the catalogue (`cars.json`) because the rank
+multiplies job XP (distance × class × rarity / 100): the rarest half of the
+board therefore pays alike, so no car can earn an order of magnitude more per
+ride than another. While the board is unavailable every car answers rarity 1.
+Unowned free-roam cars earn fallback class 1 × rarity 1 and never increment the
+car board. Delivery XP reads the same class × rarity terms at a fifth of the
+taxi rate.
 
 ## 7. Sending a build to someone
 

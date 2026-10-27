@@ -3,10 +3,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// <summary>
 /// The slice of the coordinator the day cycle reports to: the week roll that
 /// repaints the cached calendar and menu, the readout repaint the shift
-/// countdown forces, the shift-ended page (the coordinator owns the panel
-/// policy that reveals it) and that page's way back to the main page.
-/// Nothing here answers a question about the calendar: the week is a value the
-/// pages read from the owner.
+/// countdown forces, and the shift-ended page (the coordinator owns the panel
+/// policy that reveals it) with the way back to the screen the timeout
+/// interrupted. Nothing here answers a question about the calendar: the week is
+/// a value the pages read from the owner.
 /// </summary>
 public interface IDayCycleHost
 {
@@ -23,9 +23,10 @@ public interface IDayCycleHost
     void ShowShiftEnded(object page);
 
     /// <summary>
-    /// The shift-ended page's CONTINUE lands on the main page (the menu): a
-    /// shift that ran out while the player was elsewhere must not drop them on
-    /// the jobs list, same as the Cento Miglia receipt.
+    /// The shift-ended page's CONTINUE: hands the player back to the page and
+    /// visibility the timeout interrupted. A shift that ran out is a report,
+    /// not a job they started, so it must not cost them their place — and a
+    /// timeout that caught them driving stays on the road.
     /// </summary>
-    void GoToMainPage();
+    void ResumeAfterShiftEnded();
 }

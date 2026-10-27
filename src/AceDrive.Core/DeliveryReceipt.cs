@@ -22,6 +22,8 @@ public sealed record DeliveryReceipt(
     double ReceivedForGoods,
     double TotalEarned,
     double XpEarned,
+    int CarClass,
+    int CarRarity,
     int StreetKnowledgePct,
     string HubOwnerName,
     int FriendshipLevel,

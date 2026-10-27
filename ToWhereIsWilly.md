@@ -419,7 +419,7 @@ timer. The view adds two `DataTrigger`s for the grey/italic state.
 | Point | Change |
 |---|---|
 | `Navigation` | ctor takes `WhereIsWillyFlow`; `_willyDay` read off `ControlCalendar.Week`; `OnDay(day == _willyDay)` → `_willy.Begin()` (a running quest reopens its page); the *other* event days plus `OpenTaxiShift` and `ShowDelivery` guard on `_willy.InFlight` (Unity's blocked job centre) |
-| `MainViewModel` | ctor takes the flow; `Attach(this)`; `Poll` calls `_willy.Advance(s)` right after `_valuation.Advance(s)`; implements `IWhereIsWillyHost` |
+| `MainViewModel` | ctor takes the flow; `Attach(this)`; `Poll` calls `_willy.Advance(s)` after `_hud.Update` (the valuation venue now opens through its own POI handler, not the poll); implements `IWhereIsWillyHost` |
 | `CalendarScreenViewModel` | ctor takes the ledger + the career predicate; builds Completed/Locked labels and the two warnings |
 | `PoiWorld` | the flow's handler joins `Handlers(...)` (registered first) |
 | `GameStateSaver` | ctor takes `WhereIsWillyLedger`; `SaveDriver` writes `LastWillyDate` |
@@ -440,7 +440,7 @@ ControlGateWillyDone         SEE YOU NEXT WEDNESDAY
 ControlGateWillyLocked       UNLOCK COFFEE BEANS CAREER FIRST
 
 WillyTitle                   WHERE IS WILLY
-WillyIntro                   Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Click a coffee shop in {2} to see whether {1} is there.
+WillyIntro                   Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Select a coffee shop in {2} to find out whether {1} is there.
 WillyNotHere                 They aren't here. Navigate to another coffee shop on the map, or give up.
 WillyGiveUp                  GIVE UP SEARCH
 WillyFound                   Well that's a relief. All well and good! Missing person found! Select {0} to drive {1} back home.

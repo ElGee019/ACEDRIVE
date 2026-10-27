@@ -1,5 +1,6 @@
 using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
@@ -19,7 +20,7 @@ public sealed class ValuationScreenTests
         ValuationScreenViewModel Vm, FakeClock Clock, VoiceBeat Beat,
         List<string> Entered, List<double> Continued, bool[] Closed);
 
-    private static Harness Create()
+    private static Harness Create(double ranking = OwnedCar.DefaultLeaderboardRanking)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var clock = new FakeClock();
@@ -28,7 +29,7 @@ public sealed class ValuationScreenTests
         var continued = new List<double>();
         var closed = new bool[1];
         var garage = new Garage([TestCar]);
-        garage.Add(TestCar.Key, week: 1);
+        garage.Add(TestCar.Key, week: 1).SetLeaderboardRanking(ranking);
         var catalog = new Dictionary<string, CarSpec>(StringComparer.Ordinal)
         {
             [TestCar.Key] = TestCar,
@@ -55,7 +56,38 @@ public sealed class ValuationScreenTests
         Assert.True(h.Vm.VoiceActions.ContainsKey("BACK"));
         // The picked car still answers by its title, so voice can change it.
         Assert.Contains(h.Vm.Cars[0].Title, h.Vm.VoiceActions.Keys);
-        Assert.Equal(6, h.Vm.Stats.Count);
+        // Price, engine, power, top speed, 0-60, class and the ranking.
+        Assert.Equal(7, h.Vm.Stats.Count);
+    }
+
+    [Fact]
+    public void Stats_ReadInCapsAndExposeTheCarsOwnRanking()
+    {
+        // A car ranked halfway up its model's field prints 0.5 — the 0..1 value
+        // the score curve reads, not a percentage — so the row follows the
+        // owned car rather than the catalogue row or a placeholder.
+        var h = Create(ranking: 0.5);
+
+        // The page spells every caption upper case, so the terms of the score
+        // read as one column whatever the translation's casing rules are.
+        Assert.All(h.Vm.Stats, row => Assert.Equal(row.Label.ToUpperInvariant(), row.Label));
+        GarageStatRow ranking = h.Vm.Stats[^1];
+        Assert.Equal(Strings.Get("ValuationLeaderboardLabel"), ranking.Label);
+        Assert.Equal("0.5", ranking.Value);
+        // The starter placeholder is the top percentile and reads 1, not 100%.
+        Assert.Equal("1", Create().Vm.Stats[^1].Value);
+    }
+
+    [Fact]
+    public void IntroLine_KeepsTheTermsParagraphBelowTheAsk()
+    {
+        var h = Create();
+
+        // The blank line between the ask and the terms is part of the copy; the
+        // view only lays the two paragraphs out, so the break must survive the
+        // resx (which stores the file's CRLFs).
+        string intro = h.Vm.IntroLine.Replace("\r\n", "\n", StringComparison.Ordinal);
+        Assert.Contains("\n\n", intro, StringComparison.Ordinal);
     }
 
     [Fact]

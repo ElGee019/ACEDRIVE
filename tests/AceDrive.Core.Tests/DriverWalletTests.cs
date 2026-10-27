@@ -66,7 +66,7 @@ public sealed class DriverWalletTests
     // The delivery twin: the run's profit IS the wallet delta (Unity
     // pays out received + charge wholesale-prepaid).
     private static DeliveryReceipt Delivery(double earned = 143.40, double xp = 0.082) =>
-        new(8.2, [], 129.40, 49.00, 63.00, earned, xp, 100, "", 0, false, 0, 0.0);
+        new(8.2, [], 129.40, 49.00, 63.00, earned, xp, 10, 1, 100, "", 0, false, 0, 0.0);
 
     [Fact]
     public void AddDelivery_BanksTheRunProfit()

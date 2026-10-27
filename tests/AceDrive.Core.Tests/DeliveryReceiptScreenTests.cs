@@ -21,7 +21,8 @@ public sealed class DeliveryReceiptScreenTests
         // The fixture run: 8.2 km, 49.00 wholesale out, 63.00 payout back.
         DeliveryReceipt settled = receipt ?? DeliveryReceiptBuilder.Build(
             8.2, paidForGoods: 49.00, receivedForGoods: 63.00,
-            DeliveryFareTable.Default, streetKnowledgePct: 100, currentXp: 0.0);
+            DeliveryFareTable.Default, carClass: 10, carRarity: 1,
+            streetKnowledgePct: 100, currentXp: 0.0);
         // Empty wallet: the page lines must show the settle alone, not the
         // fresh-start seed (covered in DriverWalletTests).
         var wallet = new DriverWallet(new DriverState(0.0, 0.0));
@@ -59,10 +60,12 @@ public sealed class DeliveryReceiptScreenTests
         Assert.Equal(new ReceiptLine("Fare", "€129.40"), vm.FareLine);
         Assert.Equal(new ReceiptLine("Total earned", "€143.40"), vm.TotalLine);
         Assert.Equal("Total CR: €143.40", vm.WalletLine);
-        Assert.Equal("XP earned: 0.08", vm.XpLine);
-        // Delivery's calculation line: no car class or rarity.
-        Assert.Equal("XP: (8.2 km) / 100 × street knowledge 100%", vm.XpCalcLine);
-        Assert.Equal("Total XP: 0.08", vm.TotalXpLine);
+        Assert.Equal("XP earned: 0.16", vm.XpLine);
+        // Delivery's calculation line: the taxi terms at a fifth (/500).
+        Assert.Equal(
+            "XP: (8.2 km × class 10 × rarity 1) / 500 × street knowledge 100%",
+            vm.XpCalcLine);
+        Assert.Equal("Total XP: 0.16", vm.TotalXpLine);
     }
 
     [Fact]
@@ -78,7 +81,7 @@ public sealed class DeliveryReceiptScreenTests
     public void OwnedHubRun_ShowsFriendshipAndCredP()
     {
         var receipt = DeliveryReceiptBuilder.Build(
-            8.2, 49.00, 63.00, DeliveryFareTable.Default, 100, 0.0,
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
             friendship: new FriendshipResult("Elena Marchetti", 1, false),
             credPEarned: 2, totalCredP: 2.0);
         var (vm, _, _) = Create(receipt: receipt);
@@ -94,7 +97,7 @@ public sealed class DeliveryReceiptScreenTests
     public void TierCross_HighlightsTheFamiliarityTeal()
     {
         var receipt = DeliveryReceiptBuilder.Build(
-            8.2, 49.00, 63.00, DeliveryFareTable.Default, 100, 0.0,
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
             friendship: new FriendshipResult("Elena Marchetti", 6, true));
         var (vm, _, _) = Create(receipt: receipt);
         Assert.True(vm.FriendshipHighlight);

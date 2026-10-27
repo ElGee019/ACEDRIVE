@@ -46,6 +46,33 @@ public sealed class WhereIsWillyFlowTests
     }
 
     [Fact]
+    public void ElderHome_StaysInsideTheOperatingZone()
+    {
+        // The zone has discovered Street 1 only, while the map carries the
+        // fictional pool. The free-house fallback that places the elder must
+        // not hide them on a street the zone has not reached (TOZONES §4.7).
+        var map = new AddressMap(
+            "Germany", "Brands", 1929.0, 30.0,
+            [
+                new AddressStreet("street-1", "Street 1", 0.0, 0.5),
+                new AddressStreet("street-2", "Street 2", 0.5, 1.0),
+                new AddressStreet("street-3", "Street 3", 0.0, 0.5, Fictional: true),
+            ]);
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(hud, map: map);
+        WhereIsWillyScreenViewModel search = Begin(session, hud);
+
+        Pin(session, hud, HidingShop(search));
+        Park(session, hud);
+
+        var found = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
+        Assert.Equal(WhereIsWillyPhase.Found, found.Phase);
+        Assert.Contains("Street 1", found.FoundLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("Street 2", found.FoundLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("Street 3", found.FoundLine, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ShopRow_PinsTheCoffeeShopAndHidesThePanel()
     {
         var hud = new FakeTelemetryHud();
@@ -333,6 +360,29 @@ public sealed class WhereIsWillyFlowTests
     }
 
     [Fact]
+    public void IgnoreEventGates_ReplaysAStampedWednesdayAtAnyHour()
+    {
+        // TEMPORARY (testing): the switch opens the Wednesday window and the
+        // completion stamp together, so a stamped run starts again at 22:00 on
+        // a Wednesday and the calendar row never reads completed.
+        var hud = new FakeTelemetryHud();
+        var drivers = new FakeDriverStore();
+        TestSessionResult session = Create(
+            hud, drivers: drivers,
+            saved: DriverState.Fresh with { LastWillyDate = "2026-10-14" },
+            gameStart: new DateTime(2026, 10, 14, 22, 0, 0, DateTimeKind.Utc),
+            ignoreGates: true);
+
+        CalendarScreenViewModel calendar = OpenCalendar(session);
+        Assert.Equal("Where is Willy", WillyRow(calendar).EventLabel);
+
+        session.Willy.Begin();
+
+        Assert.True(session.Willy.InFlight);
+        Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
+    }
+
+    [Fact]
     public void DirectBegin_OutsideTheWednesdayWindow_Refuses()
     {
         TestSessionResult session = Create(
@@ -396,7 +446,8 @@ public sealed class WhereIsWillyFlowTests
         FakeFriendshipStore? friends = null, Trunk? trunk = null,
         FakeDriverStore? drivers = null, Garage? garage = null,
         PoiDirectory? directory = null, DriverState? saved = null,
-        TaxiShift? shift = null, DateTime? gameStart = null)
+        TaxiShift? shift = null, DateTime? gameStart = null,
+        AddressMap? map = null, bool ignoreGates = false)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         return TestSession.Create(new TestSessionOptions
@@ -411,9 +462,11 @@ public sealed class WhereIsWillyFlowTests
             Garage = garage,
             Cars = [TestCar],
             PoiDirectory = directory ?? TwoCoffeeShops(),
+            AddressMap = map,
             WillyRng = new Random(Seed),
             SavedDriver = saved,
             Shift = shift,
+            IgnoreEventGates = ignoreGates,
         });
     }
 

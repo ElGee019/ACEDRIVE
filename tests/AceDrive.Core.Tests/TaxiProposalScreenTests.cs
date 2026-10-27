@@ -301,10 +301,38 @@ public sealed class TaxiProposalScreenTests
     }
 
     [Fact]
-    public void OneStreetMap_FallsBackToThePlaceholderLegs()
+    public void OneStreetMap_KeepsBothLegsOnThatStreet()
     {
+        // A fresh career's zone covers a single street: the page still resolves
+        // two real doors, the second as a neighbour on the same street
+        // (TOZONES §4.7), and the residence copy carries the surname.
         var map = new AddressMap(
             "Germany", "Brands", 1_929.0, 30.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var (vm, _, _, _, _, accepted) = Create(map: map);
+        vm.Open();
+
+        Assert.DoesNotContain("Address A", vm.Phrase, StringComparison.Ordinal);
+        Assert.DoesNotContain("Address B", vm.Phrase, StringComparison.Ordinal);
+        Assert.Contains("Only Street", vm.Phrase, StringComparison.Ordinal);
+        Assert.Contains("the Sohn residence", vm.Phrase, StringComparison.Ordinal);
+
+        vm.AcceptCommand.Execute(null);
+        TaxiJobState job = Assert.Single(accepted);
+        Assert.Equal("Only Street", job.CustomerHome!.Value.StreetName);
+        Assert.Equal("Only Street", job.PickupAddress!.Value.StreetName);
+        Assert.Equal("Only Street", job.DropoffAddress!.Value.StreetName);
+        Assert.NotEqual(
+            job.PickupAddress.Value.HouseNumber, job.DropoffAddress.Value.HouseNumber);
+    }
+
+    [Fact]
+    public void NoHouseMap_FallsBackToThePlaceholderLegs()
+    {
+        // No house number on any street: the page has no door to name and
+        // keeps its placeholder legs, never a made-up address.
+        var map = new AddressMap(
+            "Germany", "Brands", 1_929.0, 0.0,
             [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
         var (vm, _, _, _, _, accepted) = Create(map: map);
         vm.Open();

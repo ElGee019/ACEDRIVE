@@ -66,6 +66,10 @@ public sealed class MainViewModel
     // registers and the world push. The zone state itself belongs to the
     // services that draw and bank it.
     private readonly ZoneGrowth _zoneGrowth;
+    // The expansion this settle produced, held until the receipt's CONTINUE
+    // claims it: the page opens before the page the receipt would have shown.
+    // Null when no street joined, and the next settle overwrites it.
+    private ZoneExpansionReport? _pendingExpansion;
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
@@ -376,8 +380,16 @@ public sealed class MainViewModel
     void IJobSettlementHost.SaveGarage() => SaveGarage();
     void IJobSettlementHost.OnProgressBanked()
     {
-        _zoneGrowth.Expand();
-        _poiWorld.Grow();
+        // The growth report tells the POI world which street just joined, so
+        // the first new door of this expansion opens there (Unity's
+        // FinishExpandCoroutine rule) instead of anywhere on the map. Only a
+        // real street growth earns the page; a job-gated door without one
+        // continues straight through.
+        ZoneExpansion? expansion = _zoneGrowth.Expand();
+        IReadOnlyList<PointOfInterest> added = _poiWorld.Grow(expansion);
+        _pendingExpansion = expansion is null
+            ? null
+            : new ZoneExpansionReport(expansion, added);
         // The job may complete a tip and rotate the list: sync against the
         // fresh career first, then count this job's rotation turn on the
         // slots the sync left behind.
@@ -385,11 +397,28 @@ public sealed class MainViewModel
         _todos.RotateOnJob();
     }
     RivalsResult? IJobSettlementHost.RefreshStandings() => RefreshStandings();
-    void IJobSettlementHost.GoToControlPage() => _nav.ShowControl();
+    void IJobSettlementHost.GoToControlPage() => ContinueAfterSettle(_nav.ShowControl);
     void IJobSettlementHost.GoToMenuPage() => _nav.ShowMenuPage();
     void IJobSettlementHost.RefreshDeliveryBoard() => _delivery.RefreshBoard();
     void IJobSettlementHost.ClearDeliveryRun() => _delivery.Stop();
-    void IJobSettlementHost.GoToDeliveryBoard() => _nav.ShowDeliveryBoard();
+    void IJobSettlementHost.GoToDeliveryBoard() => ContinueAfterSettle(_nav.ShowDeliveryBoard);
+
+    // The receipt's CONTINUE is where a settle's expansion page appears: the
+    // report waits here (Unity's zoneExpanded || poiAdded guard, minus the
+    // businesses-only title) and the page's own CONTINUE then runs the target
+    // the receipt would have gone to. No report means the receipt continues
+    // straight through to the control page or the delivery board.
+    private void ContinueAfterSettle(Action next)
+    {
+        if (_pendingExpansion is { } report)
+        {
+            _pendingExpansion = null;
+            _nav.ShowZoneExpansion(report.Zone, report.Added, next);
+            return;
+        }
+
+        next();
+    }
 
     // The host slice the taxi flow sees: the flow owns the job and the ask; the
     // shell owns the panel and the settle that prices the ride.
@@ -441,9 +470,9 @@ public sealed class MainViewModel
         _centoSettlement.Settle(race, start, end, this);
 
     // The host slice the weekly valuation sees: the flow owns the week, the
-    // venue leg and the comparison; the shell owns the panel, the page swap and
-    // the companion's destination line it reaches through ITelemetryHud.
-    void IValuationHost.ShowValuation(object screen) => _panel.Present(screen);
+    // venue leg and the comparison; the shell owns the panel and the return to
+    // the control page. The showcase page itself reaches the panel through the
+    // venue's POI handler, like every other door.
     void IValuationHost.HidePanel() => _panel.Hide();
     void IValuationHost.ShowControl() => _nav.ShowControl();
 
@@ -486,11 +515,12 @@ public sealed class MainViewModel
 
     // The host slice the day cycle sees: the week roll repaints the cached
     // pages, the countdown forces a readout, and the shift-end page arrives
-    // here to be revealed (the panel policy stays in this class).
+    // here to interrupt the panel and hand it back (the panel policy stays in
+    // this class).
     void IDayCycleHost.DisplayWeekChanged(int week) => _nav.DisplayWeekChanged(week);
     void IDayCycleHost.ReadoutsChanged() => RefreshJob();
-    void IDayCycleHost.ShowShiftEnded(object page) => _panel.PresentJob(page);
-    void IDayCycleHost.GoToMainPage() => _nav.ShowMenuPage();
+    void IDayCycleHost.ShowShiftEnded(object page) => _panel.PresentInterruption(page);
+    void IDayCycleHost.ResumeAfterShiftEnded() => _panel.ResumeInterrupted();
 
     // ---- lifecycle (called by the view) ----------------------------------
 
@@ -668,10 +698,6 @@ public sealed class MainViewModel
         _fleet.IntegrateOdometer(s, dt, _story.Done);
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
-        // The valuation leg's arrival rides the same poll: parked inside the
-        // pinned venue opens the showcase (Unity's OnDestinationReached). It
-        // reads the HUD's cached arrival, never the position again.
-        _valuation.Advance(s);
         // The missing-person run's arrival rides the same poll: parked at a
         // coffee shop finds the elder (or spends an attempt), parked at the
         // elder's door brings them home. It reads the HUD's cached arrival.

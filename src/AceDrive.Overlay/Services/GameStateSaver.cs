@@ -185,6 +185,10 @@ public sealed class GameStateSaver
             ValuationOwnScore = _valuation.OwnScore,
             ValuationSeenUids = [.. _valuation.SeenUids],
             LastValuationResetWeek = _valuation.LastResetWeek,
+            // The real-world entry stamp: the two-day window keeps running
+            // while the overlay is closed, so a restart must not reopen the
+            // entry as if it had just been made.
+            ValuationEnteredAtUtc = _valuation.EnteredAtUtc,
             // The weekly missing-person run keeps only its completion stamp
             // (ToWhereIsWilly.md §2.9): the search itself is session state, so
             // a restart inside the run reopens the row with nothing paid.

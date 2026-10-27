@@ -7,7 +7,8 @@ namespace AceDrive.Core.Tests;
 /// <summary>
 /// The trunk page (Unity YouScreen's TrunkScreen): free space against the
 /// current car, the appetite label, one row per carried stack and the EAT tap
-/// that consumes a unit and feeds the driver.
+/// that consumes a unit and feeds the driver — plus the glove compartment,
+/// which carries the non-food keepsakes and offers no bite.
 /// </summary>
 public sealed class TrunkScreenViewModelTests
 {
@@ -20,6 +21,10 @@ public sealed class TrunkScreenViewModelTests
 
     private static readonly StoreItem Banana =
         new("BANANA", 2.0, 0.3, 4, "groceries");
+
+    // A Cento Miglia certificate: the game hands it over as a keepsake, so the
+    // catalogue has no row for it and it belongs in the glove compartment.
+    private const string Certificate = "Cento Miglia Certificate Week 3 1924 - Tier 1";
 
     private static (
         TrunkScreenViewModel Vm, Trunk Trunk, Hunger Hunger, List<string> Events)
@@ -48,6 +53,9 @@ public sealed class TrunkScreenViewModelTests
     private static TrunkItemRow Row(TrunkScreenViewModel vm, string name) =>
         vm.Rows.First(row => row.Name == name);
 
+    private static TrunkItemRow CompartmentRow(TrunkScreenViewModel vm, string name) =>
+        vm.CompartmentRows.First(row => row.Name == name);
+
     [Fact]
     public void Open_RendersFreeSpaceHungerAndStacks()
     {
@@ -58,7 +66,8 @@ public sealed class TrunkScreenViewModelTests
         Assert.Equal("Free space: 59.20/60L", vm.FreeSpaceLine);
         Assert.Equal("HUNGER 0/36", vm.HungerLine);
         Assert.False(vm.HungerAmber);
-        Assert.False(vm.IsEmpty);
+        Assert.False(vm.IsTrunkEmpty);
+        Assert.True(vm.IsCompartmentEmpty);
 
         TrunkItemRow row = Row(vm, "MAPLE SYRUP");
         Assert.Equal("x2", row.QuantityLine);
@@ -71,9 +80,12 @@ public sealed class TrunkScreenViewModelTests
     {
         var (vm, _, _, _) = Create();
 
-        Assert.True(vm.IsEmpty);
+        Assert.True(vm.IsTrunkEmpty);
+        Assert.True(vm.IsCompartmentEmpty);
         Assert.Empty(vm.Rows);
-        Assert.Equal("Your trunk is empty.", vm.EmptyLine);
+        Assert.Empty(vm.CompartmentRows);
+        Assert.Equal("Your trunk is empty.", vm.TrunkEmptyLine);
+        Assert.Equal("Your glove compartment is empty.", vm.CompartmentEmptyLine);
         // No car capacity left over: the whole trunk is free.
         Assert.Equal("Free space: 60.00/60L", vm.FreeSpaceLine);
     }
@@ -117,23 +129,69 @@ public sealed class TrunkScreenViewModelTests
         vm.EatCommand.Execute(Row(vm, "BANANA"));
 
         Assert.Empty(trunk.Items);
-        Assert.True(vm.IsEmpty);
+        Assert.True(vm.IsTrunkEmpty);
         Assert.Equal("Free space: 60.00/60L", vm.FreeSpaceLine);
     }
 
     [Fact]
-    public void Eat_ItemMissingFromTheCatalogue_KeepsTheStackAndTheMeter()
+    public void Open_SplitsFoodFromTheGloveCompartment()
     {
-        // A retired catalogue row must not feed the driver an invented value.
+        // The certificate is not a catalogue row: Unity keeps it in the glove
+        // compartment, so the trunk lists the maple syrup alone.
+        var (vm, _, _, _) = Create(items:
+        [
+            new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 2 },
+            new TrunkItem(Certificate, 0.1) { Quantity = 1 },
+        ]);
+
+        Assert.Equal(["MAPLE SYRUP"], vm.Rows.Select(row => row.Name));
+        Assert.Equal([Certificate], vm.CompartmentRows.Select(row => row.Name));
+
+        TrunkItemRow keepsake = Assert.Single(vm.CompartmentRows);
+        Assert.Equal("x1", keepsake.QuantityLine);
+        Assert.Equal(string.Empty, keepsake.HungerLine);
+        Assert.False(keepsake.CanEat);
+        Assert.False(vm.IsTrunkEmpty);
+        Assert.False(vm.IsCompartmentEmpty);
+    }
+
+    [Fact]
+    public void Open_OnlyKeepsakes_LeavesTheTrunkEmptyAndTheCompartmentFull()
+    {
+        var (vm, _, _, _) = Create(
+            items: [new TrunkItem(Certificate, 0.1) { Quantity = 1 }]);
+
+        Assert.True(vm.IsTrunkEmpty);
+        Assert.False(vm.IsCompartmentEmpty);
+        Assert.Empty(vm.Rows);
+        Assert.Single(vm.CompartmentRows);
+    }
+
+    [Fact]
+    public void Open_CatalogueRowThatFeedsNothing_GoesToTheCompartment()
+    {
+        // The catalogue's hunger value is the food test: a row that would feed
+        // nothing is a keepsake, not a meal with its EAT tap.
+        var (vm, _, _, _) = Create(
+            items: [new TrunkItem("SOUVENIR MUG", 0.5) { Quantity = 1 }],
+            catalog: [new StoreItem("SOUVENIR MUG", 6.0, 0.5, 0, "groceries")]);
+
+        Assert.Empty(vm.Rows);
+        TrunkItemRow mug = Assert.Single(vm.CompartmentRows);
+        Assert.Equal(string.Empty, mug.HungerLine);
+        Assert.False(mug.CanEat);
+    }
+
+    [Fact]
+    public void Eat_CompartmentRow_KeepsTheStackAndTheMeter()
+    {
+        // Nothing in the compartment can be eaten: a stray tap (or a retired
+        // catalogue row) must not feed the driver an invented value.
         var (vm, trunk, hunger, events) = Create(
             hunger: 10,
-            items: [new TrunkItem("OLD SPECIAL", 0.5) { Quantity = 1 }]);
+            items: [new TrunkItem(Certificate, 0.1) { Quantity = 1 }]);
 
-        TrunkItemRow row = Row(vm, "OLD SPECIAL");
-        Assert.False(row.CanEat);
-        Assert.Equal(string.Empty, row.HungerLine);
-
-        vm.EatCommand.Execute(row);
+        vm.EatCommand.Execute(Assert.Single(vm.CompartmentRows));
 
         Assert.Equal(1, trunk.Items.Single().Quantity);
         Assert.Equal(10, hunger.Value);

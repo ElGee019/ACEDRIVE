@@ -7,11 +7,11 @@ namespace AceDrive.Core;
 /// <summary>
 /// Builds a settled delivery receipt from the run's inputs: the tiered
 /// distance charge, the goods money (wholesale out, retail payout in) and
-/// the delivery XP (distance / 100 × street knowledge, then diminishing —
-/// Unity applies no car class or rarity here, unlike the taxi). Skips what
-/// has no system here yet (starter bonus, profit-boost and free-tank-refill
-/// cards, auto fuel): those arrive as new receipt fields with their own
-/// systems, never as branches in this method.
+/// the delivery XP (the taxi formula at <see cref="XpEarning.DeliveryShare"/>:
+/// distance × class × rarity / 100 × street knowledge, then diminishing).
+/// Skips what has no system here yet (starter bonus, profit-boost and
+/// free-tank-refill cards, auto fuel): those arrive as new receipt fields
+/// with their own systems, never as branches in this method.
 /// </summary>
 public static class DeliveryReceiptBuilder
 {
@@ -20,6 +20,8 @@ public static class DeliveryReceiptBuilder
         double paidForGoods,
         double receivedForGoods,
         DeliveryFareTable table,
+        int carClass,
+        int carRarity,
         int streetKnowledgePct,
         double currentXp,
         FriendshipResult? friendship = null,
@@ -41,7 +43,8 @@ public static class DeliveryReceiptBuilder
         // An unowned car pays the run but earns no player XP: the caller owns
         // the ownership rule, this builder only knows whether to award.
         double xp = awardsXp
-            ? XpEarning.ComputeDelivery(distanceKm, streetKnowledgePct, currentXp)
+            ? XpEarning.ComputeDelivery(
+                distanceKm, carClass, carRarity, streetKnowledgePct, currentXp)
             : 0.0;
         return new DeliveryReceipt(
             distanceKm,
@@ -51,6 +54,8 @@ public static class DeliveryReceiptBuilder
             Cents(Math.Max(0.0, receivedForGoods)),
             totalEarned,
             xp,
+            carClass,
+            carRarity,
             Math.Clamp(streetKnowledgePct, 0, 100),
             friendship?.OwnerName ?? "",
             friendship?.Level ?? 0,

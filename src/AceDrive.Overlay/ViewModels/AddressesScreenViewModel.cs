@@ -5,12 +5,13 @@ using AceDrive.Overlay.Localization;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The addresses page (PORTPLAN 24/27): every discovered POI, alphabetical by
-/// name, with the street and house number under it. This is the temporary
-/// stand-in for markers on the map: tapping an address pins the HUD's
-/// drive-to line, and driving there puts ENTER up on the companion so the
-/// place can be entered. The page writes nothing itself — the HUD owns the
-/// destination and the host owns navigation.
+/// The addresses page (PORTPLAN 24/27 + TOZONES §3.5): the operating zone's
+/// readout — street count, area, jobs to the next expansion and the streets it
+/// covers — then every discovered POI, alphabetical by name, with the street
+/// and house number under it. This is the temporary stand-in for markers on
+/// the map: tapping an address pins the HUD's drive-to line, and driving there
+/// puts ENTER up on the companion so the place can be entered. The page writes
+/// nothing itself — the HUD owns the destination and the host owns navigation.
 /// </summary>
 public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
 {
@@ -22,9 +23,10 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
     private string? _selectedId;
 
     public AddressesScreenViewModel(
-        PoiDirectory directory, ITelemetryHud? hud, ICommand backCommand,
+        PoiDirectory directory, OperatingZone zone, ITelemetryHud? hud, ICommand backCommand,
         VoiceBeat beat, Action? onPinned = null)
     {
+        ArgumentNullException.ThrowIfNull(zone);
         _directory = directory;
         _hud = hud;
         _backCommand = backCommand;
@@ -32,6 +34,18 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
         _onPinned = onPinned;
         SelectCommand = new ParameterizedCommand<AddressRow>(Select);
         BackCommand = new RelayCommand(Back);
+        // The zone readout (TOZONES §3.5): Unity paints these facts on the map
+        // HUD, and this page is the port's stand-in for that map. The zone's
+        // cached ZoneMap is the addressable area every draw already reads, so
+        // the header can never name a street the player has not discovered.
+        StreetNames = BuildStreetNames(zone);
+        ZoneLine = Strings.Format("AddressesZoneLine", StreetNames.Count, zone.Km);
+        // A zone that already covers every street on the map has nothing left
+        // to buy: the counter stays due (Unity's empty-pool path), so the page
+        // names the completion instead of promising jobs for no expansion.
+        NextExpansionLine = zone.NextStreet is null
+            ? Strings.Get("AddressesZoneComplete")
+            : Strings.Format("AddressesZoneNext", zone.JobsUntilNext);
         Rows = BuildRows();
         RebuildVoice();
     }
@@ -57,6 +71,21 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
 
     /// <summary>Caption above the list.</summary>
     public string SelectLabel { get; } = Strings.Get("AddressesSelect");
+
+    /// <summary>"Operating Zone: 6 streets · 2.9 km": Unity's map HUD line, which
+    /// this page carries because the port has no map yet.</summary>
+    public string ZoneLine { get; }
+
+    /// <summary>"Jobs to next expansion: 3", or the completion line once the
+    /// zone covers every street on the map.</summary>
+    public string NextExpansionLine { get; }
+
+    /// <summary>Caption above the discovered street names.</summary>
+    public string StreetsLabel { get; } = Strings.Get("AddressesStreetsLabel");
+
+    /// <summary>The streets the zone covers, home street first: the addressable
+    /// area every new draw reads, so a door can never sit off-zone.</summary>
+    public IReadOnlyList<string> StreetNames { get; }
 
     /// <summary>The confirmation under the list once an address is picked.</summary>
     public string SelectedLine { get => _selectedLine; private set => SetField(ref _selectedLine, value); }
@@ -95,6 +124,21 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
         _onPinned?.Invoke();
         Rows = BuildRows();
         SelectedLine = Strings.Format("AddressesSelected", row.Name, row.Address);
+    }
+
+    /// <summary>Builds the street rows from the zone's cached addressable map.</summary>
+    private static List<string> BuildStreetNames(OperatingZone zone)
+    {
+        // The count and the names come from the same rows on purpose: a legacy
+        // save can carry more street ids than the map can name (the old "s1",
+        // "s2" pool), and the header must never claim a street it cannot list.
+        IReadOnlyList<AddressStreet> streets = zone.ZoneMap.Streets;
+        var names = new List<string>(streets.Count);
+        foreach (AddressStreet street in streets)
+        {
+            names.Add(street.Name);
+        }
+        return names;
     }
 
     private List<AddressRow> BuildRows()

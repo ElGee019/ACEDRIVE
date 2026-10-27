@@ -34,6 +34,30 @@ public sealed class AddressBookTests
     }
 
     [Fact]
+    public void MapLengthKm_CountsBaseStreetsOnly_AndOneStreetCarriesItsOwnSpan()
+    {
+        // The fictional rows label the same lap, so they must not inflate the
+        // base area the zone and the starter bonus seed from (TOZONES §4.1).
+        var map = new AddressMap(
+            "Germany", "Test", 1929.0, 30.0,
+            [
+                new AddressStreet("street-1", "Street 1", 0.0, 0.5),
+                new AddressStreet("street-2", "Street 2", 0.5, 1.0),
+                new AddressStreet("street-3", "Street 3", 0.0, 0.5, Fictional: true),
+                new AddressStreet("street-4", "Street 4", 0.5, 1.0, Fictional: true),
+            ]);
+
+        Assert.Equal(1.929, AddressBook.MapLengthKm(map), precision: 9);
+        Assert.Equal(0.9645, AddressBook.AverageStreetLengthKm(map), precision: 9);
+        Assert.Equal(
+            0.9645, AddressBook.StreetLengthKm(map, map.Streets[2]), precision: 9);
+        // A map with no base street has no base area, never a fictional one.
+        Assert.Equal(0.0, AddressBook.MapLengthKm(new AddressMap(
+            "Germany", "Test", 1929.0, 30.0,
+            [new AddressStreet("street-3", "Street 3", 0.0, 0.5, Fictional: true)])));
+    }
+
+    [Fact]
     public void Home_ResolvesTheSavedStreetAndNumber()
     {
         var profile = new PlayerProfile(

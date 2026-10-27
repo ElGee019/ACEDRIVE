@@ -112,26 +112,7 @@ public sealed class JobSettlement
         // only its fare still pays.
         CarSpec? xpCar = _fleet.XpCar();
         bool earnsProgress = !_fleet.IsDrivingUnownedCar();
-        int carClass = FallbackCarClass;
-        int carRarity = FallbackCarRarity;
-        if (earnsProgress)
-        {
-            if (xpCar is { Class: > 0 } knownClass)
-            {
-                carClass = knownClass.Class;
-            }
-            if (xpCar is not null)
-            {
-                carRarity = _rarity.GetRarity(xpCar.Key);
-            }
-        }
-        else
-        {
-            // An unowned car has no class/rarity in the career ledger, so the
-            // receipt's own XP formula reads 0 × 0.
-            carClass = 0;
-            carRarity = 0;
-        }
+        (int carClass, int carRarity) = XpCarFacts();
         string carKey = xpCar?.Key ?? string.Empty;
         int tripKm = TripKm(job.DistanceKm);
         // Unity keys familiarity off the base name (no companion suffix):
@@ -288,15 +269,17 @@ public sealed class JobSettlement
         // progress, exactly like the taxi settle: no XP, country km, zone job
         // or XP standings.
         bool earnsProgress = !_fleet.IsDrivingUnownedCar();
+        CarSpec? deliveryCar = _fleet.XpCar();
+        (int deliveryClass, int deliveryRarity) = XpCarFacts();
         DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
             distanceKm, run.PaidForGoods, run.ReceivedForGoods,
-            _deliveryFares, PlaceholderStreetKnowledgePct, _wallet.Xp,
+            _deliveryFares, deliveryClass, deliveryRarity,
+            PlaceholderStreetKnowledgePct, _wallet.Xp,
             friendship, credPEarned, _career.CredP, awardsXp: earnsProgress);
         _wallet.AddDelivery(receipt);
         // Delivery's km feed: the owned car contributes to the global rarity
-        // board and the country aggregate, exactly like the taxi settle. The
-        // delivery XP itself stays class/rarity-free (Unity parity).
-        CarSpec? deliveryCar = _fleet.XpCar();
+        // board and the country aggregate, exactly like the taxi settle. Its
+        // XP rides the same class × rarity terms (at a fifth of the taxi rate).
         int deliveryKm = TripKm(distanceKm);
         if (earnsProgress)
         {
@@ -347,6 +330,23 @@ public sealed class JobSettlement
         host.ShowReceipt(new DeliveryReceiptScreenViewModel(
             receipt, _wallet, _beat,
             new RelayCommand(host.GoToDeliveryBoard), _rivals));
+    }
+
+    // The class × rarity pair the receipts' XP formula reads for the car
+    // driven now: an owned car answers its catalogue class and its global
+    // rarity rank, a car the fleet cannot resolve keeps the fallback pair,
+    // and an unowned free-roam car answers 0 × 0 (no XP) because it has no
+    // place in the career ledger. Both settles read the same pair.
+    private (int CarClass, int CarRarity) XpCarFacts()
+    {
+        if (_fleet.IsDrivingUnownedCar())
+        {
+            return (0, 0);
+        }
+        CarSpec? car = _fleet.XpCar();
+        int carClass = car is { Class: > 0 } known ? known.Class : FallbackCarClass;
+        int rarity = car is not null ? _rarity.GetRarity(car.Key) : FallbackCarRarity;
+        return (carClass, rarity);
     }
 
     // Unity's whole-km trip unit (Mathf.RoundToInt with a 1 km floor): the

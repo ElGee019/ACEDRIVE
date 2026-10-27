@@ -16,6 +16,16 @@ public static class XpEarning
     private const double TierPenalty = 0.01;
     private const double MinMultiplier = 0.01;
 
+    /// <summary>
+    /// What a delivery keeps of the taxi award for the same drive: a fifth.
+    /// WHY: Unity paid the goods run on distance alone (no class/rarity), so
+    /// the same car and route earned an order of magnitude less on a
+    /// delivery than on a passenger ride and the job felt like no progress.
+    /// A fifth keeps the delivery clearly the lesser job without stalling the
+    /// career.
+    /// </summary>
+    public const double DeliveryShare = 0.2;
+
     public static double Compute(
         double distanceKm, int carClass, int carRarity,
         int streetKnowledgePct, double currentXp)
@@ -26,17 +36,17 @@ public static class XpEarning
     }
 
     /// <summary>
-    /// Delivery XP (Unity ApplyStoreDeliveryEffects): distance / 100 scaled
-    /// by street knowledge, then the same diminishing returns — no car
-    /// class or rarity, the ride hauls goods, not passengers.
+    /// Delivery XP: the taxi formula at <see cref="DeliveryShare"/> — the
+    /// same distance, car class, rarity and street knowledge, then the same
+    /// diminishing returns. The car still hauls the goods, so it still
+    /// supplies the class/rarity terms.
     /// </summary>
     public static double ComputeDelivery(
-        double distanceKm, int streetKnowledgePct, double currentXp)
-    {
-        double raw = Math.Max(0.0, distanceKm) / 100.0
-            * (Math.Clamp(streetKnowledgePct, 0, 100) / 100.0);
-        return Diminish(raw, currentXp);
-    }
+        double distanceKm, int carClass, int carRarity,
+        int streetKnowledgePct, double currentXp) =>
+        Compute(
+            Math.Max(0.0, distanceKm), carClass, carRarity,
+            Math.Clamp(streetKnowledgePct, 0, 100), currentXp) * DeliveryShare;
 
     public static double GetMultiplier(double currentXp)
     {

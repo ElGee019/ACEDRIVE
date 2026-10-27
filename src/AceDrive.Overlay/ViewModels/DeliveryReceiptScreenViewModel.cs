@@ -64,10 +64,11 @@ public sealed class DeliveryReceiptScreenViewModel : ViewModelBase, IVoiceScreen
 
     public string XpLine => Strings.Format("ReceiptXp", _receipt.XpEarned);
 
-    /// <summary>Delivery's calculation line: no car class or rarity, the
-    /// ride hauls goods (Unity DeliveryReceiptScreen.PopulateXp).</summary>
+    /// <summary>Delivery's calculation line: the taxi terms at a fifth
+    /// (the /500 divisor), so a goods run reads as the lesser job it is.</summary>
     public string XpCalcLine => Strings.Format(
-        "DelReceiptXpCalc", _receipt.DistanceKm, _receipt.StreetKnowledgePct);
+        "DelReceiptXpCalc", _receipt.DistanceKm, _receipt.CarClass,
+        _receipt.CarRarity, _receipt.StreetKnowledgePct);
 
     public string TotalXpLine => Strings.Format("ReceiptTotalXp", _wallet.Xp);
 

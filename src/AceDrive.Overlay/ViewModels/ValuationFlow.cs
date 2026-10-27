@@ -13,24 +13,35 @@ namespace AceDrive.Overlay.ViewModels;
 ///
 /// The week is Unity's: the venue is drawn on Monday from 6am, the calendar's
 /// MARKET VALUATION row (Monday 8am-8pm) pins it on the companion and hides the
-/// panel, and parking at the venue opens the showcase automatically. The player
-/// enters one car, its score is fixed for the week, and every later entrant on
-/// the shared list is compared against it — a lower score pays the winner's
-/// gap/500, a higher one the loser's gap/1000 consolation. The list resets on
-/// the Sunday-to-Monday midnight crossing; a restart inside the same week
-/// catches up on the wins that landed while the overlay was closed.
+/// panel, and the companion's ENTER button (voice included) opens the showcase
+/// once the car is parked at the venue. The player enters one car, its score is
+/// fixed for the week, and every later entrant on the shared list is compared
+/// against it — a lower score pays the winner's gap/500, a higher one the flat
+/// consolation a lost showcase pays (never a share of the gap). The list
+/// resets on the Sunday-to-Monday midnight crossing; a restart inside the same
+/// week catches up on the wins that landed while the overlay was closed.
+///
+/// The entry itself lives two real-world days, not the whole week: the window
+/// exists so an idle driver cannot keep banking comparisons without playing.
+/// When it closes the flow settles the newcomers who turned up inside it,
+/// deletes the own doc and forgets the entry, so rivals stop being compared
+/// against a car nobody is showcasing any more. Entering next week's car
+/// overwrites the old entry the same way, through the weekly reset.
 ///
 /// Location selection is a placeholder until the Eifel map can resolve real
 /// addresses: <see cref="ValuationRules.PickVenue"/> draws a random house on
-/// the two placeholder streets (TODO at that helper).
+/// the operating zone's streets (TODO at that helper). The same zone map
+/// resolves a saved venue, so the showcase can never sit on a street the zone
+/// has not discovered (TOZONES §4.7).
 /// </summary>
 public sealed class ValuationFlow
 {
     private const double ResultSeconds = 4.0;
     private const double CatchUpRetrySeconds = 60.0;
 
-    private readonly AddressMap _map;
+    private readonly OperatingZone _zone;
     private readonly GameClock _game;
+    private readonly IClock _clock;
     private readonly ValuationLedger _ledger;
     private readonly IValuationBoard _board;
     private readonly Garage _garage;
@@ -54,21 +65,31 @@ public sealed class ValuationFlow
     private Task<IReadOnlyList<ValuationEntry>?>? _catchUpTask;
     private bool _catchUpDone;
     private bool _catchUpStarted;
+    // The in-flight catch-up read belongs to an expired entry: its answer
+    // settles the two-day window and then forgets the entry instead of
+    // reopening the week's comparison.
+    private bool _catchingUpExpiry;
     private DateTime _nextCatchUpAt = DateTime.MinValue;
     private readonly ConcurrentQueue<IReadOnlyList<ValuationEntry>> _snapshots = new();
     private readonly Queue<PendingResult> _results = new();
     private DateTime _nextResultAt = DateTime.MinValue;
     private ValuationEntry? _houseEntry;
 
+    // TEMPORARY (testing): true skips the Monday-window and one-entry-a-week
+    // gates, so the showcase can be driven and entered again at any time. The
+    // app passes true; the tests keep the shipping reading.
+    private readonly bool _ignoreEventGates;
+
     public ValuationFlow(
-        AddressMap map, GameClock game, ValuationLedger ledger,
+        OperatingZone zone, GameClock game, IClock clock, ValuationLedger ledger,
         IValuationBoard board, Garage garage, IReadOnlyList<CarSpec> catalog,
         DriverWallet wallet, IProfileStore profiles, ITelemetryHud? hud,
         GameStateSaver saver, IRivalsService rivals, VoiceBeat beat,
-        Random rng, ILog log)
+        Random rng, ILog log, bool ignoreEventGates = false)
     {
-        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(game);
+        ArgumentNullException.ThrowIfNull(clock);
         ArgumentNullException.ThrowIfNull(ledger);
         ArgumentNullException.ThrowIfNull(board);
         ArgumentNullException.ThrowIfNull(garage);
@@ -81,8 +102,9 @@ public sealed class ValuationFlow
         ArgumentNullException.ThrowIfNull(rng);
         ArgumentNullException.ThrowIfNull(log);
 
-        _map = map;
+        _zone = zone;
         _game = game;
+        _clock = clock;
         _ledger = ledger;
         _board = board;
         _garage = garage;
@@ -100,6 +122,7 @@ public sealed class ValuationFlow
         _beat = beat;
         _rng = rng;
         _log = log;
+        _ignoreEventGates = ignoreEventGates;
         _board.Changed += OnBoardChanged;
     }
 
@@ -128,14 +151,16 @@ public sealed class ValuationFlow
     public void BeginDrive()
     {
         DateTime now = _game.GameNow;
-        if (!ValuationRules.IsWindow(ControlCalendar.ToDayOfWeek(now), now.Hour))
+        if (!_ignoreEventGates
+            && !ValuationRules.IsWindow(ControlCalendar.ToDayOfWeek(now), now.Hour))
         {
             _log.LogInfo("market valuation drive ignored: outside the Monday 8am-8pm window");
             return;
         }
         // One entry a week (Unity's lastValuationGameDay gate): a row whose
         // showcase was already entered cannot send the player out again.
-        if (_screen is not null || _ledger.HasEntry(ValuationRules.WeekKey(now)))
+        if (_screen is not null
+            || (!_ignoreEventGates && _ledger.HasEntry(ValuationRules.WeekKey(now))))
         {
             return;
         }
@@ -159,11 +184,13 @@ public sealed class ValuationFlow
 
     /// <summary>
     /// One poll of the weekly bookkeeping: the Monday reset, the 6am venue
-    /// draw, the offline catch-up, the board snapshots and the queued result
-    /// notices. No disk or network call runs unless a transition needs it.
-    /// <paramref name="now"/> is the wall clock (the 4 s notice cadence and the
-    /// catch-up retry); every calendar decision reads the game clock instead,
-    /// so a wall hour can never open or close the Monday window.
+    /// draw, the two-day expiry, the offline catch-up, the board snapshots and
+    /// the queued result notices. No disk or network call runs unless a
+    /// transition needs it.
+    /// <paramref name="now"/> is the wall clock (the entry's expiry, the 4 s
+    /// notice cadence and the catch-up retry); every calendar decision reads the
+    /// game clock instead, so a wall hour can never open or close the Monday
+    /// window.
     /// </summary>
     public void Tick(DateTime now)
     {
@@ -185,7 +212,17 @@ public sealed class ValuationFlow
             DrawVenue();
         }
 
-        TryCatchUp(now, week);
+        // The two-day cap comes before the catch-up: an entry whose window
+        // closed must not reopen the week's comparison. It settles what landed
+        // inside the window, then forgets the entry.
+        if (_ledger.HasEntry(week) && _ledger.IsExpired(now))
+        {
+            TickExpiredEntry(now);
+        }
+        else
+        {
+            TryCatchUp(now, week);
+        }
         DrainSnapshots();
         DrainDraw();
         DrainCatchUp(now);
@@ -193,17 +230,35 @@ public sealed class ValuationFlow
     }
 
     /// <summary>
-    /// One poll while the drive is live: parking at the pinned venue completes
-    /// the leg and reveals the showcase (Unity's OnDestinationReached).
+    /// ENTER on the pinned venue (reached through <see cref="ValuationPoiHandler"/>;
+    /// the companion's button, voice included, raises it): the arrival consumes
+    /// the venue and hands back the showcase page. A park alone only puts the
+    /// button up — the player decides when the showcase opens.
     /// </summary>
-    public void Advance(TelemetrySample? sample)
+    public object? EnterVenue(PointOfInterest? poi)
     {
-        if (sample is null || !_ledger.Driving || _hud is null || !_hud.ParkedAtTarget)
+        if (_screen is not null)
         {
-            return;
+            return _screen;
+        }
+        if (poi is null || !_ledger.Driving)
+        {
+            return null;
+        }
+        if (!TryVenue(out ValuationVenue venue))
+        {
+            _ledger.EndDrive();
+            return null;
         }
 
-        OnArrival();
+        _ledger.CompleteEvent();
+        _hud?.SetDestination(null);
+        _saver.SaveDriver(_rivals.LastResult);
+        _screen = CreateScreen(venue);
+        _log.LogInfo(
+            $"market valuation reached {AddressFormatter.Format(venue.Location)}: " +
+            $"showcase open ({_ledger.EventsCompleted} event(s) completed)");
+        return _screen;
     }
 
     /// <summary>The entry phase's ENTER: records the car and draws an opponent.</summary>
@@ -219,10 +274,14 @@ public sealed class ValuationFlow
         double broken = owned?.Engine.BrokenPercent(
             spec?.EngineCc ?? 0, owned.Odometer) ?? 0.0;
         int jobs = owned?.JobsCompleted ?? 0;
-        double score = ValuationRules.Score(spec, jobs, broken);
+        // TODO(leaderboards): replace the per-car placeholder with the rank the
+        // stretch boards report for this model (ValuationRules.LeaderboardRanking)
+        // once they exist; until then every owned car carries the top percentile.
+        double ranking = owned?.LeaderboardRanking ?? 0.0;
+        double score = ValuationRules.Score(spec, jobs, broken, ranking);
         int week = ValuationRules.WeekKey(_game.GameNow);
         string name = PlayerName();
-        _ledger.MarkEntry(carKey, score, week);
+        _ledger.MarkEntry(carKey, score, week, _clock.UtcNow);
         _catchUpDone = true;
         _saver.SaveDriver(_rivals.LastResult);
         _screen.ShowWaiting(name, carKey, score);
@@ -233,7 +292,8 @@ public sealed class ValuationFlow
         _board.StartWatching();
         _log.LogInfo(
             $"market valuation entered: {carKey}, score {score:0.00}, " +
-            $"{jobs} job(s), engine {broken:P0} broken");
+            $"{jobs} job(s), engine {broken:P0} broken, " +
+            $"leaderboard {ranking:0.00} (+{ValuationRules.LeaderboardPoints(ranking):0.0})");
     }
 
     /// <summary>CONTINUE: pays the verdict XP and returns to the control page.</summary>
@@ -293,26 +353,6 @@ public sealed class ValuationFlow
         _log.LogInfo($"market valuation reset: week {week}");
     }
 
-    // The entry phase's arrival. The venue is consumed before the page opens,
-    // exactly like Unity's arrival tail: the week's street cannot be reused.
-    private void OnArrival()
-    {
-        if (!TryVenue(out ValuationVenue venue))
-        {
-            _ledger.EndDrive();
-            return;
-        }
-
-        _ledger.CompleteEvent();
-        _hud?.SetDestination(null);
-        _saver.SaveDriver(_rivals.LastResult);
-        _screen = CreateScreen(venue);
-        _host.ShowValuation(_screen);
-        _log.LogInfo(
-            $"market valuation reached {AddressFormatter.Format(venue.Location)}: " +
-            $"showcase open ({_ledger.EventsCompleted} event(s) completed)");
-    }
-
     private ValuationScreenViewModel CreateScreen(ValuationVenue venue) =>
         new(
             _garage, _catalog,
@@ -324,19 +364,22 @@ public sealed class ValuationFlow
         PointOfInterest poi = new(
             "valuation", Strings.Get("EventValuation"), venue.Location,
             PoiTypes.Valuation);
+        // The arrival is the button: parked at the venue the companion invites
+        // ENTER (and the same word by voice) instead of telling the player to
+        // park at a house the car is already standing on.
         _hud?.SetDestination(
             poi,
             new HudDestinationCopy(
-                "HudValuationDrive", "HudValuationArrived", ActionKey: string.Empty));
+                "HudValuationDrive", ArrivedKey: string.Empty, ActionKey: "HudEnter"));
         _hud?.ShowTaskText();
     }
 
     private ValuationVenue? DrawVenue()
     {
-        ValuationVenue? venue = ValuationRules.PickVenue(_map, _rng.Next);
+        ValuationVenue? venue = ValuationRules.PickVenue(_zone.ZoneMap, _rng.Next);
         if (venue is null)
         {
-            _log.LogWarning("market valuation venue not drawn: no house on the placeholder map");
+            _log.LogWarning("market valuation venue not drawn: no house in the operating zone");
             return null;
         }
         _ledger.SetVenue(venue);
@@ -346,8 +389,10 @@ public sealed class ValuationFlow
         return venue;
     }
 
-    // The stored venue resolved against the live map. A stale street/house
-    // (hand-edited map, old save) consumes the venue instead of throwing.
+    // The stored venue resolved against the zone's live map: the draw and the
+    // resolve read one owner, so a saved door can never sit off-zone. A stale
+    // street/house (an old save, a shrunk zone) consumes the venue instead of
+    // throwing; the next 6am preload draws a fresh one.
     private bool TryVenue(out ValuationVenue venue)
     {
         venue = null!;
@@ -355,10 +400,11 @@ public sealed class ValuationFlow
         {
             return false;
         }
-        AddressStreet? street = AddressBook.Street(_map, streetId);
+        AddressMap zoneMap = _zone.ZoneMap;
+        AddressStreet? street = AddressBook.Street(zoneMap, streetId);
         if (street is null
             || _ledger.VenueHouseNumber < 1
-            || _ledger.VenueHouseNumber > HouseNumberPlan.Count(street, _map))
+            || _ledger.VenueHouseNumber > HouseNumberPlan.Count(street, zoneMap))
         {
             _ledger.ClearVenue();
             return false;
@@ -414,7 +460,12 @@ public sealed class ValuationFlow
         {
             return null;
         }
-        double score = ValuationRules.Score(_catalog.GetValueOrDefault(key), 0, 0.0);
+
+        // Nobody owns the house car, so it carries no job, wear or leaderboard
+        // credit: its score is the catalogue formula alone, the bar the player's
+        // entry has to clear when no rival is listed.
+        double score = ValuationRules.Score(
+            _catalog.GetValueOrDefault(key), 0, 0.0, leaderboardRanking: 0.0);
         _houseEntry = new ValuationEntry(
             ValuationRules.HouseEntryDocId, ValuationRules.HouseEntryName,
             key, 0, 0.0, score);
@@ -438,11 +489,13 @@ public sealed class ValuationFlow
     // A live snapshot from the watcher: every newcomer pays a win or a
     // consolation, exactly like Unity's listener. A missing own entry means the
     // player is not on this week's list any more (wipe/TTL), so the flow
-    // re-seeds silently and stops comparing.
+    // re-seeds silently and stops comparing. A closed window pays nothing: the
+    // snapshot may still be in flight from the watcher when the cap lands.
     private void ProcessSnapshot(IReadOnlyList<ValuationEntry> entries)
     {
         string? ownUid = _board.OwnUid;
-        if (string.IsNullOrEmpty(ownUid) || _ledger.EntryWeek != ValuationRules.WeekKey(_game.GameNow))
+        if (string.IsNullOrEmpty(ownUid) || _ledger.EntryWeek != ValuationRules.WeekKey(_game.GameNow)
+            || _ledger.IsExpired(_clock.UtcNow))
         {
             return;
         }
@@ -463,19 +516,18 @@ public sealed class ValuationFlow
             ValuationRules.FindUnseen(_ledger.SeenUids, entries, ownUid);
         foreach (ValuationEntry entry in newcomers)
         {
-            if (entry.Score < own.Score)
+            // Ties are Unity's ignored case — no popup, no payout — even
+            // though the showcase page reads a tie as a win.
+            if (entry.Score == own.Score)
             {
-                _results.Enqueue(new PendingResult(
-                    entry.PlayerName, (own.Score - entry.Score) / ValuationRules.WinXpDivisor,
-                    Won: true, Offline: false, WinCount: 1));
+                continue;
             }
-            else if (entry.Score > own.Score)
-            {
-                _results.Enqueue(new PendingResult(
-                    entry.PlayerName, (entry.Score - own.Score) / ValuationRules.LossXpDivisor,
-                    Won: false, Offline: false, WinCount: 1));
-            }
-            // Ties are Unity's ignored case: no popup, no payout.
+            // One rule for every payout: the page, this listener and the
+            // restart catch-up all read ValuationRules.Verdict, so a win can
+            // never pay a different amount depending on where it landed.
+            ValuationVerdict verdict = ValuationRules.Verdict(own.Score, entry.Score);
+            _results.Enqueue(new PendingResult(
+                entry.PlayerName, verdict.Xp, verdict.Won, Offline: false, WinCount: 1));
         }
 
         _ledger.RecordSeen(Uids(entries));
@@ -515,10 +567,17 @@ public sealed class ValuationFlow
         }
         _catchUpTask = null;
         _catchUpStarted = false;
+        bool settlesExpiry = _catchingUpExpiry;
+        _catchingUpExpiry = false;
         IReadOnlyList<ValuationEntry>? entries = ResultOf(task);
         if (entries is null)
         {
             _nextCatchUpAt = now + TimeSpan.FromSeconds(CatchUpRetrySeconds);
+            return;
+        }
+        if (settlesExpiry)
+        {
+            SettleExpiredEntry(entries);
             return;
         }
 
@@ -538,7 +597,11 @@ public sealed class ValuationFlow
         ValuationOfflineGains gains = ValuationRules.ComputeOfflineGains(
             _ledger.OwnScore, _ledger.SeenUids, entries, ownUid);
         _ledger.RecordSeen(gains.NewSeenUids);
-        _ledger.MarkEntry(own.CarKey, own.Score, _ledger.EntryWeek);
+        // The refresh keeps the entry's own stamp: a catch-up read must not
+        // restart the two-day window it is settling against.
+        _ledger.MarkEntry(
+            own.CarKey, own.Score, _ledger.EntryWeek,
+            _ledger.EnteredAtUtc ?? _clock.UtcNow);
         _catchUpDone = true;
         _board.StartWatching();
         _saver.SaveDriver(_rivals.LastResult);
@@ -553,6 +616,61 @@ public sealed class ValuationFlow
         {
             _log.LogInfo("market valuation catch-up: no wins while away");
         }
+    }
+
+    // The two-day cap's tick. A session that was live while the window closed
+    // already paid every comparison as it landed, so forgetting is the whole
+    // job; a session that opens after the window first settles the newcomers
+    // that arrived inside it. Offline keeps the entry (there is no list to
+    // settle against) and retries on a later tick.
+    private void TickExpiredEntry(DateTime now)
+    {
+        if (_catchUpDone)
+        {
+            ForgetEntry("two-day window closed");
+            return;
+        }
+        if (!_board.IsOnline || _catchUpStarted
+            || string.IsNullOrEmpty(_board.OwnUid) || now < _nextCatchUpAt)
+        {
+            return;
+        }
+
+        _catchUpStarted = true;
+        _catchingUpExpiry = true;
+        _catchUpTask = _board.ListAsync();
+    }
+
+    // The window's last word: pay the wins that landed inside it, then forget
+    // the entry. The own doc may already be gone (the Firestore TTL fires on
+    // the same 48 h), so a missing own entry is not an error here — the window
+    // is measured from the local stamp, not from the doc that just died.
+    private void SettleExpiredEntry(IReadOnlyList<ValuationEntry> entries)
+    {
+        DateTime expiresAt = _ledger.ExpiresAtUtc ?? _clock.UtcNow;
+        ValuationOfflineGains gains = ValuationRules.ComputeOfflineGains(
+            _ledger.OwnScore, _ledger.SeenUids, entries, _board.OwnUid, expiresAt);
+        _ledger.RecordSeen(gains.NewSeenUids);
+        if (gains.WinCount > 0 && gains.TotalXp > 0.0)
+        {
+            _results.Enqueue(new PendingResult(
+                string.Empty, gains.TotalXp, Won: true, Offline: true, gains.WinCount));
+        }
+        ForgetEntry(
+            $"two-day window closed ({gains.WinCount} newcomer(s) settled inside it)");
+    }
+
+    // Forgetting is the entry leaving both the game and the shared list: the
+    // player's own doc goes (a rival's never does), the watcher stops, and the
+    // settled set stays so a later entry in the same week cannot pay a
+    // newcomer this one already settled.
+    private void ForgetEntry(string why)
+    {
+        _board.StopWatching();
+        _ledger.ClearEntry();
+        _saver.SaveDriver(_rivals.LastResult);
+        SafeTask.Forget(_board.WipeOwnAsync(), _log, "valuation expiry wipe");
+        _log.LogInfo($"market valuation entry forgotten: {why}");
     }
 
     private void ShowNextResult(DateTime now)
@@ -574,7 +692,7 @@ public sealed class ValuationFlow
             ? Strings.Format("ValuationOfflineSummary", result.WinCount, result.Xp)
             : result.Won
                 ? Strings.Format("ValuationNoticeWin", result.PlayerName, result.Xp)
-                : Strings.Format("ValuationNoticeLoss", result.PlayerName);
+                : Strings.Format("ValuationNoticeLoss", result.PlayerName, result.Xp);
         _hud?.ShowNotice(text, TimeSpan.FromSeconds(ResultSeconds));
         _log.LogInfo($"market valuation result: {(result.Won ? "won" : "lost")} " +
             $"{result.Xp:0.000} XP{(result.Offline ? " (while away)" : "")}");

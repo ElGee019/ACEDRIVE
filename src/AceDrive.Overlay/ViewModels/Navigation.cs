@@ -37,6 +37,10 @@ public sealed class Navigation
     private readonly DriverWallet _wallet;
     private readonly Garage _garage;
     private readonly IRivalsService _rivals;
+    // The operating-zone board: the expansion page shows its rank, and the
+    // navigator ranks the new area before opening the page, so the block reads
+    // a fresh result on construct (never polls).
+    private readonly IZoneStandings _zoneStandings;
     private readonly Trunk _trunk;
     private readonly Hunger _hunger;
     private readonly StoreCatalog _stores;
@@ -128,6 +132,10 @@ public sealed class Navigation
     // the same way: the strip owns which weekday hosts the event.
     private readonly int _willyDay = WillyDayOfWeek();
 
+    // TEMPORARY (testing): forwarded to the calendar page so every event row
+    // answers on any day and hour (see CalendarScreenViewModel).
+    private readonly bool _ignoreEventGates;
+
     // WHY late: the host is the coordinator, which is built after this
     // navigator. Every member below is only reachable from a page command, so
     // the attach in the coordinator's constructor always comes first.
@@ -138,6 +146,7 @@ public sealed class Navigation
         GameClock game, IClock clock, TaxiShift shift, TodoBoard todos,
         RoadTestLedger roads, GameStateSaver saver,
         DriverWallet wallet, Garage garage, IRivalsService rivals,
+        IZoneStandings zoneStandings,
         Trunk trunk, Hunger hunger, StoreCatalog stores,
         PoiDirectory directory, ITelemetryHud? hud,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
@@ -145,7 +154,7 @@ public sealed class Navigation
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
-        Func<string> carBrand, Random rng, ILog log)
+        Func<string> carBrand, Random rng, ILog log, bool ignoreEventGates = false)
     {
         _shell = shell;
         _beat = beat;
@@ -158,6 +167,7 @@ public sealed class Navigation
         _wallet = wallet;
         _garage = garage;
         _rivals = rivals;
+        _zoneStandings = zoneStandings;
         _trunk = trunk;
         _hunger = hunger;
         _stores = stores;
@@ -182,6 +192,7 @@ public sealed class Navigation
         _carBrand = carBrand;
         _rng = rng;
         _log = log;
+        _ignoreEventGates = ignoreEventGates;
 
         ControlCommand = new RelayCommand(ShowControl);
         MenuCommand = new RelayCommand(ShowMenuPage);
@@ -396,7 +407,8 @@ public sealed class Navigation
             _beat, _game, _clock, _roads,
             CalendarStamp.Default with { Week = _day.DisplayWeek },
             _openDay, MenuCommand, _willyLedger,
-            () => WhereIsWillyRules.HasCoffeeCareer(_directory, _career));
+            () => WhereIsWillyRules.HasCoffeeCareer(_directory, _career),
+            _ignoreEventGates);
         return _calendar;
     }
 
@@ -585,13 +597,38 @@ public sealed class Navigation
 
     // The addresses page (PORTPLAN 24/27): the discovered POIs alphabetic, the
     // temporary stand-in for markers on the map. A row pins the HUD's drive-to
-    // line; driving there and pressing ENTER enters the place.
+    // line; driving there and pressing ENTER enters the place. The zone travels
+    // along because the page carries its readout (TOZONES §3.5).
     private void OpenAddresses() =>
-        ShowScreen(new AddressesScreenViewModel(
-            _directory, _hud,
-            new RelayCommand(OpenHome),
-            _beat,
-            _host.DestinationPinned));
+        ShowScreen(AddressesPage(new RelayCommand(OpenHome)));
+
+    // One builder for the page's two entry points: the home tile (BACK to the
+    // home page) and the expansion page's FIND STREET (BACK runs the same
+    // continuation the expansion was going to run).
+    private AddressesScreenViewModel AddressesPage(ICommand back) =>
+        new(_directory, _zone, _hud, back, _beat, _host.DestinationPinned);
+
+    /// <summary>
+    /// The operating-zone expansion page (TOZONES §4.5, Unity
+    /// ZoneExpansionScreen): the receipt's CONTINUE opens it before the page it
+    /// would have shown, and its CONTINUE runs <paramref name="next"/>.
+    /// FIND STREET opens the addresses page (the port's map stand-in) with its
+    /// BACK running that same continuation, so the button keeps Unity's map
+    /// contract without a map. The board is ranked against the new area first,
+    /// so the page's standings block renders a fresh result instead of polling.
+    /// </summary>
+    public void ShowZoneExpansion(
+        ZoneExpansion zone, IReadOnlyList<PointOfInterest> added, Action next)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        _zoneStandings.Refresh(zone.NewKm);
+        var page = new ZoneExpansionScreenViewModel(
+            zone, added, _zoneStandings, _beat,
+            new RelayCommand(next),
+            new RelayCommand(() =>
+                ShowScreen(AddressesPage(new RelayCommand(next)))));
+        ShowScreen(page);
+    }
 
     // The trunk page (PORTPLAN 26, Unity YouScreen's TrunkScreen) is rebuilt on
     // every visit like Unity's RebuildTrunkScreen: a shop purchase made since

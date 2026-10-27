@@ -2,8 +2,10 @@ using AceDrive.Core;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>Unity TaxiJobGenerator steps 1-2: two different streets, one
-/// house each, filtered by the radius around the player's home.</summary>
+/// <summary>Unity TaxiJobGenerator steps 1-2: two houses, on different streets
+/// while the map offers a second one, filtered by the radius around the
+/// player's home; a one-street zone falls back to another house on that street
+/// (TOZONES §4.7).</summary>
 public sealed class TaxiAddressPlanTests
 {
     private static readonly AddressMap Map = AddressMap.Default;
@@ -47,11 +49,37 @@ public sealed class TaxiAddressPlanTests
     }
 
     [Fact]
-    public void OneStreet_CannotSupplyADifferentResidence()
+    public void OneStreet_DrawsTheSecondResidenceOnTheSameStreet()
     {
+        // A fresh career's zone covers a single street. The proposal must still
+        // resolve both legs — the second one as another door on that street,
+        // never the same address twice.
         var map = new AddressMap(
             "Germany", "Test", 1_929.0, 30.0,
             [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+
+        foreach (int seed in Enumerable.Range(0, 25))
+        {
+            Assert.True(TaxiAddressPlan.TryDraw(
+                map, new Random(seed), home: null, radiusKm: 0,
+                out AddressLocation home, out AddressLocation second));
+
+            Assert.Equal("Only Street", home.StreetName);
+            Assert.Equal(home.StreetName, second.StreetName);
+            Assert.NotEqual(home.HouseNumber, second.HouseNumber);
+            Assert.InRange(home.HouseNumber, 1, 65);
+            Assert.InRange(second.HouseNumber, 1, 65);
+        }
+    }
+
+    [Fact]
+    public void OneStreetWithASingleHouse_CannotDraw()
+    {
+        // One address cannot host both legs: the page keeps its fallback copy
+        // instead of sending the passenger next door to themselves.
+        var map = new AddressMap(
+            "Germany", "Test", 1_000.0, 2_000.0,
+            [new AddressStreet("only", "Only Street", 0.0, 0.5)]);
 
         Assert.False(TaxiAddressPlan.TryDraw(
             map, new Random(0), home: null, radiusKm: 0,
@@ -97,10 +125,12 @@ public sealed class TaxiAddressPlanTests
     }
 
     [Fact]
-    public void Radius_LeavingOneStreet_AnswersFalse()
+    public void Radius_LeavingOneStreet_DrawsBothLegsOnIt()
     {
         // A covers 0-10 km, B 30-90 km: from home at 0 only A has a door
-        // inside 5 km (B's nearest end is 10 km away around the loop).
+        // inside 5 km (B's nearest end is 10 km away around the loop). The
+        // radius leaves a one-street pool, so the relaxed draw keeps both legs
+        // on A instead of answering false.
         var map = new AddressMap(
             "Germany", "Test", 100_000.0, 1_000.0,
             [
@@ -109,9 +139,16 @@ public sealed class TaxiAddressPlanTests
             ]);
         var home = new AddressLocation("A", 1, HouseSide.Right);
 
-        Assert.False(TaxiAddressPlan.TryDraw(
-            map, new Random(0), home, radiusKm: 5, out _, out _));
         Assert.True(TaxiAddressPlan.TryDraw(
-            map, new Random(0), home, radiusKm: 0, out _, out _));
+            map, new Random(0), home, radiusKm: 5,
+            out AddressLocation first, out AddressLocation second));
+        Assert.NotEqual(first.HouseNumber, second.HouseNumber);
+        Assert.True(AddressBook.DistanceMeters(map, home, first) <= 5_000.0);
+        Assert.True(AddressBook.DistanceMeters(map, home, second) <= 5_000.0);
+
+        Assert.True(TaxiAddressPlan.TryDraw(
+            map, new Random(0), home, radiusKm: 0,
+            out AddressLocation unlimitedFirst, out AddressLocation unlimitedSecond));
+        Assert.NotEqual(unlimitedFirst.StreetName, unlimitedSecond.StreetName);
     }
 }

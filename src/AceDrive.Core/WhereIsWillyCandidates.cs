@@ -13,13 +13,16 @@ namespace AceDrive.Core;
 public static class WhereIsWillyCandidates
 {
     /// <summary>
-    /// Every discovered coffee-shop door, in directory order. A row without a
-    /// real house number is skipped: the quest cannot pin a door that does not
-    /// resolve on the map.
+    /// Every discovered coffee-shop door the operating zone covers, in
+    /// directory order. A row without a real house number is skipped: the quest
+    /// cannot pin a door that does not resolve on the map. <paramref
+    /// name="addressable"/> is the zone's map, so a search can never send the
+    /// player to a street the zone has not discovered (TOZONES §4.7).
     /// </summary>
     public static IReadOnlyList<PointOfInterest> CoffeeShops(
-        IEnumerable<PointOfInterest>? doors)
+        IEnumerable<PointOfInterest>? doors, AddressMap addressable)
     {
+        ArgumentNullException.ThrowIfNull(addressable);
         List<PointOfInterest> shops = [];
         if (doors is null)
         {
@@ -31,7 +34,8 @@ public static class WhereIsWillyCandidates
             if (poi is not null
                 && string.Equals(poi.Type, PoiTypes.CoffeeShop, StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(poi.Address.StreetName)
-                && poi.Address.HouseNumber > 0)
+                && poi.Address.HouseNumber > 0
+                && AddressBook.StreetByName(addressable, poi.Address.StreetName) is not null)
             {
                 shops.Add(poi);
             }
@@ -101,9 +105,11 @@ public static class WhereIsWillyCandidates
     /// <summary>
     /// The empty-book fallback (adaptation A3): one house no known POI or
     /// resident already lives at, drawn on the caller's seeded stream over the
-    /// map's streets with <see cref="PoiGenerator.DrawHouse"/>. The elder can
-    /// never share a door with a discovered place, and a map with no free house
-    /// answers null so the event degrades to its silent return.
+    /// addressable map's streets with <see cref="PoiGenerator.DrawHouse"/>. The
+    /// caller passes the operating zone's map, so the elder never hides on an
+    /// undiscovered street; the elder can never share a door with a discovered
+    /// place, and a map with no free house answers null so the event degrades to
+    /// its silent return.
     /// </summary>
     public static AddressLocation? PickFreeHouse(
         AddressMap map, PoiGenerator generator, IEnumerable<AddressLocation> taken)

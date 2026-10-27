@@ -8,6 +8,7 @@ TestResults/
 /.dsh-write-probe.txt
 /build-*.txt
 /restore-out.txt
+/restore-diag*.txt
 /test-rarity.txt
 /sess-prev*
 

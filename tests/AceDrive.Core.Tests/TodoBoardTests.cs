@@ -22,7 +22,7 @@ public sealed class TodoBoardTests
         var pins = new DestinationPins();
         var board = new TodoBoard(
             TodoTable.Default, store, directory, onboarding, wallet, jobs,
-            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             pins, visits, new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
         return (board, store, wallet, onboarding, directory, visits, jobs, pins);
     }
@@ -42,7 +42,7 @@ public sealed class TodoBoardTests
         var resumed = new TodoBoard(
             TodoTable.Default, store, new PoiDirectory(), new FakeOnboardingStore(),
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
-            new JobLedger(), new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new DestinationPins(), new VisitLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
 
@@ -77,7 +77,7 @@ public sealed class TodoBoardTests
         var board2 = new TodoBoard(
             TodoTable.Default, store, new PoiDirectory(), new FakeOnboardingStore(),
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
-            new JobLedger(), new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new DestinationPins(), new VisitLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
         int saves = store.Saves;
@@ -112,7 +112,7 @@ public sealed class TodoBoardTests
         var board = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(), new JobLedger(),
-            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             pins, new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0),
             new NullLogger());
 
@@ -134,7 +134,7 @@ public sealed class TodoBoardTests
         var board = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             onboarding, new DriverWallet(), new JobLedger(),
-            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new DestinationPins(), new VisitLedger(), career, new NullLogger());
 
         // The boot sync met the grocery gate: the follow-up took its slot.

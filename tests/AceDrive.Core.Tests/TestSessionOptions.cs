@@ -73,6 +73,8 @@ internal sealed class TestSessionOptions
     public IPlayerTelemetry? Telemetry { get; init; }
     public ShiftRecord? Shifts { get; init; }
     public IShiftStandings? ShiftStandings { get; init; }
+    // The operating-zone board the expansion page renders (PORTPLAN 58).
+    public IZoneStandings? ZoneStandings { get; init; }
     public IPlayerNameRegistry? PlayerNames { get; init; }
     public TaxiShift? Shift { get; init; }
     public IShiftStore? ShiftStore { get; init; }
@@ -93,4 +95,7 @@ internal sealed class TestSessionOptions
     public ResidentBook? Residents { get; init; }
     public WhereIsWillyRules? WillyRules { get; init; }
     public Random? WillyRng { get; init; }
+    // TEMPORARY (testing): opens every calendar event's gates, so a suite can
+    // drive an off-day or replayed event. Shipping sessions keep the gates.
+    public bool IgnoreEventGates { get; init; }
 }

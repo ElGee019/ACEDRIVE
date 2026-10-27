@@ -39,15 +39,24 @@ public sealed class XpEarningTests
         Assert.Equal(0.041, XpEarning.Compute(8.2, 1, 1, 50, 0.0), precision: 9);
     }
 
-    // Delivery twin (Unity ApplyStoreDeliveryEffects): no car class or
-    // rarity, the ride hauls goods.
+    // Delivery twin: the taxi formula at a fifth, so the goods run stays the
+    // lesser job without paying an order of magnitude less.
     [Fact]
-    public void ComputeDelivery_DistanceAndStreetKnowledgeOnly()
+    public void ComputeDelivery_PaysAFifthOfTheTaxiRate()
     {
-        // 8.2 / 100 x SK 100% = 0.082 at full rate.
-        Assert.Equal(0.082, XpEarning.ComputeDelivery(8.2, 100, 0.0), precision: 9);
-        Assert.Equal(0.041, XpEarning.ComputeDelivery(8.2, 50, 0.0), precision: 9);
-        // Diminishing still applies (2 full tiers in at 250 XP).
-        Assert.Equal(0.082 * 0.98, XpEarning.ComputeDelivery(8.2, 100, 250.0), precision: 9);
+        // (8.2 km x class 10 x rarity 1) / 100 x SK 100% x 0.2 = 0.164.
+        Assert.Equal(0.164, XpEarning.ComputeDelivery(8.2, 10, 1, 100, 0.0), precision: 9);
+        Assert.Equal(0.082, XpEarning.ComputeDelivery(8.2, 10, 1, 50, 0.0), precision: 9);
+        // The diminishing tier still applies on top of the fifth (2 full
+        // tiers in at 250 XP).
+        Assert.Equal(0.164 * 0.98, XpEarning.ComputeDelivery(8.2, 10, 1, 100, 250.0), precision: 9);
+    }
+
+    [Fact]
+    public void ComputeDelivery_IsAlwaysAFifthOfTheMatchingTaxiAward()
+    {
+        double taxi = XpEarning.Compute(12.5, 14, 6, 80, 40.0);
+        double delivery = XpEarning.ComputeDelivery(12.5, 14, 6, 80, 40.0);
+        Assert.Equal(taxi * XpEarning.DeliveryShare, delivery, precision: 12);
     }
 }

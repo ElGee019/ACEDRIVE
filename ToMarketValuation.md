@@ -90,10 +90,15 @@ uniformly over every house on both streets. Mark the real discovery with a
      `valuationEventsCompleted++`;
    - clear the marker/alarm, deselect the POI;
    - **open `ValuationScreen` immediately** (no ENTER).
+   - **ACEDRIVE deviation (2026-10-27):** parking alone only raises the
+     companion's ENTER button; the showcase opens when the player taps it (or
+     says "enter"). The arrival line is deliberately empty: once the car stands
+     on the venue's house, "park here to enter your vehicle" is dead copy. The
+     venue stays pinned and `valuationDriving` stays true until that ENTER, so
+     the button survives parking, driving off and a relaunch.
 5. Offline arrival (app killed after DRIVE): on next boot the marker is back
    and the button reads **ENTER**, which opens the showcase without re-driving;
-   `OnContinueClicked` runs the same consume/bookkeeping if the live arrival
-   never ran.
+   the same ENTER runs the consume/bookkeeping if the live arrival never ran.
 
 ### 2.4 Showcase screen
 
@@ -113,7 +118,9 @@ Action phase:
 - Draw a random entry that is **not** the player (`SelectCompetitor`), else
   the local house entry.
 - Verdict: ties favour the player. `won = own >= opponent`; gap =
-  `abs(own - opponent)`; XP = `gap / 500` when won, `gap / 1000` when lost.
+  `abs(own - opponent)`; XP = `gap / 500` when won, a flat `0.1` consolation
+  when lost — and never less than the consolation either way, so no verdict
+  ever pays zero.
 - Text: `YOU WON` / `YOU LOST`, the International Automotive Jury sentence,
   `You receive {xp:F2} XP`.
 - XP is **not** paid until CONTINUE. A double click cannot pay twice.
@@ -129,23 +136,32 @@ Displayed with two decimals. `jobsWithCar` = completed taxi + delivery jobs
 with that car (`CarJobsService.GetJobs`); `engineBrokenPercent` = the car's
 engine state at entry time.
 
+**ACEDRIVE addition — stretch leaderboard term (2026-10-27):** the port adds
+`pow(leaderboardRanking, 2) * 150`, where `leaderboardRanking` is a per-owned-car
+value in 0..1 (best percentile of its model's stretch boards). It starts on the
+top percentile (1 = the full 150 points) because the stretch leaderboards do not
+exist yet; the future board source writes the computed value through
+`OwnedCar.SetLeaderboardRanking`, and `ValuationRules.LeaderboardRanking` already
+implements the calculation (each stretch's `(field - rank) / field` percentile,
+best three averaged). The house entry carries no ranking (0 points).
+
 ### 2.5 Live comparison (ValuationPopScreen)
 
 - Firestore snapshot listener on the weekly list. First snapshot only seeds
   the seen set. A missing own entry re-seeds silently (covers the Monday
   wipe): winning or losing is impossible without an own entry.
 - For every newcomer uid not seen and not own:
-  - lower score → win, XP `(own - newcomer) / 500`, popup
+  - lower score → win, XP `max((own - newcomer) / 500, 0.1)`, popup
     `You won a Valuation event against {name} and received {xp:F3}XP`;
-  - higher score → loss, consolation `(newcomer - own) / 1000`, popup
-    `You just lost a Valuation Event against {name}.`;
+  - higher score → loss, the flat `0.1` consolation (never a share of the
+    gap), popup `You just lost a Valuation Event against {name} (+{xp:F2} XP).`;
   - tie → ignored.
 - Each popup is 4 s, plays the Completion sound, and grants XP when shown.
 - Seen uid set + own score + week key are mirrored into the save.
 - Offline catch-up on restart: one one-shot load diffs the list against the
-  persisted seen set; **wins only** (losses while away pay nothing), one
-  aggregate popup `While you were away you won N Valuation events and gained
-  X XP`. The seen set is unioned, never overwritten.
+  persisted seen set; **wins only** (losses while away pay nothing), each win
+  at the live rate, one aggregate popup `While you were away you won N
+  Valuation events and gained X XP`. The seen set is unioned, never overwritten.
 
 ---
 
@@ -154,13 +170,16 @@ engine state at entry time.
 ### 3.1 Core (pure, no WPF/IO/telemetry)
 
 - `ValuationRules` extensions:
-  - `WinXpDivisor = 500`, `LossXpDivisor = 1000`, `MondayDayOfWeek = 2`.
+  - `WinXpDivisor = 500`, `ConsolationXp = 0.1`, `MondayDayOfWeek = 2`.
   - `IsWindow(dayOfWeek, hour)` → Monday 8–20.
   - `IsPreloadWindow(dayOfWeek, hour)` → Monday 6–20.
   - `WeekKey(DateTime)` → whole weeks since Monday 2024-01-01; the weekly
     reset/entry gate.
   - `PickVenue(AddressMap, Func<int,int>)` → random house, TODO for Step 1.
-  - `Score(CarSpec?, jobsWithCar, engineBrokenPercent)`.
+  - `Score(CarSpec?, jobsWithCar, engineBrokenPercent, leaderboardRanking)`.
+  - `LeaderboardRanking(ranks)` → the 0..1 ranking from `StretchRank` rows
+    (`(field - rank) / field` per stretch, best three averaged, 0 with none).
+  - `LeaderboardPoints(ranking)` → `ranking² × LeaderboardMaxPoints` (150).
   - `Verdict(ownScore, competitorScore)` → `ValuationVerdict`.
   - `SelectCompetitor(entries, ownUid, nextInt)` (skip self + `house-entry`).
   - `FindUnseen(seenUids, entries, ownUid)`.
@@ -175,6 +194,8 @@ engine state at entry time.
   - `ValuationOfflineGains` (totalXp, winCount, newSeenUids).
   - `ValuationLedger` (persisted half): venue, driving flag, events
     completed, entry week/car/score, seen uids, last reset week.
+  - `StretchRank` (sameCarRank, totalSameCarPlayers): one stretch's standing
+    for a car model, the input the leaderboard term is computed from.
 - `DriverState` gains nine optional fields (old saves load unchanged):
   `ValuationVenueStreetId`, `ValuationVenueHouseNumber`, `ValuationDriving`,
   `ValuationEventsCompleted`, `ValuationEntryWeek` (`-1`), `ValuationEntryCarKey`,
@@ -183,6 +204,10 @@ engine state at entry time.
 - `OwnedCar.JobsCompleted` + `RegisterJob()`; `OwnedCarState` gains
   `JobsCompleted = 0`. `JobSettlement` increments the current car's counter
   in the `earnsProgress` block at both settles (taxi and delivery).
+- `OwnedCar.LeaderboardRanking` + `SetLeaderboardRanking(double)`;
+  `OwnedCarState` gains `LeaderboardRanking = 1.0` (the top-percentile
+  placeholder until the stretch boards land). It rides the garage save per
+  owned car and feeds the score's leaderboard term at ENTER.
 - `PoiTypes.Valuation = "valuation"` for the temporary venue marker.
 
 **Score deviation to approve:** EVO's `cars.json` has no `maxRpm` column.
@@ -219,8 +244,13 @@ Owns all timing/state transitions; no UI copy, no direct `new` of services.
   `valuationDriving`, save, hide panel, log.
 - `Tick(now)` — Monday reset, 6 am venue draw, offline catch-up, drain board
   snapshots, drain draw/catch-up tasks, show queued 4 s notices.
-- `Advance(sample)` — when `hud.ParkedAtTarget` and driving: consume venue,
-  `valuationEventsCompleted++`, clear HUD destination, open the screen.
+- `EnterVenue(poi)` — the venue's POI handler (`ValuationPoiHandler`): when
+  driving, consume the venue, `valuationEventsCompleted++`, clear the HUD
+  destination, build and return the showcase page. Parking itself does nothing;
+  the HUD's ENTER (voice "enter") is the only way in, so the arrival copy is
+  never a dead sentence. Driven by the HUD's `EnterRequested` through
+  `OnboardingFlow.EnterPoi` → `PoiArrivalRouter`, the same path a shop door
+  takes.
 - `Enter(carKey)` — score from garage + per-car jobs + engine state; persist
   week entry; push async; start watcher; start competitor list task.
 - `Continue(xp)` — add XP, save, back to control page.
@@ -245,18 +275,19 @@ Owns all timing/state transitions; no UI copy, no direct `new` of services.
 - `ValuationScreenView.xaml` + empty code-behind, same page skeleton as
   Garage/Cento; add `<DataTemplate DataType="{x:Type vm:ValuationScreenViewModel}">`
   in `MainWindow.xaml`.
-- `IValuationHost`: `ShowValuation(object)`, `HidePanel()`, `ShowControl()`.
-  `MainViewModel` implements it with `PanelPresenter.Present`,
-  `PanelPresenter.Hide`, `Navigation.ShowControl`.
+- `IValuationHost`: `HidePanel()`, `ShowControl()`. The showcase page reaches
+  the panel through the venue's POI handler, so the host has no page verb.
+  `MainViewModel` implements it with `PanelPresenter.Hide`,
+  `Navigation.ShowControl`.
 
 ### 3.5 Wiring
 
 | Point | Change |
 |---|---|
 | `Navigation` | ctor takes `ValuationFlow`; `_valuationDay` read from `ControlCalendar.Week`; `OnDay(valuationDay)` → `_valuation.BeginDrive()` (calendar gate already checks day + 8–20) |
-| `MainViewModel` | ctor takes `ValuationFlow`; `Attach(this)`; `Poll` calls `_valuation.Tick(now)` after `_day.Tick` and `_valuation.Advance(s)` after `_hud.Update`; implements `IValuationHost` |
+| `MainViewModel` | ctor takes `ValuationFlow`; `Attach(this)`; `Poll` calls `_valuation.Tick(now)` after `_day.Tick`; implements `IValuationHost` |
 | `GameStateSaver` | ctor takes `ValuationLedger`; `SaveDriver` writes the nine valuation fields with `with { … }` |
-| `App.OnStartup` | build `ValuationLedger`; choose `FirestoreValuationBoard` (online branch, after `_firebase`) or `OfflineValuationBoard`; build `ValuationFlow` before `Navigation`; pass ledger to saver and flow to nav/VM |
+| `App.OnStartup` | build `ValuationLedger`; choose `FirestoreValuationBoard` (online branch, after `_firebase`) or `OfflineValuationBoard`; build `ValuationFlow` before `Navigation`; register `ValuationPoiHandler` on the arrival router; pass ledger to saver and flow to nav/VM |
 | `TestSession` | `FakeValuationBoard` option, ledger, flow, nav/VM/saver params; expose the flow for integration tests |
 | `firestore.rules` | already allows `acevo_enteredForValuation`; no change |
 | `FIREBASE.md` | move weekly valuation entries from “backend-only” to wired; document the live watcher and own-entry wipe |
@@ -293,7 +324,6 @@ ValuationTopSpeed          {0} km/h
 ValuationAcceleration      {0:0.#}s
 ValuationClass             {0}
 HudValuationDrive          Drive to {0}: {1} {2}, {3} to enter your vehicle into the weekly tier-ranking showcase.
-HudValuationArrived        Market valuation: park here to enter your vehicle.
 ValuationNoticeWin         You won a Valuation event against {0} and received {1:0.000}XP
 ValuationNoticeLoss        You just lost a Valuation Event against {0}.
 ValuationOfflineSummary    While you were away you won {0} Valuation events and gained {1:0.000} XP
@@ -301,6 +331,11 @@ ValuationOfflineSummary    While you were away you won {0} Valuation events and 
 
 (HUD copies keep the generic placeholders `{0}` name, `{1}` street,
 `{2}` number, `{3}` city so a translator can reorder them.)
+
+The venue's action button reuses the generic `HudEnter` copy ("ENTER" /
+"BINNENGAAN") and therefore its voice keyword "enter"; its copy carries an
+empty `ArrivedKey`, which tells the HUD to leave the arrival sentence down
+(`HudDestinationCopy`). The old `HudValuationArrived` key is gone.
 
 ---
 
@@ -325,8 +360,10 @@ Services:
 
 Flow/integration (`TestSession`):
 - Monday 08:00 start → `vm.Poll()` draws a venue; `BeginDrive` pins the HUD
-  and hides the panel; fake HUD parked → `Poll` opens
-  `ValuationScreenViewModel`.
+  and hides the panel; the pin carries the `HudEnter` action and no arrival
+  copy. Fake HUD parked → the button is up and the showcase is **not** open;
+  the fake HUD's `RaiseEnter` (the same event the button and the mic raise)
+  opens `ValuationScreenViewModel` and consumes the venue.
 - ENTER with an owned car pushes one entry, computes the Unity score
   (including per-car jobs + engine), draws the fake board's rival, paints
   win/loss and pays XP only on CONTINUE.
@@ -379,6 +416,12 @@ Flow/integration (`TestSession`):
    no audio seam for it. The HUD notice is the port's equivalent.
 7. **Voice** — the screen's spoken labels are wired through `IVoiceScreen`;
    the "market valuation" calendar keyword already exists.
+8. **Stretch leaderboards** — not built yet. Every owned car carries
+   `LeaderboardRanking = 1` (full 150 points) until a board source reports
+   per-stretch, same-model ranks; the seam is
+   `OwnedCar.SetLeaderboardRanking(ValuationRules.LeaderboardRanking(rows))`
+   at ENTER (`ValuationFlow.Enter`'s TODO). Until then the player's entry
+   out-scores the house fallback by the 150-point placeholder.
 
 ---
 

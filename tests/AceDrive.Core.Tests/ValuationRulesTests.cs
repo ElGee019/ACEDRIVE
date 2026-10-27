@@ -116,7 +116,27 @@ public sealed class ValuationRulesTests
             Horsepower: 150, TopSpeedKmh: 200);
 
         // class 5 + 200/2 + 150/10 + 20000/1000 + 3 jobs + a fresh engine's 100.
-        Assert.Equal(243.0, ValuationRules.Score(car, jobsWithCar: 3, 0.0), 6);
+        Assert.Equal(
+            243.0, ValuationRules.Score(car, jobsWithCar: 3, 0.0, leaderboardRanking: 0.0), 6);
+    }
+
+    [Fact]
+    public void Score_AddsTheLeaderboardTerm()
+    {
+        var car = new CarSpec(
+            "ks_test", 2020, "Test", "One", Class: 5, Price: 20000.0,
+            Horsepower: 150, TopSpeedKmh: 200);
+
+        // The placeholder ranking (1.0 on every owned car) is worth the full
+        // 150 points, so a fresh entry reads 243 + 150; an unranked car (the
+        // house entry) adds nothing.
+        Assert.Equal(
+            243.0, ValuationRules.Score(car, jobsWithCar: 3, 0.0, leaderboardRanking: 0.0), 6);
+        Assert.Equal(
+            393.0, ValuationRules.Score(car, jobsWithCar: 3, 0.0, leaderboardRanking: 1.0), 6);
+        Assert.Equal(
+            243.0 + 37.5,
+            ValuationRules.Score(car, jobsWithCar: 3, 0.0, leaderboardRanking: 0.5), 6);
     }
 
     [Fact]
@@ -127,45 +147,109 @@ public sealed class ValuationRulesTests
             Horsepower: 150, TopSpeedKmh: 200);
 
         Assert.Equal(
-            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 1.0),
-            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 4.0), 6);
+            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 1.0, leaderboardRanking: 0.0),
+            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 4.0, leaderboardRanking: 0.0), 6);
         Assert.Equal(
-            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 0.0),
-            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: -2.0), 6);
+            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 0.0, leaderboardRanking: 0.0),
+            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: -2.0, leaderboardRanking: 0.0), 6);
         // A negative job count never takes points off the car.
         Assert.Equal(
-            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 0.0),
-            ValuationRules.Score(car, jobsWithCar: -5, engineBrokenPercent: 0.0), 6);
+            ValuationRules.Score(car, jobsWithCar: 0, engineBrokenPercent: 0.0, leaderboardRanking: 0.0),
+            ValuationRules.Score(car, jobsWithCar: -5, engineBrokenPercent: 0.0, leaderboardRanking: 0.0), 6);
     }
 
     [Fact]
-    public void Score_WithoutACar_IsZero() => Assert.Equal(0.0, ValuationRules.Score(null, 3, 0.0));
+    public void LeaderboardPoints_SquareTheRankingOntoTheMaximum()
+    {
+        Assert.Equal(0.0, ValuationRules.LeaderboardPoints(0.0));
+        Assert.Equal(37.5, ValuationRules.LeaderboardPoints(0.5), 6);
+        Assert.Equal(ValuationRules.LeaderboardMaxPoints, ValuationRules.LeaderboardPoints(1.0), 6);
+        // A hand-written ranking can never out-earn a perfect one, and a
+        // negative one can never take points off the score.
+        Assert.Equal(ValuationRules.LeaderboardMaxPoints, ValuationRules.LeaderboardPoints(4.0), 6);
+        Assert.Equal(0.0, ValuationRules.LeaderboardPoints(-1.0));
+    }
 
     [Fact]
-    public void Verdict_TiesFavourThePlayer()
+    public void LeaderboardRanking_AveragesTheThreeBestPercentiles()
+    {
+        // Percentile = (field - rank) / field: 0.9, 0.5, 0.25, 0.1. The best
+        // three average, so the weakest stretch does not drag the ranking down.
+        StretchRank[] ranks =
+        [
+            new(SameCarRank: 1, TotalSameCarPlayers: 10),
+            new(SameCarRank: 5, TotalSameCarPlayers: 10),
+            new(SameCarRank: 3, TotalSameCarPlayers: 4),
+            new(SameCarRank: 9, TotalSameCarPlayers: 10),
+        ];
+
+        double ranking = ValuationRules.LeaderboardRanking(ranks);
+
+        Assert.Equal((0.9 + 0.5 + 0.25) / 3.0, ranking, 6);
+    }
+
+    [Fact]
+    public void LeaderboardRanking_FewerThanThreeStretches_AveragesWhatExists()
+    {
+        Assert.Equal(
+            0.9, ValuationRules.LeaderboardRanking([new(1, 10)]), 6);
+        // A lone entrant has no percentile to brag about: the field is one.
+        Assert.Equal(
+            0.0, ValuationRules.LeaderboardRanking([new(1, 1)]), 6);
+    }
+
+    [Fact]
+    public void LeaderboardRanking_WithNoUsableBoard_IsUnranked()
+    {
+        Assert.Equal(0.0, ValuationRules.LeaderboardRanking(null));
+        Assert.Equal(0.0, ValuationRules.LeaderboardRanking([]));
+        // A zero (or negative) field cannot produce a percentile; a rank past
+        // the field clamps to the bottom instead of going negative.
+        Assert.Equal(0.0, ValuationRules.LeaderboardRanking([new(1, 0)]));
+        Assert.Equal(0.0, ValuationRules.LeaderboardRanking([new(15, 10)]), 6);
+    }
+
+    [Fact]
+    public void Score_WithoutACar_IsZero() =>
+        Assert.Equal(0.0, ValuationRules.Score(null, 3, 0.0, leaderboardRanking: 1.0));
+
+    [Fact]
+    public void Verdict_TiesFavourThePlayerAndPayTheConsolation()
     {
         ValuationVerdict tie = ValuationRules.Verdict(100.0, 100.0);
         Assert.True(tie.Won);
         Assert.Equal(0.0, tie.Gap);
-        Assert.Equal(0.0, tie.Xp);
+        Assert.Equal(ValuationRules.ConsolationXp, tie.Xp, 6);
     }
 
     [Fact]
     public void Verdict_WinnerPaysTheGapOverFiveHundred()
     {
-        ValuationVerdict verdict = ValuationRules.Verdict(100.0, 90.0);
+        ValuationVerdict verdict = ValuationRules.Verdict(200.0, 100.0);
         Assert.True(verdict.Won);
-        Assert.Equal(10.0, verdict.Gap, 6);
-        Assert.Equal(10.0 / 500.0, verdict.Xp, 6);
+        Assert.Equal(100.0, verdict.Gap, 6);
+        Assert.Equal(100.0 / 500.0, verdict.Xp, 6);
     }
 
     [Fact]
-    public void Verdict_LoserBanksTheGapOverOneThousand()
+    public void Verdict_SmallWinStillPaysTheConsolation()
     {
-        ValuationVerdict verdict = ValuationRules.Verdict(90.0, 100.0);
+        // A 10-point win would be 0.02 XP; every verdict keeps the floor so a
+        // showcase never reads as zero progress.
+        ValuationVerdict verdict = ValuationRules.Verdict(100.0, 90.0);
+        Assert.True(verdict.Won);
+        Assert.Equal(ValuationRules.ConsolationXp, verdict.Xp, 6);
+    }
+
+    [Fact]
+    public void Verdict_LoserBanksTheFlatConsolation()
+    {
+        // A landslide and a near miss pay the same tiny consolation: losing
+        // must never out-earn the job, and must never read as zero XP.
+        ValuationVerdict verdict = ValuationRules.Verdict(90.0, 5000.0);
         Assert.False(verdict.Won);
-        Assert.Equal(10.0, verdict.Gap, 6);
-        Assert.Equal(10.0 / 1000.0, verdict.Xp, 6);
+        Assert.Equal(4910.0, verdict.Gap, 6);
+        Assert.Equal(0.1, verdict.Xp, 6);
     }
 
     [Fact]
@@ -199,9 +283,10 @@ public sealed class ValuationRulesTests
     [Fact]
     public void OfflineGains_PayWinsOnlyAndSettleEveryFreshUid()
     {
-        // Unity's catch-up: a win pays, a loss and a tie pay nothing, and every
-        // fresh uid joins the settled set so the live path cannot pay it again.
-        ValuationEntry win = Entry("win", 90.0);
+        // Unity's catch-up: a win pays the live rate, a loss and a tie pay
+        // nothing, and every fresh uid joins the settled set so the live path
+        // cannot pay it again.
+        ValuationEntry win = Entry("win", 0.0);
         ValuationEntry loss = Entry("loss", 110.0);
         ValuationEntry tie = Entry("tie", 100.0);
         ValuationEntry own = Entry("me", 100.0);
@@ -211,7 +296,7 @@ public sealed class ValuationRulesTests
             100.0, ["old"], [win, loss, tie, own, settled], "me");
 
         Assert.Equal(1, gains.WinCount);
-        Assert.Equal(10.0 / 500.0, gains.TotalXp, 6);
+        Assert.Equal(100.0 / 500.0, gains.TotalXp, 6);
         // Every fresh uid settles, own included (the live path skips it twice
         // over); a uid already seen keeps its settled state.
         Assert.Equal(["win", "loss", "tie", "me", "old"], gains.NewSeenUids);
@@ -224,6 +309,52 @@ public sealed class ValuationRulesTests
         Assert.Equal(entered.AddHours(48), ValuationRules.ComputeExpiryUtc(entered));
     }
 
-    private static ValuationEntry Entry(string uid, double score) =>
-        new(uid, uid, "ks_test", 1, 0.0, score);
+    [Fact]
+    public void Expired_OnlyAfterTwoFullDays()
+    {
+        var entered = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+        DateTime expires = ValuationRules.ComputeExpiryUtc(entered);
+
+        Assert.False(ValuationRules.IsEntryExpired(entered, entered));
+        Assert.False(ValuationRules.IsEntryExpired(entered, expires.AddSeconds(-1)));
+        Assert.True(ValuationRules.IsEntryExpired(entered, expires));
+    }
+
+    [Fact]
+    public void OfflineGains_IgnoreTheNewcomersWhoArrivedAfterTheWindowClosed()
+    {
+        // The two-day cap: a late return pays the rivals who turned up while
+        // the entry was still showcasing, never the ones after it.
+        var entered = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+        DateTime expires = ValuationRules.ComputeExpiryUtc(entered);
+        ValuationEntry inside = Entry("inside", 0.0, expires.AddMinutes(-1));
+        ValuationEntry after = Entry("after", 0.0, expires.AddMinutes(1));
+
+        ValuationOfflineGains capped = ValuationRules.ComputeOfflineGains(
+            100.0, null, [inside, after], "me", expires);
+
+        Assert.Equal(1, capped.WinCount);
+        Assert.Equal(100.0 / 500.0, capped.TotalXp, 6);
+        // Both settle, so a later live snapshot cannot pay the late one either.
+        Assert.Equal(["inside", "after"], capped.NewSeenUids);
+
+        // Without the cap the same list pays both, which is what the window
+        // exists to stop.
+        Assert.Equal(2, ValuationRules.ComputeOfflineGains(
+            100.0, null, [inside, after], "me").WinCount);
+    }
+
+    [Fact]
+    public void UndatedEntry_StaysInsideTheWindow()
+    {
+        // A legacy doc without an EnteredAt stamp cannot be dated, and the list
+        // is already bounded to the week: it must not be voided by the cap.
+        var expires = new DateTime(2026, 10, 24, 12, 0, 0, DateTimeKind.Utc);
+
+        Assert.True(ValuationRules.EnteredWithinWindow(Entry("old", 0.0), expires));
+    }
+
+    private static ValuationEntry Entry(
+        string uid, double score, DateTime? enteredAt = null) =>
+        new(uid, uid, "ks_test", 1, 0.0, score, enteredAt);
 }

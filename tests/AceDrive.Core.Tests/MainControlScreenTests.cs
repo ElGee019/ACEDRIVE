@@ -41,7 +41,7 @@ public sealed class MainControlScreenTests
         return new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(), new JobLedger(),
-            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new DestinationPins(), new VisitLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
     }
@@ -53,7 +53,7 @@ public sealed class MainControlScreenTests
         return new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
-            new OperatingZone(null, seed: 0), new Garage(TestRoadCars.Pool),
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new DestinationPins(state), new VisitLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
     }
@@ -63,6 +63,7 @@ public sealed class MainControlScreenTests
     {
         var vm = Create();
         Assert.Equal(4, vm.TodoLines.Count);
+        Assert.StartsWith("Earn ", vm.TodoLines[0], StringComparison.Ordinal); // open tips stay unnumbered
         Assert.Contains("Earn 500 CR", vm.TodoLines[0], StringComparison.Ordinal);
         Assert.Contains("Earn 2 XP", vm.TodoLines[1], StringComparison.Ordinal);
         Assert.Contains("1002 CR in the bank", vm.TodoLines[2], StringComparison.Ordinal);
@@ -77,7 +78,9 @@ public sealed class MainControlScreenTests
         var vm = Create(todos: Board(new DriverState(0.0, 0.0, CreditEarned: 500.0)));
 
         Assert.True(vm.HasCompletedTodos);
-        Assert.Contains("Earn 500 CR", Assert.Single(vm.CompletedTodoLines), StringComparison.Ordinal);
+        string only = Assert.Single(vm.CompletedTodoLines);
+        Assert.StartsWith("1. ", only, StringComparison.Ordinal);
+        Assert.Contains("Earn 500 CR", only, StringComparison.Ordinal);
         Assert.False(vm.ShowDeliverCarePackages);
         Assert.DoesNotContain("DELIVER CARE PACKAGES", vm.VoiceActions.Keys);
     }
@@ -93,6 +96,13 @@ public sealed class MainControlScreenTests
 
         Assert.True(vm.ShowDeliverCarePackages);
         Assert.Equal(6, vm.CompletedTodoLines.Count);
+
+        // Numbered 1..6: the ordinal is the page's marker (resx
+        // TodoCompletedLine), not part of the tip's own copy.
+        for (int i = 0; i < vm.CompletedTodoLines.Count; i++)
+        {
+            Assert.StartsWith($"{i + 1}. ", vm.CompletedTodoLines[i], StringComparison.Ordinal);
+        }
         Assert.True(vm.VoiceActions.ContainsKey("DELIVER CARE PACKAGES"));
 
         vm.TodoAcknowledgeCommand.Execute(null);

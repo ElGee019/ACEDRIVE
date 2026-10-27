@@ -276,6 +276,33 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void DestinationWithoutAnArrivalLine_LeavesOnlyTheActionButton()
+    {
+        var vm = Create();
+        var venue = new PointOfInterest(
+            "valuation", "Market valuation",
+            new AddressLocation("Street 1", 17, HouseSide.Right), PoiTypes.Valuation);
+
+        vm.SetDestination(venue, new HudDestinationCopy(
+            "HudValuationDrive", ArrivedKey: string.Empty, ActionKey: "HudEnter"));
+
+        // En route the leg still reads as the one drive-to sentence.
+        Assert.Contains("Drive to", vm.BannerText, StringComparison.Ordinal);
+        Assert.False(vm.ShowEnterButton);
+
+        // 0.25 resolves to Street 1 No. 17, the venue's door.
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        // Parked, the arrival sentence stays down and the button is the whole
+        // invitation; "enter" is what the mic answers.
+        Assert.True(vm.AtDestination);
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal(string.Empty, vm.DestinationText);
+        Assert.Equal("ENTER", vm.EnterText);
+        Assert.Contains("enter", vm.EnterKeywords);
+    }
+
+    [Fact]
     public void HomeDestination_CarriesTheStoryCopyAndThePancakeAction()
     {
         var vm = Create();

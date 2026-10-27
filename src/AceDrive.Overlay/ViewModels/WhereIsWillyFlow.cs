@@ -17,7 +17,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// wrong address throws the search away without a receipt and the row reopens.
 /// The map is a page until the marker network lands (adaptation A1): the quest
 /// page lists the town's coffee shops, and the companion carries the pinned
-/// door. Arrival rides the one 10 Hz poll through
+/// door. Both the shop list and the elder's free house are drawn on the
+/// operating zone's map, so a search never leaves the discovered streets
+/// (TOZONES §4.7). Arrival rides the one 10 Hz poll through
 /// <see cref="ITelemetryHud.ParkedAtTarget"/>, never a timer of its own.
 /// </summary>
 public sealed class WhereIsWillyFlow
@@ -31,7 +33,7 @@ public sealed class WhereIsWillyFlow
     private const string HomeMarkerId = "willy-home";
     private const string WrongMarkerId = "willy-wrong";
 
-    private readonly AddressMap _map;
+    private readonly OperatingZone _zone;
     private readonly GameClock _game;
     private readonly PoiGenerator _generator;
     private readonly PoiDirectory _directory;
@@ -65,16 +67,21 @@ public sealed class WhereIsWillyFlow
     private bool _missed;
     private WhereIsWillyReceipt? _receipt;
 
+    // TEMPORARY (testing): true skips the Wednesday-window and completed-stamp
+    // gates, so the run can start any time and be replayed after it paid. The
+    // app passes true; the tests keep the shipping reading.
+    private readonly bool _ignoreEventGates;
+
     public WhereIsWillyFlow(
-        AddressMap map, GameClock game, PoiGenerator generator,
+        OperatingZone zone, GameClock game, PoiGenerator generator,
         PoiDirectory directory, ResidentBook residents, Garage garage,
         IReadOnlyList<CarSpec> catalog, WhereIsWillyRules rules,
         WhereIsWillyLedger ledger, IFriendshipStore friendships, Trunk trunk,
         DriverWallet wallet, ITelemetryHud? hud, GameStateSaver saver,
         IRivalsService rivals, VoiceBeat beat, Func<int> displayWeek,
-        Random rng, ILog log)
+        Random rng, ILog log, bool ignoreEventGates = false)
     {
-        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(generator);
         ArgumentNullException.ThrowIfNull(directory);
@@ -93,7 +100,7 @@ public sealed class WhereIsWillyFlow
         ArgumentNullException.ThrowIfNull(rng);
         ArgumentNullException.ThrowIfNull(log);
 
-        _map = map;
+        _zone = zone;
         _game = game;
         _generator = generator;
         _directory = directory;
@@ -117,6 +124,7 @@ public sealed class WhereIsWillyFlow
         _displayWeek = displayWeek;
         _rng = rng;
         _log = log;
+        _ignoreEventGates = ignoreEventGates;
     }
 
     /// <summary>
@@ -142,12 +150,13 @@ public sealed class WhereIsWillyFlow
     public void Begin()
     {
         DateTime now = _game.GameNow;
-        if (!WhereIsWillyRules.IsWindow(ControlCalendar.ToDayOfWeek(now), now.Hour))
+        if (!_ignoreEventGates
+            && !WhereIsWillyRules.IsWindow(ControlCalendar.ToDayOfWeek(now), now.Hour))
         {
             _log.LogInfo("where is willy ignored: outside the Wednesday 8am-8pm window");
             return;
         }
-        if (_ledger.CompletedOn(now))
+        if (!_ignoreEventGates && _ledger.CompletedOn(now))
         {
             _log.LogInfo("where is willy ignored: this Wednesday is already stamped");
             return;
@@ -163,7 +172,8 @@ public sealed class WhereIsWillyFlow
             return;
         }
 
-        IReadOnlyList<PointOfInterest> shops = WhereIsWillyCandidates.CoffeeShops(_directory.All);
+        IReadOnlyList<PointOfInterest> shops = WhereIsWillyCandidates.CoffeeShops(
+            _directory.All, _zone.ZoneMap);
         if (shops.Count == 0)
         {
             _log.LogWarning("where is willy not drawn: no coffee shop in town");
@@ -181,7 +191,7 @@ public sealed class WhereIsWillyFlow
         _receipt = null;
         _host.PresentQuest(CreateQuestPage());
         _log.LogInfo(
-            $"where is willy started: {_elder?.Name.Full} missing in {_map.City}, " +
+            $"where is willy started: {_elder?.Name.Full} missing in {_zone.ZoneMap.City}, " +
             $"{shops.Count} coffee shop(s) to search");
     }
 
@@ -391,7 +401,7 @@ public sealed class WhereIsWillyFlow
             taken.Add(resident.Address);
         }
 
-        return WhereIsWillyCandidates.PickFreeHouse(_map, _generator, taken) is { } door
+        return WhereIsWillyCandidates.PickFreeHouse(_zone.ZoneMap, _generator, taken) is { } door
             ? _residents.GetOrCreate(door)
             : null;
     }
@@ -514,12 +524,12 @@ public sealed class WhereIsWillyFlow
     }
 
     private WhereIsWillyScreenViewModel CreateQuestPage() => new(
-        _phase, _elder!, _home, _map.City,
+        _phase, _elder!, _home, _zone.ZoneMap.City,
         _phase == WhereIsWillyPhase.Searching ? Shops() : [],
         _missed, ChooseCoffeeShop, ChooseHome, Abandon, new RelayCommand(Back), _beat);
 
     private List<PointOfInterest> Shops() =>
-        [.. WhereIsWillyCandidates.CoffeeShops(_directory.All)];
+        [.. WhereIsWillyCandidates.CoffeeShops(_directory.All, _zone.ZoneMap)];
 
     // The elder's door as a quest marker: the name is the elder's first name,
     // because the HUD copy's {0} is the marker name.

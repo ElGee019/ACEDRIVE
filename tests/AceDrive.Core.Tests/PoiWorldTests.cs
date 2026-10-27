@@ -21,6 +21,20 @@ public sealed class PoiWorldTests
     private static readonly DeliveryCatalog BoardCatalog =
         new([Post], 0.7, 100);
 
+    // The fixed street pool continues past the two base rows; an expansion
+    // test needs the new street in the zone's addressable map.
+    private static readonly AddressMap SixStreets = AddressMap.Default with
+    {
+        Streets =
+        [
+            .. AddressMap.Default.Streets,
+            new AddressStreet("street-3", "Street 3", 0.0, 0.5, Fictional: true),
+            new AddressStreet("street-4", "Street 4", 0.5, 1.0, Fictional: true),
+            new AddressStreet("street-5", "Street 5", 0.0, 0.5, Fictional: true),
+            new AddressStreet("street-6", "Street 6", 0.5, 1.0, Fictional: true),
+        ],
+    };
+
     private static HubCatalog Hubs => new(
         [new HubTier(1, true, [
             new HubCareer("groceries", "GROCERIES",
@@ -41,7 +55,8 @@ public sealed class PoiWorldTests
         PoiDirectory? directory = null,
         DriverState? saved = null,
         StoreCatalog? stores = null,
-        int week = 1)
+        int week = 1,
+        AddressMap? map = null)
     {
         var clock = new FakeClock();
         var wallet = new DriverWallet();
@@ -58,7 +73,7 @@ public sealed class PoiWorldTests
         {
             onboarding.Save(progress);
         }
-        var zone = new OperatingZone(saved, seed: 0);
+        var zone = new OperatingZone(saved, seed: 0, map ?? AddressMap.Default);
         var jobs = new JobLedger(saved);
         var board = new DeliveryBoard(BoardCatalog);
         var deliveryCareer = career ?? new DeliveryCareer(Hubs, BoardCatalog.StartCredP);
@@ -71,7 +86,7 @@ public sealed class PoiWorldTests
             new FakeProfileStore(), new FakeRivals(), saver, beat, week, logger);
         var world = new PoiWorld(
             new PoiSpawner(
-                AddressMap.Default, PoiCatalog.Default,
+                PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             doors, store, board, deliveryCareer, city, stores ?? StoreCatalog.Default,
             zone, jobs, onboarding, shops, day, logger);
@@ -89,7 +104,8 @@ public sealed class PoiWorldTests
             0, 0, StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"], JobsCompleted: 10);
         var fixture = Build(saved: saved);
 
-        fixture.World.Grow();
+        Assert.Empty(fixture.World.Grow(
+            new ZoneExpansion("Street 2", 2, 1.929, 2.8935, 3)));
 
         Assert.Empty(fixture.Directory.All);
         Assert.Equal(0, fixture.Store.Saves);
@@ -103,10 +119,12 @@ public sealed class PoiWorldTests
             0, 0, StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"], JobsCompleted: 10);
         var fixture = Build(progress: Done, saved: saved);
 
-        fixture.World.Grow();
+        IReadOnlyList<PointOfInterest> grown = fixture.World.Grow();
 
         Assert.Contains(fixture.Directory.All, poi => poi.Type == PoiTypes.CarWash);
         Assert.Contains(fixture.Directory.All, poi => poi.Type == PoiTypes.Dealer);
+        // Every door the report lists was actually banked.
+        Assert.Equal(grown.Count, fixture.Directory.All.Count);
         Assert.NotEmpty(fixture.Store.Saved);
         // The board page is refreshed once even with no shop door: a new
         // business door is still news for the cached addresses/board reads.
@@ -122,9 +140,45 @@ public sealed class PoiWorldTests
 
         fixture.World.Grow();
         int count = fixture.Directory.All.Count;
-        fixture.World.Grow();
+        Assert.Empty(fixture.World.Grow());
 
         Assert.Equal(count, fixture.Directory.All.Count);
+    }
+
+    [Fact]
+    public void Grow_WithAnExpansion_OpensItsFirstDoorOnTheNewStreet()
+    {
+        // The zone already covers six streets; the settle's report names the
+        // sixth, so the car wash that threshold opens must land there.
+        var saved = new DriverState(
+            0, 0, StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"]);
+        var fixture = Build(progress: Done, saved: saved, map: SixStreets);
+
+        IReadOnlyList<PointOfInterest> grown = fixture.World.Grow(
+            new ZoneExpansion("Street 6", 6, 1.929, 2.8935, 3));
+
+        PointOfInterest carwash = Assert.Single(grown);
+        Assert.Equal(PoiTypes.CarWash, carwash.Type);
+        Assert.Equal("Street 6", carwash.Address.StreetName);
+    }
+
+    [Fact]
+    public void Grow_ReturnsTheBankedStore_AfterAdoptingIt()
+    {
+        // A newly opened grocery must be on the delivery board and in the town
+        // before the caller (the expansion page) lists it.
+        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        Assert.True(career.TryOpenCareer(1, 0, 0));
+        var fixture = Build(progress: Done, career: career);
+
+        IReadOnlyList<PointOfInterest> grown = fixture.World.Grow();
+
+        PointOfInterest store = Assert.Single(
+            grown, poi => poi.Type == PoiTypes.GroceryStore);
+        DeliveryStore row = Assert.IsType<DeliveryStore>(
+            fixture.Board.Catalog.Find(store.Id));
+        Assert.Equal(store.Address, row.Address);
+        Assert.Equal(row.UnitCapacity, fixture.City.Live(row).StockedUnits);
     }
 
     [Fact]

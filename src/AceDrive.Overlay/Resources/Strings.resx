@@ -219,7 +219,11 @@ For instance "{0}".</value></data>
   <data name="TodoVisitCarDealer" xml:space="preserve"><value>Enter the car dealer.</value></data>
   <data name="TodoVisitInsurance" xml:space="preserve"><value>Enter the insurance broker.</value></data>
   <data name="TodoCompletedHeader" xml:space="preserve"><value>TODOS COMPLETED!</value></data>
-  <data name="TodoCarePackages" xml:space="preserve"><value>Every completed Todo motivates kind-hearted Sonja to arrange a Care Kit for the neighborhood. Collect 5 and deliver to the Community Centre for a guaranteed reward!</value></data>
+  <!-- The completed block is numbered: the marker belongs to the copy, so a
+       translation can pick its own (Dutch keeps "1." but is free to differ).
+       {0} is the ordinal, {1} the tip itself. -->
+  <data name="TodoCompletedLine" xml:space="preserve"><value>{0}. {1}</value></data>
+  <data name="TodoCarePackages" xml:space="preserve"><value>For every completed Todo, Sonja arranges a Care Kit for the neighborhood. Collect 5 and deliver to the Community Centre for a guaranteed reward!</value></data>
   <data name="TodoDeliver" xml:space="preserve"><value>DELIVER CARE PACKAGES</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Credibility Points: {0}</value></data>
@@ -405,18 +409,58 @@ Accept this job?</value></data>
   <data name="WalletCornering" xml:space="preserve"><value>Cornering: {0:0}%</value></data>
   <data name="WalletOffTheLine" xml:space="preserve"><value>Off-The-Line: {0:0}%</value></data>
   <data name="WalletBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Operating-zone expansion page (PORTPLAN 58, Unity ZoneExpansionScreen):
+       the street that just joined, the zone's count and area, the jobs to the
+       next expansion and the businesses it opened. {0} = street count, km,
+       jobs or the POI type label; {1} = the generated business name.
+       Placeholders survive translation; translators may reorder, never
+       remove. -->
+  <data name="ZoneExpansionTitle" xml:space="preserve"><value>OPERATING ZONE EXPANDED</value></data>
+  <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>New street discovered</value></data>
+  <data name="ZoneExpansionZoneLine" xml:space="preserve"><value>Operating Zone: {0} streets</value></data>
+  <data name="ZoneExpansionPreviousArea" xml:space="preserve"><value>Previous Area: {0:0.0} km</value></data>
+  <data name="ZoneExpansionNewArea" xml:space="preserve"><value>New Total Area: {0:0.0} km</value></data>
+  <data name="ZoneExpansionJobsToNext" xml:space="preserve"><value>Jobs to next expansion: {0}</value></data>
+  <data name="ZoneExpansionNewBusinesses" xml:space="preserve"><value>New businesses available</value></data>
+  <data name="ZoneExpansionPoiLine" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="ZoneExpansionContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="ZoneExpansionFindStreet" xml:space="preserve"><value>FIND STREET</value></data>
+  <!-- Longest-operating-zone world standings (PORTPLAN 58, Unity
+       ZoneStandingsService + ZoneExpansionScreen): the section label, the rank
+       line ({0} = ordinal rank, {1} = competitors) and the —/— placeholder
+       while the board has not landed. Hidden with no backend at all. -->
+  <data name="ZoneStandingsLabel" xml:space="preserve"><value>Longest Operating Zone World Standings</value></data>
+  <data name="ZoneStandingsRank" xml:space="preserve"><value>{0} of {1}.</value></data>
+  <data name="ZoneStandingsUnknown" xml:space="preserve"><value>—/—</value></data>
+  <!-- The POI families the zone spawns (TOZONES §4.5): the expansion page's
+       business labels. An unknown tag falls back to the title-cased type. -->
+  <data name="PoiTypeCarWash" xml:space="preserve"><value>Car Wash</value></data>
+  <data name="PoiTypeBank" xml:space="preserve"><value>Bank</value></data>
+  <data name="PoiTypeInsurance" xml:space="preserve"><value>Insurance</value></data>
+  <data name="PoiTypeDealer" xml:space="preserve"><value>Car Dealer</value></data>
+  <data name="PoiTypeMechanic" xml:space="preserve"><value>Mechanic</value></data>
+  <data name="PoiTypeGrocery" xml:space="preserve"><value>Grocery Store</value></data>
+  <data name="PoiTypeCoffee" xml:space="preserve"><value>Coffee Shop</value></data>
   <!-- Home page (Unity YouScreen): the player's own doors, starting with the
        garage and the addresses page. -->
   <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
   <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
   <data name="HomeAddresses" xml:space="preserve"><value>ADDRESSES</value></data>
   <data name="HomeBack" xml:space="preserve"><value>BACK</value></data>
-  <!-- Addresses page (PORTPLAN 24/27): every discovered POI alphabetical by
+  <!-- Addresses page (PORTPLAN 24/27 + TOZONES §3.5): the operating-zone
+       readout first — street count with the area, the jobs to the next
+       expansion (or the completion line once the street pool ends) and the
+       discovered street names — then every discovered POI alphabetical by
        name, the temporary stand-in for markers on the map. A row pins the
-       HUD's drive-to line; {0} = POI name, {1} = its formatted street and
-       house number. Placeholders survive translation; translators may
-       reorder, never remove. -->
+       HUD's drive-to line. {0}/{1:0.0} = the zone's street count and km,
+       {0} = the jobs still needed, and on the selected line {0} = POI name,
+       {1} = its formatted street and house number. Placeholders survive
+       translation; translators may reorder, never remove. -->
   <data name="AddressesTitle" xml:space="preserve"><value>ADDRESSES</value></data>
+  <data name="AddressesZoneLine" xml:space="preserve"><value>Operating Zone: {0} streets · {1:0.0} km</value></data>
+  <data name="AddressesZoneNext" xml:space="preserve"><value>Jobs to next expansion: {0}</value></data>
+  <data name="AddressesZoneComplete" xml:space="preserve"><value>Operating zone complete — every street discovered</value></data>
+  <data name="AddressesStreetsLabel" xml:space="preserve"><value>STREETS</value></data>
   <data name="AddressesEmpty" xml:space="preserve"><value>No addresses discovered yet.</value></data>
   <data name="AddressesSelect" xml:space="preserve"><value>PICK AN ADDRESS</value></data>
   <data name="AddressesSelected" xml:space="preserve"><value>Task set: drive to {0} at {1}</value></data>
@@ -494,7 +538,7 @@ Accept this job?</value></data>
   <data name="DelReceiptTotalCr" xml:space="preserve"><value>Total CR: €{0:0.00}</value></data>
   <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points earned: {0}</value></data>
   <data name="DelReceiptCredPTotal" xml:space="preserve"><value>Total Credibility Points: {0}</value></data>
-  <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km) / 100 × street knowledge {1}%</value></data>
+  <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × class {1} × rarity {2}) / 500 × street knowledge {3}%</value></data>
   <!-- Car-haul receipt page (PORTPLAN 20, Unity CarHaulingScreen). Pay is
        time-based: class band scales the driver rating into a per-minute
        rate, the drive minutes price the total. No XP or standings block —
@@ -610,6 +654,10 @@ Accept this job?</value></data>
   <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
   <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
   <data name="TrunkEat" xml:space="preserve"><value>EAT</value></data>
+  <!-- Glove compartment (the non-food half of the same page): its title wears
+       the page title's face, and its empty hint mirrors the trunk's. -->
+  <data name="TrunkGloveTitle" xml:space="preserve"><value>GLOVE COMPARTMENT</value></data>
+  <data name="TrunkGloveEmpty" xml:space="preserve"><value>Your glove compartment is empty.</value></data>
   <data name="TrunkBack" xml:space="preserve"><value>BACK</value></data>
   <!-- Menu meter tiles (PORTPLAN items 26/33): a tap swaps the drawn battery
        for the reading. {0} is a whole percent — no decimals, because the
@@ -676,7 +724,12 @@ Accept this job?</value></data>
        so a translator may reorder and never remove. -->
   <data name="ValuationTitle" xml:space="preserve"><value>MARKET VALUATION</value></data>
   <data name="ValuationVenueLine" xml:space="preserve"><value>This week's venue: {0}</value></data>
-  <data name="ValuationIntro" xml:space="preserve"><value>Choose the car you want the jury to value this week.</value></data>
+  <!-- Two paragraphs in one value: the page's ask (Unity's line) and the terms
+       the jury scores. The blank line is part of the copy, so a translator
+       keeps it rather than the view inventing the break. -->
+  <data name="ValuationIntro" xml:space="preserve"><value>Choose the car you want the jury to value this week.
+
+Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and Leaderboard ranking</value></data>
   <data name="ValuationSelect" xml:space="preserve"><value>Select car</value></data>
   <data name="ValuationNoCars" xml:space="preserve"><value>There is no car in the garage to enter.</value></data>
   <!-- Plain ENTER: the label doubles as the voice key, and Vosk never hears a
@@ -695,16 +748,24 @@ Accept this job?</value></data>
   <data name="ValuationJuryLost" xml:space="preserve"><value>The International Automotive Jury values your car lower than your opponent's!</value></data>
   <data name="ValuationXp" xml:space="preserve"><value>You receive {0:0.000} XP</value></data>
   <data name="ValuationYou" xml:space="preserve"><value>You</value></data>
-  <data name="ValuationTopSpeedLabel" xml:space="preserve"><value>Top speed</value></data>
+  <!-- The stats block's labels are authored in caps, like the garage block's:
+       the valuation page lists the terms of the score, and the caps keep that
+       column uniform whatever the translation's casing rules are. -->
+  <data name="ValuationTopSpeedLabel" xml:space="preserve"><value>TOP SPEED</value></data>
   <data name="ValuationAccelerationLabel" xml:space="preserve"><value>0-60</value></data>
-  <data name="ValuationClassLabel" xml:space="preserve"><value>Class</value></data>
+  <data name="ValuationClassLabel" xml:space="preserve"><value>CLASS</value></data>
+  <!-- The stretch-board term (ValuationRules.LeaderboardPoints): the owned
+       car's own percentile of its model's board, printed as the 0..1 value the
+       curve reads (1 is the top percentile), never as a percentage. The two
+       optional decimals keep a computed average readable. -->
+  <data name="ValuationLeaderboardLabel" xml:space="preserve"><value>LEADERBOARD RANKING</value></data>
   <data name="ValuationTopSpeed" xml:space="preserve"><value>{0} km/h</value></data>
   <data name="ValuationAcceleration" xml:space="preserve"><value>{0:0.#}s</value></data>
   <data name="ValuationClass" xml:space="preserve"><value>{0}</value></data>
+  <data name="ValuationLeaderboard" xml:space="preserve"><value>{0:0.##}</value></data>
   <data name="HudValuationDrive" xml:space="preserve"><value>Drive to {0}: {1} {2}, {3} to enter your vehicle into the weekly tier-ranking showcase.</value></data>
-  <data name="HudValuationArrived" xml:space="preserve"><value>Market valuation: park here to enter your vehicle.</value></data>
   <data name="ValuationNoticeWin" xml:space="preserve"><value>You won a Valuation event against {0} and received {1:0.000}XP</value></data>
-  <data name="ValuationNoticeLoss" xml:space="preserve"><value>You just lost a Valuation Event against {0}.</value></data>
+  <data name="ValuationNoticeLoss" xml:space="preserve"><value>You just lost a Valuation Event against {0} (+{1:0.00} XP).</value></data>
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>While you were away you won {0} Valuation events and gained {1:0.000} XP</value></data>
 
   <!-- Weekly missing-person run (ToWhereIsWilly.md §2.1/§3.5): the calendar
@@ -718,7 +779,7 @@ Accept this job?</value></data>
   <!-- The quest page (Unity's map stand-in): the title, the two Unity task
        sentences, the failed-visit hint, the found sentence and the two verbs. -->
   <data name="WillyTitle" xml:space="preserve"><value>WHERE IS WILLY</value></data>
-  <data name="WillyIntro" xml:space="preserve"><value>Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Click a coffee shop in {2} to see whether {1} is there.</value></data>
+  <data name="WillyIntro" xml:space="preserve"><value>Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Select a coffee shop in {2} to find out whether {1} is there.</value></data>
   <data name="WillyNotHere" xml:space="preserve"><value>They aren't here. Navigate to another coffee shop on the map, or give up.</value></data>
   <data name="WillyGiveUp" xml:space="preserve"><value>GIVE UP SEARCH</value></data>
   <data name="WillyFound" xml:space="preserve"><value>Well that's a relief. All well and good! Missing person found! Select {0} to drive {1} back home.</value></data>

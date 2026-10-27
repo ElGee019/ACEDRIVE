@@ -26,7 +26,8 @@ public sealed class NavigationTests
         FakeClock Clock, TaxiShift Shift, FakeShiftStore ShiftStore,
         RoadTestLedger Roads, FakeRoadTestStore RoadTests,
         Garage Garage, FakeGarageStore GarageStore, TestLog Log) Create(
-        int startWeek = 1, IReadOnlyList<CarSpec>? cars = null, Garage? garage = null)
+        int startWeek = 1, IReadOnlyList<CarSpec>? cars = null, Garage? garage = null,
+        IZoneStandings? zoneStandings = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -53,7 +54,8 @@ public sealed class NavigationTests
         // the event opens with every club locked (Unity's fresh-driver state).
         // Its length is the placeholder map's, exactly as the root seeds it.
         var zoneInstance = new OperatingZone(
-            null, seed: 0, AddressBook.MapLengthKm(AddressMap.Default));
+            null, seed: 0, AddressMap.Default,
+            initialKm: AddressBook.MapLengthKm(AddressMap.Default));
         // One instance per service graph: the saver writes the same stores the
         // assertions read.
         var willyLedger = new WhereIsWillyLedger();
@@ -74,10 +76,10 @@ public sealed class NavigationTests
             startWeek, log);
         var world = new PoiWorld(
             new PoiSpawner(
-                AddressMap.Default, PoiCatalog.Default,
+                PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
             directory, new FakePoiDirectoryStore(), board, career, city,
-            StoreCatalog.Default, new OperatingZone(null, seed: 0), new JobLedger(),
+            StoreCatalog.Default, new OperatingZone(null, seed: 0, AddressMap.Default), new JobLedger(),
             onboarding,
             new ShopInteriors(
                 wallet, garageInstance, game, InsuranceRules.Default, poolCars,
@@ -104,20 +106,20 @@ public sealed class NavigationTests
         // its drive leg, so the navigator needs the real flow (the list stays
         // empty offline, which is the page's own fallback path).
         var valuation = new ValuationFlow(
-            AddressMap.Default, game, new ValuationLedger(), new OfflineValuationBoard(),
+            zoneInstance, game, clock, new ValuationLedger(), new OfflineValuationBoard(),
             garageInstance, poolCars, wallet, new FakeProfileStore(), null, saver,
             rivals, beat, new Random(0), log);
         // The ToDo list the jobs page reads: its own ledger over the same
         // state instances, with an in-memory file.
         var todoBoard = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), directory, onboarding,
-            wallet, new JobLedger(), new OperatingZone(null, seed: 0), garageInstance,
+            wallet, new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), garageInstance,
             new DestinationPins(), new VisitLedger(), career, log);
         // The weekly missing-person run: the calendar's Wednesday tap starts it,
         // so the navigator needs the real flow (its resident table is the one
         // the elder is drawn from).
         var willy = new WhereIsWillyFlow(
-            AddressMap.Default, game,
+            zoneInstance, game,
             new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
             directory,
             new ResidentBook(
@@ -128,7 +130,8 @@ public sealed class NavigationTests
             new Random(0), log);
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
-            wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
+            wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
+            trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
             valuation, willy, willyLedger,
@@ -164,6 +167,66 @@ public sealed class NavigationTests
         menu.HomeCommand.Execute(null);
         var second = Assert.IsType<HomeScreenViewModel>(shell.CurrentScreen);
         Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void ZoneExpansion_ContinueRunsTheContinuation()
+    {
+        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
+        int continued = 0;
+
+        nav.ShowZoneExpansion(
+            new ZoneExpansion("Street 2", 2, 1.929, 2.8935, 3), [],
+            () => continued++);
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(shell.CurrentScreen);
+        page.ContinueCommand.Execute(null);
+
+        Assert.Equal(1, continued);
+    }
+
+    [Fact]
+    public void ZoneExpansion_RanksTheNewAreaBeforeOpeningThePage()
+    {
+        // The page must not poll: the navigator ranks the zone's new area
+        // first, so the standings block reads a fresh result on construct.
+        var standings = new FakeZoneStandings
+        {
+            Result = new ZoneStandingsResult(2, 9, 1, 3, IsFirstTime: false),
+        };
+        var (nav, shell, _, _, _, _, _, _, _, _, _) =
+            Create(zoneStandings: standings);
+
+        nav.ShowZoneExpansion(
+            new ZoneExpansion("Street 6", 6, 1.929, 2.8935, 3), [],
+            () => { });
+
+        Assert.Equal(2.8935, Assert.Single(standings.RefreshedAt));
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(shell.CurrentScreen);
+        Assert.Equal("2nd of 9.", page.Standings.Line);
+    }
+
+    [Fact]
+    public void ZoneExpansion_FindStreet_OpensAddresses_AndBackRunsTheContinuation()
+    {
+        // FIND STREET keeps Unity's map contract without a map: the addresses
+        // page stands in, and its BACK is the continuation the expansion page
+        // would have run.
+        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
+        int continued = 0;
+
+        nav.ShowZoneExpansion(
+            new ZoneExpansion("Street 2", 2, 1.929, 2.8935, 3), [],
+            () => continued++);
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(shell.CurrentScreen);
+        page.FindStreetCommand.Execute(null);
+
+        var addresses = Assert.IsType<AddressesScreenViewModel>(shell.CurrentScreen);
+        // The page carries the zone readout (TOZONES §3.5), read from the live
+        // zone the navigator holds rather than a snapshot of its own.
+        Assert.Equal(["Street 1"], addresses.StreetNames);
+        addresses.BackCommand.Execute(null);
+
+        Assert.Equal(1, continued);
     }
 
     [Fact]

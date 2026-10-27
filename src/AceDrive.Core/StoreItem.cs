@@ -9,4 +9,14 @@ public sealed record StoreItem(
     double Price,
     double Volume,
     int Hunger,
-    string Category);
+    string Category)
+{
+    /// <summary>
+    /// True for food: the trunk page files these under the trunk and the rest
+    /// — awards, certificates, anything the game hands over — under the glove
+    /// compartment. The catalogue's hunger value is the only food signal the
+    /// data carries, and it is the same value a bite feeds, so a row that would
+    /// feed nothing is not food.
+    /// </summary>
+    public bool IsFood => Hunger > 0;
+}

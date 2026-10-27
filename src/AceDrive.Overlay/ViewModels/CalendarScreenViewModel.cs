@@ -39,6 +39,11 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
     // flips to completed or locked without the page caching a mirror of them.
     private readonly WhereIsWillyLedger _willy;
     private readonly Func<bool> _hasCoffeeCareer;
+    // TEMPORARY (testing): true keeps every event row playable on any day and
+    // hour and hides the missing-person row's closed states, so each event can
+    // be replayed while the real gates wait for their playtest. The app passes
+    // true; the tests keep the shipping reading.
+    private readonly bool _ignoreEventGates;
     private readonly ICommand _openDayAction;
     private readonly ICommand _backCommand;
     private int _lastMinute = -1;
@@ -51,7 +56,8 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
     public CalendarScreenViewModel(
         VoiceBeat beat, GameClock game, IClock clock, RoadTestLedger roads,
         CalendarStamp stamp, ICommand openDay, ICommand back,
-        WhereIsWillyLedger willy, Func<bool> hasCoffeeCareer)
+        WhereIsWillyLedger willy, Func<bool> hasCoffeeCareer,
+        bool ignoreEventGates = false)
     {
         _beat = beat;
         _game = game;
@@ -59,6 +65,7 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
         _roads = roads;
         _willy = willy;
         _hasCoffeeCareer = hasCoffeeCareer;
+        _ignoreEventGates = ignoreEventGates;
         // The stamp is the persisted display week (PORTPLAN item 51); the
         // year stays data-only, never shown in the overlay.
         _week = stamp.Week;
@@ -147,8 +154,8 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
         // tick. The stamp changes mid-minute when the receipt pays, so it must
         // be part of the guard or the row would read open until the next game
         // minute.
-        bool coffeeOpen = _hasCoffeeCareer();
-        bool willyDone = _willy.CompletedOn(now);
+        bool coffeeOpen = _ignoreEventGates || _hasCoffeeCareer();
+        bool willyDone = !_ignoreEventGates && _willy.CompletedOn(now);
         if (now.Hour * 60 + now.Minute == _lastMinute
             && pick == _lastPick
             && _week == _lastWeek
@@ -194,7 +201,7 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
                 DisplayLabel(i, day, done, locked),
                 day.DayOfWeek,
                 isToday,
-                isToday && ControlCalendar.IsEventWindow(now.Hour),
+                _ignoreEventGates || (isToday && ControlCalendar.IsEventWindow(now.Hour)),
                 Completed: done,
                 Locked: locked);
         }
@@ -314,7 +321,8 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
             _beat.Defer(() => Warn(index, "ControlGateWillyDone"));
             return;
         }
-        if (day != Today || !ControlCalendar.IsEventWindow(_game.GameNow.Hour))
+        if (!_ignoreEventGates
+            && (day != Today || !ControlCalendar.IsEventWindow(_game.GameNow.Hour)))
         {
             Flash(index);
             _beat.Defer(() => WarnDay(index));

@@ -69,7 +69,7 @@ public sealed class WorldTicksTests
             clock, game, new FakeGameClockStore(), driverStore, new FakeGarageStore(),
             new FakeCityStore(), hungerStore, new FakeRoadTestStore(),
             new FakeShiftStore(), wallet, new DailyStreak(clock, null),
-            new OperatingZone(null, seed: 0), new Trunk(), garage, city, appetite,
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage, city, appetite,
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
             new JobLedger(), new DestinationPins(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger());

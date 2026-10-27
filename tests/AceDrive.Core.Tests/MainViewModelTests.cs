@@ -14,6 +14,13 @@ public sealed class MainViewModelTests
     private static OnboardingState ErrandDone =>
         new(null, null, BirthdayDone: true, MaxErrandDone: true);
 
+    // A career that already expanded onto both placeholder streets. A fresh
+    // driver's zone covers Street 1 only (TOZONES P5), which makes both taxi
+    // legs neighbours; the route-timed tests need two streets so their
+    // allowance is the old two-street one. Only the street COUNT is read.
+    private static DriverState TwoStreetCareer =>
+        DriverState.Fresh with { StreetIds = ["street-1", "street-2"] };
+
     // The walk's closing car page needs a car to offer; every other test drives
     // the earlier pages or a save that is already past the introduction, so
     // only the closing-page tests hand this content in.
@@ -623,8 +630,11 @@ public sealed class MainViewModelTests
         Assert.False(vm.IsShown);
         Assert.True(vm.PickupCommand.CanExecute(null));
         Assert.Contains("To pickup", vm.JobLine, StringComparison.Ordinal);
-        Assert.Contains("Street 1", vm.JobLine, StringComparison.Ordinal);
-        Assert.Contains("Street 2", vm.JobLine, StringComparison.Ordinal);
+        // A fresh zone covers Street 1 only, so both legs sit on it (TOZONES
+        // P5) at two different numbers: the line still names both doors.
+        int firstDoor = vm.JobLine.IndexOf("Street 1", StringComparison.Ordinal);
+        Assert.True(firstDoor >= 0);
+        Assert.NotEqual(firstDoor, vm.JobLine.LastIndexOf("Street 1", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -994,7 +1004,7 @@ public sealed class MainViewModelTests
         };
         var (vm, clock, tel, _) = Create(
             speedKmh: 0f, hud: hud, requests: requests, police: police,
-            taxiRules: rules, wallet: wallet);
+            taxiRules: rules, wallet: wallet, savedDriver: TwoStreetCareer);
 
         TaxiFlow.Propose(vm);
         TaxiFlow.Pickup(vm, clock);
@@ -1136,7 +1146,8 @@ public sealed class MainViewModelTests
         {
             Result = CustomerRequestTestData.HurryPromise,
         };
-        var (vm, clock, tel, _) = Create(speedKmh: 0f, hud: hud, requests: requests);
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, savedDriver: TwoStreetCareer);
 
         TaxiFlow.Propose(vm);
         var screen = Assert.IsType<CustomerRequestScreenViewModel>(
@@ -1418,9 +1429,15 @@ public sealed class MainViewModelTests
         var session = Create(speedKmh: 0f);
         var (vm, clock, _, _) = session;
         session.Story.FinishDialogue();
+        // The introduction hands the panel back to the HUD (the panel is
+        // closed); a player reopens it on the menu and walks to the jobs page.
+        vm.ToggleShowCommand.Execute(null);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen).JobsCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         vm.TaxiShiftCommand.Execute(null);
         var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
         proposal.BackCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
 
         clock.Advance(TimeSpan.FromMinutes(30).Add(TimeSpan.FromSeconds(1)));
         vm.TaxiShiftCommand.Execute(null);
@@ -1429,20 +1446,66 @@ public sealed class MainViewModelTests
         Assert.Equal("Jobs completed: 0", page.JobsLine);
         Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
 
-        // CONTINUE lands on the main page (the menu), not the jobs list the
-        // shift was started from; the Jobs tile then leads back to the control
-        // page, whose next TAXI tap opens a fresh shift as usual.
+        // CONTINUE hands the player back to the page the stale tap interrupted
+        // (the control page they backed out to), so the next TAXI tap opens a
+        // fresh shift as usual instead of being given the menu.
         page.ContinueCommand.Execute(null);
-        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
-        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
-
-        menu.JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
         Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
 
         vm.TaxiShiftCommand.Execute(null);
         Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
         Assert.Contains("left", vm.ShiftText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ShiftEnd_WhileThePanelWasHidden_ContinuesBackToTheRoad()
+    {
+        // The timeout catches the player driving with the panel closed: the
+        // page announces the end, and CONTINUE closes the panel again instead
+        // of opening a menu over the road.
+        var session = Create(speedKmh: 0f);
+        var (vm, clock, _, _) = session;
+        session.Story.FinishDialogue();
+        vm.TaxiShiftCommand.Execute(null);
+        Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen).BackCommand.Execute(null);
+        Assert.False(vm.IsShown);
+
+        clock.Advance(TimeSpan.FromMinutes(TaxiShift.TimeoutMinutes).Add(TimeSpan.FromSeconds(1)));
+        vm.Poll();
+
+        var page = Assert.IsType<ShiftEndedScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
+        page.ContinueCommand.Execute(null);
+
+        Assert.False(vm.IsShown);
+        // Back in the hidden state a later call resolves to the menu, so the
+        // panel did not keep the summary page as its way back in.
+        vm.ToggleShowCommand.Execute(null);
+        Assert.True(vm.IsShown);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void ShiftEnd_WhileAReceiptIsUp_ContinuesBackToTheReceipt()
+    {
+        // A page that keeps itself open (a receipt) survives the idle window,
+        // so the timeout interrupts it: CONTINUE puts that page back instead
+        // of discarding the page the player was reading.
+        var (vm, clock, tel, _) = Create(speedKmh: 0f);
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+
+        clock.Advance(TimeSpan.FromMinutes(TaxiShift.TimeoutMinutes).Add(TimeSpan.FromSeconds(1)));
+        vm.Poll();
+
+        Assert.IsType<ShiftEndedScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
+
+        Assert.Same(receipt, vm.CurrentScreen);
+        Assert.True(vm.IsShown);
     }
 
     [Fact]
@@ -3226,7 +3289,9 @@ public sealed class MainViewModelTests
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
         // 63.00 payout + 129.40 fare - 49.00 wholesale = the profit delta.
         Assert.Equal(143.40, wallet.Cash);
-        Assert.Equal(0.082, wallet.Xp, precision: 9);
+        // Delivery XP is the taxi rate at a fifth: (8.2 × class 1 × rarity 1)
+        // / 100 × 0.2 = 0.0164.
+        Assert.Equal(0.0164, wallet.Xp, precision: 9);
         // The ramp paid the producing hub's block; the familiarity went to
         // its owner, assigned at purchase (Unity GetHubOwnerName).
         Assert.Equal(["Elena Marchetti"], friends.Names);
@@ -3415,12 +3480,88 @@ public sealed class MainViewModelTests
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         after = drivers.Saved[^1];
         // The expansion fired on this second job: the counter resets, the
-        // count grows and s1 joins behind the home street.
+        // count grows and the map's next street (Street 2) joins the zone.
         Assert.Equal(0, after.ExpansionJobs);
         Assert.Equal(1, after.ExpansionCount);
-        Assert.Equal(["home", "s1"], after.StreetIds);
+        Assert.Equal(["home", "street-2"], after.StreetIds);
         // Interim: the 1.929 km placeholder map + one mean street (0.9645 km).
         Assert.Equal(2.8935, after.ZoneKm, precision: 4);
+    }
+
+    [Fact]
+    public void ZoneExpansion_ShowsOnTheReceiptContinue_ThenLandsOnTheControlPage()
+    {
+        var session = Create(speedKmh: 0f);
+        var (vm, clock, tel, _) = session;
+        session.Story.FinishDialogue();
+
+        // The first settled job is below the curve: CONTINUE goes straight to
+        // the control page, exactly as before the expansion page existed.
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var first = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        first.ContinueCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+
+        // The second job reaches the first threshold: CONTINUE opens the zone
+        // page first, and its CONTINUE lands on the control page.
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        receipt.ContinueCommand.Execute(null);
+
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("STREET 2", page.StreetLine);
+        Assert.Equal("Operating Zone: 2 streets", page.ZoneLine);
+
+        page.ContinueCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void ZoneExpansion_OnADeliverySettle_ContinuesToTheDeliveryBoard()
+    {
+        // The delivery settle is the other place the curve can be reached: the
+        // expansion page still comes first, then CONTINUE lands back on the
+        // board the receipt would have shown.
+        var catalog = new DeliveryCatalog(
+            [new DeliveryStore(
+                "adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries",
+                new AddressLocation("Street 2", 5, HouseSide.Left))],
+            0.7, 100);
+        var hubs = new HubCatalog(
+            [new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES",
+                    [new HubLevel("Grocers and Sons", 100)])])],
+            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        var saved = new DriverState(
+            0.0, 0.0, StreetIds: ["home"], ExpansionJobs: 1);
+        var hud = new FakeTelemetryHud();
+        var session = Create(
+            catalog: catalog, hubs: hubs, wallet: EmptyWallet(),
+            savedDriver: saved, speedKmh: 0f, hud: hud);
+        var (vm, clock, tel, _) = session;
+
+        var control = FinishIntro(session);
+        control.DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen);
+        board.MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+        hub.BackCommand.Execute(null);
+        board.ToggleOrderCommand.Execute(board.Rows[0]);
+        board.MainButtonCommand.Execute(null);
+        hud.RaiseJobEnter();
+        TaxiFlow.Drive(vm, clock, tel, TaxiFlow.DefaultDistanceKm);
+        hud.RaiseJobEnter();
+
+        var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
+        receipt.ContinueCommand.Execute(null);
+
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("STREET 2", page.StreetLine);
+
+        page.ContinueCommand.Execute(null);
+        Assert.Same(board, vm.CurrentScreen);
     }
 
     [Fact]

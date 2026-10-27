@@ -102,9 +102,12 @@ internal static class TestSession
         var driverStoreInstance = options.DriverStore ?? new FakeDriverStore();
         var streakInstance = new DailyStreak(clock, options.SavedDriver);
         // Production seeds the interim zone length from the placeholder map
-        // (App.OnStartup), so the starter bonus decays the same way.
+        // (App.OnStartup) and leads the discovered order with the profile's
+        // home street, so the starter bonus decays the same way.
         var zoneInstance = new OperatingZone(
-            options.SavedDriver, seed: 0, AddressBook.MapLengthKm(map));
+            options.SavedDriver, seed: 0, map,
+            homeStreetId: profiles.Load()?.StreetId,
+            initialKm: AddressBook.MapLengthKm(map));
         var shiftsInstance = options.Shifts ?? new ShiftRecord(options.SavedDriver);
         var hungerInstance = options.Hunger ?? new Hunger(HungerRules.Default);
         var hungerStoreInstance = options.HungerStore ?? new FakeHungerStore();
@@ -150,12 +153,15 @@ internal static class TestSession
             walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver,
             visitsInstance, beat, logger);
         var spawnerInstance = options.PoiSpawner ?? new PoiSpawner(
-            map, PoiCatalog.Default,
+            PoiCatalog.Default,
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0);
         // The session calendar and the readout formatter: the week the pages
         // stamp, the shift timeout that opens its page and the painted strings.
         // One board instance for the cycle and the assertions, like the stores.
         IShiftStandings shiftBoard = options.ShiftStandings ?? new FakeShiftStandings();
+        // The longest-operating-zone board the expansion page renders: the
+        // offline-shaped fake unless a case scripts a rank.
+        IZoneStandings zoneBoard = options.ZoneStandings ?? new FakeZoneStandings();
         var dayCycle = new DayCycle(
             game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
             profiles, rivalsInstance, saver, beat, options.StartWeek, logger);
@@ -169,13 +175,13 @@ internal static class TestSession
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
             logger);
         var willyFlow = new WhereIsWillyFlow(
-            map, game,
+            zoneInstance, game,
             options.Pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
             directory, residentsInstance, garageInstance,
             pool, options.WillyRules ?? WhereIsWillyRules.Default, willyLedgerInstance,
             friendsInstance, trunkInstance, walletInstance, options.Hud, saver,
             rivalsInstance, beat, () => dayCycle.DisplayWeek,
-            options.WillyRng ?? new Random(9), logger);
+            options.WillyRng ?? new Random(9), logger, options.IgnoreEventGates);
         // The session-start catch-up: the starter car and today's login bonus,
         // wired to the same stores and wallet the assertions read. Production
         // seeds the streak's skill rolls here, so a test can pin them.
@@ -195,15 +201,13 @@ internal static class TestSession
             spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
             onboardingStore, shops, dayCycle, logger);
-        var poiArrivals = new PoiArrivalRouter(
-            poiWorld.Handlers([new WhereIsWillyPoiHandler(willyFlow), .. handlers]));
         // The ToDo list: its own ledger + file, synced on the cold edges the
         // tests drive (settle, POI entry, pin, purchase, boot).
         var todoBoard = new TodoBoard(
             options.Todos ?? TodoTable.Default, todoStoreInstance, directory,
             onboardingStore, walletInstance, jobsInstance, zoneInstance, garageInstance,
             pinsInstance, visitsInstance, deliveryCareer, logger);
-        var proposalsInstance = TaxiTestData.Proposer(map: map, seed: 0);
+        var proposalsInstance = TaxiTestData.Proposer(zone: zoneInstance, seed: 0);
         var taxi = new TaxiJobFlow(
             proposalsInstance, map, brands, pool, options.Requests,
             options.RequestTable ?? CustomerRequestTable.Empty, options.Police,
@@ -226,21 +230,31 @@ internal static class TestSession
         // The weekly market valuation (PORTPLAN 49): the same ledger, board and
         // wallet the assertions read, with a pinned draw stream of its own.
         var valuationFlow = new ValuationFlow(
-            map, game, valuationInstance, valuationBoard, garageInstance, pool,
+            zoneInstance, game, clock, valuationInstance, valuationBoard, garageInstance, pool,
             walletInstance, profiles, options.Hud, saver, rivalsInstance, beat,
-            options.ValuationRng ?? new Random(3), logger);
+            options.ValuationRng ?? new Random(3), logger, options.IgnoreEventGates);
+        // The venue's typed handler, registered after its flow exactly like the
+        // root does, so ENTER on the pinned house opens the showcase.
+        IReadOnlyList<IPoiArrivalHandler> arrivals =
+        [
+            new WhereIsWillyPoiHandler(willyFlow),
+            new ValuationPoiHandler(valuationFlow),
+            .. handlers,
+        ];
+        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(arrivals));
         // The page graph shares the one shell the VM binds: the tests assert
         // vm.CurrentScreen, so both must report the same panel.
         var shell = new OverlayShell();
         var navigation = new Navigation(
             shell, beat, game, clock, shiftInstance, todoBoard, roadsInstance,
-            saver, walletInstance, garageInstance, rivalsInstance, trunkInstance,
+            saver, walletInstance, garageInstance, rivalsInstance, zoneBoard,
+            trunkInstance,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
             willyFlow, willyLedgerInstance,
-            () => brands.Brand, new Random(6), logger);
+            () => brands.Brand, new Random(6), logger, options.IgnoreEventGates);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(shell, navigation, taxi, delivery, clock, logger);

@@ -4,9 +4,10 @@ using AceDrive.Overlay.Services;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The overlay panel's reveal policy: what a call opens, what revealing a POI
-/// or a job page does to the panel, and what hiding means. The shell owns the
-/// state (visible, page, activity stamp); this decides when that state moves.
+/// The overlay panel's reveal policy: what a call opens, what revealing a POI,
+/// a job page or an interrupting page does to the panel, how an interruption
+/// hands the player back and what hiding means. The shell owns the state
+/// (visible, page, activity stamp); this decides when that state moves.
 ///
 /// WHY it is not the coordinator's: the story flow and the voice router both
 /// reveal pages, and both are built by the root before the coordinator exists.
@@ -21,6 +22,15 @@ public sealed class PanelPresenter
     private readonly DeliveryFlow _delivery;
     private readonly IClock _clock;
     private readonly ILog _log;
+
+    // The page and visibility an interruption took away: one slot, rewritten
+    // by the next interruption, so it needs no other invalidation — only the
+    // interruption page's own CONTINUE reads it back. Restoring an arbitrary
+    // page is safe because the idle rule hides the panel 15 s after the player
+    // stops touching it, so the pages still up when a shift times out are the
+    // ones that keep the panel open by design (a receipt, a POI, a dialogue).
+    private object? _interruptedScreen;
+    private bool _interruptedShown;
 
     public PanelPresenter(
         OverlayShell shell, Navigation navigation, TaxiJobFlow taxi,
@@ -94,10 +104,51 @@ public sealed class PanelPresenter
     public void Present(object screen) => Reveal(screen, "overlay shown (POI)");
 
     /// <summary>
-    /// Reveals the panel on a job page (refusal, breakdown, receipt, shift
-    /// ended). Same rule as <see cref="Present"/>, reported as job traffic.
+    /// Reveals the panel on a job page (refusal, breakdown, receipt). Same
+    /// rule as <see cref="Present"/>, reported as job traffic.
     /// </summary>
     public void PresentJob(object screen) => Reveal(screen, "overlay shown (job)");
+
+    /// <summary>
+    /// Reveals a page that interrupts the player without them having started
+    /// it (a shift that just ran out) and remembers the page and visibility it
+    /// takes away, so <see cref="ResumeInterrupted"/> can hand them back. The
+    /// capture happens before the swap, so it records the player's own screen,
+    /// never this page.
+    /// </summary>
+    public void PresentInterruption(object screen)
+    {
+        _interruptedScreen = _shell.CurrentScreen;
+        _interruptedShown = _shell.IsShown;
+        Reveal(screen, "overlay shown (shift ended)");
+    }
+
+    /// <summary>
+    /// The interruption page's way back: the player resumes the page the
+    /// interruption took, and a panel that was hidden (the timeout caught them
+    /// driving) stays hidden instead of opening a menu over the road. The tap
+    /// is presence, so the idle countdown restarts with it — otherwise the
+    /// restored page would be hidden again on the next poll.
+    /// </summary>
+    public void ResumeInterrupted()
+    {
+        if (!_interruptedShown)
+        {
+            Hide();
+            return;
+        }
+
+        RecordActivity();
+        if (_interruptedScreen is { } screen)
+        {
+            _nav.ShowScreen(screen);
+            return;
+        }
+
+        // Nothing was up (the panel's very first page): the menu is the page
+        // every later call opens, so that is where the player would have been.
+        _nav.ShowMenuPage();
+    }
 
     /// <summary>
     /// Shows the menu the finished introduction hands over to. It is the one
