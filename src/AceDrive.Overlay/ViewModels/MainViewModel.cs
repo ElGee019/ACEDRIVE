@@ -17,7 +17,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class MainViewModel
     : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
-      ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost, IDisposable
+      ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost,
+      IValuationHost, IWhereIsWillyHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -51,6 +52,14 @@ public sealed class MainViewModel
     // the Star of the Show item. Kept apart from JobSettlement so the job
     // settles never grow a third, unrelated effect order.
     private readonly CentoRaceSettlement _centoSettlement;
+    // The weekly market valuation: the Monday venue draw, the drive leg, the
+    // showcase page and the live/offline comparison. It owns its week state and
+    // reaches back only through IValuationHost for the panel and the page.
+    private readonly ValuationFlow _valuation;
+    // The weekly missing-person run: the Wednesday draw, the search, the
+    // drive home and the receipt. It owns its session state and reaches back
+    // only through IWhereIsWillyHost for the panel and the page.
+    private readonly WhereIsWillyFlow _willy;
     // The POI world: the business/store/hub doors and the arrival handlers.
     private readonly PoiWorld _poiWorld;
     // The zone growth at the settle hooks: the introduction gate, the street it
@@ -66,6 +75,10 @@ public sealed class MainViewModel
     // process. Both null keeps the button off pages built without them.
     private readonly ISaveDataResetter? _saveResets;
     private readonly IAppRestarter? _restarter;
+    // The settings page's QUIT: closing the panel is the app's one exit path,
+    // so the root supplies that action instead of a hard process kill. Null
+    // keeps the button off pages built without a window to close.
+    private readonly Action? _quit;
     private readonly ILog _log;
     private readonly DriverWallet _wallet;
     // The session-start catch-up: the starter car and today's login bonus. It
@@ -160,11 +173,13 @@ public sealed class MainViewModel
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
         CentoRaceFlow cento, CentoRaceSettlement centoSettlement,
+        ValuationFlow valuation, WhereIsWillyFlow willy,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
         TodoBoard todos, DestinationPins pins,
         ITelemetryHud? hud = null,
         ISaveDataResetter? saveResets = null,
-        IAppRestarter? restarter = null)
+        IAppRestarter? restarter = null,
+        Action? quit = null)
     {
         _telemetry = telemetry;
         _clock = clock;
@@ -174,6 +189,7 @@ public sealed class MainViewModel
         _store = store;
         _saveResets = saveResets;
         _restarter = restarter;
+        _quit = quit;
         _log = log;
         _addressMap = addressMap;
         _taxiRules = taxiRules;
@@ -203,6 +219,8 @@ public sealed class MainViewModel
         _delivery = delivery;
         _cento = cento;
         _centoSettlement = centoSettlement;
+        _valuation = valuation;
+        _willy = willy;
         _poiWorld = poiWorld;
         _zoneGrowth = zoneGrowth;
         // The readout formatter and the session calendar are built by the root
@@ -225,6 +243,8 @@ public sealed class MainViewModel
         _taxi.Attach(this);
         _delivery.Attach(this);
         _cento.Attach(this);
+        _valuation.Attach(this);
+        _willy.Attach(this);
         _poiWorld.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications so the bindings stay live.
@@ -420,6 +440,20 @@ public sealed class MainViewModel
     void ICentoRaceHost.SettleRace(CentoMigliaEvent race, double start, double end) =>
         _centoSettlement.Settle(race, start, end, this);
 
+    // The host slice the weekly valuation sees: the flow owns the week, the
+    // venue leg and the comparison; the shell owns the panel, the page swap and
+    // the companion's destination line it reaches through ITelemetryHud.
+    void IValuationHost.ShowValuation(object screen) => _panel.Present(screen);
+    void IValuationHost.HidePanel() => _panel.Hide();
+    void IValuationHost.ShowControl() => _nav.ShowControl();
+
+    // The host slice the missing-person run sees: the flow owns the quest, the
+    // search, the drive home and the receipt; the shell owns the panel and the
+    // page swap it reaches through the presenter.
+    void IWhereIsWillyHost.PresentQuest(object page) => _panel.PresentJob(page);
+    void IWhereIsWillyHost.HidePanel() => _panel.Hide();
+    void IWhereIsWillyHost.ShowControl() => _nav.ShowControl();
+
     // The host slice the POI world sees: the world owns the doors and the
     // board growth; the navigator owns the board page and the dealer's follow-up.
     void IPoiWorldHost.RefreshBoard() => _delivery.RefreshBoard();
@@ -456,7 +490,7 @@ public sealed class MainViewModel
     void IDayCycleHost.DisplayWeekChanged(int week) => _nav.DisplayWeekChanged(week);
     void IDayCycleHost.ReadoutsChanged() => RefreshJob();
     void IDayCycleHost.ShowShiftEnded(object page) => _panel.PresentJob(page);
-    void IDayCycleHost.GoToControlPage() => _nav.ShowControl();
+    void IDayCycleHost.GoToMainPage() => _nav.ShowMenuPage();
 
     // ---- lifecycle (called by the view) ----------------------------------
 
@@ -464,9 +498,19 @@ public sealed class MainViewModel
     {
         _lastTick = _clock.UtcNow;
         string brand = _carBrands.Prime(DefaultBrand);
-        _log.LogInfo($"listening for 'hey {brand}'");
+        // The microphone stays closed until the voice page's CONFIRM (or a
+        // save that already answered, including the grandfathered ones). A
+        // fresh walk must never listen before the player consents.
+        if (_story.Progress.VoiceAllowed)
+        {
+            _log.LogInfo($"listening for 'hey {brand}'");
+            _voice.StartListening();
+        }
+        else
+        {
+            _log.LogInfo("voice consent not given: microphone stays off");
+        }
         _carBrands.StartWatching();
-        _voice.StartListening();
         _timer.Start();
         // Bank the resumed (or freshly drawn) pick at the top of the session:
         // a killed process never reaches a completion, and the next session
@@ -566,6 +610,12 @@ public sealed class MainViewModel
         // repaints the readouts by itself.
         _day.Tick(now, JobInProgress, _taxi.LegActive);
 
+        // The weekly market valuation (PORTPLAN 49): the Monday reset, the 6am
+        // venue draw, the saved-week catch-up and the queued result notices.
+        // The board's own re-read runs on its background watcher, so this call
+        // only drains what it published — never a network or disk read.
+        _valuation.Tick(now);
+
         // Voice acknowledgment: the beat drains first so a due tap acts at
         // its end, then flash expiry runs on the clock, not the minute
         // guard: a half-second teal glow must clear inside the same minute
@@ -618,6 +668,14 @@ public sealed class MainViewModel
         _fleet.IntegrateOdometer(s, dt, _story.Done);
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
+        // The valuation leg's arrival rides the same poll: parked inside the
+        // pinned venue opens the showcase (Unity's OnDestinationReached). It
+        // reads the HUD's cached arrival, never the position again.
+        _valuation.Advance(s);
+        // The missing-person run's arrival rides the same poll: parked at a
+        // coffee shop finds the elder (or spends an attempt), parked at the
+        // elder's door brings them home. It reads the HUD's cached arrival.
+        _willy.Advance(s);
         // The entry's own edge rides the same loop: parked at the start opens
         // the registration page, parked at the finish settles the race, and the
         // reputation ticker banks the distance this tick covered, so a parked
@@ -685,12 +743,14 @@ public sealed class MainViewModel
     // save and apply immediately through the walk's writer, and BACK comes
     // back here instead of advancing the introduction (the walk is done). The
     // reset action is passed only when the composition root injected the
-    // wipe + restart pair; otherwise the page keeps its first-run shape.
+    // wipe + restart pair; otherwise the page keeps its first-run shape. The
+    // quit action arrives from the root the same way, because closing the
+    // window is the root's fact and not a ViewModel's.
     private void OpenSettings()
     {
         Func<GameResetFailure>? resetGame =
             _saveResets is null || _restarter is null ? null : ResetGame;
-        _nav.ShowScreen(_story.CreateSettingsPage(_nav.ShowMenuPage, resetGame));
+        _nav.ShowScreen(_story.CreateSettingsPage(_nav.ShowMenuPage, resetGame, _quit));
     }
 
     /// <summary>

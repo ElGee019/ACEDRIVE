@@ -1,0 +1,13 @@
+{
+  "FinderFeeRate": 0.04,
+  "MinReward": 100,
+  "AttemptBase": 3.0,
+  "AttemptFloor": 0.5,
+  "ShopBands": [
+    { "MaxShops": 2, "Multiplier": 1.0 },
+    { "MaxShops": 5, "Multiplier": 1.25 },
+    { "MaxShops": 9, "Multiplier": 1.5 },
+    { "MaxShops": 14, "Multiplier": 1.75 },
+    { "MaxShops": null, "Multiplier": 2.0 }
+  ]
+}

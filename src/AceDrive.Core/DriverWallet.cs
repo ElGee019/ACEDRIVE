@@ -58,6 +58,20 @@ public sealed class DriverWallet
     public double Cash { get; private set; }
     public double Xp { get; private set; }
 
+    /// <summary>
+    /// Unity's direct <c>player.xp +=</c> for a bonus the receipt system does
+    /// not own (the market valuation verdict and its live/offline results).
+    /// Non-positive and non-finite amounts are ignored, so a malformed draw
+    /// can never move the ledger.
+    /// </summary>
+    public void AddXp(double xp)
+    {
+        if (xp > 0.0 && double.IsFinite(xp))
+        {
+            Xp += xp;
+        }
+    }
+
     /// <summary>Every CR this driver ever earned from a job, a bonus or an
     /// insurance payout (Unity totalCREarned).</summary>
     public double CreditEarned { get; private set; }

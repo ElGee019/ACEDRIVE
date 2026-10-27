@@ -269,9 +269,10 @@ page); the second cannot move to the navigator without closing a cycle
 - `DayCycle` reads the confirmed name off `IProfileStore` for the shift push
   (the story flow's live profile is still coordinator-built until S6), so the
   push keeps naming the driver without a host getter.
-- `GoToControlPage` joined `IDayCycleHost`: the shift-ended page is the
-  cycle's, so it builds it and the host only reveals it — the same split
-  `IJobSettlementHost.ShowReceipt` already uses.
+- `GoToMainPage` joined `IDayCycleHost` (originally `GoToControlPage`): the
+  shift-ended page is the cycle's, so it builds it and the host only reveals
+  it — the same split `IJobSettlementHost.ShowReceipt` already uses. Its
+  CONTINUE lands on the menu, not the jobs list, like the Cento receipt.
 
 **S6 — `App.OnStartup` rewrite.** ✅ (−184 lines in the coordinator): the root
 now builds the whole DAG, including `PanelPresenter`, `StoryHost`,
@@ -491,12 +492,30 @@ dictionary. If a slice adds a cache, it adds its row here.
 | board/standings cache | `FirestoreRivals`, `FirestoreShiftStandings`, `FirestoreCarRarity` | board | `Refresh()` | one board |
 | `_lastDay`, `_lastShiftSecs` | `DayCycle` | — | the day/time changing | 2 values |
 | `_lastPacketId` | `TelemetryReadouts` | — | packet id change | 1 value |
+| `_houseEntry`, `_snapshots`, `_results` | `ValuationFlow` | week / arrival order | `ResetWeek` drops the house entry; a snapshot or result is dequeued once | one house entry, one drain pass per poll |
 
 Two rules the table makes checkable: **no row's owner is a View or the
 coordinator** (a cache whose owner is `MainViewModel` is a mirror of someone
 else's state — §7 rule 1), and **every row has a named invalidator**. A row
 with "never" is only allowed for data that cannot change in a session
 (embedded packs), and must say so.
+
+The market valuation's live comparison is the one cache fed by a background
+task: `FirestoreValuationBoard` re-reads the weekly list every 30 s on its own
+token-linked task and publishes only through `Changed`, so the 10 Hz `Poll`
+drains a queue instead of touching the network. The bound is the queue itself —
+a slow tick processes the backlog on the next pass, it never grows without a
+reader — and stopping the watcher (Monday reset, own entry gone) cancels the
+task that fills it.
+
+The weekly missing-person run adds **no cache row**: its phase, drawn shop,
+elder, attempts, home address and priced receipt are session state owned by
+`WhereIsWillyFlow` (a restart throws them away on purpose, ToWhereIsWilly.md
+§2.9), and the one persisted fact — the completion stamp — is a single field on
+`WhereIsWillyLedger`. The ledger parses that date once at construction so the
+calendar's 10 Hz `CompletedOn` check is an allocation-free date compare instead
+of a per-tick string format; the parsed twin is the same value, not a second
+copy of it.
 
 ### Stores: read once, then cache
 

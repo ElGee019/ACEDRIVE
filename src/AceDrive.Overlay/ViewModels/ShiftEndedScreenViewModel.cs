@@ -11,8 +11,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// records and the best-single-shift world standings. Unity chains this page
 /// before the map, so a shift is never silently over; the host has already
 /// banked the record and pushed it by the time the page opens, so this page
-/// only reports. CONTINUE returns to the control page and the next TAXI tap
-/// opens a fresh shift, like Unity's doorway back to the map.
+/// only reports. CONTINUE returns to the main page (the menu), like the Cento
+/// Miglia receipt: a shift that ran out is no reason to drop the player on the
+/// jobs list, and the Jobs tile still leads there for the fresh shift.
 /// </summary>
 public sealed class ShiftEndedScreenViewModel :
     ViewModelBase, IVoiceScreen, IKeepPanelOpen

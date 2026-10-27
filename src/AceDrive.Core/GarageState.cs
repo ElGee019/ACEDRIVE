@@ -14,7 +14,9 @@ public sealed record GarageState(
 
 /// <summary>Persisted per-car state (Unity OwnedCar fields this port keeps).
 /// AskedCategories is the car-stat quiz history; a save written before the
-/// request slice has none and loads as empty.</summary>
+/// request slice has none and loads as empty. JobsCompleted is the valuation
+/// score's per-car job term (Unity CarJobsService): a save before the market
+/// slice loads as zero.</summary>
 public sealed record OwnedCarState(
     string Key,
     int PurchaseWeek = 0,
@@ -23,7 +25,8 @@ public sealed record OwnedCarState(
     int Filth = 0,
     IReadOnlyList<MaintenancePartState>? Parts = null,
     EngineConditionState? Engine = null,
-    IReadOnlyList<string>? AskedCategories = null);
+    IReadOnlyList<string>? AskedCategories = null,
+    int JobsCompleted = 0);
 
 /// <summary>One part's baseline (Unity CarMaintenancePart: partKey +
 /// lastServiceOdometer).</summary>

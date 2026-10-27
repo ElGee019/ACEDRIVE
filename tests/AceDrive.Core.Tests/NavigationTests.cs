@@ -56,12 +56,14 @@ public sealed class NavigationTests
             null, seed: 0, AddressBook.MapLengthKm(AddressMap.Default));
         // One instance per service graph: the saver writes the same stores the
         // assertions read.
+        var willyLedger = new WhereIsWillyLedger();
         var saver = new GameStateSaver(
             clock, game, new FakeGameClockStore(), new FakeDriverStore(), garageStore,
             new FakeCityStore(), new FakeHungerStore(), roadTests, shiftStore,
             wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
-            new JobLedger(), new DestinationPins(), new VisitLedger());
+            new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new ValuationLedger(), willyLedger);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var directory = new PoiDirectory();
@@ -98,17 +100,38 @@ public sealed class NavigationTests
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(brands, poolCars, wallet, day, saver, beat, log);
+        // The weekly market valuation's flow: the calendar's Monday tap starts
+        // its drive leg, so the navigator needs the real flow (the list stays
+        // empty offline, which is the page's own fallback path).
+        var valuation = new ValuationFlow(
+            AddressMap.Default, game, new ValuationLedger(), new OfflineValuationBoard(),
+            garageInstance, poolCars, wallet, new FakeProfileStore(), null, saver,
+            rivals, beat, new Random(0), log);
         // The ToDo list the jobs page reads: its own ledger over the same
         // state instances, with an in-memory file.
         var todoBoard = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), directory, onboarding,
             wallet, new JobLedger(), new OperatingZone(null, seed: 0), garageInstance,
             new DestinationPins(), new VisitLedger(), career, log);
+        // The weekly missing-person run: the calendar's Wednesday tap starts it,
+        // so the navigator needs the real flow (its resident table is the one
+        // the elder is drawn from).
+        var willy = new WhereIsWillyFlow(
+            AddressMap.Default, game,
+            new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 0),
+            directory,
+            new ResidentBook(
+                new FakeResidentStore(),
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), log),
+            garageInstance, poolCars, WhereIsWillyRules.Default, willyLedger, friends,
+            trunk, wallet, null, saver, rivals, beat, () => day.DisplayWeek,
+            new Random(0), log);
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
+            valuation, willy, willyLedger,
             () => "mazda", new Random(0), log);
         var host = new FakeNavigationHost();
         nav.Attach(host);

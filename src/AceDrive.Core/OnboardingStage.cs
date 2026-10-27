@@ -19,7 +19,7 @@ public enum OnboardingStage
     /// <summary>Favorite brand pick.</summary>
     Brand = 2,
 
-    /// <summary>Voice-info page that hands over to the birthday dialogue.</summary>
+    /// <summary>Voice consent page that hands over to the birthday dialogue.</summary>
     VoiceInfo = 3,
 
     /// <summary>Birthday dialogue: grandma gives the car and the errand away.</summary>

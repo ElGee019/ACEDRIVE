@@ -4,9 +4,10 @@ namespace AceDrive.Overlay.Services;
 
 /// <summary>
 /// One place that banks the live session to disk. Every state owner
-/// (wallet + trunk, streak, zone, garage, city, hunger, road test) contributes
-/// its slice of a save, so a save from any path can never clobber another
-/// owner with stale numbers — the caller never assembles a snapshot itself.
+/// (wallet + trunk, streak, zone, garage, city, hunger, road test, weekly
+/// market valuation, missing-person stamp) contributes its slice of a save, so
+/// a save from any path can never clobber another owner with stale numbers —
+/// the caller never assembles a snapshot itself.
 /// All stores swallow their own I/O, so none of these methods throw.
 /// </summary>
 public sealed class GameStateSaver
@@ -26,6 +27,8 @@ public sealed class GameStateSaver
     private readonly JobLedger _jobs;
     private readonly DestinationPins _pins;
     private readonly VisitLedger _visits;
+    private readonly ValuationLedger _valuation;
+    private readonly WhereIsWillyLedger _willy;
     private readonly Trunk _trunk;
     private readonly Garage _garage;
     private readonly CityEconomy _city;
@@ -43,7 +46,8 @@ public sealed class GameStateSaver
         DriverWallet wallet, DailyStreak streak, OperatingZone zone, Trunk trunk,
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
         TaxiShift shift, ShiftRecord shifts, JobLedger jobs,
-        DestinationPins pins, VisitLedger visits)
+        DestinationPins pins, VisitLedger visits, ValuationLedger valuation,
+        WhereIsWillyLedger willy)
     {
         _clock = clock;
         _game = game;
@@ -60,6 +64,8 @@ public sealed class GameStateSaver
         _jobs = jobs;
         _pins = pins;
         _visits = visits;
+        _valuation = valuation;
+        _willy = willy;
         _trunk = trunk;
         _garage = garage;
         _city = city;
@@ -165,5 +171,23 @@ public sealed class GameStateSaver
             ShiftTotal = _shifts.Total,
             ShiftsCompleted = _shifts.ShiftsCompleted,
             LongestShiftJobs = _shifts.LongestJobs,
+            // The weekly market valuation (PORTPLAN 49): the venue draw, the
+            // in-flight leg, the week's entry and the settled uid set all
+            // resume from here, so a restart reopens the same showcase week.
+            // The seen set is copied: the ledger keeps appending to its own
+            // list, and the snapshot must not move under the write.
+            ValuationVenueStreetId = _valuation.VenueStreetId,
+            ValuationVenueHouseNumber = _valuation.VenueHouseNumber,
+            ValuationDriving = _valuation.Driving,
+            ValuationEventsCompleted = _valuation.EventsCompleted,
+            ValuationEntryWeek = _valuation.EntryWeek,
+            ValuationEntryCarKey = _valuation.EntryCarKey,
+            ValuationOwnScore = _valuation.OwnScore,
+            ValuationSeenUids = [.. _valuation.SeenUids],
+            LastValuationResetWeek = _valuation.LastResetWeek,
+            // The weekly missing-person run keeps only its completion stamp
+            // (ToWhereIsWilly.md §2.9): the search itself is session state, so
+            // a restart inside the run reopens the row with nothing paid.
+            LastWillyDate = _willy.LastCompletedDate,
         });
 }

@@ -71,7 +71,8 @@ public sealed class WorldTicksTests
             new FakeShiftStore(), wallet, new DailyStreak(clock, null),
             new OperatingZone(null, seed: 0), new Trunk(), garage, city, appetite,
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
-            new JobLedger(), new DestinationPins(), new VisitLedger());
+            new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new ValuationLedger(), new WhereIsWillyLedger());
         var world = new WorldTicks(
             game, city, appetite, fleet, board, career, saver, rivals, log);
         return new Fixture(world, clock, city, appetite, garage, wallet, driverStore, hungerStore, log);

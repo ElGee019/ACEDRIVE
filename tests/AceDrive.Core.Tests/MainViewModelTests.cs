@@ -1429,9 +1429,14 @@ public sealed class MainViewModelTests
         Assert.Equal("Jobs completed: 0", page.JobsLine);
         Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
 
-        // CONTINUE lands on the control page; the next tap then opens a
-        // fresh shift as usual.
+        // CONTINUE lands on the main page (the menu), not the jobs list the
+        // shift was started from; the Jobs tile then leads back to the control
+        // page, whose next TAXI tap opens a fresh shift as usual.
         page.ContinueCommand.Execute(null);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
+
+        menu.JobsCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         Assert.DoesNotContain("left", vm.ShiftText, StringComparison.Ordinal);
 
@@ -1550,17 +1555,23 @@ public sealed class MainViewModelTests
     [Fact]
     public void TapOtherDay_StaysLocked()
     {
+        // A day the strip hosts no event for answers the locked hint and leaves
+        // the road-test pick alone. Thursday is that day: Monday now starts the
+        // weekly market valuation, Tuesday the road test and Sunday the Cento
+        // Miglia, so every other row still waits on the freeroam map.
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
         var session = Create(speedKmh: 0f, log: log, roads: roads);
-        var (vm, _, _, _) = session;
+        var (vm, clock, _, _) = session;
         session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         string first = TuesdayButton(calendar);
+        clock.Advance(TimeSpan.FromMinutes(160)); // Monday 08:00 -> Thursday morning
+        vm.Poll();
 
-        calendar.DayCommand.Execute(2);
+        calendar.DayCommand.Execute(5);
         Assert.Equal(first, TuesdayButton(calendar));
-        Assert.Contains(log.Infos, m => m.StartsWith("calendar day 2 tapped", StringComparison.Ordinal));
+        Assert.Contains(log.Infos, m => m.StartsWith("calendar day 5 tapped", StringComparison.Ordinal));
     }
 
     [Fact]

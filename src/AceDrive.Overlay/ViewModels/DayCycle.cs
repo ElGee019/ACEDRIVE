@@ -136,7 +136,7 @@ public sealed class DayCycle
         _host.ReadoutsChanged();
         _host.ShowShiftEnded(new ShiftEndedScreenViewModel(
             summary, _records, _standings, _beat,
-            new RelayCommand(_host.GoToControlPage)));
+            new RelayCommand(_host.GoToMainPage)));
     }
 
     // Game-day flip: the calendar highlight moved. One int compare per tick,

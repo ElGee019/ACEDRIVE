@@ -90,6 +90,10 @@ internal static class TestSession
         var shiftStoreInstance = options.ShiftStore ?? new FakeShiftStore();
         var contentSource = new FakeContentSource(options.Content ?? EmptyContent);
         var logger = options.Log ?? new NullLogger();
+        // One mic for the whole session: the story flow's consent page starts
+        // it and the coordinator owns its launch/stop lifecycle, exactly like
+        // the root's single listener.
+        var voiceInstance = options.Voice ?? new FakeVoiceListener(available: false);
         var cityInstance = options.City ?? new CityEconomy(board.Stores, CityRules.Default);
         var cityStoreInstance = options.CityStore ?? new FakeCityStore();
         var roadsInstance = options.Roads ?? TestRoadCars.Ledger();
@@ -108,13 +112,20 @@ internal static class TestSession
         var jobsInstance = options.Jobs ?? new JobLedger(options.SavedDriver);
         var pinsInstance = options.Pins ?? new DestinationPins(options.SavedDriver);
         var visitsInstance = options.Visits ?? new VisitLedger(options.SavedDriver);
+        // The weekly valuation's persisted half, resumed exactly like the root
+        // does; the board is the scripted fake unless a case supplies one.
+        var valuationInstance = new ValuationLedger(options.SavedDriver);
+        // The weekly missing-person run's persisted half, resumed the same way.
+        var willyLedgerInstance = new WhereIsWillyLedger(options.SavedDriver);
+        IValuationBoard valuationBoard = options.ValuationBoard ?? new FakeValuationBoard();
         var todoStoreInstance = options.TodoStore ?? new FakeTodoProgressStore();
         var saver = new GameStateSaver(
             clock, game, clockStoreInstance, driverStoreInstance, garageStoreInstance,
             cityStoreInstance, hungerStoreInstance, roadTestStoreInstance, shiftStoreInstance,
             walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
             cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance,
-            jobsInstance, pinsInstance, visitsInstance);
+            jobsInstance, pinsInstance, visitsInstance, valuationInstance,
+            willyLedgerInstance);
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
             brands, contentSource);
@@ -149,6 +160,22 @@ internal static class TestSession
             game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
             profiles, rivalsInstance, saver, beat, options.StartWeek, logger);
         var readouts = new TelemetryReadouts();
+        // The missing-person run: its resident table is the one the elder is
+        // drawn from, its own seeded stream keeps the draw deterministic, and
+        // the wallet, trunk and friendship store are the instances the
+        // assertions read (its receipt pays into all three).
+        var residentsInstance = options.Residents ?? new ResidentBook(
+            new FakeResidentStore(),
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            logger);
+        var willyFlow = new WhereIsWillyFlow(
+            map, game,
+            options.Pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
+            directory, residentsInstance, garageInstance,
+            pool, options.WillyRules ?? WhereIsWillyRules.Default, willyLedgerInstance,
+            friendsInstance, trunkInstance, walletInstance, options.Hud, saver,
+            rivalsInstance, beat, () => dayCycle.DisplayWeek,
+            options.WillyRng ?? new Random(9), logger);
         // The session-start catch-up: the starter car and today's login bonus,
         // wired to the same stores and wallet the assertions read. Production
         // seeds the streak's skill rolls here, so a test can pin them.
@@ -168,7 +195,8 @@ internal static class TestSession
             spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
             onboardingStore, shops, dayCycle, logger);
-        var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(handlers));
+        var poiArrivals = new PoiArrivalRouter(
+            poiWorld.Handlers([new WhereIsWillyPoiHandler(willyFlow), .. handlers]));
         // The ToDo list: its own ledger + file, synced on the cold edges the
         // tests drive (settle, POI entry, pin, purchase, boot).
         var todoBoard = new TodoBoard(
@@ -195,6 +223,12 @@ internal static class TestSession
         // read, and the calendar whose week its checkpoint banks.
         var haul = new CarHaulFlow(
             brands, pool, walletInstance, dayCycle, saver, beat, logger);
+        // The weekly market valuation (PORTPLAN 49): the same ledger, board and
+        // wallet the assertions read, with a pinned draw stream of its own.
+        var valuationFlow = new ValuationFlow(
+            map, game, valuationInstance, valuationBoard, garageInstance, pool,
+            walletInstance, profiles, options.Hud, saver, rivalsInstance, beat,
+            options.ValuationRng ?? new Random(3), logger);
         // The page graph shares the one shell the VM binds: the tests assert
         // vm.CurrentScreen, so both must report the same panel.
         var shell = new OverlayShell();
@@ -204,7 +238,8 @@ internal static class TestSession
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
-            map, () => profiles.Load()?.StreetId, cento,
+            map, () => profiles.Load()?.StreetId, cento, valuationFlow,
+            willyFlow, willyLedgerInstance,
             () => brands.Brand, new Random(6), logger);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
@@ -219,18 +254,19 @@ internal static class TestSession
             options.Preferences ?? PlayerPreferences.Default,
             options.Culture ?? new FakeCultureService(), beat, options.Hud, garageInstance,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => brands.Brand,
-            logger, new StoryHost(panel, navigation, saver, rivalsInstance, todoBoard));
+            logger, new StoryHost(panel, navigation, saver, rivalsInstance, todoBoard),
+            voiceInstance.StartListening, voiceInstance.StopListening);
         var voiceRouter = new VoiceRouter(
             panel, brands, contentSource, clock, logger, options.Hud);
         var vm = new MainViewModel(
             tel, clock, world, shiftInstance, store, logger,
-            options.Voice ?? new FakeVoiceListener(available: false), brands, map,
+            voiceInstance, brands, map,
             taxiRulesInstance,
             beat, walletInstance,
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, poiWorld, cento, centoSettlement,
+            taxi, delivery, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             navigation, readouts, dayCycle,
             todoBoard, pinsInstance,
             options.Hud, options.SaveResets, options.Restarter);
@@ -240,7 +276,10 @@ internal static class TestSession
             // headless: the VM now follows the announced car like live.
             brands.Fire("test", announced);
         }
-        return new TestSessionResult(vm, clock, tel, store, story, todoBoard);
+        return new TestSessionResult(
+            vm, clock, tel, store, story, todoBoard,
+            valuationFlow, valuationInstance, valuationBoard,
+            willyFlow, willyLedgerInstance);
     }
 
     // The real career opens these through the street/job thresholds; the flow

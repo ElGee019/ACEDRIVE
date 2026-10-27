@@ -12,7 +12,8 @@ public sealed class CalendarScreenTests
     private static CalendarScreenViewModel Create(
         FakeClock? clock = null, RoadTestLedger? roads = null, VoiceBeat? beat = null,
         DateTime? gameStart = null, int week = 1,
-        Action<int>? openDay = null, Action? back = null)
+        Action<int>? openDay = null, Action? back = null,
+        WhereIsWillyLedger? willy = null, bool coffeeCareer = true)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
@@ -23,7 +24,8 @@ public sealed class CalendarScreenTests
             beat ?? new VoiceBeat(tick), game, tick, roads ?? TestRoadCars.Ledger(),
             CalendarStamp.Default with { Week = week },
             new ParameterizedCommand<int>(day => openDay?.Invoke(day)),
-            new RelayCommand(() => back?.Invoke()));
+            new RelayCommand(() => back?.Invoke()),
+            willy ?? new WhereIsWillyLedger(), () => coffeeCareer);
     }
 
     [Fact]
@@ -258,6 +260,69 @@ public sealed class CalendarScreenTests
 
         var wednesday = Create(gameStart: new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc));
         Assert.Equal("where is", VoiceMatch.MatchLabel("where is willie", wednesday.VoiceActions.Keys));
+    }
+
+    [Fact]
+    public void WillyRow_CompletedToday_ReadsCompletedAndWarnsWithoutOpening()
+    {
+        // Wednesday, and the run on this game date already paid: the row wears
+        // the completed label, grey in the view, and its tap only hints.
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        int opened = -1;
+        var vm = Create(
+            clock, beat: beat,
+            gameStart: new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc),
+            openDay: day => opened = day,
+            willy: new WhereIsWillyLedger(DriverState.Fresh with { LastWillyDate = "2026-10-14" }));
+        CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
+        Assert.True(willy.Completed);
+        Assert.False(willy.Locked);
+        Assert.Equal("Where is Willy (Completed)", willy.EventLabel);
+
+        vm.DayCommand.Execute(4);
+        Assert.Equal(-1, opened);
+        Assert.True(Assert.Single(vm.Days, d => d.DayOfWeek == 4).Flash);
+
+        clock.Advance(TimeSpan.FromSeconds(0.51));
+        beat.Poll();
+        vm.UpdateFlash();
+        Assert.Equal(
+            "SEE YOU NEXT WEDNESDAY",
+            Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(3.1));
+        vm.UpdateFlash();
+        Assert.Equal(
+            "Where is Willy (Completed)",
+            Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
+    }
+
+    [Fact]
+    public void WillyRow_CoffeeCareerClosed_ReadsLockedAndWarnsWithoutOpening()
+    {
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        int opened = -1;
+        var vm = Create(
+            clock, beat: beat,
+            gameStart: new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc),
+            openDay: day => opened = day,
+            coffeeCareer: false);
+        CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
+        Assert.True(willy.Locked);
+        Assert.False(willy.Completed);
+        Assert.Equal("UNLOCK COFFEE BEANS CAREER FIRST", willy.EventLabel);
+
+        vm.DayCommand.Execute(4);
+        Assert.Equal(-1, opened);
+
+        clock.Advance(TimeSpan.FromSeconds(0.51));
+        beat.Poll();
+        vm.UpdateFlash();
+        Assert.Equal(
+            "UNLOCK COFFEE BEANS CAREER FIRST",
+            Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
     }
 
     [Fact]

@@ -6,8 +6,8 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The introduction walk (PORTPLAN Career Start items 1-5 + item 54):
-/// preferences, opening screen, brand, voice info, birthday dialogue, and the
-/// car page that closes it before the errand is handed over. It owns the
+/// preferences, opening screen, brand, voice consent, birthday dialogue, and
+/// the car page that closes it before the errand is handed over. It owns the
 /// persisted progress and profile, so the pages talk to this flow through
 /// <see cref="IScreenController"/> instead of the whole shell.
 /// </summary>
@@ -41,6 +41,11 @@ public sealed class OnboardingFlow : IScreenController
     private readonly Func<string> _carBrand;
     private readonly ILog _log;
     private readonly IStoryHost _host;
+    // The mic lifecycle belongs to the root; the consent page only asks the
+    // two questions, so the flow gets the two verbs it needs and never the
+    // listener itself.
+    private readonly Action _startVoice;
+    private readonly Action _stopVoice;
     // Story destinations that are not shop interiors: the friend pickups,
     // grandma's pancakes and the community centre. Registering the action here
     // keeps a new leg out of EnterPoi's branching.
@@ -98,7 +103,8 @@ public sealed class OnboardingFlow : IScreenController
         IPreferencesStore preferencesStore, PlayerPreferences preferences,
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
         Garage garage, Func<int> displayWeek, Action saveGarage,
-        Func<string> carBrand, ILog log, IStoryHost host)
+        Func<string> carBrand, ILog log, IStoryHost host,
+        Action startVoice, Action stopVoice)
     {
         _onboarding = onboarding;
         _content = content;
@@ -124,6 +130,8 @@ public sealed class OnboardingFlow : IScreenController
         _carBrand = carBrand;
         _log = log;
         _host = host;
+        _startVoice = startVoice;
+        _stopVoice = stopVoice;
         _storyArrivals = new Dictionary<string, Action<PointOfInterest>>(StringComparer.Ordinal)
         {
             [PoiTypes.Person] = PickUpFriend,
@@ -183,7 +191,7 @@ public sealed class OnboardingFlow : IScreenController
             OnboardingStage.Opening => OpeningPage(),
             OnboardingStage.Brand => BrandPage(),
             OnboardingStage.GrandmaCar => CarPage(),
-            OnboardingStage.VoiceInfo => VoiceIntroPage(),
+            OnboardingStage.VoiceInfo => VoiceConsentPage(),
             OnboardingStage.Dialogue => BirthdayPage(),
             _ => PreferencesPage(),
         };
@@ -247,13 +255,14 @@ public sealed class OnboardingFlow : IScreenController
     /// CONTINUE and answering that word from the mic. Its action hands back to
     /// the caller's page instead of advancing the walk, while a selection still
     /// saves and applies through the walk's one preferences writer. The
-    /// optional reset action adds the settings page's destructive button; the
-    /// first-run page passes none, so it never offers to wipe a career.
+    /// optional reset action adds the settings page's destructive button and
+    /// the optional quit action its way out of the session; the first-run page
+    /// passes neither, so it never offers to wipe a career or quit the app.
     /// </summary>
     public PreferencesScreenViewModel CreateSettingsPage(
-        Action done, Func<GameResetFailure>? resetGame = null) =>
+        Action done, Func<GameResetFailure>? resetGame = null, Action? quit = null) =>
         new(_preferences, OnPreferencesChanged, done,
-            SettingsDoneLabelKey, SettingsVoiceBackLabel, resetGame);
+            SettingsDoneLabelKey, SettingsVoiceBackLabel, resetGame, quit);
 
     private object? OpeningPage()
     {
@@ -288,24 +297,59 @@ public sealed class OnboardingFlow : IScreenController
             return _progress.IsComplete ? _host.ControlScreen() : null;
         }
 
-        return new GrandmaCarScreenViewModel(this, Content.Cars[0]);
+        return new GrandmaCarScreenViewModel(this, Content.Cars[0], _beat);
     }
 
-    private VoiceInfoScreenViewModel VoiceIntroPage() => new VoiceInfoScreenViewModel(
-        _beat, ShowDialogue,
-        Strings.Get("VoiceInfoIntro"),
-        Strings.Format("VoiceInfoButtons",
-            Strings.Get("DialogueContinue").ToUpperInvariant()));
+    // The one page that asks before the mic opens. The microphone is a device
+    // the player may not want us to use, so the decision is recorded with the
+    // walk and the mic only starts on the explicit CONFIRM; a refusal still
+    // continues the introduction, just with voice off.
+    private VoiceConsentScreenViewModel VoiceConsentPage() =>
+        new(ConfirmVoice, DeclineVoice);
+
+    private void ConfirmVoice()
+    {
+        RecordVoiceConsent(allowed: true);
+        _startVoice();
+        ShowDialogue();
+    }
+
+    private void DeclineVoice()
+    {
+        RecordVoiceConsent(allowed: false);
+        // A save that was already granted voice and reopened here (a crash
+        // between the two saves) must not keep listening after the refusal.
+        _stopVoice();
+        ShowDialogue();
+    }
+
+    private void RecordVoiceConsent(bool allowed)
+    {
+        if (_progress.VoiceConsent == allowed) return;
+        _progress = _progress with { VoiceConsent = allowed };
+        _onboarding.Save(_progress);
+        _log.LogInfo(allowed ? "voice consent: allowed" : "voice consent: declined");
+    }
 
     // Rebuilds the birthday conversation on its own: resuming a page must not
     // replay the voice-info acknowledgment log of the transition into it.
+    // The first page carries the voice lesson above CONTINUE: the mic is live
+    // from the consent answer, and that button is the example it names.
     private DialogueScreenViewModel BirthdayPage()
     {
         _poi = BirthdayErrand();
+        // A refusal still continues the walk, but the lesson above CONTINUE
+        // would promise voice the player just turned down, so it rides only on
+        // an allowed (or grandfathered) save.
+        string? voiceLesson = _progress.VoiceAllowed ? VoiceLesson() : null;
         return new DialogueScreenViewModel(
             FillDialogue(Content.Dialogue, _poi), Strings.Get("BirthdayTitle"),
-            _beat, FinishDialogue);
+            _beat, FinishDialogue, voiceLesson);
     }
+
+    private static string VoiceLesson() =>
+        Strings.Get("VoiceInfoIntro") + Environment.NewLine +
+        Strings.Format("VoiceInfoButtons", Strings.Get("DialogueContinue").ToUpperInvariant());
 
     public void ChooseBrand(string brand)
     {
@@ -317,7 +361,7 @@ public sealed class OnboardingFlow : IScreenController
         };
         _onboarding.Save(_progress);
         _log.LogInfo($"favorite brand: {brand}");
-        _host.ShowScreen(VoiceIntroPage());
+        _host.ShowScreen(VoiceConsentPage());
     }
 
     public void ChooseCar(string carId)
@@ -368,7 +412,7 @@ public sealed class OnboardingFlow : IScreenController
 
     public void ShowDialogue()
     {
-        _log.LogInfo("voice info acknowledged: showing birthday dialogue");
+        _log.LogInfo("voice consent answered: showing birthday dialogue");
         SaveStage(OnboardingStage.Dialogue);
         _host.ShowScreen(BirthdayPage());
     }

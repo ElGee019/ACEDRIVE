@@ -19,16 +19,18 @@ public sealed class Trunk
         foreach (TrunkItem? item in saved)
         {
             // Hand-edited/corrupt rows are dropped rather than poisoning the
-            // volume maths; the next purchase writes a clean stack.
+            // volume maths; the next purchase writes a clean stack. A zero
+            // unit volume is a keepsake the certificate path banked, never a
+            // corrupt row, so it must survive the load.
             if (item is null
                 || string.IsNullOrWhiteSpace(item.Name)
                 || item.Quantity <= 0
                 || !double.IsFinite(item.UnitVolume)
-                || item.UnitVolume <= 0.0)
+                || item.UnitVolume < 0.0)
             {
                 continue;
             }
-            Add(item.Name, item.Quantity, item.UnitVolume);
+            Merge(item.Name, item.UnitVolume, item.Quantity);
         }
     }
 
@@ -79,7 +81,9 @@ public sealed class Trunk
         return false;
     }
 
-    /// <summary>Merges a stack; invalid/zero quantities are ignored.</summary>
+    /// <summary>
+    /// Merges a stack; invalid/zero quantities are ignored.
+    /// </summary>
     public void Add(string name, int quantity, double unitVolume)
     {
         if (string.IsNullOrWhiteSpace(name) || quantity <= 0
@@ -88,6 +92,27 @@ public sealed class Trunk
             return;
         }
 
+        Merge(name, unitVolume, quantity);
+    }
+
+    /// <summary>
+    /// Adds a keepsake: a certificate or award the game hands over as a card
+    /// (Unity's 0-volume glove-compartment item), so it never consumes trunk
+    /// space and a full trunk still takes it. The 0 L stack survives the
+    /// snapshot/load round trip because the loader accepts a zero unit volume.
+    /// </summary>
+    public void AddKeepsake(string name, int quantity)
+    {
+        if (string.IsNullOrWhiteSpace(name) || quantity <= 0)
+        {
+            return;
+        }
+
+        Merge(name, 0.0, quantity);
+    }
+
+    private void Merge(string name, double unitVolume, int quantity)
+    {
         foreach (TrunkItem item in _items)
         {
             if (string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))

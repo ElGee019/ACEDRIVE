@@ -9,8 +9,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// picks the distance unit and the UI language once, so the HUD and every later
 /// screen read in their language. The settings entry reuses this page; it swaps
 /// the action label to BACK, returns to the menu, answers the English voice
-/// label, and adds the destructive reset game action (absent on the first run).
-/// The first-run page stays mouse-only like the other setup pages.
+/// label, and adds the QUIT and destructive reset game actions (both absent on
+/// the first run). The first-run page stays mouse-only like the other setup
+/// pages.
 /// The option labels are language-independent on purpose — "km"/"mi" symbols
 /// and endonyms ("English"/"Nederlands") — so switching the language never has
 /// to rebuild the dropdowns; only the page copy below re-reads.
@@ -18,6 +19,7 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private const string ContinueLabelKey = "PreferencesContinue";
+    private const string QuitLabelKey = "SettingsQuit";
     private const string ResetLabelKey = "SettingsResetGame";
     private const string ResetConfirmLabelKey = "SettingsResetConfirm";
     private const string ResetWarningKey = "SettingsResetWarning";
@@ -29,6 +31,9 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly Action<PlayerPreferences> _changed;
     private readonly Action _done;
     private readonly string _doneLabelKey;
+    // Null on the first run: the walk has no session to quit and CONTINUE
+    // already advances it.
+    private readonly Action? _quit;
     // Null on the first run: there is no career to wipe yet.
     private readonly Func<GameResetFailure>? _resetGame;
 
@@ -41,6 +46,7 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     private string _unitsLabel = Strings.Get("PreferencesUnits");
     private string _languageLabel = Strings.Get("PreferencesLanguage");
     private string _continueLabel = Strings.Get(ContinueLabelKey);
+    private string _quitLabel = Strings.Get(QuitLabelKey);
     private string _resetLabel = Strings.Get(ResetLabelKey);
     private string _resetWarning = Strings.Get(ResetWarningKey);
     private string _resetStatus = string.Empty;
@@ -55,11 +61,13 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         Action done,
         string doneLabelKey = ContinueLabelKey,
         string? voiceDoneLabel = null,
-        Func<GameResetFailure>? resetGame = null)
+        Func<GameResetFailure>? resetGame = null,
+        Action? quit = null)
     {
         _changed = changed;
         _done = done;
         _doneLabelKey = doneLabelKey;
+        _quit = quit;
         _resetGame = resetGame;
         _continueLabel = Strings.Get(doneLabelKey);
         var voice = new Dictionary<string, Action>(StringComparer.Ordinal);
@@ -81,6 +89,7 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         _unit = UnitOptions.FirstOrDefault(o => o.Value == current.Units) ?? UnitOptions[0];
         _language = LanguageOptions.FirstOrDefault(o => o.Value == current.Language) ?? LanguageOptions[0];
         ContinueCommand = new RelayCommand(() => _done());
+        QuitCommand = new RelayCommand(Quit);
         ResetCommand = new RelayCommand(RequestReset);
     }
 
@@ -90,6 +99,12 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     public string UnitsLabel { get => _unitsLabel; private set => SetField(ref _unitsLabel, value); }
     public string LanguageLabel { get => _languageLabel; private set => SetField(ref _languageLabel, value); }
     public string ContinueLabel { get => _continueLabel; private set => SetField(ref _continueLabel, value); }
+
+    /// <summary>The settings entry can leave the session; the first run cannot.</summary>
+    public bool CanQuit => _quit is not null;
+
+    /// <summary>QUIT, re-read on a language change like the rest of the page.</summary>
+    public string QuitLabel { get => _quitLabel; private set => SetField(ref _quitLabel, value); }
 
     /// <summary>The settings entry has a career to wipe; the first run does not.</summary>
     public bool CanReset => _resetGame is not null;
@@ -137,6 +152,9 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
 
     public ICommand ContinueCommand { get; }
 
+    /// <summary>QUIT; inert on the first-run page, where it is hidden.</summary>
+    public ICommand QuitCommand { get; }
+
     /// <summary>RESET GAME; inert on the first-run page, where it is hidden.</summary>
     public ICommand ResetCommand { get; }
 
@@ -152,6 +170,7 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         UnitsLabel = Strings.Get("PreferencesUnits");
         LanguageLabel = Strings.Get("PreferencesLanguage");
         ContinueLabel = Strings.Get(_doneLabelKey);
+        QuitLabel = Strings.Get(QuitLabelKey);
         ResetLabel = Strings.Get(
             IsConfirmingReset ? ResetConfirmLabelKey : ResetLabelKey);
         ResetWarning = Strings.Get(ResetWarningKey);
@@ -160,6 +179,10 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
             ResetStatus = DescribeReset(_resetFailure);
         }
     }
+
+    // QUIT closes the panel, which is the app's one exit path: the window's
+    // close handlers still bank the session, so this is not a hard exit.
+    private void Quit() => _quit?.Invoke();
 
     // Two taps: the first reveals the warning and asks again, so a stray click
     // on the settings page never deletes a career. The second wipes the save

@@ -54,4 +54,18 @@ public static class PoiTypes
     /// <summary>A wholesale hub's pickup door (Unity's "hub" family): the
     /// delivery run loads the cart's freight here (PORTPLAN 19).</summary>
     public const string Hub = "hub";
+
+    /// <summary>
+    /// The weekly market-valuation venue (Unity ValuationHandler.MarkerKey):
+    /// a temporary door, not a business. No typed handler owns it; the
+    /// valuation flow watches the arrival itself.
+    /// </summary>
+    public const string Valuation = "valuation";
+
+    /// <summary>
+    /// The missing-person run's temporary marker (ToWhereIsWilly.md §3.1): the
+    /// home door, the wrong-address door and a search stop. Never
+    /// <see cref="Person"/>: that tag is the friend pickup's story arrival.
+    /// </summary>
+    public const string Willy = "willy";
 }

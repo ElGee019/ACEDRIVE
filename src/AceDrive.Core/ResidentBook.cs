@@ -15,6 +15,10 @@ public sealed class ResidentBook
 {
     private readonly Dictionary<string, Resident> _byAddress =
         new(StringComparer.OrdinalIgnoreCase);
+    // WHY a second list: the quest's elder draw must be deterministic, so the
+    // candidate table needs one stable order (load order, then first-encounter
+    // order) instead of the dictionary's.
+    private readonly List<Resident> _ordered = [];
     private readonly ProceduralNameGenerator _names;
     private readonly IResidentStore _store;
     private readonly ILog _log;
@@ -30,10 +34,22 @@ public sealed class ResidentBook
         {
             if (saved is not null && IsValid(saved))
             {
-                _byAddress[KeyOf(saved.Address)] = saved;
+                string key = KeyOf(saved.Address);
+                if (_byAddress.TryAdd(key, saved))
+                {
+                    _ordered.Add(saved);
+                }
             }
         }
     }
+
+    /// <summary>
+    /// Every known resident in first-encounter order. The weekly
+    /// missing-person run draws its elder from this table (Unity's
+    /// <c>player.pois</c> residents), so the order must be stable across
+    /// launches.
+    /// </summary>
+    public IReadOnlyList<Resident> Residents => _ordered;
 
     /// <summary>
     /// The homeowner at the address, drawn and persisted the first time the
@@ -50,6 +66,7 @@ public sealed class ResidentBook
 
         var resident = new Resident(address, _names.Next());
         _byAddress[key] = resident;
+        _ordered.Add(resident);
         _store.Save([.. _byAddress.Values]);
         _log.LogInfo(
             $"resident created at {address.StreetName} No. {address.HouseNumber}: {resident.Name.Full}");

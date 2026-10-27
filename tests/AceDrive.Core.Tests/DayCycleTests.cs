@@ -54,7 +54,8 @@ public sealed class DayCycleTests
             shiftStore, wallet, new DailyStreak(clock, null),
             new OperatingZone(null, seed: 0), new Trunk(), garage,
             new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
-            new RoadTestLedger([], seed: 0), shiftInstance, records, new JobLedger(), new DestinationPins(), new VisitLedger());
+            new RoadTestLedger([], seed: 0), shiftInstance, records, new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new ValuationLedger(), new WhereIsWillyLedger());
         var log = new TestLog();
         var cycle = new DayCycle(
             game, shiftInstance, records, board, online,
@@ -170,7 +171,7 @@ public sealed class DayCycleTests
     }
 
     [Fact]
-    public void EndShift_ClosesTheShiftAndThePageContinuesToTheControlPage()
+    public void EndShift_ClosesTheShiftAndThePageContinuesToTheMainPage()
     {
         var fixture = Build(MondayNoon);
 
@@ -178,6 +179,6 @@ public sealed class DayCycleTests
 
         var page = Assert.IsType<ShiftEndedScreenViewModel>(fixture.Host.Page);
         page.ContinueCommand.Execute(null);
-        Assert.Equal(1, fixture.Host.ControlPages);
+        Assert.Equal(1, fixture.Host.MainPages);
     }
 }

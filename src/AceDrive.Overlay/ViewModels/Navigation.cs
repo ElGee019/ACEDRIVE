@@ -80,6 +80,18 @@ public sealed class Navigation
     // owns the drive, the registration check and the finish.
     private readonly CentoRaceFlow _cento;
 
+    // The weekly market valuation (PORTPLAN 49): the calendar's Monday row is
+    // its job-centre button, so the tap starts the drive leg and the flow owns
+    // the venue, the showcase page and the comparison from there.
+    private readonly ValuationFlow _valuation;
+
+    // The weekly missing-person run (ToWhereIsWilly.md): the calendar's
+    // Wednesday row starts it, and while it is in flight the other event rows,
+    // the taxi shift and the delivery career refuse — Unity's blocked job
+    // centre. The ledger rides along for the cached calendar page's label.
+    private readonly WhereIsWillyFlow _willy;
+    private readonly WhereIsWillyLedger _willyLedger;
+
     // The event page's registration draw, the one randomness its ENTER flow
     // owns: a fresh number per entry, never a shared global.
     private readonly Random _rng;
@@ -108,6 +120,14 @@ public sealed class Navigation
     // way: the strip owns which weekday hosts the event.
     private readonly int _centoDay = CentoDayOfWeek();
 
+    // Weekday number of the weekly market valuation (Unity: Monday), read off
+    // the calendar data like the other two events.
+    private readonly int _valuationDay = ValuationDayOfWeek();
+
+    // Weekday number of the weekly missing-person run (Unity: Wednesday), read
+    // the same way: the strip owns which weekday hosts the event.
+    private readonly int _willyDay = WillyDayOfWeek();
+
     // WHY late: the host is the coordinator, which is built after this
     // navigator. Every member below is only reachable from a page command, so
     // the attach in the coordinator's constructor always comes first.
@@ -124,6 +144,7 @@ public sealed class Navigation
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
+        ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
         Func<string> carBrand, Random rng, ILog log)
     {
         _shell = shell;
@@ -155,6 +176,9 @@ public sealed class Navigation
         _addressMap = addressMap;
         _playerStreetId = playerStreetId;
         _cento = cento;
+        _valuation = valuation;
+        _willy = willy;
+        _willyLedger = willyLedger;
         _carBrand = carBrand;
         _rng = rng;
         _log = log;
@@ -223,6 +247,15 @@ public sealed class Navigation
     // shift record and its summary page).
     private void OpenTaxiShift()
     {
+        // Unity's blocked job centre (ToWhereIsWilly.md §2.1): a missing-person
+        // run in flight starts no second job, so the shift button is refused
+        // until the receipt or a give-up clears it.
+        if (_willy.InFlight)
+        {
+            _log.LogInfo("taxi shift refused: the missing-person run is in flight");
+            return;
+        }
+
         DateTime now = _clock.UtcNow;
         if (_shift.IsTimedOut(now) && _shift.TryEndTimedOut(now, out TimeSpan idle))
         {
@@ -256,6 +289,14 @@ public sealed class Navigation
     // OPEN NEW CAREER page (item 18).
     private void ShowDelivery()
     {
+        // The same lock the shift reads: the delivery career is the other job a
+        // missing-person run may not start beside (Unity's blocked job centre).
+        if (_willy.InFlight)
+        {
+            _log.LogInfo("delivery career refused: the missing-person run is in flight");
+            return;
+        }
+
         // A hub bought on the previous visit may have opened store doors; the
         // board must include them before the cached page paints.
         _world.Grow();
@@ -354,7 +395,8 @@ public sealed class Navigation
         _calendar ??= new CalendarScreenViewModel(
             _beat, _game, _clock, _roads,
             CalendarStamp.Default with { Week = _day.DisplayWeek },
-            _openDay, MenuCommand);
+            _openDay, MenuCommand, _willyLedger,
+            () => WhereIsWillyRules.HasCoffeeCareer(_directory, _career));
         return _calendar;
     }
 
@@ -362,6 +404,17 @@ public sealed class Navigation
 
     private void OnDay(int day)
     {
+        // The missing-person lock (ToWhereIsWilly.md §2.1/§3.6): Unity blocks
+        // the whole job centre while the run is in flight, so no other event
+        // row may dispatch. The Willy row itself is left to the flow, which
+        // reopens its own page (or refuses a terminal phase).
+        if (_willy.InFlight && day != _willyDay)
+        {
+            _log.LogInfo(
+                $"calendar day {day} refused: the missing-person run is in flight");
+            return;
+        }
+
         if (day == _roadTestDay)
         {
             string before = DescribeRoadTest();
@@ -378,6 +431,25 @@ public sealed class Navigation
         if (day == _centoDay)
         {
             OpenCento();
+            return;
+        }
+
+        // The weekly market valuation (PORTPLAN 49): the Monday row is the
+        // show's job-centre button. The tap pins the venue and sends the
+        // player off; the flow owns the window gate as well, so a caller can
+        // never jump it.
+        if (day == _valuationDay)
+        {
+            _valuation.BeginDrive();
+            return;
+        }
+
+        // The weekly missing-person run (ToWhereIsWilly.md): the Wednesday row
+        // is Unity's job-centre button. The flow owns the gate, the draw and
+        // the page; a run already in flight reopens its page.
+        if (day == _willyDay)
+        {
+            _willy.Begin();
             return;
         }
 
@@ -441,6 +513,37 @@ public sealed class Navigation
         foreach (CalendarDay day in ControlCalendar.Week)
         {
             if (day.EventId == ControlCalendar.CentoMiglia)
+            {
+                return day.DayOfWeek;
+            }
+        }
+
+        return -1;
+    }
+
+    // Market-valuation weekday number, read off the same calendar data: the
+    // strip owns which weekday hosts the event, the flow never assumes Monday.
+    private static int ValuationDayOfWeek()
+    {
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.EventId == ControlCalendar.Valuation)
+            {
+                return day.DayOfWeek;
+            }
+        }
+
+        return -1;
+    }
+
+    // Missing-person weekday number, read off the same calendar data: the
+    // strip owns which weekday hosts the event, the flow never assumes
+    // Wednesday on its own.
+    private static int WillyDayOfWeek()
+    {
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.EventId == ControlCalendar.Willy)
             {
                 return day.DayOfWeek;
             }

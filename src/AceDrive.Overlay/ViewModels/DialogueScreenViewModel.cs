@@ -14,14 +14,17 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
     private readonly Action _onFinished;
     private readonly VoiceBeat _beat;
     private readonly IReadOnlyList<DialogueLine> _lines;
+    private readonly string _firstPageHint;
     private int _index;
 
     public DialogueScreenViewModel(
-        IReadOnlyList<DialogueLine> lines, string title, VoiceBeat beat, Action onFinished)
+        IReadOnlyList<DialogueLine> lines, string title, VoiceBeat beat, Action onFinished,
+        string? firstPageHint = null)
     {
         _onFinished = onFinished;
         _beat = beat;
         _lines = lines;
+        _firstPageHint = firstPageHint ?? string.Empty;
         Title = title;
         ContinueCommand = new RelayCommand(Continue);
         VoiceActions = new Dictionary<string, Action>
@@ -60,6 +63,15 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
     private string _note = "";
 
     public bool HasNote => Note.Length > 0;
+
+    /// <summary>
+    /// One-time aside above CONTINUE, first page only: the voice lesson after
+    /// the consent page, where the microphone is live and that button is the
+    /// example it names. Empty on later pages and on dialogues that pass none.
+    /// </summary>
+    public string FirstPageHint => _index == 0 ? _firstPageHint : string.Empty;
+
+    public bool HasFirstPageHint => FirstPageHint.Length > 0;
 
     public ICommand ContinueCommand { get; }
 
@@ -137,5 +149,9 @@ public sealed class DialogueScreenViewModel : ViewModelBase, IVoiceScreen, IDial
         };
         Body = line.Text;
         Note = line.Note ?? "";
+        // The first-page hint is index-dependent: the page change has to
+        // repaint it even though neither value has its own setter.
+        OnPropertyChanged(nameof(FirstPageHint));
+        OnPropertyChanged(nameof(HasFirstPageHint));
     }
 }

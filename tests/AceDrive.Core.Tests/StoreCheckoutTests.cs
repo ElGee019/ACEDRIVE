@@ -116,18 +116,23 @@ public sealed class StoreCheckoutTests
     }
 
     [Fact]
-    public void Trunk_ResumesAValidSavedStackAndDropsCorruptRows()
+    public void Trunk_ResumesAValidSavedStackAndKeepsAZeroVolumeKeepsake()
     {
         var trunk = new Trunk(
         [
             new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 2 },
+            // A zero unit volume is a keepsake (the certificate path banks
+            // one), not a corrupt row: it stays and weighs nothing.
             new TrunkItem("BROKEN", 0.0) { Quantity = 1 },
             new TrunkItem("EMPTY", 0.5) { Quantity = 0 },
         ]);
 
-        TrunkItem item = Assert.Single(trunk.Items);
+        Assert.Equal(2, trunk.Items.Count);
+        TrunkItem item = trunk.Items[0];
         Assert.Equal("MAPLE SYRUP", item.Name);
         Assert.Equal(2, item.Quantity);
+        Assert.Equal("BROKEN", trunk.Items[1].Name);
+        Assert.Equal(0.0, trunk.Items[1].UnitVolume, 6);
         Assert.Equal(0.8, trunk.UsedLitres, 6);
     }
 

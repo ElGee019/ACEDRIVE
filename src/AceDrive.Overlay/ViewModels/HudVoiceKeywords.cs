@@ -55,9 +55,12 @@ internal static class HudVoiceKeywords
     public static IReadOnlyList<string> For(string actionKey) => actionKey switch
     {
         "HudPickUp" or "HudJobPickupAction" or "HudDeliveryHubAction" => PickUp,
-        "HudJobDropoffAction" => DropOff,
+        "HudJobDropoffAction" or "HudWillyDropOff" => DropOff,
         "HudDeliveryStoreAction" => Deliver,
         "HudPancakes" => Pancakes,
+        // The missing-person run's clears: the receipt's read continues and the
+        // wrong address is acknowledged with the one word the model hears.
+        "HudWillyContinue" => Enter,
         _ => Enter,
     };
 }

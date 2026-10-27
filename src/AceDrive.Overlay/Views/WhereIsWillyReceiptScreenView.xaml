@@ -1,0 +1,62 @@
+<UserControl x:Class="AceDrive.Overlay.Views.WhereIsWillyReceiptScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Missing-person receipt (ToWhereIsWilly.md §2.7, Unity
+         WillyReceiptScreen): who was returned, where they were found, the
+         finder's fee with both multipliers, the certificate and where it went,
+         the friendship level and CONTINUE. The flow paid and stamped before
+         this page opened, so nothing here is interactive except the exit. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding Title}"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding ReturnedLine}" Foreground="#FFF" FontSize="15"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"/>
+            <TextBlock Text="{Binding FoundAtLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <Border Style="{StaticResource SectionDivider}"/>
+            <TextBlock Text="{Binding FeeTitle}" Foreground="#FFF" FontSize="13"
+                       FontWeight="Bold" TextAlignment="Center" Margin="0,0,0,4"/>
+            <TextBlock Text="{Binding BaseFeeLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding ShopMultiplierLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding AttemptLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"/>
+            <Border Style="{StaticResource SectionDivider}"/>
+            <TextBlock Text="{Binding TotalLine}" Foreground="#FF97EAD2" FontSize="20"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding CertificateLine}" Foreground="#FFF" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding CertificateStoredLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,6"/>
+            <TextBlock Text="{Binding FriendshipLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=ReceiptContinue}" Padding="4"
+                    HorizontalAlignment="Stretch" Command="{Binding ContinueCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

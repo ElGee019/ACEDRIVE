@@ -118,6 +118,8 @@
   <data name="PreferencesLanguage" xml:space="preserve"><value>LANGUAGE</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="PreferencesBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Settings entry only: leaves the overlay (the window's own close path). -->
+  <data name="SettingsQuit" xml:space="preserve"><value>QUIT</value></data>
   <data name="SettingsResetGame" xml:space="preserve"><value>RESET GAME</value></data>
   <data name="SettingsResetConfirm" xml:space="preserve"><value>DELETE ALL PROGRESS</value></data>
   <data name="SettingsResetWarning" xml:space="preserve"><value>This deletes your profile, money, cars and every bit of progress. You start over from the introduction.</value></data>
@@ -137,9 +139,15 @@
   <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>
   <data name="VoiceInfoIntro" xml:space="preserve"><value>Control navigation with your voice.</value></data>
-  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Click "{0}" and select "JOBS" to start your first taxi shift.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Say a button's text to click that button.
 For instance "{0}".</value></data>
+  <!-- The first birthday page prints the lesson above its CONTINUE once the
+       consent page has answered. The consent page itself only asks, so the
+       two buttons below this sentence are the answer. -->
+  <data name="VoiceConsentIntro" xml:space="preserve"><value>ACEDrive can be voice controlled. If you want to activate that option, confirm here</value></data>
+  <data name="VoiceConsentConfirm" xml:space="preserve"><value>CONFIRM</value></data>
+  <data name="VoiceConsentDecline" xml:space="preserve"><value>NO THANK YOU</value></data>
+  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Click "{0}" and select "JOBS" to start your first taxi shift.</value></data>
   <data name="SpeakerGrandma" xml:space="preserve"><value>Grandma</value></data>
   <data name="SpeakerYou" xml:space="preserve"><value>You</value></data>
   <data name="SpeakerAnnabella" xml:space="preserve"><value>Annabella</value></data>
@@ -660,4 +668,84 @@ Accept this job?</value></data>
   <data name="HudCentoFinishDrive" xml:space="preserve"><value>Race to the Cento Miglia finish at {1} No. {2} in {3}</value></data>
   <data name="HudCentoFinishArrived" xml:space="preserve"><value>You have finished the Cento Miglia!</value></data>
   <data name="HudCentoReputation" xml:space="preserve"><value>YOUR CLUB REPUTATION: {0:0.00000}</value></data>
+  <!-- Weekly market valuation (PORTPLAN 49, Unity ValuationScreen +
+       ValuationPopScreen). The venue/score/jury lines, the two live notice
+       sentences and the offline catch-up summary; the HUD lines keep the
+       generic drive-to placeholders ({0} name, {1} street, {2} number,
+       {3} city) and the notices carry the entrant's name plus the XP amount,
+       so a translator may reorder and never remove. -->
+  <data name="ValuationTitle" xml:space="preserve"><value>MARKET VALUATION</value></data>
+  <data name="ValuationVenueLine" xml:space="preserve"><value>This week's venue: {0}</value></data>
+  <data name="ValuationIntro" xml:space="preserve"><value>Choose the car you want the jury to value this week.</value></data>
+  <data name="ValuationSelect" xml:space="preserve"><value>Select car</value></data>
+  <data name="ValuationNoCars" xml:space="preserve"><value>There is no car in the garage to enter.</value></data>
+  <data name="ValuationEnter" xml:space="preserve"><value>ENTER WITH {0}</value></data>
+  <data name="ValuationEnterEmpty" xml:space="preserve"><value>ENTER</value></data>
+  <data name="ValuationBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="ValuationContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="ValuationOwnScore" xml:space="preserve"><value>YOUR SCORE: {0}</value></data>
+  <data name="ValuationOpponentScore" xml:space="preserve"><value>OPPONENT'S SCORE: {0}</value></data>
+  <data name="ValuationScore" xml:space="preserve"><value>{0:0.00}</value></data>
+  <data name="ValuationWaiting" xml:space="preserve"><value>Drawing an opponent…</value></data>
+  <data name="ValuationWon" xml:space="preserve"><value>YOU WON</value></data>
+  <data name="ValuationLost" xml:space="preserve"><value>YOU LOST</value></data>
+  <data name="ValuationJuryWon" xml:space="preserve"><value>The International Automotive Jury values your car higher than your opponent's!</value></data>
+  <data name="ValuationJuryLost" xml:space="preserve"><value>The International Automotive Jury values your car lower than your opponent's!</value></data>
+  <data name="ValuationXp" xml:space="preserve"><value>You receive {0:0.000} XP</value></data>
+  <data name="ValuationYou" xml:space="preserve"><value>You</value></data>
+  <data name="ValuationTopSpeedLabel" xml:space="preserve"><value>Top speed</value></data>
+  <data name="ValuationAccelerationLabel" xml:space="preserve"><value>0-60</value></data>
+  <data name="ValuationClassLabel" xml:space="preserve"><value>Class</value></data>
+  <data name="ValuationTopSpeed" xml:space="preserve"><value>{0} km/h</value></data>
+  <data name="ValuationAcceleration" xml:space="preserve"><value>{0:0.#}s</value></data>
+  <data name="ValuationClass" xml:space="preserve"><value>{0}</value></data>
+  <data name="HudValuationDrive" xml:space="preserve"><value>Drive to {0}: {1} {2}, {3} to enter your vehicle into the weekly tier-ranking showcase.</value></data>
+  <data name="HudValuationArrived" xml:space="preserve"><value>Market valuation: park here to enter your vehicle.</value></data>
+  <data name="ValuationNoticeWin" xml:space="preserve"><value>You won a Valuation event against {0} and received {1:0.000}XP</value></data>
+  <data name="ValuationNoticeLoss" xml:space="preserve"><value>You just lost a Valuation Event against {0}.</value></data>
+  <data name="ValuationOfflineSummary" xml:space="preserve"><value>While you were away you won {0} Valuation events and gained {1:0.000} XP</value></data>
+
+  <!-- Weekly missing-person run (ToWhereIsWilly.md §2.1/§3.5): the calendar
+       row's completed and locked labels plus the two gate hints that share the
+       strip's one three-second warning slot. -->
+  <data name="EventWillyCompleted" xml:space="preserve"><value>Where is Willy (Completed)</value></data>
+  <data name="EventWillyLocked" xml:space="preserve"><value>UNLOCK COFFEE BEANS CAREER FIRST</value></data>
+  <data name="ControlGateWillyDone" xml:space="preserve"><value>SEE YOU NEXT WEDNESDAY</value></data>
+  <data name="ControlGateWillyLocked" xml:space="preserve"><value>UNLOCK COFFEE BEANS CAREER FIRST</value></data>
+
+  <!-- The quest page (Unity's map stand-in): the title, the two Unity task
+       sentences, the failed-visit hint, the found sentence and the two verbs. -->
+  <data name="WillyTitle" xml:space="preserve"><value>WHERE IS WILLY</value></data>
+  <data name="WillyIntro" xml:space="preserve"><value>Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Click a coffee shop in {2} to see whether {1} is there.</value></data>
+  <data name="WillyNotHere" xml:space="preserve"><value>They aren't here. Navigate to another coffee shop on the map, or give up.</value></data>
+  <data name="WillyGiveUp" xml:space="preserve"><value>GIVE UP SEARCH</value></data>
+  <data name="WillyFound" xml:space="preserve"><value>Well that's a relief. All well and good! Missing person found! Select {0} to drive {1} back home.</value></data>
+  <data name="WillyDriveHome" xml:space="preserve"><value>DRIVE {0} HOME</value></data>
+  <data name="WillyBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="WillyCertificateName" xml:space="preserve"><value>Bring-Them-Home Certificate Week {0} {1}</value></data>
+
+  <!-- The companion's quest legs. The generic placeholders stay ({0} name,
+       {1} street, {2} number, {3} city) so a translation can reorder them. -->
+  <data name="HudWillySearchDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3} and look for the missing elder.</value></data>
+  <data name="HudWillyHomeDrive" xml:space="preserve"><value>Drive {0} home to {1} No. {2} in {3}</value></data>
+  <data name="HudWillyHomeArrived" xml:space="preserve"><value>Welcome home {0}!</value></data>
+  <data name="HudWillyDropOff" xml:space="preserve"><value>DROP OFF</value></data>
+  <data name="HudWillyWrongAddress" xml:space="preserve"><value>This is not {0}'s home address. {0} is still out there somewhere...</value></data>
+  <data name="HudWillyContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="HudWillyAbandoned" xml:space="preserve"><value>Search abandoned. {0} is still out there somewhere...</value></data>
+
+  <!-- The receipt (Unity WillyReceiptScreen): the payment lines, the attempt
+       line the data picks, the certificate and the friendship the run left. -->
+  <data name="WillyReceiptTitle" xml:space="preserve"><value>MISSING PERSON RECEIPT</value></data>
+  <data name="WillyReceiptReturned" xml:space="preserve"><value>Returned: {0}</value></data>
+  <data name="WillyReceiptFoundAt" xml:space="preserve"><value>Found at: {0}</value></data>
+  <data name="WillyReceiptFeeTitle" xml:space="preserve"><value>FINDER'S FEE</value></data>
+  <data name="WillyReceiptBaseFee" xml:space="preserve"><value>Base Fee = {0:0}CR</value></data>
+  <data name="WillyReceiptShopMult" xml:space="preserve"><value>Coffee shops in town: multiplier x{0:0.00}</value></data>
+  <data name="WillyReceiptFirstTry" xml:space="preserve"><value>Found on 1st try: multiplier x{0:0.00}</value></data>
+  <data name="WillyReceiptAttempt" xml:space="preserve"><value>Found on attempt {0}: multiplier x{1:0.00}</value></data>
+  <data name="WillyReceiptTotal" xml:space="preserve"><value>REWARD: {0} CR</value></data>
+  <data name="WillyReceiptCertificate" xml:space="preserve"><value>Certificate: {0}</value></data>
+  <data name="WillyReceiptCertificateStored" xml:space="preserve"><value>Certificate added to the trunk of your car.</value></data>
+  <data name="WillyReceiptFriendship" xml:space="preserve"><value>Friendship level: {0}</value></data>
 </root>

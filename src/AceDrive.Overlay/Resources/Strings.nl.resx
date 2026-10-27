@@ -97,6 +97,7 @@
   <data name="PreferencesLanguage" xml:space="preserve"><value>TAAL</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="PreferencesBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="SettingsQuit" xml:space="preserve"><value>STOPPEN</value></data>
   <data name="SettingsResetGame" xml:space="preserve"><value>SPEL RESETTEN</value></data>
   <data name="SettingsResetConfirm" xml:space="preserve"><value>ALLE VOORTGANG WISSEN</value></data>
   <data name="SettingsResetWarning" xml:space="preserve"><value>Dit wist je profiel, geld, auto's en alle voortgang. Je begint opnieuw bij de introductie.</value></data>
@@ -118,9 +119,15 @@
   <data name="SpeakerMax" xml:space="preserve"><value>Max</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>SPRAAKBEDIENING</value></data>
   <data name="VoiceInfoIntro" xml:space="preserve"><value>Bedien de navigatie met je stem.</value></data>
-  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Klik op "{0}" en kies "JOBS" om je eerste taxidienst te starten.</value></data>
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Spreek de tekst van een knop uit om op die knop te drukken.
 Bijvoorbeeld "{0}".</value></data>
+  <!-- De eerste verjaardagspagina toont de uitleg boven zijn DOORGAAN zodra de
+       toestemmingspagina is beantwoord. De toestemmingspagina zelf vraagt het
+       alleen, dus de twee knoppen onder deze zin zijn het antwoord. -->
+  <data name="VoiceConsentIntro" xml:space="preserve"><value>ACEDrive kan met spraak bediend worden. Wil je die optie activeren, bevestig dan hier</value></data>
+  <data name="VoiceConsentConfirm" xml:space="preserve"><value>BEVESTIGEN</value></data>
+  <data name="VoiceConsentDecline" xml:space="preserve"><value>NEE, BEDANKT</value></data>
+  <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Klik op "{0}" en kies "JOBS" om je eerste taxidienst te starten.</value></data>
   <data name="ControlTaxi" xml:space="preserve"><value>START TAXIDIENST</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>DOORGAAN MET TAXIDIENST</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
@@ -497,4 +504,80 @@ Deze klus aannemen?</value></data>
   <data name="MenuVoiceWake" xml:space="preserve"><value>Zeg "Hey {{BRAND}}" om dit scherm tijdens het rijden op te roepen. Bijvoorbeeld "Hey {0}".</value></data>
   <data name="MenuVoiceHotkey" xml:space="preserve"><value>Je kunt ook CTRL+Shift+C indrukken.</value></data>
   <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
+  <!-- Wekelijkse marktwaardering (PORTPLAN 49, Unity ValuationScreen +
+       ValuationPopScreen). De locatie-, score- en jurylijnen, de twee live
+       meldingen en de samenvatting van de inhaalslag; de HUD-regels houden de
+       generieke plaatsaanduidingen ({0} naam, {1} straat, {2} nummer,
+       {3} stad) en de meldingen dragen de naam van de deelnemer plus het
+       XP-bedrag, zodat een vertaler mag herordenen en nooit mag weglaten. -->
+  <data name="ValuationTitle" xml:space="preserve"><value>MARKTWAARDERING</value></data>
+  <data name="ValuationVenueLine" xml:space="preserve"><value>De locatie van deze week: {0}</value></data>
+  <data name="ValuationIntro" xml:space="preserve"><value>Kies de auto die de jury deze week moet waarderen.</value></data>
+  <data name="ValuationSelect" xml:space="preserve"><value>Kies auto</value></data>
+  <data name="ValuationNoCars" xml:space="preserve"><value>Er staat geen auto in de garage om in te zetten.</value></data>
+  <data name="ValuationEnter" xml:space="preserve"><value>MEEDOEN MET {0}</value></data>
+  <data name="ValuationEnterEmpty" xml:space="preserve"><value>MEEDOEN</value></data>
+  <data name="ValuationBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="ValuationContinue" xml:space="preserve"><value>DOORGAAN</value></data>
+  <data name="ValuationOwnScore" xml:space="preserve"><value>JOUW SCORE: {0}</value></data>
+  <data name="ValuationOpponentScore" xml:space="preserve"><value>SCORE TEGENSTANDER: {0}</value></data>
+  <data name="ValuationScore" xml:space="preserve"><value>{0:0.00}</value></data>
+  <data name="ValuationWaiting" xml:space="preserve"><value>Er wordt een tegenstander geloot…</value></data>
+  <data name="ValuationWon" xml:space="preserve"><value>JE HEBT GEWONNEN</value></data>
+  <data name="ValuationLost" xml:space="preserve"><value>JE HEBT VERLOREN</value></data>
+  <data name="ValuationJuryWon" xml:space="preserve"><value>De Internationale Automobieljury waardeert je auto hoger dan die van je tegenstander!</value></data>
+  <data name="ValuationJuryLost" xml:space="preserve"><value>De Internationale Automobieljury waardeert je auto lager dan die van je tegenstander!</value></data>
+  <data name="ValuationXp" xml:space="preserve"><value>Je ontvangt {0:0.000} XP</value></data>
+  <data name="ValuationYou" xml:space="preserve"><value>Jij</value></data>
+  <data name="ValuationTopSpeedLabel" xml:space="preserve"><value>Topsnelheid</value></data>
+  <data name="ValuationAccelerationLabel" xml:space="preserve"><value>0-60</value></data>
+  <data name="ValuationClassLabel" xml:space="preserve"><value>Klasse</value></data>
+  <data name="ValuationTopSpeed" xml:space="preserve"><value>{0} km/h</value></data>
+  <data name="ValuationAcceleration" xml:space="preserve"><value>{0:0.#}s</value></data>
+  <data name="ValuationClass" xml:space="preserve"><value>{0}</value></data>
+  <data name="HudValuationDrive" xml:space="preserve"><value>Rijd naar {0}: {1} {2}, {3} om je auto in te zetten voor de wekelijkse klassenranglijst.</value></data>
+  <data name="HudValuationArrived" xml:space="preserve"><value>Marktwaardering: parkeer hier om je auto in te zetten.</value></data>
+  <data name="ValuationNoticeWin" xml:space="preserve"><value>Je won een marktwaarderingsronde van {0} en ontving {1:0.000}XP</value></data>
+  <data name="ValuationNoticeLoss" xml:space="preserve"><value>Je verloor zojuist een marktwaarderingsronde van {0}.</value></data>
+  <data name="ValuationOfflineSummary" xml:space="preserve"><value>Terwijl je weg was won je {0} marktwaarderingsrondes en kreeg je {1:0.000} XP</value></data>
+
+  <!-- Wekelijkse vermiste-persoonrit (ToWhereIsWilly.md §3.5). -->
+  <data name="EventWillyCompleted" xml:space="preserve"><value>Waar is Willy (Voltooid)</value></data>
+  <data name="EventWillyLocked" xml:space="preserve"><value>ONTGRENDEL EERST DE KOFFIEBONEN-CARRIÈRE</value></data>
+  <data name="ControlGateWillyDone" xml:space="preserve"><value>TOT VOLGENDE WOENSDAG</value></data>
+  <data name="ControlGateWillyLocked" xml:space="preserve"><value>ONTGRENDEL EERST DE KOFFIEBONEN-CARRIÈRE</value></data>
+
+  <!-- De speurpagina (de kaartvervanger): titel, de twee Unity-taken, de hint
+       na een misse winkel, de vondstzin en de twee werkwoorden. -->
+  <data name="WillyTitle" xml:space="preserve"><value>WAAR IS WILLY</value></data>
+  <data name="WillyIntro" xml:space="preserve"><value>De oude {0} wordt vermist! Kun je onze lieve oudere in een van de koffiebars vinden en {1} naar huis brengen? Klik op een koffiebar in {2} om te zien of {1} daar is.</value></data>
+  <data name="WillyNotHere" xml:space="preserve"><value>Ze zijn hier niet. Rijd naar een andere koffiebar op de kaart, of geef het op.</value></data>
+  <data name="WillyGiveUp" xml:space="preserve"><value>ZOEKTOCHT OPGEVEN</value></data>
+  <data name="WillyFound" xml:space="preserve"><value>Gelukkig maar, alles goed en wel! Vermiste gevonden! Selecteer {0} om {1} naar huis te brengen.</value></data>
+  <data name="WillyDriveHome" xml:space="preserve"><value>RIJD {0} NAAR HUIS</value></data>
+  <data name="WillyBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="WillyCertificateName" xml:space="preserve"><value>Thuisbreng-certificaat week {0} {1}</value></data>
+
+  <!-- De begeleidingsregels van de rit op de companion. -->
+  <data name="HudWillySearchDrive" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3} en zoek de vermiste oudere.</value></data>
+  <data name="HudWillyHomeDrive" xml:space="preserve"><value>Breng {0} naar huis, naar {1} nr. {2} in {3}</value></data>
+  <data name="HudWillyHomeArrived" xml:space="preserve"><value>Welkom thuis {0}!</value></data>
+  <data name="HudWillyDropOff" xml:space="preserve"><value>AFZETTEN</value></data>
+  <data name="HudWillyWrongAddress" xml:space="preserve"><value>Dit is niet het huisadres van {0}. {0} is nog steeds ergens daarbuiten...</value></data>
+  <data name="HudWillyContinue" xml:space="preserve"><value>DOORGAAN</value></data>
+  <data name="HudWillyAbandoned" xml:space="preserve"><value>Zoektocht opgegeven. {0} is nog steeds ergens daarbuiten...</value></data>
+
+  <!-- De bon (Unity WillyReceiptScreen). -->
+  <data name="WillyReceiptTitle" xml:space="preserve"><value>BON VERMISTE PERSOON</value></data>
+  <data name="WillyReceiptReturned" xml:space="preserve"><value>Teruggebracht: {0}</value></data>
+  <data name="WillyReceiptFoundAt" xml:space="preserve"><value>Gevonden bij: {0}</value></data>
+  <data name="WillyReceiptFeeTitle" xml:space="preserve"><value>VINDERSLOON</value></data>
+  <data name="WillyReceiptBaseFee" xml:space="preserve"><value>Basisloon = {0:0}CR</value></data>
+  <data name="WillyReceiptShopMult" xml:space="preserve"><value>Koffiebars in de stad: vermenigvuldiger x{0:0.00}</value></data>
+  <data name="WillyReceiptFirstTry" xml:space="preserve"><value>In één keer gevonden: vermenigvuldiger x{0:0.00}</value></data>
+  <data name="WillyReceiptAttempt" xml:space="preserve"><value>Gevonden bij poging {0}: vermenigvuldiger x{1:0.00}</value></data>
+  <data name="WillyReceiptTotal" xml:space="preserve"><value>BELONING: {0} CR</value></data>
+  <data name="WillyReceiptCertificate" xml:space="preserve"><value>Certificaat: {0}</value></data>
+  <data name="WillyReceiptCertificateStored" xml:space="preserve"><value>Certificaat toegevoegd aan de kofferbak van je auto.</value></data>
+  <data name="WillyReceiptFriendship" xml:space="preserve"><value>Vriendschapsniveau: {0}</value></data>
 </root>

@@ -35,8 +35,23 @@ public sealed record OnboardingState(
     bool MaxDeliveryIntroSeen = false,
     // Last argument so saves written before the stage existed deserialize
     // with the fresh default (Preferences) instead of failing.
-    OnboardingStage Stage = OnboardingStage.Preferences)
+    OnboardingStage Stage = OnboardingStage.Preferences,
+    // The mic permission the voice page asks for. Null means the question was
+    // never answered, which is the state of a fresh install and of every save
+    // written before the page existed; VoiceAllowed below tells the two apart.
+    bool? VoiceConsent = null)
 {
     public static readonly OnboardingState Fresh = new(null, null, false);
     public bool IsComplete => BirthdayDone;
+
+    /// <summary>
+    /// True when the microphone may open. An explicit CONFIRM allows it and an
+    /// explicit NO THANK YOU keeps it off; an unanswered save is grandfathered
+    /// only once it already walked past the voice page (or finished the intro),
+    /// so an update never silently mutes an existing profile. A fresh install
+    /// stays off until the page is answered, because the mic must never open
+    /// before the player consented.
+    /// </summary>
+    public bool VoiceAllowed =>
+        VoiceConsent ?? (IsComplete || Stage is OnboardingStage.Dialogue or OnboardingStage.GrandmaCar);
 }

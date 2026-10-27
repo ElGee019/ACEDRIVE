@@ -34,28 +34,36 @@
                            TextWrapping="Wrap" TextAlignment="Center"/>
             </StackPanel>
         </StackPanel>
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="2*"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button Grid.Column="1" Content="{loc:Loc Key=DialogueContinue}" Padding="4"
-                    HorizontalAlignment="Stretch"
-                    Command="{Binding ContinueCommand}">
-                <Button.Style>
-                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                        <Style.Triggers>
-                            <!-- Teal voice-ack glow: every CONTINUE tap (a
-                                 page turn or the finish) waits out the beat
-                                 on this button before advancing. -->
-                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
-                                <Setter Property="Foreground" Value="#FF97EAD2"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </Button.Style>
-            </Button>
-        </Grid>
+        <StackPanel Grid.Row="2">
+            <!-- One-time guidance above CONTINUE, first page only: the voice
+                 lesson after the consent page (the mic is live and this is the
+                 button its example names). Collapsed on every later page. -->
+            <TextBlock Text="{Binding FirstPageHint}" Foreground="#FF97EAD2" FontSize="13"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,10"
+                       Visibility="{Binding HasFirstPageHint, Converter={StaticResource BoolToVis}}"/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="1" Content="{loc:Loc Key=DialogueContinue}" Padding="4"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding ContinueCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <!-- Teal voice-ack glow: every CONTINUE tap (a
+                                     page turn or the finish) waits out the beat
+                                     on this button before advancing. -->
+                                <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </StackPanel>
     </Grid>
 </UserControl>

@@ -150,6 +150,19 @@
                                                         <DataTrigger Binding="{Binding Flash}" Value="True">
                                                             <Setter Property="Foreground" Value="#FF97EAD2"/>
                                                         </DataTrigger>
+                                                        <!-- The missing-person row's two
+                                                             closed states read grey and
+                                                             italic: the run is done for
+                                                             this Wednesday, or the coffee
+                                                             career is still closed. -->
+                                                        <DataTrigger Binding="{Binding Completed}" Value="True">
+                                                            <Setter Property="Foreground" Value="#FFBFC4C9"/>
+                                                            <Setter Property="FontStyle" Value="Italic"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Locked}" Value="True">
+                                                            <Setter Property="Foreground" Value="#FFBFC4C9"/>
+                                                            <Setter Property="FontStyle" Value="Italic"/>
+                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>

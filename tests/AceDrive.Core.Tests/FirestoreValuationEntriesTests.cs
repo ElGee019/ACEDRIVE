@@ -55,4 +55,31 @@ public sealed class FirestoreValuationEntriesTests
         Assert.True(await Create(db).WipeAsync());
         Assert.Empty(db.Deleted);
     }
+
+    [Fact]
+    public async Task WipeOwn_DeletesOnlyTheCallersDocument()
+    {
+        // Unity WipeOwnEntry: the Monday reset of one player must never remove
+        // a rival's doc from the shared weekly list.
+        var db = new FakeFirestoreDatabase();
+        db.Collections[FirestoreCollections.Valuation] =
+        [
+            new FirestoreDocument("uid-1", new Dictionary<string, object?>(StringComparer.Ordinal)),
+            new FirestoreDocument("uid-2", new Dictionary<string, object?>(StringComparer.Ordinal)),
+        ];
+        FirestoreValuationEntries entries = Create(db);
+
+        Assert.True(await entries.WipeOwnAsync("uid-1"));
+
+        Assert.Equal(["acevo_enteredForValuation/uid-1"], Assert.Single(db.Deleted));
+        Assert.Empty(db.Sets);
+    }
+
+    [Fact]
+    public async Task WipeOwn_WithoutAUid_IsRefused()
+    {
+        var db = new FakeFirestoreDatabase();
+        Assert.False(await Create(db).WipeOwnAsync(string.Empty));
+        Assert.Empty(db.Deleted);
+    }
 }

@@ -56,8 +56,11 @@ firebase deploy --only firestore:rules
 file that only contains `acevo_*`.
 
 The weekly valuation list can additionally use a Firestore TTL policy on
-`acevo_enteredForValuation.expiresAt` (48 h), but the client-side Monday wipe
-is the source of truth.
+`acevo_enteredForValuation.expiresAt` (48 h). The client-side Monday wipe stays
+the source of truth, and it deletes **only the player's own doc**
+(`FirestoreValuationEntries.WipeOwnAsync`): rivals' docs leave through the TTL,
+never through another player's wipe. The legacy cloud `house-entry` doc is
+filtered client-side, because the house entry is drawn locally.
 
 ## 4. Collections
 
@@ -88,10 +91,17 @@ Live wiring:
 - best single-shift earnings on shift end, and the shift-ended page shows the
   resulting world standings (the push waits for anonymous auth: a shift that
   ended before the first sign-in still creates a new player's doc);
-- per-country km on every paid trip.
+- per-country km on every paid trip;
+- weekly market valuation (PORTPLAN 49, `FirestoreValuationBoard`): the Monday
+  jump-out pushes one entry per player, the ongoing comparison reads the list,
+  and the Monday 00:00 reset deletes the player's own doc. The live comparison
+  is a 30 s background re-read (`Changed` event), not a Firestore snapshot
+  listener, and it runs on its own task so the 10 Hz gameplay poll only drains
+  the list it published. Offline, the same page compares against the local
+  house entry.
 
 Backend-only today (no ACEDRIVE screen/caller yet, compiled and tested):
-road-test time/brake boards, weekly valuation entries, cloud car sprites.
+road-test time/brake boards, cloud car sprites.
 
 ## 6. Rarity model
 

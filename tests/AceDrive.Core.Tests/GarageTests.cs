@@ -184,6 +184,24 @@ public sealed class GarageTests
     }
 
     [Fact]
+    public void JobsCompleted_RidesTheSnapshot()
+    {
+        // The valuation score's per-car job term (PORTPLAN 49, Unity
+        // CarJobsService) survives the same restart as the odometer.
+        var garage = New();
+        OwnedCar car = garage.Add(Mx5, week: 1);
+        car.RegisterJob();
+        car.RegisterJob();
+
+        var resumed = New(garage.Snapshot());
+
+        OwnedCar again = resumed.Find(Mx5.Key)!;
+        Assert.Equal(2, again.JobsCompleted);
+        again.RegisterJob();
+        Assert.Equal(3, again.JobsCompleted);
+    }
+
+    [Fact]
     public void Resume_DropsBrokenRowsAndFixesTheCurrentKey()
     {
         // A hand-edited file (or a store that let something through) degrades

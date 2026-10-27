@@ -79,7 +79,18 @@ internal sealed class TestSessionOptions
     public FakeSaveDataResetter? SaveResets { get; init; }
     public FakeAppRestarter? Restarter { get; init; }
     public StoreCatalog? StoreCatalog { get; init; }
+    // The weekly valuation list the flow reads and pushes to (PORTPLAN 49).
+    public IValuationBoard? ValuationBoard { get; init; }
+    // The valuation's own draw stream: a suite that pins an opponent or a venue
+    // hands its seeded instance in instead of sharing the other draws'.
+    public Random? ValuationRng { get; init; }
     // The Cento Miglia page's tier table: empty by default, so only the suites
     // that drive the event page hand content in (production loads the JSON).
     public IReadOnlyList<CentoTier>? CentoTiers { get; init; }
+    // The weekly missing-person run (ToWhereIsWilly.md §5): the resident table
+    // its elder draw reads, its balance and its own seeded stream. Production
+    // shares one resident book; a suite that pins an elder hands one in.
+    public ResidentBook? Residents { get; init; }
+    public WhereIsWillyRules? WillyRules { get; init; }
+    public Random? WillyRng { get; init; }
 }

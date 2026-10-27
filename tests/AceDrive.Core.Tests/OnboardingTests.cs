@@ -158,7 +158,7 @@ public sealed class OnboardingTests
     [InlineData(OnboardingStage.Opening, typeof(OpeningScreenViewModel))]
     [InlineData(OnboardingStage.Brand, typeof(BrandScreenViewModel))]
     [InlineData(OnboardingStage.GrandmaCar, typeof(GrandmaCarScreenViewModel))]
-    [InlineData(OnboardingStage.VoiceInfo, typeof(VoiceInfoScreenViewModel))]
+    [InlineData(OnboardingStage.VoiceInfo, typeof(VoiceConsentScreenViewModel))]
     [InlineData(OnboardingStage.Dialogue, typeof(DialogueScreenViewModel))]
     public void SavedStage_ReopensThatPage(OnboardingStage stage, Type page)
     {
@@ -185,8 +185,9 @@ public sealed class OnboardingTests
         session.Story.ChooseBrand("Mazda");
         Assert.Equal(OnboardingStage.VoiceInfo, store.State.Stage);
 
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
-            .ContinueCommand.Execute(null);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .ConfirmCommand.Execute(null);
+        Assert.True(store.State.VoiceConsent);
         Assert.Equal(OnboardingStage.Dialogue, store.State.Stage);
 
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
@@ -210,7 +211,7 @@ public sealed class OnboardingTests
         // walk resumes at the page those picks imply instead of replaying.
         var vm = Create(new OnboardingState("Mazda", "ks_mazda_mx5_na", BirthdayDone: false));
 
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -222,8 +223,8 @@ public sealed class OnboardingTests
         var session = CreateSession(OnboardingState.Fresh with { BirthdayDone = true });
         var vm = session.Vm;
         session.Story.ChooseBrand("Honda");
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
-            .ContinueCommand.Execute(null);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .ConfirmCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
         dialogue.ContinueCommand.Execute(null);
@@ -237,12 +238,12 @@ public sealed class OnboardingTests
     }
 
     [Fact]
-    public void ChooseBrand_ShowsVoiceInfo()
+    public void ChooseBrand_ShowsVoiceConsent()
     {
         var session = CreateSession();
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -252,8 +253,8 @@ public sealed class OnboardingTests
         var session = CreateSession(onboarding: store);
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen)
-            .ContinueCommand.Execute(null);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .ConfirmCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         dialogue.ContinueCommand.Execute(null);
         dialogue.ContinueCommand.Execute(null);
@@ -293,8 +294,9 @@ public sealed class OnboardingTests
         session.Story.ChooseBrand("Honda");
         Assert.Equal("Honda", store.State.FavoriteBrand);
 
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
+        var voice = Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen);
+        voice.ConfirmCommand.Execute(null);
+        Assert.True(store.State.VoiceConsent);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(Strings.Get("BirthdayTitle"), dialogue.Title);
         Assert.Equal("Grandma", dialogue.SpeakerName);
@@ -315,58 +317,83 @@ public sealed class OnboardingTests
     [Fact]
     public void BrandPage_MouseOnly_VoiceOff()
     {
-        // Companion parity: brand/car pages expose no voice commands at all;
-        // clicks drive them. Only the dialogue's Continue responds to speech.
+        // The brand page sits before the consent question, so it stays
+        // mouse-only; the car page after the birthday does answer CONTINUE to
+        // speech (the mic is live by then).
         var vm = Create();
         ToBrandPage(vm);
         var brands = Assert.IsType<BrandScreenViewModel>(vm.CurrentScreen);
         brands.ChooseBrandCommand.Execute("Mazda");
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
-    public void VoiceInfoPage_NamesNoWakePhrase()
+    public void VoiceConsentPage_AsksBeforeTheMicOpens()
     {
+        // The consent page is only the permission ask; the lesson belongs to
+        // the birthday page, where the mic is live. The ask must not sneak the
+        // wake word in, and the page exposes no spoken buttons because there
+        // is no open mic to answer it with.
         var session = CreateSession();
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        Assert.Contains("Control navigation with your voice.", voice.LeadText, StringComparison.Ordinal);
-        Assert.DoesNotContain("HEY", voice.LeadText, StringComparison.Ordinal);
-        Assert.Null(voice.HintText);
+        var voice = Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(
+            "ACEDrive can be voice controlled. If you want to activate that option, confirm here",
+            Strings.Get("VoiceConsentIntro"));
+        Assert.DoesNotContain("HEY", Strings.Get("VoiceConsentIntro"), StringComparison.Ordinal);
+        Assert.False(typeof(IVoiceScreen).IsAssignableFrom(voice.GetType()));
     }
 
     [Fact]
-    public void VoiceInfoContinue_ShowsDialogue()
+    public void VoiceConsentConfirm_ShowsDialogueAndBanksThePermission()
     {
-        var session = CreateSession();
+        var store = new FakeOnboardingStore();
+        var session = CreateSession(onboarding: store);
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .ConfirmCommand.Execute(null);
+        Assert.True(store.State.VoiceConsent);
         Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
-    public void VoiceInfoVoiceContinue_GlowsThenWaitsBeatThenShowsDialogue()
+    public void VoiceConsentConfirm_BirthdayPageTeachesVoiceAboveContinue()
     {
-        // Voice navigation waits out the half-second beat so the teal glow
-        // is actually seen; clicks (the test above) stay instant.
-        var clock = new FakeClock();
-        var session = CreateSession(clock: clock);
+        // The lesson moved off the consent page to the first birthday page:
+        // that is where the mic is live and where the example button (CONTINUE)
+        // actually sits. Every later page drops the hint.
+        var session = CreateSession();
         var vm = session.Vm;
         session.Story.ChooseBrand("Mazda");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        string? label = VoiceMatch.MatchLabel("could you please continue", voice.VoiceActions.Keys);
-        Assert.Equal("CONTINUE", label);
-        voice.VoiceActions[label!].Invoke();
-        Assert.True(voice.ContinueFlash);
-        Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen); // still glowing, not yet flipped
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .ConfirmCommand.Execute(null);
 
-        clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
-        vm.Poll();
-        Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
-        Assert.False(voice.ContinueFlash);
+        var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
+        Assert.True(dialogue.HasFirstPageHint);
+        Assert.Contains("Control navigation with your voice.", dialogue.FirstPageHint, StringComparison.Ordinal);
+        Assert.Contains("Say a button's text", dialogue.FirstPageHint, StringComparison.Ordinal);
+        Assert.Contains("CONTINUE", dialogue.FirstPageHint, StringComparison.Ordinal);
+
+        dialogue.ContinueCommand.Execute(null);
+        Assert.False(dialogue.HasFirstPageHint);
+    }
+
+    [Fact]
+    public void VoiceConsentDecline_ContinuesWithThePermissionOff()
+    {
+        // NO THANK YOU is not a dead end: the walk still continues, just with
+        // the mic never opened.
+        var store = new FakeOnboardingStore();
+        var session = CreateSession(onboarding: store);
+        var vm = session.Vm;
+        session.Story.ChooseBrand("Mazda");
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .DeclineCommand.Execute(null);
+        Assert.False(store.State.VoiceConsent);
+        var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
+        Assert.False(dialogue.HasFirstPageHint);
     }
 
     [Fact]
@@ -379,8 +406,8 @@ public sealed class OnboardingTests
         var session = CreateSession(clock: clock);
         var vm = session.Vm;
         session.Story.ChooseBrand("Honda");
-        var voice = Assert.IsType<VoiceInfoScreenViewModel>(vm.CurrentScreen);
-        voice.ContinueCommand.Execute(null);
+        Assert.IsType<VoiceConsentScreenViewModel>(vm.CurrentScreen)
+            .ConfirmCommand.Execute(null);
         var dialogue = Assert.IsType<DialogueScreenViewModel>(vm.CurrentScreen);
         string? label = VoiceMatch.MatchLabel("could you please continue", dialogue.VoiceActions.Keys);
         Assert.Equal("CONTINUE", label);

@@ -33,6 +33,7 @@ public sealed class OwnedCar
         Condition = new CarCondition(maintenance, saved?.Parts, Odometer);
         Engine = new EngineHealth(maintenance, saved?.Engine, Odometer, seed);
         _askedCategories = CleanAsked(saved?.AskedCategories);
+        JobsCompleted = Math.Max(0, saved?.JobsCompleted ?? 0);
     }
 
     /// <summary>Catalogue key of the bought car (<see cref="CarSpec.Key"/>).</summary>
@@ -43,6 +44,13 @@ public sealed class OwnedCar
 
     /// <summary>Kilometres driven in this car. Feeds the wear/engine math (PORTPLAN 31/32).</summary>
     public double Odometer { get; private set; }
+
+    /// <summary>
+    /// Settled taxi/delivery jobs completed with this car (Unity
+    /// CarJobsService.GetJobs). The weekly valuation score adds one point per
+    /// job, so the count rides the garage save.
+    /// </summary>
+    public int JobsCompleted { get; private set; }
 
     /// <summary>Whether the daily premium covers this car (Unity OwnedCar.hasInsurance).</summary>
     public bool HasInsurance { get; private set; }
@@ -88,13 +96,19 @@ public sealed class OwnedCar
     /// <summary>Unity OwnedCar.hasInsurance flip (broker / insurance screen, item 34).</summary>
     public void SetInsurance(bool insured) => HasInsurance = insured;
 
+    /// <summary>
+    /// One settled job with this car (Unity CarJobsService's counter). The
+    /// caller saving the garage right after the settle banks it.
+    /// </summary>
+    public void RegisterJob() => JobsCompleted++;
+
     /// <summary>Unity ReplaceEngine's odometer reset ("a new engine resets car
     /// km to 0"): the caller resets the part baselines too (<see cref="CarCondition.ResetAll"/>).</summary>
     public void ResetOdometer() => Odometer = 0.0;
 
     public OwnedCarState Snapshot() => new(
         Key, PurchaseWeek, Odometer, HasInsurance, Filth.Value,
-        Condition.Snapshot(), Engine.Snapshot(), _askedCategories);
+        Condition.Snapshot(), Engine.Snapshot(), _askedCategories, JobsCompleted);
 
     private static List<string> CleanAsked(IReadOnlyList<string>? saved)
     {

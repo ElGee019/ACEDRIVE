@@ -18,6 +18,7 @@ public partial class App : Application, IDisposable
 {
     private FileLogger? _log;
     private FirebaseConnection? _firebase;
+    private FirestoreValuationBoard? _valuationBoard;
     private bool _disposed;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -56,6 +57,10 @@ public partial class App : Application, IDisposable
         // Star of the Show curve and the generated item names, shipped as
         // content like the tier table so no rule class carries a number.
         CentoRaceRules centoRaceRules = new JsonCentoRaceRulesStore(_log).Load();
+        // The weekly missing-person run's balance (ToWhereIsWilly.md §3.2): the
+        // finder's fee, its multipliers and the 100 CR floor, shipped as
+        // content like the fares so no rule class carries a number.
+        WhereIsWillyRules willyRules = new JsonWhereIsWillyRules(_log).Load();
         // The placeholder address map grounds the HUD, the onboarding home and
         // the taxi job doors; load it before the proposal draw.
         var addressMap = new JsonAddressMapStore(_log).Load();
@@ -215,6 +220,14 @@ public partial class App : Application, IDisposable
         // tips measure a real career instead of a placeholder.
         var pins = new DestinationPins(savedDriver);
         var visits = new VisitLedger(savedDriver);
+        // The weekly market valuation (PORTPLAN 49): the preloaded venue, the
+        // in-flight leg, the week's entry and the settled uid set resume from
+        // the driver file, so a restart reopens the same showcase week.
+        var valuation = new ValuationLedger(savedDriver);
+        // The missing-person run's persisted half (ToWhereIsWilly.md §2.9): the
+        // game date its receipt last stamped, so a restart closes the row for
+        // the rest of that Wednesday.
+        var willyLedger = new WhereIsWillyLedger(savedDriver);
         var todoStore = new JsonTodoProgressStore(_log);
         // The open taxi shift resumes with its wall-clock stamps (PORTPLAN 12):
         // the 30-minute idle rule keeps running while the app and EVO are
@@ -248,6 +261,7 @@ public partial class App : Application, IDisposable
         IPlayerTelemetry telemetry;
         IShiftStandings shiftStandings;
         IPlayerNameRegistry playerNames;
+        IValuationBoard valuationBoard;
         FirebaseOptions? firebaseOptions = FirebaseOptions.TryLoad(_log);
         if (firebaseOptions is not null)
         {
@@ -285,6 +299,15 @@ public partial class App : Application, IDisposable
                 _firebase.UidAsync, _log, _firebase.StopToken);
             playerNames = new FirestorePlayerNameRegistry(
                 _firebase.Database, _firebase.UidAsync, wall, _log);
+
+            // The weekly valuation list (PORTPLAN 49): the same anonymous uid
+            // and the same stop token as the other live boards. Its watcher is
+            // a background re-read, never part of the 10 Hz poll.
+            _valuationBoard = new FirestoreValuationBoard(
+                new FirestoreValuationEntries(
+                    _firebase.Database, _firebase.UidAsync, wall, _log),
+                () => _firebase?.Session.Uid, _log, _firebase.StopToken);
+            valuationBoard = _valuationBoard;
         }
         else
         {
@@ -297,6 +320,9 @@ public partial class App : Application, IDisposable
             offlineShiftBoard.RestoreSnapshot(savedDriver);
             shiftStandings = offlineShiftBoard;
             playerNames = new OfflinePlayerNameRegistry();
+            // No backend: the list is empty and the house entry is the only
+            // opponent, exactly like Unity's unconfigured build.
+            valuationBoard = new OfflineValuationBoard();
         }
         // Familiarity (PORTPLAN 45): one persisted level per resident, so a
         // restart reopens the same friendships instead of resetting them.
@@ -304,13 +330,9 @@ public partial class App : Application, IDisposable
         // Brand mileage (PORTPLAN 35): lifetime km per driven brand behind
         // the receipt's sponsorship rate, resumed across sessions.
         var brands = new JsonBrandMileageStore(_log);
-        // The typed POI handlers (PORTPLAN item 24): Max's grocery is the
-        // first interior. The business interiors (bank, dealer, …) are built
-        // by the host, which owns their destination changes and banking.
-        IPoiArrivalHandler[] poiHandlers =
-        [
-            new StorePoiHandler(stores, trunk, driver, garage, friendships, beat),
-        ];
+        // The typed POI handlers (PORTPLAN item 24) are assembled below, once
+        // the missing-person flow exists: its marker handler joins the list
+        // first so a quest marker never falls through to a business interior.
         var taxiRules = new JsonTaxiRulesStore(_log).Load();
         // Customer request content (PORTPLAN item 11): suffix lines, quiz
         // categories and tier chances. Its own seeded stream, offset from the
@@ -349,7 +371,8 @@ public partial class App : Application, IDisposable
         var saver = new GameStateSaver(
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
-            garage, city, hunger, roadTests, shift, shifts, jobs, pins, visits);
+            garage, city, hunger, roadTests, shift, shifts, jobs, pins, visits,
+            valuation, willyLedger);
         // The panel, its page and the activity stamp: view state with an owner
         // the view binds through the shell, not state the coordinator holds.
         var shell = new OverlayShell();
@@ -362,6 +385,21 @@ public partial class App : Application, IDisposable
         var dayCycle = new DayCycle(
             game, shift, shifts, shiftStandings, telemetry, profileStore,
             rivals, saver, beat, startWeek, _log);
+        // The weekly missing-person run (ToWhereIsWilly.md): its own flow owns
+        // the Wednesday draw, the search, the drive home and the receipt, so
+        // the coordinator only forwards the calendar tap, the poll and the one
+        // ENTER the HUD raises. Draws get their own seeded stream.
+        var willyFlow = new WhereIsWillyFlow(
+            addressMap, game, poiGenerator, poiDirectory, residents, garage, cars,
+            willyRules, willyLedger, friendships, trunk, driver, hud, saver,
+            rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log);
+        // The quest's marker handler joins the typed arrival list first, so a
+        // Willy marker can never fall through to a business interior.
+        IPoiArrivalHandler[] poiHandlers =
+        [
+            new WhereIsWillyPoiHandler(willyFlow),
+            new StorePoiHandler(stores, trunk, driver, garage, friendships, beat),
+        ];
         // The session-start catch-up (PORTPLAN items 30/47): the starter car a
         // pre-garage save never created, and today's login bonus. It owns the
         // streak counter and the skill-gain stream, so the coordinator does not
@@ -420,6 +458,14 @@ public partial class App : Application, IDisposable
         // The car haul (PORTPLAN 20): settle-only today, so the tap prices the
         // placeholder leg, banks it and hands back the flow's own receipt.
         var haul = new CarHaulFlow(carBrands, cars, driver, dayCycle, saver, beat, _log);
+        // The weekly market valuation (PORTPLAN 49): its own flow owns the
+        // Monday week, the venue leg and the live/offline comparison, so the
+        // coordinator only forwards the calendar tap, the poll and the arrival
+        // edge. Its draws get their own seeded stream, offset from the other
+        // launch draws.
+        var valuationFlow = new ValuationFlow(
+            addressMap, game, valuation, valuationBoard, garage, cars, driver,
+            profileStore, hud, saver, rivals, beat, new Random(taxiSeed + 8), _log);
         // The page graph: the control page, the menu and every tile behind
         // them, with their own caches. It takes the flows (their pages are
         // theirs) and the session's data; the coordinator attaches as its host
@@ -436,6 +482,7 @@ public partial class App : Application, IDisposable
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
+            valuationFlow, willyFlow, willyLedger,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
             () => carBrands.Brand, new Random(taxiSeed + 6), _log);
@@ -448,16 +495,26 @@ public partial class App : Application, IDisposable
         // host (page swaps, panel reveals, the shared driver save), so it is
         // built here like every other collaborator. Its car brand is read live
         // off the watcher, the week off the calendar.
+        // The mic is built by the root and handed to both sides that need it:
+        // the coordinator owns its session lifecycle, the story flow only gets
+        // the two verbs the consent page's answer needs.
+        IVoiceListener voice = CreateVoice(_log);
         var story = new OnboardingFlow(
             onboardingStore, content, profileStore, playerNames, addressMap, playerName,
             poiGenerator, poiDirectory, poiStore, poiArrivals, trunk,
             deliveryCareer, deliveryBoard.Catalog.StartCredP,
             preferencesStore, preferences, culture, beat, hud, garage,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => carBrands.Brand,
-            _log, new StoryHost(panel, navigation, saver, rivals, todoBoard));
+            _log, new StoryHost(panel, navigation, saver, rivals, todoBoard),
+            voice.StartListening, voice.StopListening);
         // Voice dispatch: the wake word and the button taps, on the same panel
         // and content tables the screens use.
         var voiceRouter = new VoiceRouter(panel, carBrands, content, wall, _log, hud);
+        // Settings' QUIT closes the main panel, the app's one exit path: the
+        // window's close handlers bank the session and App.xaml shuts down on
+        // that close, so it never needs a hard Environment.Exit. The window is
+        // built below, hence the deferred read.
+        Action quit = () => MainWindow?.Close();
         var vm = new MainViewModel(
             new ShmReader(_log),
             wall,
@@ -465,7 +522,7 @@ public partial class App : Application, IDisposable
             shift,
             new JsonSettingsStore(),
             _log,
-            CreateVoice(_log),
+            voice,
             carBrands,
             addressMap,
             taxiRules,
@@ -474,11 +531,11 @@ public partial class App : Application, IDisposable
             rivals,
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, poiWorld, cento, centoSettlement,
+            taxi, delivery, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             navigation, readouts, dayCycle,
             todoBoard, pins,
             hud,
-            saveResets, restarter);
+            saveResets, restarter, quit);
 
         MainWindow = new MainWindow(vm, _log, story.Done);
         // The 200 px companion: own placement file, width follows the main
@@ -616,6 +673,11 @@ public partial class App : Application, IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        // The valuation watcher stops before the connection it reads through:
+        // its own cancel token is linked to the session's, and a disposed
+        // client must not be asked for one more list.
+        _valuationBoard?.Dispose();
+        _valuationBoard = null;
         _firebase?.Dispose();
         _firebase = null;
         _log?.Dispose();

@@ -1,3 +1,4 @@
+using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
@@ -17,7 +18,9 @@ internal sealed class TestSessionResult
 {
     public TestSessionResult(
         MainViewModel vm, FakeClock clock, FakeTelemetry tel, FakeStore store,
-        OnboardingFlow story, TodoBoard todos)
+        OnboardingFlow story, TodoBoard todos, ValuationFlow valuation,
+        ValuationLedger ledger, IValuationBoard board,
+        WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger)
     {
         Vm = vm;
         Clock = clock;
@@ -25,6 +28,11 @@ internal sealed class TestSessionResult
         Store = store;
         Story = story;
         Todos = todos;
+        Valuation = valuation;
+        Ledger = ledger;
+        Board = board;
+        Willy = willy;
+        WillyLedger = willyLedger;
     }
 
     public MainViewModel Vm { get; }
@@ -40,6 +48,21 @@ internal sealed class TestSessionResult
 
     /// <summary>The ToDo list the jobs page reads (PORTPLAN 46).</summary>
     public TodoBoard Todos { get; }
+
+    /// <summary>The weekly market valuation's flow (PORTPLAN 49).</summary>
+    public ValuationFlow Valuation { get; }
+
+    /// <summary>The valuation's persisted half the assertions read.</summary>
+    public ValuationLedger Ledger { get; }
+
+    /// <summary>The list the flow reads and pushes to.</summary>
+    public IValuationBoard Board { get; }
+
+    /// <summary>The weekly missing-person run's flow (ToWhereIsWilly.md).</summary>
+    public WhereIsWillyFlow Willy { get; }
+
+    /// <summary>The missing-person run's persisted completion stamp.</summary>
+    public WhereIsWillyLedger WillyLedger { get; }
 
     public void Deconstruct(
         out MainViewModel vm, out FakeClock clock, out FakeTelemetry tel,

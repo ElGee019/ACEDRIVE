@@ -183,6 +183,54 @@ public sealed class PreferencesScreenTests
     }
 
     [Fact]
+    public void FirstRun_HasNoQuitAction()
+    {
+        var vm = Create([], () => { });
+
+        Assert.False(vm.CanQuit);
+    }
+
+    [Fact]
+    public void SettingsQuit_RunsTheQuitAction()
+    {
+        bool quit = false;
+        var vm = QuitPage(() => quit = true);
+
+        Assert.True(vm.CanQuit);
+
+        vm.QuitCommand.Execute(null);
+
+        Assert.True(quit);
+    }
+
+    [Fact]
+    public void SettingsQuit_CopyFollowsLanguageChange()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = new CultureInfo("en-US");
+            var vm = new PreferencesScreenViewModel(
+                PlayerPreferences.Default,
+                preferences => CultureInfo.CurrentUICulture =
+                    new CultureInfo(preferences.Language == UiLanguage.Dutch ? "nl-NL" : "en-US"),
+                () => { },
+                "PreferencesBack", "BACK",
+                quit: () => { });
+
+            Assert.Equal("QUIT", vm.QuitLabel);
+
+            vm.SelectedLanguage = vm.LanguageOptions[1];
+
+            Assert.Equal("STOPPEN", vm.QuitLabel);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
+    }
+
+    [Fact]
     public void FirstRun_HasNoResetAction()
     {
         var vm = Create([], () => { });
@@ -328,4 +376,8 @@ public sealed class PreferencesScreenTests
     private static PreferencesScreenViewModel ResetPage(Func<GameResetFailure> reset) =>
         new(PlayerPreferences.Default, _ => { }, () => { },
             "PreferencesBack", "BACK", reset);
+
+    private static PreferencesScreenViewModel QuitPage(Action quit) =>
+        new(PlayerPreferences.Default, _ => { }, () => { },
+            "PreferencesBack", "BACK", quit: quit);
 }

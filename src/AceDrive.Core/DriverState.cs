@@ -43,7 +43,13 @@ namespace AceDrive.Core;
 /// prints it with Unity's 1.0 floor — and only a finished Cento Miglia moves
 /// it, so the race port owns the writes while the page already reads it.
 /// The Star of the Show win total (Unity PlayerData.starOfTheShowWins) rides
-/// here too: the race prize scales on it (each win pays more than the last).</summary>
+/// here too: the race prize scales on it (each win pays more than the last).
+/// The weekly market valuation (PORTPLAN 49, Unity PlayerData.valuation*)
+/// keeps its venue, in-flight drive, week's entry, settled uid set and last
+/// reset week here, so a restart reopens the same showcase week.
+/// The weekly missing-person run (ToWhereIsWilly.md §2.9, Unity
+/// PlayerData.lastWillyGameDay + lastWillyYear) keeps only its completion
+/// date here: the search itself is session state and never resumes.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -79,7 +85,17 @@ public sealed record DriverState(
     bool VisitedCarDealer = false,
     bool VisitedInsurance = false,
     double ClubReputation = 0.0,
-    int StarOfTheShowWins = 0)
+    int StarOfTheShowWins = 0,
+    string? ValuationVenueStreetId = null,
+    int ValuationVenueHouseNumber = 0,
+    bool ValuationDriving = false,
+    int ValuationEventsCompleted = 0,
+    int ValuationEntryWeek = -1,
+    string? ValuationEntryCarKey = null,
+    double ValuationOwnScore = 0.0,
+    IReadOnlyList<string>? ValuationSeenUids = null,
+    int LastValuationResetWeek = -1,
+    string? LastWillyDate = null)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

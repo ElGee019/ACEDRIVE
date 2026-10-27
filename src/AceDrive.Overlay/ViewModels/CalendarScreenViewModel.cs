@@ -14,7 +14,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// beat and runs the host action; a tap outside it glows the same beat first,
 /// then swaps the text for the COME BACK warning for three real seconds and
 /// restores (Unity RestoreButtonText parity). The Tuesday road-test button
-/// names the week's car inside its outline (PORTPLAN item 49).
+/// names the week's car inside its outline (PORTPLAN item 49). The Wednesday
+/// missing-person row wears its completed or locked label and answers its tap
+/// with that state's own three-second hint instead of dispatching
+/// (ToWhereIsWilly.md §3.5).
 /// The shared <see cref="VoiceBeat"/> times the teal acknowledgment glow;
 /// game time flows through <see cref="GameClock"/> (clock header + calendar
 /// highlight), never tick counts.
@@ -31,21 +34,31 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly GameClock _game;
     private readonly IClock _clock;
     private readonly RoadTestLedger _roads;
+    // The weekly missing-person run's completion stamp and coffee-career gate
+    // (ToWhereIsWilly.md §3.5): the Wednesday row reads both live, so the label
+    // flips to completed or locked without the page caching a mirror of them.
+    private readonly WhereIsWillyLedger _willy;
+    private readonly Func<bool> _hasCoffeeCareer;
     private readonly ICommand _openDayAction;
     private readonly ICommand _backCommand;
     private int _lastMinute = -1;
     private string? _lastPick;
     private int _lastWeek = -1;
+    private bool _lastCoffeeOpen;
+    private bool _lastWillyDone;
     private int _week;
 
     public CalendarScreenViewModel(
         VoiceBeat beat, GameClock game, IClock clock, RoadTestLedger roads,
-        CalendarStamp stamp, ICommand openDay, ICommand back)
+        CalendarStamp stamp, ICommand openDay, ICommand back,
+        WhereIsWillyLedger willy, Func<bool> hasCoffeeCareer)
     {
         _beat = beat;
         _game = game;
         _clock = clock;
         _roads = roads;
+        _willy = willy;
+        _hasCoffeeCareer = hasCoffeeCareer;
         // The stamp is the persisted display week (PORTPLAN item 51); the
         // year stays data-only, never shown in the overlay.
         _week = stamp.Week;
@@ -120,32 +133,47 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
     /// when the flip lands inside the same wall minute. A road-test switch
     /// (manual tap or week flip) repaints the same way: the pick joins the
     /// guard, otherwise the minute check would swallow it. Same for the
-    /// display week, which the controller pushes on the Sunday boundary.
+    /// display week, which the controller pushes on the Sunday boundary, and
+    /// the missing-person row's two states: the completion stamp (written the
+    /// moment the receipt pays, possibly inside the same game minute) and the
+    /// coffee career opening or closing between two looks.
     /// </summary>
     public void Refresh()
     {
         DateTime now = _game.GameNow;
         string? pick = _roads.Current?.Id;
+        // All three are allocation-free reads (the ledger caches its parsed
+        // stamp), so the guard can include them and still cost a compare per
+        // tick. The stamp changes mid-minute when the receipt pays, so it must
+        // be part of the guard or the row would read open until the next game
+        // minute.
+        bool coffeeOpen = _hasCoffeeCareer();
+        bool willyDone = _willy.CompletedOn(now);
         if (now.Hour * 60 + now.Minute == _lastMinute
             && pick == _lastPick
-            && _week == _lastWeek)
+            && _week == _lastWeek
+            && coffeeOpen == _lastCoffeeOpen
+            && willyDone == _lastWillyDone)
         {
             return;
         }
         _lastMinute = now.Hour * 60 + now.Minute;
         _lastPick = pick;
         _lastWeek = _week;
+        _lastCoffeeOpen = coffeeOpen;
+        _lastWillyDone = willyDone;
 
         int today = ControlCalendar.ToDayOfWeek(now);
         // The year stays data-only (PORTPLAN item 51 persist): irrelevant in
         // the overlay context, so the header shows the display week alone.
         ClockText = GameClockText.Time(now);
         DayWeekText = GameClockText.DayWeek(today, _week);
-        Days = BuildDays(now, today);
+        Days = BuildDays(now, today, coffeeOpen, willyDone);
         RebuildVoice();
     }
 
-    private CalendarRow[] BuildDays(DateTime now, int today)
+    private CalendarRow[] BuildDays(
+        DateTime now, int today, bool coffeeOpen, bool completed)
     {
         var rows = new CalendarRow[ControlCalendar.Week.Count];
         for (int i = 0; i < rows.Length; i++)
@@ -153,31 +181,51 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
             CalendarDay day = ControlCalendar.Week[i];
             bool isToday = day.DayOfWeek == today;
             string suffix = DaySuffixes[day.DayOfWeek - 1];
+            // The missing-person row is the one stateful event row: its run is
+            // stamped for the rest of the Wednesday, and its coffee career can
+            // still be closed. Both states are grey and warn on tap instead of
+            // dispatching (Unity's completed label and its unlock label).
+            bool willy = day.EventId == ControlCalendar.Willy;
+            bool done = willy && completed;
+            bool locked = willy && !done && !coffeeOpen;
             rows[i] = new CalendarRow(
                 Strings.Get("Day" + suffix),
                 Strings.Get("DayShort" + suffix),
-                DisplayLabel(i, day),
+                DisplayLabel(i, day, done, locked),
                 day.DayOfWeek,
                 isToday,
-                isToday && ControlCalendar.IsEventWindow(now.Hour));
+                isToday && ControlCalendar.IsEventWindow(now.Hour),
+                Completed: done,
+                Locked: locked);
         }
         return rows;
     }
 
     // An active gate warning outranks the event label until its deadline, so
     // a mid-warning repaint (game minute, road-test switch) keeps the hint.
-    private string DisplayLabel(int index, CalendarDay day) =>
-        index == _warnIndex && _clock.UtcNow < _warnUntil ? _warnText : EventLabel(day);
+    private string DisplayLabel(int index, CalendarDay day, bool completed, bool locked) =>
+        index == _warnIndex && _clock.UtcNow < _warnUntil
+            ? _warnText
+            : EventLabel(day, completed, locked);
 
     // Button copy per day: the resx label, except the road-test row names the
-    // running car inside the button ("Road test: 1990 MAZDA MX-5 NA"). The car
+    // running car inside the button ("Road test: 1990 MAZDA MX-5 NA") and the
+    // missing-person row swaps to its completed or locked variant. The car
     // suffix is data, all caps; the resx prefix keeps its localization.
     // Empty when the row has no event or the pool failed to load.
-    private string EventLabel(CalendarDay day)
+    private string EventLabel(CalendarDay day, bool completed, bool locked)
     {
         if (day.EventId is null)
         {
             return string.Empty;
+        }
+        if (completed)
+        {
+            return Strings.Get("EventWillyCompleted");
+        }
+        if (locked)
+        {
+            return Strings.Get("EventWillyLocked");
         }
         string label = Strings.Get("Event" + day.EventId);
         string detail = RoadTestDetail(day);
@@ -249,6 +297,23 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
         {
             return;
         }
+        CalendarRow row = Days[index];
+        // The missing-person row's two closed states answer with their own
+        // three-second warning and never dispatch: Unity's SEE YOU NEXT
+        // WEDNESDAY after a stamped run and its unlock hint before the coffee
+        // career opens. Both share the one warning slot, so no new timer.
+        if (row.Locked)
+        {
+            Flash(index);
+            _beat.Defer(() => Warn(index, "ControlGateWillyLocked"));
+            return;
+        }
+        if (row.Completed)
+        {
+            Flash(index);
+            _beat.Defer(() => Warn(index, "ControlGateWillyDone"));
+            return;
+        }
         if (day != Today || !ControlCalendar.IsEventWindow(_game.GameNow.Hour))
         {
             Flash(index);
@@ -282,6 +347,16 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
         RepaintRows();
     }
 
+    // The missing-person row's own hints: the copy is a whole resx sentence,
+    // so nothing is formatted in.
+    private void Warn(int index, string key)
+    {
+        _warnIndex = index;
+        _warnText = Strings.Get(key);
+        _warnUntil = _clock.UtcNow + TimeSpan.FromSeconds(GateWarningSeconds);
+        RepaintRows();
+    }
+
     private void ClearWarning()
     {
         _warnIndex = -1;
@@ -294,7 +369,12 @@ public sealed class CalendarScreenViewModel : ViewModelBase, IVoiceScreen
         var rows = new CalendarRow[Days.Count];
         for (int i = 0; i < rows.Length; i++)
         {
-            rows[i] = Days[i] with { EventLabel = DisplayLabel(i, ControlCalendar.Week[i]) };
+            CalendarRow row = Days[i];
+            rows[i] = row with
+            {
+                EventLabel = DisplayLabel(
+                    i, ControlCalendar.Week[i], row.Completed, row.Locked),
+            };
         }
         Days = rows;
     }

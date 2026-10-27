@@ -49,6 +49,14 @@
                 </ComboBox>
             </Grid>
 
+            <!-- Settings entry only: a first run has no session to leave, so
+                 QUIT stays collapsed there. It runs the window's own close
+                 path (wired in App), which banks the session on the way out. -->
+            <Button Content="{Binding QuitLabel}"
+                    Command="{Binding QuitCommand}"
+                    Margin="0,28,0,0"
+                    Visibility="{Binding CanQuit, Converter={StaticResource BoolToVis}}"/>
+
             <!-- Settings entry only: a first run has no career to wipe, so the
                  whole block stays collapsed there. The warning appears between
                  the two taps of the reset button. -->

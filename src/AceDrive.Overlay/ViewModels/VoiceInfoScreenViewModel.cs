@@ -5,12 +5,12 @@ using AceDrive.Overlay.Localization;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// Voice-control page: first the Career Start insert after grandma's car,
-/// later the ride-home explanation after the community centre grants the
-/// taxi license. The flow owns the copy and what CONTINUE means, so one page
-/// serves both lessons without a second view. The closing page carries only
-/// its next-step line: the wake word and the hotkey now live on the menu,
-/// above the clock, so the lesson is not repeated after it was taught.
+/// Closing voice page, shown after the community centre grants the taxi
+/// license. The flow owns the copy and what CONTINUE means. The page carries
+/// only its next-step line: the wake word and the hotkey live on the menu,
+/// above the clock, so the lesson is not repeated after it was taught. The
+/// earlier consent question has its own page (<see cref="VoiceConsentScreenViewModel"/>)
+/// because it is answered by clicking while the mic is still closed.
 /// </summary>
 public sealed class VoiceInfoScreenViewModel : ViewModelBase, IVoiceScreen
 {

@@ -185,6 +185,13 @@ public sealed class JobSettlement
             // gates the job-opened businesses.
             _zone.RegisterJob();
             _jobs.RegisterTaxi();
+            // Per-car job count (Unity CarJobsService): the valuation score
+            // adds one point per job done with the entered car. The settle's
+            // SaveGarage below banks it.
+            if (xpCar is not null && _garage.Find(xpCar.Key) is { } owned)
+            {
+                owned.RegisterJob();
+            }
         }
         ApplyBankInterest();
         if (earnsProgress)
@@ -305,6 +312,11 @@ public sealed class JobSettlement
             // counters, interest and expansion flow exactly like the taxi hook.
             _zone.RegisterJob();
             _jobs.RegisterDelivery();
+            // Per-car job count, delivery twin: the valuation score's job term.
+            if (deliveryCar is not null && _garage.Find(deliveryCar.Key) is { } owned)
+            {
+                owned.RegisterJob();
+            }
         }
         ApplyBankInterest();
         if (earnsProgress)

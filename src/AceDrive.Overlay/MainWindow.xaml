@@ -26,6 +26,9 @@
         <DataTemplate DataType="{x:Type vm:GrandmaCarScreenViewModel}">
             <views:GrandmaCarScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:VoiceConsentScreenViewModel}">
+            <views:VoiceConsentScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:VoiceInfoScreenViewModel}">
             <views:VoiceInfoScreenView/>
         </DataTemplate>
@@ -112,6 +115,15 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:BreakdownScreenViewModel}">
             <views:BreakdownScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ValuationScreenViewModel}">
+            <views:ValuationScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:WhereIsWillyScreenViewModel}">
+            <views:WhereIsWillyScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:WhereIsWillyReceiptScreenViewModel}">
+            <views:WhereIsWillyReceiptScreenView/>
         </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes

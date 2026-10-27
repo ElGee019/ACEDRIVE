@@ -13,7 +13,8 @@ namespace AceDrive.Core.Tests;
 internal static class TestSaveState
 {
     public static GameStateSaver Saver(
-        IClock clock, DriverWallet wallet, Garage garage, IDriverStore? drivers = null) =>
+        IClock clock, DriverWallet wallet, Garage garage, IDriverStore? drivers = null,
+        ValuationLedger? valuation = null) =>
         new(clock, new GameClock(clock, clock.UtcNow),
             new FakeGameClockStore(), drivers ?? new FakeDriverStore(),
             new FakeGarageStore(), new FakeCityStore(),
@@ -22,5 +23,6 @@ internal static class TestSaveState
             wallet, new DailyStreak(clock, null), new OperatingZone(null, seed: 0), new Trunk(),
             garage, new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
             new RoadTestLedger([], seed: 0), new TaxiShift(), new ShiftRecord(null), new JobLedger(),
-            new DestinationPins(), new VisitLedger());
+            new DestinationPins(), new VisitLedger(), valuation ?? new ValuationLedger(),
+            new WhereIsWillyLedger());
 }

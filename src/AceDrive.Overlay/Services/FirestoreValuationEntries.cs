@@ -63,6 +63,20 @@ public sealed class FirestoreValuationEntries
             cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Deletes only this player's own entry (Unity WipeOwnEntry): the weekly
+    /// reset must never remove a rival's doc from a shared list. Missing uid
+    /// answers false instead of wiping the list.
+    /// </summary>
+    public async Task<bool> WipeOwnAsync(
+        string uid, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(uid)) return false;
+        return await _db.BatchDeleteAsync(
+            [FirestoreCollections.Valuation + "/" + uid], cancellationToken)
+            .ConfigureAwait(false);
+    }
+
     public async Task<bool> WipeAsync(CancellationToken cancellationToken = default)
     {
         IReadOnlyList<FirestoreDocument>? documents =

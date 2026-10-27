@@ -14,7 +14,7 @@ internal sealed class FakeDayCycleHost : IDayCycleHost
 
     public object? Page { get; private set; }
 
-    public int ControlPages { get; private set; }
+    public int MainPages { get; private set; }
 
     public void DisplayWeekChanged(int week) => Weeks.Add(week);
 
@@ -22,5 +22,5 @@ internal sealed class FakeDayCycleHost : IDayCycleHost
 
     public void ShowShiftEnded(object page) => Page = page;
 
-    public void GoToControlPage() => ControlPages++;
+    public void GoToMainPage() => MainPages++;
 }
