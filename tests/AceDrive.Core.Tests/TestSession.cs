@@ -43,8 +43,12 @@ internal static class TestSession
             onboardingStore.Save(options.Progress);
         }
         var board = options.Catalog ?? DeliveryCatalog.Default;
+        // The career resumes from the saved driver exactly like App.OnStartup:
+        // a session rebuilt from a banked DriverState reopens the hubs it bought.
         var deliveryCareer = options.Career
-            ?? new DeliveryCareer(options.Hubs ?? HubCatalog.Default, board.StartCredP);
+            ?? (options.SavedDriver?.Career is { } savedCareer
+                ? new DeliveryCareer(options.Hubs ?? HubCatalog.Default, savedCareer)
+                : new DeliveryCareer(options.Hubs ?? HubCatalog.Default, board.StartCredP));
         var deliveryBoard = new DeliveryBoard(board);
         CarIdentity? announced =
             options.CarKsId is null ? null : new CarIdentity(options.CarKsId, options.CarPreset);
@@ -128,7 +132,7 @@ internal static class TestSession
             walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
             cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance,
             jobsInstance, pinsInstance, visitsInstance, valuationInstance,
-            willyLedgerInstance);
+            willyLedgerInstance, deliveryCareer);
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
             brands, contentSource);
@@ -212,7 +216,7 @@ internal static class TestSession
             proposalsInstance, map, brands, pool, options.Requests,
             options.RequestTable ?? CustomerRequestTable.Empty, options.Police,
             taxiRulesInstance, faresInstance, garageInstance, walletInstance,
-            friendsInstance, fleet, game, clock, beat, meter, saver, rivalsInstance,
+            friendsInstance, fleet, game, clock, beat, saver, rivalsInstance,
             breakdownsInstance, options.Hud, logger);
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,

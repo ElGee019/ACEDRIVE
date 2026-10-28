@@ -24,6 +24,10 @@ public sealed record OnboardingState(
     string? MaxStoreId = null,
     AddressLocation? MaxStoreAddress = null,
     AddressLocation? CommunityCentreAddress = null,
+    // The door-only La Strada office: placed on a street connecting the tour's
+    // neighbourhood so the addresses page can list it before its interior is
+    // ported. Null on saves written before the door existed.
+    AddressLocation? LaStradaAddress = null,
     bool CommunityCentreDone = false,
     bool MaxErrandDone = false,
     // Max's first store visit after the introduction shows the delivery offer

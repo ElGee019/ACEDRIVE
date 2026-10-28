@@ -58,6 +58,43 @@ public sealed class JsonDriverStoreTests
         finally { File.Delete(file); }
     }
 
+    [Fact]
+    public void SaveAndLoad_RoundTripsTheDeliveryCareer()
+    {
+        // The career rides the driver file (this port's PlayerData): the bought
+        // hub, the CredP left and the ramp count must all come back, or a
+        // restart loses the career the player paid for.
+        var hubs = new HubCatalog(
+            [new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES",
+                    [new HubLevel("Grocers and Sons", 100)])])],
+            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        var career = new DeliveryCareer(hubs, 100);
+        Assert.True(career.TryOpenCareer(1, 0, 0));
+        Assert.Equal(1, career.RegisterDelivery("groceries").CredPEarned);
+
+        string file = TempFile();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonDriverStore(file, log);
+            store.Save(DriverState.Fresh with { Career = career.Snapshot() });
+
+            DriverState? loaded = store.Load();
+
+            Assert.NotNull(loaded?.Career);
+            var resumed = new DeliveryCareer(hubs, loaded.Career!);
+            Assert.Equal(career.CredP, resumed.CredP);
+            OwnedHub hub = Assert.Single(resumed.Owned);
+            Assert.Equal("Grocers and Sons", hub.Name);
+            Assert.Equal("groceries_grocers_and_sons", hub.Key);
+            // The second delivery after the restart keeps the ramp moving.
+            Assert.Equal(2, resumed.RegisterDelivery("groceries").CredPEarned);
+            Assert.Empty(log.Warnings);
+        }
+        finally { File.Delete(file); }
+    }
+
     private static string TempFile() =>
         Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString() + ".json");
 }

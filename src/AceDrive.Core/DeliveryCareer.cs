@@ -7,9 +7,11 @@ namespace AceDrive.Core;
 /// <summary>
 /// The player's delivery career: the CredP balance (starts empty; Max's
 /// first store visit hands over the intro gift, PORTPLAN Career Start item 5)
-/// plus the hubs bought with it. Unity: player.credP + player.ownedWholesaleHubs,
-/// in memory until the save lands (PORTPLAN 51). Buying spends it; a delivered
-/// store earns it back through <see cref="RegisterDelivery"/>'s ramp.
+/// plus the hubs bought with it. Unity: player.credP + player.ownedWholesaleHubs.
+/// Buying spends it; a delivered store earns it back through
+/// <see cref="RegisterDelivery"/>'s ramp. The whole career rides the driver
+/// save (<see cref="Snapshot"/>, PORTPLAN 51 interim), so a restart reopens
+/// the hubs it bought and the balance it had left.
 /// </summary>
 public sealed class DeliveryCareer
 {
@@ -19,16 +21,58 @@ public sealed class DeliveryCareer
     // per delivered store, never inside a tick loop.
     private readonly Dictionary<string, int> _deliveries = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>A new career with the given starting balance (0 before Max's gift).</summary>
     public DeliveryCareer(HubCatalog hubs, double startCredP)
     {
         Hubs = hubs;
         CredP = startCredP;
     }
 
+    /// <summary>
+    /// Resumes the career banked in the driver save. A hand-edited or older
+    /// save is tolerated rather than trusted: a negative balance clamps to 0,
+    /// a hub without a name/category is unusable and dropped, a missing map
+    /// identity is rebuilt from the same rule <see cref="TryOpenCareer"/> uses,
+    /// and a repeated hub (a merged save) keeps the first copy only.
+    /// </summary>
+    public DeliveryCareer(HubCatalog hubs, DeliveryCareerState saved)
+    {
+        ArgumentNullException.ThrowIfNull(saved);
+        Hubs = hubs;
+        CredP = Math.Max(0, saved.CredP);
+        if (saved.Owned is not null)
+        {
+            foreach (OwnedHub hub in saved.Owned)
+            {
+                Restore(hub);
+            }
+        }
+        if (saved.Deliveries is not null)
+        {
+            foreach (KeyValuePair<string, int> count in saved.Deliveries)
+            {
+                // A zero is the absence of a count: the ramp reads its default.
+                if (count.Key.Length > 0 && count.Value > 0)
+                {
+                    _deliveries[count.Key] = count.Value;
+                }
+            }
+        }
+    }
+
     /// <summary>The purchasable content table this career spends against.</summary>
     public HubCatalog Hubs { get; }
 
     public double CredP { get; private set; }
+
+    /// <summary>
+    /// The career to bank in the driver save. Both collections are copied, so
+    /// a later purchase or delivery can never move the written snapshot.
+    /// </summary>
+    public DeliveryCareerState Snapshot() => new(
+        CredP,
+        [.. _owned],
+        new Dictionary<string, int>(_deliveries, StringComparer.OrdinalIgnoreCase));
 
     /// <summary>
     /// Banks CredP earned outside the delivery ramp. Max's first-store visit
@@ -171,6 +215,18 @@ public sealed class DeliveryCareer
     // the owned hub alone.
     private static string HubKey(string category, string name) =>
         $"{category}_{name.ToLowerInvariant().Replace(' ', '_')}";
+
+    // One saved hub: content edits can leave a nameless/category-less row, and
+    // a hand edit can repeat one; both are dropped instead of poisoning the
+    // ownership checks the whole delivery board reads.
+    private void Restore(OwnedHub hub)
+    {
+        if (hub.Name.Length == 0 || hub.Category.Length == 0) return;
+        if (IsOwned(hub.Name)) return;
+        _owned.Add(hub.Key.Length == 0
+            ? hub with { Key = HubKey(hub.Category, hub.Name) }
+            : hub);
+    }
 
     private bool TryResolve(
         int tierId, int careerIndex, int levelIndex,

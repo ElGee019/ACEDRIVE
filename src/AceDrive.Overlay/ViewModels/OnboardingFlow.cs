@@ -73,6 +73,10 @@ public sealed class OnboardingFlow : IScreenController
     // that actually bought what this tour asked for.
     private Dictionary<string, int>? _errandStockAtEntry;
 
+    // The pancake click eats the errand groceries once: a repeated ENTER while
+    // the dialogue is open must not consume a second stack.
+    private bool _pancakesCooked;
+
     // Unity's task lines for the two friend legs (MapScreen taskTexts[11] and
     // [5]); the HUD joins the hint to the address it renders.
     private const string JustinHint = "HudHintJustin";
@@ -430,7 +434,7 @@ public sealed class OnboardingFlow : IScreenController
             return banked;
         }
 
-        PointOfInterest? drawn = _pois.Spawn(PoiCatalog.MaxGroceryId);
+        PointOfInterest? drawn = DrawMaxStore();
         if (drawn is not null)
         {
             _progress = _progress with
@@ -473,6 +477,14 @@ public sealed class OnboardingFlow : IScreenController
         if (!_progress.AnnabellaPickedUp || _progress.PancakesDone)
         {
             return;
+        }
+
+        // The pancake click uses up the errand's groceries; the guard keeps a
+        // repeated ENTER while the dialogue is open from eating a second stack.
+        if (!_pancakesCooked)
+        {
+            _pancakesCooked = true;
+            ConsumeErrandItems();
         }
 
         ShowPancakeDialogue();
@@ -725,6 +737,9 @@ public sealed class OnboardingFlow : IScreenController
         _progress = _progress with { MaxDeliveryIntroSeen = true };
         _onboarding.Save(_progress);
         _career.AddCredP(_introCredP);
+        // The gift is career state now: bank it with the flag, so a restart
+        // before the first hub purchase still has the CredP it was handed.
+        _host.SaveDriver();
         _log.LogInfo($"Max's delivery intro: {_introCredP} CredP");
         OpenInterior(poi);
     }
@@ -774,11 +789,32 @@ public sealed class OnboardingFlow : IScreenController
     // later bank or dealer interior cannot complete the story by accident.
     private void LeavePoi(PointOfInterest poi)
     {
-        bool purchased = ReferenceEquals(_poi, poi) && BoughtErrandItems(poi);
+        // The live leg can hold a different instance than the directory row a
+        // relaunch rebuilt, so the stable id identifies the errand too.
+        bool errand = _poi is { } live
+            && (ReferenceEquals(live, poi)
+                || string.Equals(live.Id, poi.Id, StringComparison.Ordinal));
+        bool purchased = errand && BoughtErrandItems(poi);
         _errandStockAtEntry = null;
         if (purchased)
         {
+            // The errand item was bought: the intro continues with its next
+            // leg, so the HUD is re-pinned by AdvancePastErrand and never
+            // held on this door.
             AdvancePastErrand(poi);
+            _host.Hide();
+            return;
+        }
+
+        // Leaving the live errand without its item keeps the errand on the
+        // HUD: the arrival line and ENTER come back, the main page stays out
+        // of the way, and the player has to walk back in and buy it. The
+        // hidden store page is dropped too: re-entering must build a fresh
+        // visit (and a fresh stock snapshot), not revive the old one.
+        if (errand)
+        {
+            _hud?.SetDestination(poi);
+            _host.ShowScreen(null);
             _host.Hide();
             return;
         }
@@ -793,9 +829,10 @@ public sealed class OnboardingFlow : IScreenController
     // more, even when the stack was already there.
     private bool BoughtErrandItems(PointOfInterest poi)
     {
+        PointOfInterest errand = BankedErrand() ?? poi;
         if (_errandStockAtEntry is not { } before
-            || poi.GuaranteedItems is not { Count: > 0 } required
-            || !Errand.IsComplete(poi, _trunk))
+            || errand.GuaranteedItems is not { Count: > 0 } required
+            || !Errand.IsComplete(errand, _trunk))
         {
             return false;
         }
@@ -815,7 +852,7 @@ public sealed class OnboardingFlow : IScreenController
     private Dictionary<string, int> StockOf(PointOfInterest poi)
     {
         var stock = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-        if (poi.GuaranteedItems is { } required)
+        if ((BankedErrand() ?? poi).GuaranteedItems is { } required)
         {
             foreach (string name in required)
             {
@@ -823,6 +860,34 @@ public sealed class OnboardingFlow : IScreenController
             }
         }
         return stock;
+    }
+
+    // The errand's guaranteed items come from the banked store definition, not
+    // from whichever PointOfInterest instance the HUD or the addresses page
+    // pinned: an old directory row can carry the door without the item list,
+    // and that must not turn a real maple purchase into a no-op.
+    private PointOfInterest? BankedErrand() =>
+        _progress.MaxStoreId is { } id && _progress.MaxStoreAddress is { } address
+            ? _pois.Place(id, address)
+            : null;
+
+    // The pancakes use up the errand's groceries: one unit of each guaranteed
+    // item leaves the trunk. The banked store identity names the items, so no
+    // story item is hardcoded here.
+    private void ConsumeErrandItems()
+    {
+        if (_progress.MaxStoreId is not { } id
+            || _progress.MaxStoreAddress is not { } address
+            || _pois.Place(id, address) is not { GuaranteedItems: { Count: > 0 } items })
+        {
+            return;
+        }
+
+        foreach (string item in items)
+        {
+            _trunk.RemoveOne(item);
+        }
+        _host.SaveDriver();
     }
 
     private int QuantityOf(string name)
@@ -918,16 +983,19 @@ public sealed class OnboardingFlow : IScreenController
 
         if (_progress.CommunityCentreAddress is { } stored)
         {
+            EnsureLaStrada();
             return Place(StoryCommunityCentre.Definition, stored);
         }
 
-        if (_pois.DrawAddress() is not { } address)
+        IReadOnlyList<AddressStreet> used = UsedStoryStreets();
+        if (DrawStoryDoor(used, used) is not { } address)
         {
             return null;
         }
 
         _progress = _progress with { CommunityCentreAddress = address };
         _onboarding.Save(_progress);
+        EnsureLaStrada();
         return Place(StoryCommunityCentre.Definition, address);
     }
 
@@ -956,9 +1024,10 @@ public sealed class OnboardingFlow : IScreenController
             : null;
     }
 
-    // Both friends still live in the street where the player grew up (Unity
-    // draws the pair from one street's houses), so both doors are drawn in one
-    // go and banked with the progress.
+    // The friends share one street that connects the player's street to Max's
+    // shop (Unity discovers both on connected streets). It is not the home
+    // street itself: the pair lives around the corner, not next door. Both
+    // doors are drawn in one go and banked with the progress.
     private void DrawFriendDoors()
     {
         if (_progress.JustinAddress is not null && _progress.AnnabellaAddress is not null)
@@ -971,63 +1040,182 @@ public sealed class OnboardingFlow : IScreenController
             return;
         }
 
-        AddressLocation? justin = _progress.JustinAddress;
-        if (justin is null)
+        AddressLocation? drawn = _progress.JustinAddress
+            ?? _pois.DrawHouse(street, TakenHouseNumbers(street));
+        if (drawn is not { } justin)
         {
-            justin = _pois.DrawHouse(street, OwnHouse(street));
-            if (justin is null)
-            {
-                return;
-            }
+            return;
         }
 
+        int[] taken = [.. TakenHouseNumbers(street), justin.HouseNumber];
         AddressLocation? annabella = _progress.AnnabellaAddress
-            ?? _pois.DrawHouse(street, TakenHouses(street, justin));
+            ?? _pois.DrawHouse(street, taken);
 
         _progress = _progress with { JustinAddress = justin, AnnabellaAddress = annabella };
         _onboarding.Save(_progress);
     }
 
-    // The house the player grew up in is never a friend's door (Unity picks the
-    // friends' houses off the same street, away from home).
-    private int[] OwnHouse(AddressStreet street) =>
-        _profile is { } profile
-        && string.Equals(profile.StreetId, street.Id, StringComparison.OrdinalIgnoreCase)
-            ? [profile.HouseNumber]
-            : [];
-
-    // The player's own house plus Justin's door, when his is on this street.
-    private int[] TakenHouses(AddressStreet street, AddressLocation? justin)
-    {
-        int[] taken = OwnHouse(street);
-        return justin is { } door && door.StreetName == street.Name
-            ? [.. taken, door.HouseNumber]
-            : taken;
-    }
-
-    // Justin still lives in the street where the player grew up (Unity's task
-    // line), so the profile's street wins. A save without one falls back to the
-    // first street that has houses, so the tour never dead-ends on a
-    // half-filled profile.
+    // The pair lives one street over from the player or from Max's shop
+    // (Unity's connected-street discovery): one of the free streets connecting
+    // either. A save without a profile falls back to the first street with
+    // houses, so the tour never dead-ends on a half-filled profile.
     private AddressStreet? FriendStreet()
     {
-        AddressStreet? first = null;
+        var anchors = new List<AddressStreet>();
+        AddStreet(anchors, HomeStreet());
+        AddStreet(anchors, StreetOf(_progress.MaxStoreAddress));
+        return anchors.Count == 0
+            ? FirstStreetWithHouses()
+            : _pois.PickConnectingStreet(anchors, anchors);
+    }
+
+    // The birthday errand joins the neighbourhood: Max's shop opens on a
+    // street connected to the player's own, never on the home street itself.
+    // A save without a profile keeps the old whole-map draw so the errand is
+    // still placeable.
+    private PointOfInterest? DrawMaxStore()
+    {
+        if (HomeStreet() is not { } home)
+        {
+            return _pois.Spawn(PoiCatalog.MaxGroceryId);
+        }
+
+        if (DrawStoryDoor([home], [home]) is { } address)
+        {
+            return _pois.Place(PoiCatalog.MaxGroceryId, address);
+        }
+
+        return null;
+    }
+
+    // One story door on a street connected to the neighbourhood already in
+    // use: the next place opens around the corner, never on the other side of
+    // the lap. Excluded numbers keep the fallback rows collision-free.
+    private AddressLocation? DrawStoryDoor(
+        IReadOnlyList<AddressStreet> anchors, IReadOnlyList<AddressStreet> used)
+    {
+        AddressStreet? street = _pois.PickConnectingStreet(anchors, used);
+        return street is null ? null : _pois.DrawHouse(street, TakenHouseNumbers(street));
+    }
+
+    // La Strada closes the neighbourhood as a door-only story place: the
+    // addresses page lists it, while its interior is still out of the port
+    // (PORTPLAN 37). It opens beside the community centre, so the two closing
+    // places sit on connecting streets. Idempotent, so a relaunch never moves
+    // a banked door.
+    private void EnsureLaStrada()
+    {
+        if (_progress.LaStradaAddress is { } stored)
+        {
+            Remember(Place(StoryLaStrada.Definition, stored));
+            return;
+        }
+
+        IReadOnlyList<AddressStreet> used = UsedStoryStreets();
+        IReadOnlyList<AddressStreet> anchors =
+            StreetOf(_progress.CommunityCentreAddress) is { } centre ? [centre] : used;
+        if (DrawStoryDoor(anchors, used) is not { } address)
+        {
+            return;
+        }
+
+        _progress = _progress with { LaStradaAddress = address };
+        _onboarding.Save(_progress);
+        Remember(Place(StoryLaStrada.Definition, address));
+        _log.LogInfo($"la strada door: {AddressFormatter.Format(address)}");
+    }
+
+    // The streets the story already lives on, home first and then every
+    // banked door: the next leg picks a free neighbour of one of these.
+    private List<AddressStreet> UsedStoryStreets()
+    {
+        var streets = new List<AddressStreet>();
+        AddStreet(streets, HomeStreet());
+        AddStreet(streets, StreetOf(_progress.MaxStoreAddress));
+        AddStreet(streets, StreetOf(_progress.JustinAddress));
+        AddStreet(streets, StreetOf(_progress.AnnabellaAddress));
+        AddStreet(streets, StreetOf(_progress.CommunityCentreAddress));
+        AddStreet(streets, StreetOf(_progress.LaStradaAddress));
+        return streets;
+    }
+
+    private static void AddStreet(List<AddressStreet> streets, AddressStreet? street)
+    {
+        if (street is null || ContainsStreet(streets, street))
+        {
+            return;
+        }
+        streets.Add(street);
+    }
+
+    private static bool ContainsStreet(
+        IReadOnlyList<AddressStreet> streets, AddressStreet street)
+    {
+        foreach (AddressStreet candidate in streets)
+        {
+            if (string.Equals(candidate.Id, street.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Every number already used on this street: the player's own door, the
+    // banked story addresses and anything already in the directory. Only the
+    // small-map fallback can land on a street that already has doors; on the
+    // shipped ring a connecting street arrives empty.
+    private int[] TakenHouseNumbers(AddressStreet street)
+    {
+        var numbers = new List<int>();
+        if (_profile is { } profile
+            && string.Equals(profile.StreetId, street.Id, StringComparison.OrdinalIgnoreCase))
+        {
+            numbers.Add(profile.HouseNumber);
+        }
+
+        AddNumber(numbers, street, _progress.MaxStoreAddress);
+        AddNumber(numbers, street, _progress.JustinAddress);
+        AddNumber(numbers, street, _progress.AnnabellaAddress);
+        AddNumber(numbers, street, _progress.CommunityCentreAddress);
+        AddNumber(numbers, street, _progress.LaStradaAddress);
+
+        foreach (PointOfInterest poi in _poiDirectory.All)
+        {
+            AddNumber(numbers, street, poi.Address);
+        }
+        return [.. numbers];
+    }
+
+    private static void AddNumber(
+        List<int> numbers, AddressStreet street, AddressLocation? address)
+    {
+        if (address is { } door
+            && string.Equals(door.StreetName, street.Name, StringComparison.OrdinalIgnoreCase)
+            && !numbers.Contains(door.HouseNumber))
+        {
+            numbers.Add(door.HouseNumber);
+        }
+    }
+
+    private AddressStreet? HomeStreet() =>
+        AddressBook.Street(_addressMap, _profile?.StreetId);
+
+    private AddressStreet? StreetOf(AddressLocation? address) =>
+        address is { } door ? AddressBook.StreetByName(_addressMap, door.StreetName) : null;
+
+    // A save without a profile still gets a street: the first row that has a
+    // house, so the tour never dead-ends on a half-filled profile.
+    private AddressStreet? FirstStreetWithHouses()
+    {
         foreach (AddressStreet street in _addressMap.Streets)
         {
-            if (HouseNumberPlan.Count(street, _addressMap) <= 0)
-            {
-                continue;
-            }
-
-            if (string.Equals(street.Id, _profile?.StreetId, StringComparison.OrdinalIgnoreCase))
+            if (HouseNumberPlan.Count(street, _addressMap) > 0)
             {
                 return street;
             }
-
-            first ??= street;
         }
-
-        return first;
+        return null;
     }
 
     private static string HintKey(PointOfInterest friend) =>
@@ -1064,6 +1252,11 @@ public sealed class OnboardingFlow : IScreenController
             Remember(Place(StoryCommunityCentre.Definition, centre));
         }
 
+        if (_progress.LaStradaAddress is { } laStrada)
+        {
+            Remember(Place(StoryLaStrada.Definition, laStrada));
+        }
+
         if (_progress.JustinAddress is { } justin)
         {
             Remember(Place(StoryFriends.Justin, justin));
@@ -1077,6 +1270,14 @@ public sealed class OnboardingFlow : IScreenController
         if (_profile is not null && HomeAddress() is { } home)
         {
             Remember(Place(StoryHome.Definition, home));
+        }
+
+        // A save written before the door-only La Strada row existed: draw it
+        // once the tour's neighbourhood is known, so the addresses page gains
+        // it without moving any banked door.
+        if (_progress.CommunityCentreAddress is not null)
+        {
+            EnsureLaStrada();
         }
     }
 

@@ -325,7 +325,14 @@ public sealed class Navigation
             _career, _log,
             new RelayCommand(CloseHub),
             _beat,
-            _world.PlaceHubDoor));
+            hub =>
+            {
+                _world.PlaceHubDoor(hub);
+                // A bought hub is career state the player can see, so it goes
+                // to disk now: closing the overlay before the first settled run
+                // must not lose the career that was just paid for.
+                _saver.SaveDriver(_rivals.LastResult);
+            }));
 
     /// <summary>
     /// The board itself, for the paths that come back to it from elsewhere (the

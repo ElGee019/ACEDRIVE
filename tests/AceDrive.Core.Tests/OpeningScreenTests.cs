@@ -49,6 +49,24 @@ public sealed class OpeningScreenTests
     }
 
     [Fact]
+    public void ShippedMap_OffersEveryStreetInTheHomeDropdown()
+    {
+        // The home address is chosen on the actual Brands Hatch stand-in: every
+        // street of the shipped map has to be selectable, not just the home
+        // row, and each one answers its own three houses.
+        AddressMap map = new JsonAddressMapStore(
+            Path.Combine(AppContext.BaseDirectory, "Data", "address_map.json"),
+            new TestLog()).Load();
+        var (vm, _) = Create(map: map);
+
+        Assert.Equal(map.Streets.Count, vm.Streets.Count);
+        Assert.Equal(32, vm.Streets.Count);
+        Assert.All(map.Streets, street =>
+            Assert.Contains(vm.Streets, row => row.Id == street.Id));
+        Assert.Equal(3, vm.HouseNumbers.Count);
+    }
+
+    [Fact]
     public void BlankName_DisablesContinue()
     {
         var (vm, confirmed) = Create(detected: null);

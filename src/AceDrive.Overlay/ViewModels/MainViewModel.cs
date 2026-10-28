@@ -690,6 +690,11 @@ public sealed class MainViewModel
             _taxi.SetTrackLength(track.LengthMeters);
         }
 
+        // The taxi flow prices the drive to the pickup from the car's position
+        // at ACCEPT; one cached reading per poll keeps that command free of
+        // telemetry reads.
+        _taxi.ObservePosition(s.NormalizedPosition);
+
         // Odometer feed (PORTPLAN items 31/32, Unity DrivingManager's odometer
         // integration): every live tick banks the distance the current car
         // covered into the wear deck's input, and the engine inspections ride
@@ -720,8 +725,9 @@ public sealed class MainViewModel
         // charged as delivery distance.
         if (_taxi.LegActive)
         {
-            // The flow owns the leg: meter, distance, fare and the patrols.
-            _taxi.AdvanceLeg(s, dt);
+            // The flow owns the leg: the patrols and the passenger's promise.
+            // The fare was priced at ACCEPT from the calculated distance.
+            _taxi.AdvanceLeg(s);
         }
         else if (_delivery.InProgress)
         {

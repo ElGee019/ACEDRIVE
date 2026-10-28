@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Input;
 using AceDrive.Core;
 using AceDrive.Overlay.Localization;
@@ -20,12 +21,18 @@ public sealed class CustomerRequestScreenViewModel :
 {
     private readonly CustomerRequest _request;
     private readonly VoiceBeat _beat;
+    private readonly IClock _clock;
     private readonly Action<CustomerRequestOutcome> _onFinished;
     private readonly int _timerSeconds;
     private readonly DateTime _deadline;
     private readonly bool _speedChallenge;
     private readonly DateTime? _speedDeadline;
     private readonly DateTime? _speedDismissAt;
+    // The quiz result pages (correct/wrong) carry no BACK: they report the
+    // outcome themselves after this read window, returning the HUD to its
+    // task text. Unity's panel button never lived on those two pages.
+    private static readonly TimeSpan ResultDismissAfter = TimeSpan.FromSeconds(5);
+    private DateTime? _dismissAt;
     private IReadOnlyList<CustomerRequestOption> _options = [];
     private CustomerRequestOutcome _outcome = CustomerRequestOutcome.None;
     private bool _finished;
@@ -38,6 +45,7 @@ public sealed class CustomerRequestScreenViewModel :
     {
         _request = request;
         _beat = beat;
+        _clock = clock;
         _onFinished = onFinished;
         _timerSeconds = Math.Max(0, timerSeconds);
         _speedChallenge = request.Kind == CustomerRequestKind.SpeedChallenge;
@@ -190,7 +198,9 @@ public sealed class CustomerRequestScreenViewModel :
     /// <summary>
     /// Advances the clocks on integer seconds. Called at 10 Hz by the host: a
     /// passive ask or quiz that runs out finishes exactly once and waits for
-    /// BACK to report it (so the host never loses a timed-out ask). The forced
+    /// BACK to report it (so the host never loses a timed-out ask). A quiz
+    /// answered correct/wrong has no BACK: its result reads for five seconds
+    /// and then reports itself. The forced
     /// challenge has nothing to answer: it repaints its delivery clock and
     /// reports the agreed outcome when its read-in ends, which restores the
     /// task text with the same clock still running.
@@ -199,6 +209,10 @@ public sealed class CustomerRequestScreenViewModel :
     {
         if (_finished)
         {
+            if (_dismissAt is { } dismissAt && now >= dismissAt)
+            {
+                Report();
+            }
             return;
         }
 
@@ -286,6 +300,7 @@ public sealed class CustomerRequestScreenViewModel :
                 int index = i;
                 options.Add(new CustomerRequestOption(
                     Strings.Format(quiz.Category.UnitKey, quiz.Options[i]),
+                    NumberWord(i),
                     new RelayCommand(() => Answer(index))));
             }
             Options = options;
@@ -294,10 +309,27 @@ public sealed class CustomerRequestScreenViewModel :
 
         Options =
         [
-            new CustomerRequestOption(Strings.Get("RequestAccept"), new RelayCommand(Accept)),
-            new CustomerRequestOption(Strings.Get("RequestDecline"), new RelayCommand(Decline)),
+            new CustomerRequestOption(
+                Strings.Get("RequestAccept"), Strings.Get("RequestAccept"),
+                new RelayCommand(Accept)),
+            new CustomerRequestOption(
+                Strings.Get("RequestDecline"), Strings.Get("RequestDecline"),
+                new RelayCommand(Decline)),
         ];
     }
+
+    // The quiz's button labels reuse the delivery page's number words: the
+    // button names the slot, the value reads beside it. A fourth question
+    // option would fall back to plain digits instead of showing a raw key.
+    private static readonly string[] NumberWordKeys =
+    [
+        "DeliveryNumber1", "DeliveryNumber2", "DeliveryNumber3",
+    ];
+
+    private static string NumberWord(int index) =>
+        index >= 0 && index < NumberWordKeys.Length
+            ? Strings.Get(NumberWordKeys[index])
+            : (index + 1).ToString(CultureInfo.CurrentCulture);
 
     private void Accept()
     {
@@ -328,7 +360,10 @@ public sealed class CustomerRequestScreenViewModel :
         Finish(
             outcome,
             outcome.QuizAnsweredCorrectly ? "RequestCorrect" : "RequestWrong",
-            outcome.QuizAnsweredCorrectly);
+            outcome.QuizAnsweredCorrectly,
+            // The quiz result pages have no BACK; their read window reports
+            // the outcome and restores the task text by itself.
+            dismissAfterResult: true);
     }
 
     private void Timeout()
@@ -336,7 +371,9 @@ public sealed class CustomerRequestScreenViewModel :
         Finish(CustomerRequestGrader.Timeout(_request), "RequestTimeout", positive: false);
     }
 
-    private void Finish(CustomerRequestOutcome outcome, string feedbackKey, bool positive)
+    private void Finish(
+        CustomerRequestOutcome outcome, string feedbackKey, bool positive,
+        bool dismissAfterResult = false)
     {
         if (_finished)
         {
@@ -350,18 +387,29 @@ public sealed class CustomerRequestScreenViewModel :
         TimerVisible = false;
         RequestTextVisible = false;
         Options = [];
-        ShowBack = true;
+        ShowBack = !dismissAfterResult;
+        _dismissAt = dismissAfterResult ? _clock.UtcNow + ResultDismissAfter : null;
         RebuildVoice();
     }
 
     // The one path back for an answered ask: a click and the voice tap's
     // deferred end both land here, so the glow clears on the way out and the
-    // host hears the outcome exactly once. The forced challenge has no BACK:
-    // its own read-in reports the outcome.
+    // host hears the outcome exactly once. The quiz result pages hide the
+    // button, so a stale command cannot end them early; their Tick reports.
     private void Back()
     {
         BackFlash = false;
-        if (_reported || !_finished)
+        if (!ShowBack || !_finished)
+        {
+            return;
+        }
+
+        Report();
+    }
+
+    private void Report()
+    {
+        if (_reported)
         {
             return;
         }
@@ -381,7 +429,11 @@ public sealed class CustomerRequestScreenViewModel :
         Dictionary<string, Action> actions = [];
         foreach (CustomerRequestOption option in Options)
         {
-            actions[option.Text] = () => option.Command.Execute(null);
+            Action answer = () => option.Command.Execute(null);
+            // The value and its number word both fire the row: the quiz can be
+            // answered by reading the value or by saying ONE / TWO / THREE.
+            actions[option.Text] = answer;
+            actions[option.ButtonText] = answer;
         }
         if (ShowBack)
         {

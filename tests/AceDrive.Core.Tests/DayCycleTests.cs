@@ -55,7 +55,8 @@ public sealed class DayCycleTests
             new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage,
             new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
             new RoadTestLedger([], seed: 0), shiftInstance, records, new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), new WhereIsWillyLedger());
+            new ValuationLedger(), new WhereIsWillyLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0));
         var log = new TestLog();
         var cycle = new DayCycle(
             game, shiftInstance, records, board, online,

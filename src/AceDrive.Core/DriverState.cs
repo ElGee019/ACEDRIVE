@@ -51,7 +51,11 @@ namespace AceDrive.Core;
 /// measured in real hours, not game weeks.
 /// The weekly missing-person run (ToWhereIsWilly.md §2.9, Unity
 /// PlayerData.lastWillyGameDay + lastWillyYear) keeps only its completion
-/// date here: the search itself is session state and never resumes.</summary>
+/// date here: the search itself is session state and never resumes.
+/// The delivery career (PORTPLAN 18/51, Unity PlayerData.credP +
+/// ownedWholesaleHubs + hubDeliveryStats) keeps its balance, bought hubs and
+/// per-hub ramp counts here too, so a restart reopens the career the player
+/// paid for instead of re-granting the intro gift.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -98,7 +102,8 @@ public sealed record DriverState(
     IReadOnlyList<string>? ValuationSeenUids = null,
     int LastValuationResetWeek = -1,
     string? LastWillyDate = null,
-    DateTime? ValuationEnteredAtUtc = null)
+    DateTime? ValuationEnteredAtUtc = null,
+    DeliveryCareerState? Career = null)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

@@ -72,7 +72,8 @@ fixer passes (one once removed a needed using via an IDE0005 false positive).
 2. It opens **Locked**: clicks pass through to the game.
 3. `Ctrl+Shift+C` unlocks: drag the header to move, corner grip to resize,
    buttons clickable. Same hotkey locks it again to drive.
-4. `New job` → `Pickup` → drive: the meter runs off your real speed.
+4. `New job` → `Pickup` → drive: distance and fare are calculated from the
+   lap (where you started → pickup → drop-off), not from the driven path.
    `Dropoff` shows receipt + tip and accumulates the shift total.
 5. Bounds persist to `%AppData%\AceDrive\window.json`,
    logs to `%AppData%\AceDrive\logs\`.

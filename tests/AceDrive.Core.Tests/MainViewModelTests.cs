@@ -21,6 +21,25 @@ public sealed class MainViewModelTests
     private static DriverState TwoStreetCareer =>
         DriverState.Fresh with { StreetIds = ["street-1", "street-2"] };
 
+    // A closed ring of three-house streets: the smallest topology that can
+    // carry the story chain (home -> Max -> friends -> centre -> La Strada).
+    // 65 m per row keeps three 30 m-spaced houses.
+    private static AddressMap RingMap(int streets)
+    {
+        double step = 1.0 / streets;
+        var rows = new List<AddressStreet>(streets);
+        for (int i = 0; i < streets; i++)
+        {
+            rows.Add(new AddressStreet(
+                $"street-{i + 1}", $"Street {i + 1}", i * step, (i + 1) * step));
+        }
+        return new AddressMap("Germany", "Brands", streets * 65.0, 30.0, rows);
+    }
+
+    private static string[] NeighbourNames(AddressMap map, string streetName) =>
+        [.. AddressBook.NeighbourStreets(map, AddressBook.StreetByName(map, streetName)!)
+            .Select(street => street.Name)];
+
     // The walk's closing car page needs a car to offer; every other test drives
     // the earlier pages or a save that is already past the introduction, so
     // only the closing-page tests hand this content in.
@@ -391,8 +410,9 @@ public sealed class MainViewModelTests
     [Fact]
     public void Accept_CapacityFollowsTheDrivenCar()
     {
-        // Unity scales the distance charge by passengerCapacity: a 4-seat
-        // car runs the same 8.2 km ride at 4x the charge.
+        // Unity scales the distance charge by passengerCapacity: the same
+        // 0.06 km ride (the fixture's two houses on the one-street zone) at
+        // 4x the charge.
         var pool = new List<CarSpec>
         {
             new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4),
@@ -406,11 +426,11 @@ public sealed class MainViewModelTests
             });
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
-        // 43.15 x 4 = 172.60 charge + 10 forfait = 182.60 base,
-        // 36.52 tip + 9.13 brand sponsorship (first 8.2 km in
-        // the brand: 5%) = 228.25, plus the 99% starter bonus = 454.22.
-        Assert.Equal("€454.22", vm.FareText);
-        Assert.Equal(new ReceiptLine("Fare: 4 × €43.15", "€172.60"), receipt.FareLine);
+        // 0.40 x 4 = 1.60 charge + 10 forfait = 11.60 base,
+        // 2.32 tip + 0.12 brand sponsorship (first 0.06 km in the brand: 1%)
+        // = 14.04, plus the 99% starter bonus = 27.94.
+        Assert.Equal("€27.94", vm.FareText);
+        Assert.Equal(new ReceiptLine("Fare: 4 × €0.40", "€1.60"), receipt.FareLine);
         Assert.True(receipt.HasBrandBonus);
         Assert.Contains("Customers: 4.", receipt.CustomerLine, StringComparison.Ordinal);
     }
@@ -459,10 +479,11 @@ public sealed class MainViewModelTests
     [Fact]
     public void Accept_UnknownCar_RidesSolo()
     {
-        // A live 8.2 km ride, tip eligible, no fine: 53.15 base + 10.63 tip +
-        // 2.66 brand sponsorship (first 8.2 km in the brand: 5%) = 66.44,
-        // plus the 99% starter bonus (1.929 km zone) = 132.22 on the receipt
-        // screen, banked to the wallet and the driver save.
+        // The fixture's 0.06 km job (two houses 60 m apart on the one-street
+        // zone), tip eligible, no fine: 10.40 base + 2.08 tip + 0.10 brand
+        // sponsorship = 12.58, plus the 99% starter bonus (1.929 km zone)
+        // = 25.03 on the receipt screen, banked to the wallet and the driver
+        // save.
         var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
         var (vm, clock, tel, _) = Create(
@@ -473,12 +494,12 @@ public sealed class MainViewModelTests
             });
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("€132.22", vm.FareText);
+        Assert.Equal("€25.03", vm.FareText);
         Assert.Contains("1 jobs", vm.ShiftText, StringComparison.Ordinal);
-        Assert.Equal(132.22, wallet.Cash);
-        Assert.Equal(0.082, wallet.Xp, precision: 9);
+        Assert.Equal(25.03, wallet.Cash);
+        Assert.Equal(0.0006, wallet.Xp, precision: 9);
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(132.22, saved.Cash);
+        Assert.Equal(25.03, saved.Cash);
         Assert.Equal(wallet.Xp, saved.Xp);
         // The settle now carries the streak slice too (SaveDriver): a fresh
         // driver recounts to day 1, and with onboarding incomplete no bonus
@@ -487,20 +508,71 @@ public sealed class MainViewModelTests
         Assert.Equal(clock.UtcNow.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
             saved.LastLoginDate);
         Assert.Null(saved.LastDailyBonusDate);
-        Assert.Equal(new ReceiptLine("Total earned", "€132.22"), receipt.TotalLine);
+        Assert.Equal(new ReceiptLine("Total earned", "€25.03"), receipt.TotalLine);
         Assert.False(receipt.HasFine);
         Assert.True(receipt.HasBrandBonus);
-        Assert.Equal(new ReceiptLine("mazda Sponsorship", "€2.66"), receipt.SponsorshipLine);
+        Assert.Equal(new ReceiptLine("mazda Sponsorship", "€0.10"), receipt.SponsorshipLine);
         // The seeded 1.929 km zone pays 99% of the settled total.
         Assert.True(receipt.HasStarterBonus);
         Assert.Equal(
-            new ReceiptLine("Business Starter Bonus 99.0%", "€65.78"),
+            new ReceiptLine("Business Starter Bonus 99.0%", "€12.45"),
             receipt.StarterBonusLine);
-        Assert.Contains("0.08", receipt.XpLine, StringComparison.Ordinal);
+        Assert.Contains("0.00", receipt.XpLine, StringComparison.Ordinal);
 
         // CONTINUE lands back on the control page.
         receipt.ContinueCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void JobDistance_StartsFromTheCarsPositionAtAccept()
+    {
+        // Accepted from the far side of the lap: the approach to the pickup is
+        // part of the job, so the fare is worth more than the ride alone.
+        var wallet = EmptyWallet();
+        var physics = new FakeTelemetry
+        {
+            Next = new TelemetrySample(
+                1, 0f, 0f, 4, 5000, 0f, 0f,
+                NormalizedPosition: 0.75f,
+                Track: new TrackInfo("brands_hatch", "indy", 1929.0)),
+        };
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, wallet: wallet, physics: physics,
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+        vm.Poll(); // cache the position the ACCEPT command will read
+
+        TaxiFlow.Propose(vm);
+        TaxiFlow.Pickup(vm, clock);
+        TaxiFlow.AnswerRequest(vm);
+        TaxiFlow.Drive(vm, clock, tel, km: 0.1);
+        vm.DropoffCommand.Execute(null);
+
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.True(wallet.Cash > 25.03);
+        Assert.NotEqual("Job distance: 0.1 km", receipt.DistanceLine);
+    }
+
+    [Fact]
+    public void JobDistance_IsCalculatedFromTheLapNotTheDrivenPath()
+    {
+        // The same 0.06 km job driven twice as far keeps the same calculated
+        // distance and fare: the odometer never prices a taxi job.
+        var wallet = EmptyWallet();
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, wallet: wallet,
+            requests: new FakeCustomerRequestRoller
+            {
+                Result = CustomerRequestTestData.PassiveRequest,
+            });
+        TaxiFlow.AcceptAndDrive(vm, clock, tel, km: 16.4);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+
+        Assert.Equal("Job distance: 0.1 km", receipt.DistanceLine);
+        Assert.Equal(25.03, wallet.Cash);
     }
 
     [Fact]
@@ -522,7 +594,7 @@ public sealed class MainViewModelTests
         Assert.Equal([wallet.Xp], rivals.RefreshedAt);
         Assert.Equal((wallet.Xp, string.Empty), Assert.Single(rivals.Pushed));
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(132.22, saved.Cash);
+        Assert.Equal(25.03, saved.Cash);
         Assert.Equal(wallet.Xp, saved.Xp);
         Assert.Equal(4, saved.RivalsRank);
         Assert.Equal(30, saved.RivalsTotal);
@@ -546,7 +618,7 @@ public sealed class MainViewModelTests
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         var pushed = Assert.Single(rivals.Pushed);
         Assert.Equal("ElGee", pushed.Name);
-        Assert.Equal(0.082, pushed.Xp, precision: 9);
+        Assert.Equal(0.0006, pushed.Xp, precision: 9);
     }
 
     [Fact]
@@ -565,7 +637,7 @@ public sealed class MainViewModelTests
             });
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(132.22, saved.Cash);
+        Assert.Equal(25.03, saved.Cash);
         Assert.Equal(wallet.Xp, saved.Xp);
         // Fresh driver, offline board: 0/0 keeps "never saved".
         Assert.Equal(0, saved.RivalsRank);
@@ -863,7 +935,9 @@ public sealed class MainViewModelTests
         var screen = Assert.IsType<CustomerRequestScreenViewModel>(
             TaxiFlow.Pickup(vm, clock));
         screen.Options[1].Command.Execute(null);
-        screen.BackCommand.Execute(null);
+        // The quiz result has no BACK: it reports itself after five seconds.
+        clock.Advance(TimeSpan.FromSeconds(5));
+        vm.Poll();
 
         // Unity HandleAnswer: a correct answer lifts off-the-line by 1.
         Assert.Equal(21.0, wallet.Rating.OffTheLine);
@@ -900,7 +974,8 @@ public sealed class MainViewModelTests
         var screen = Assert.IsType<CustomerRequestScreenViewModel>(
             TaxiFlow.Pickup(vm, clock));
         screen.Options[0].Command.Execute(null);
-        screen.BackCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(5));
+        vm.Poll();
 
         // A wrong answer drops off-the-line by 1 (Unity HandleAnswer).
         Assert.Equal(19.0, wallet.Rating.OffTheLine);
@@ -2253,6 +2328,7 @@ public sealed class MainViewModelTests
         // shop. The delivery page must read 0 until that visit.
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var onboarding = new FakeOnboardingStore();
+        var driverStore = new FakeDriverStore();
         var hud = new FakeTelemetryHud();
         var progress = new OnboardingState(
             null, null, BirthdayDone: true,
@@ -2261,7 +2337,8 @@ public sealed class MainViewModelTests
         var (vm, _, _, _) = Create(
             content: TestSession.OneLineDialogue, progress: progress,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
-            hud: hud, onboarding: onboarding, career: career);
+            hud: hud, onboarding: onboarding, career: career,
+            driverStore: driverStore);
 
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(0, career.CredP);
@@ -2281,6 +2358,12 @@ public sealed class MainViewModelTests
         Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(DeliveryCatalog.Default.StartCredP, career.CredP);
         Assert.True(onboarding.State.MaxDeliveryIntroSeen);
+        // The gift is banked with the flag: a restart before the first hub
+        // purchase reopens the same balance instead of re-granting it.
+        Assert.NotEmpty(driverStore.Saved);
+        Assert.Equal(
+            DeliveryCatalog.Default.StartCredP,
+            driverStore.Saved[^1].Career!.CredP);
 
         // Backing out and entering again is a plain store visit now: the
         // offer and its gift are one-shot.
@@ -2340,7 +2423,8 @@ public sealed class MainViewModelTests
         Assert.True(vm.IsShown);
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
         store.BackCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        // No maple bought: the errand stays live and the panel stays down.
+        Assert.False(vm.IsShown);
     }
 
     [Fact]
@@ -2417,26 +2501,62 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void StoreBack_WithoutMaple_KeepsTheArrivalAndThePanel()
+    public void StoreBack_WithoutMaple_KeepsTheErrandOnTheHudAndLetsThePlayerWalkBackIn()
     {
+        // The player buys something else and backs out: the errand must stay
+        // on the HUD (same door, same task text) and the main page must not
+        // steal the focus, so walking back in is the only way forward.
+        var car = new CarSpec(
+            "ks_test_grocery", 2020, "Test", "Grocery", Passengers: 1,
+            TrunkLitres: 60);
+        var pool = new[] { car };
+        var garage = new Garage(pool);
+        garage.Add(car, week: 1);
+        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var trunk = new Trunk();
+        var onboarding = new FakeOnboardingStore();
         var hud = new FakeTelemetryHud();
         var session = Create(
             content: TestSession.OneLineDialogue,
             pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
-            hud: hud);
+            hud: hud, wallet: wallet, cars: pool, garage: garage, trunk: trunk,
+            onboarding: onboarding);
         var (vm, _, _, _) = session;
 
         session.Story.ShowDialogue();
         session.Story.FinishDialogue();
-        PointOfInterest? errand = hud.Destination;
+        PointOfInterest errand = Assert.IsType<PointOfInterest>(hud.Destination);
         hud.RaiseEnter();
         var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        StoreItemRowViewModel other = store.Items.First(
+            item => item.Item.Name == "BANANA");
+        other.SelectCommand.Execute(null);
+        store.BuyCommand.Execute(null);
 
         store.BackCommand.Execute(null);
 
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        Assert.True(vm.IsShown);
+        Assert.False(vm.IsShown);
         Assert.Same(errand, hud.Destination);
+        Assert.False(onboarding.State.MaxErrandDone);
+        Assert.True(trunk.Contains("BANANA"));
+        Assert.False(trunk.Contains("MAPLE SYRUP"));
+
+        // ENTER is armed again on the same door, without driving off.
+        hud.RaiseEnter();
+        Assert.True(vm.IsShown);
+        var second = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        Assert.NotSame(store, second);
+
+        // The re-entry is a fresh visit: buying maple completes the errand
+        // and moves the intro on, never back to the same task text.
+        StoreItemRowViewModel maple = second.Items.First(
+            item => item.Item.Name == "MAPLE SYRUP");
+        maple.SelectCommand.Execute(null);
+        second.BuyCommand.Execute(null);
+        second.BackCommand.Execute(null);
+
+        Assert.True(onboarding.State.MaxErrandDone);
+        Assert.Equal(StoryFriends.Justin.Id, hud.Destination?.Id);
     }
 
     [Fact]
@@ -2462,10 +2582,10 @@ public sealed class MainViewModelTests
 
         store.BackCommand.Execute(null);
 
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
-        Assert.True(vm.IsShown);
+        Assert.False(vm.IsShown);
         Assert.Same(errand, hud.Destination);
         Assert.False(onboarding.State.MaxErrandDone);
+        Assert.True(trunk.Contains("MAPLE SYRUP"));
     }
 
     [Fact]
@@ -2536,6 +2656,104 @@ public sealed class MainViewModelTests
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(StoryFriends.Justin.Id, hud.Destination?.Id);
         Assert.Equal(PoiTypes.Person, hud.Destination?.Type);
+    }
+
+    [Fact]
+    public void MapleBoughtForTheErrand_IsCarriedUntilThePancakesUseIt()
+    {
+        // The errand item rides the driven car from Max's till to the pancake
+        // table: bought once, banked in driver.json, then used up when the
+        // pancakes happen.
+        var car = new CarSpec(
+            "ks_test_grocery", 2020, "Test", "Grocery", Passengers: 1,
+            TrunkLitres: 60);
+        var pool = new[] { car };
+        var garage = new Garage(pool);
+        garage.Add(car, week: 1);
+        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var trunk = new Trunk();
+        var drivers = new FakeDriverStore();
+        var onboarding = new FakeOnboardingStore();
+        var hud = new FakeTelemetryHud();
+        var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1);
+        var session = Create(
+            content: TestSession.OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud, wallet: wallet, cars: pool, garage: garage, trunk: trunk,
+            driverStore: drivers, onboarding: onboarding, profile: profile);
+        var (vm, _, _, _) = session;
+
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
+        hud.RaiseEnter();
+        var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        StoreItemRowViewModel maple = store.Items.First(
+            item => item.Item.Name == "MAPLE SYRUP");
+        maple.SelectCommand.Execute(null);
+        store.BuyCommand.Execute(null);
+        store.BackCommand.Execute(null);
+
+        Assert.True(onboarding.State.MaxErrandDone);
+        // The purchase continues the intro: the next leg (Justin), never the
+        // errand's own task text again.
+        Assert.Equal(StoryFriends.Justin.Id, hud.Destination?.Id);
+        Assert.True(trunk.Contains("MAPLE SYRUP"));
+        Assert.Contains(drivers.Saved, saved =>
+            saved.Trunk is { Count: > 0 }
+            && saved.Trunk.Any(item => item.Name == "MAPLE SYRUP"));
+
+        hud.RaiseEnter(); // Justin
+        Assert.Equal(StoryFriends.Annabella.Id, hud.Destination?.Id);
+        hud.RaiseEnter(); // Annabella -> home
+        Assert.Equal(StoryHome.Definition.Id, hud.Destination?.Id);
+        hud.RaiseEnter(); // PANCAKES: the groceries are used up
+
+        Assert.True(onboarding.State.PancakesDone);
+        Assert.False(trunk.Contains("MAPLE SYRUP"));
+        Assert.DoesNotContain(
+            drivers.Saved[^1].Trunk ?? [],
+            item => string.Equals(item.Name, "MAPLE SYRUP", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void BoughtMaple_AdvancesEvenWhenThePinnedDoorLostItsItemList()
+    {
+        // The addresses page or an old directory file can hand the host a Max
+        // row without the guaranteed items; the purchase must still advance
+        // the intro instead of pinning the errand again.
+        var car = new CarSpec(
+            "ks_test_grocery", 2020, "Test", "Grocery", Passengers: 1,
+            TrunkLitres: 60);
+        var pool = new[] { car };
+        var garage = new Garage(pool);
+        garage.Add(car, week: 1);
+        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var onboarding = new FakeOnboardingStore();
+        var hud = new FakeTelemetryHud();
+        var session = Create(
+            content: TestSession.OneLineDialogue,
+            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
+            hud: hud, wallet: wallet, cars: pool, garage: garage,
+            onboarding: onboarding);
+        var (vm, _, _, _) = session;
+
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
+        AddressLocation address = Assert.IsType<AddressLocation>(
+            onboarding.State.MaxStoreAddress);
+        hud.SetDestination(new PointOfInterest(
+            PoiCatalog.MaxGroceryId, "Max's Grocery Store", address, PoiTypes.Grocery));
+
+        hud.RaiseEnter();
+        var store = Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        StoreItemRowViewModel maple = store.Items.First(
+            item => item.Item.Name == "MAPLE SYRUP");
+        maple.SelectCommand.Execute(null);
+        store.BuyCommand.Execute(null);
+        store.BackCommand.Execute(null);
+
+        Assert.True(onboarding.State.MaxErrandDone);
+        Assert.Equal(StoryFriends.Justin.Id, hud.Destination?.Id);
     }
 
     [Fact]
@@ -2809,23 +3027,117 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void JustinsPlace_SitsInThePlayersStreetOffTheirOwnHouse()
+    public void JustinsPlace_SitsOnAStreetConnectingHomeAndMaxs()
     {
-        var trunk = new Trunk(
-            [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 1 }]);
+        // The pair shares one street that connects the home street or Max's
+        // shop: not the home row itself and not across the lap.
+        AddressMap map = RingMap(6);
+        var onboarding = new FakeOnboardingStore();
         var hud = new FakeTelemetryHud();
-        var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-2", 5);
+        var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-3", 1);
         var session = Create(
-            content: TestSession.OneLineDialogue,
-            pois: new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 5),
-            hud: hud, trunk: trunk, profile: profile, progress: ErrandDone);
+            content: TestSession.OneLineDialogue, addressMap: map,
+            pois: new PoiGenerator(map, PoiCatalog.Default, seed: 5),
+            hud: hud, profile: profile, onboarding: onboarding,
+            progress: ErrandDone, poiDirectory: new PoiDirectory());
 
         session.Story.ShowDialogue();
         session.Story.FinishDialogue();
 
+        AddressLocation maxs = Assert.IsType<AddressLocation>(
+            onboarding.State.MaxStoreAddress);
+        Assert.Contains(maxs.StreetName, NeighbourNames(map, "Street 3"));
+
         PointOfInterest justin = Assert.IsType<PointOfInterest>(hud.Destination);
-        Assert.Equal("Street 2", justin.Address.StreetName);
-        Assert.NotEqual(5, justin.Address.HouseNumber);
+        Assert.NotEqual("Street 3", justin.Address.StreetName);
+        Assert.NotEqual(maxs.StreetName, justin.Address.StreetName);
+        Assert.True(
+            NeighbourNames(map, "Street 3").Contains(justin.Address.StreetName)
+            || NeighbourNames(map, maxs.StreetName).Contains(justin.Address.StreetName));
+
+        hud.RaiseEnter(); // pick Justin up: Annabella's door is on the same row
+
+        PointOfInterest annabella = Assert.IsType<PointOfInterest>(hud.Destination);
+        Assert.Equal(justin.Address.StreetName, annabella.Address.StreetName);
+        Assert.NotEqual(justin.Address.HouseNumber, annabella.Address.HouseNumber);
+        Assert.Equal(annabella.Address, onboarding.State.AnnabellaAddress);
+    }
+
+    [Fact]
+    public void MaxsGrocery_SitsOnAStreetNeighbouringThePlayersChoice()
+    {
+        // The shipped Brands Hatch map, Street 5 picked on the opening screen:
+        // Max opens on 4 or 6, never on the home row and never across the lap.
+        AddressMap map = new JsonAddressMapStore(
+            Path.Combine(AppContext.BaseDirectory, "Data", "address_map.json"),
+            new TestLog()).Load();
+        var onboarding = new FakeOnboardingStore();
+        var hud = new FakeTelemetryHud();
+        var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-5", 1);
+        var session = Create(
+            content: TestSession.OneLineDialogue, addressMap: map,
+            pois: new PoiGenerator(map, PoiCatalog.Default, seed: 5),
+            hud: hud, profile: profile, onboarding: onboarding,
+            progress: ErrandDone, poiDirectory: new PoiDirectory());
+
+        session.Story.ShowDialogue();
+
+        AddressLocation maxs = Assert.IsType<AddressLocation>(
+            onboarding.State.MaxStoreAddress);
+        Assert.True(maxs.StreetName is "Street 4" or "Street 6");
+    }
+
+    [Fact]
+    public void CommunityCentreAndLaStrada_JoinTheTourNeighbourhood()
+    {
+        // The two closing story streets continue the chain: the centre takes a
+        // free neighbour of the tour, and the door-only La Strada row takes a
+        // different free neighbour beside it.
+        AddressMap map = RingMap(6);
+        var directory = new PoiDirectory();
+        var onboarding = new FakeOnboardingStore();
+        var hud = new FakeTelemetryHud();
+        var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-3", 1);
+        var session = Create(
+            content: TestSession.OneLineDialogue, addressMap: map,
+            pois: new PoiGenerator(map, PoiCatalog.Default, seed: 5),
+            hud: hud, profile: profile, onboarding: onboarding,
+            progress: ErrandDone, poiDirectory: directory);
+
+        session.Story.ShowDialogue();
+        session.Story.FinishDialogue();
+
+        AddressLocation maxs = Assert.IsType<AddressLocation>(
+            onboarding.State.MaxStoreAddress);
+        hud.RaiseEnter(); // Justin
+        PointOfInterest justin = Assert.IsType<PointOfInterest>(hud.Destination);
+        hud.RaiseEnter(); // Annabella
+        hud.RaiseEnter(); // pancakes: the next leg draws the centre
+
+        AddressLocation centre = Assert.IsType<AddressLocation>(
+            onboarding.State.CommunityCentreAddress);
+        Assert.Equal(centre, Assert.IsType<PointOfInterest>(hud.Destination).Address);
+        Assert.NotEqual("Street 3", centre.StreetName);
+        Assert.NotEqual(maxs.StreetName, centre.StreetName);
+        Assert.NotEqual(justin.Address.StreetName, centre.StreetName);
+        Assert.True(
+            NeighbourNames(map, "Street 3").Contains(centre.StreetName)
+            || NeighbourNames(map, maxs.StreetName).Contains(centre.StreetName)
+            || NeighbourNames(map, justin.Address.StreetName).Contains(centre.StreetName));
+
+        AddressLocation laStrada = Assert.IsType<AddressLocation>(
+            onboarding.State.LaStradaAddress);
+        Assert.NotEqual(centre.StreetName, laStrada.StreetName);
+        // La Strada opens beside the community centre, the tour's last stop.
+        Assert.Contains(laStrada.StreetName, NeighbourNames(map, centre.StreetName));
+
+        // The door-only magazine is on the discovery list, so the addresses
+        // page and a manual pin can already reach it.
+        PointOfInterest stored = Assert.IsType<PointOfInterest>(
+            directory.Find(StoryLaStrada.Definition.Id));
+        Assert.Equal("La Strada", stored.Name);
+        Assert.Equal(PoiTypes.Magazine, stored.Type);
+        Assert.Equal(laStrada, stored.Address);
     }
 
     [Fact]
@@ -2964,6 +3276,44 @@ public sealed class MainViewModelTests
         control.DeliveryCommand.Execute(null);
         Assert.Same(delivery, vm.CurrentScreen);
         Assert.Equal("OPEN NEW CAREER", delivery.MainButtonLabel);
+    }
+
+    [Fact]
+    public void OpenCareer_BanksTheBoughtHub_AndARestartReopensIt()
+    {
+        // The career is shared state, not session state: buying a hub must
+        // survive closing the overlay before any delivery settles. A second
+        // session rebuilt from the banked driver opens with the hub still
+        // owned and the spent CredP still spent.
+        var catalog = new DeliveryCatalog(
+            [new DeliveryStore("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries")],
+            0.7, 100);
+        var hubs = new HubCatalog([
+            new HubTier(1, true, [
+                new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])]);
+        var driverStore = new FakeDriverStore();
+        var session = Create(catalog: catalog, hubs: hubs, driverStore: driverStore);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
+
+        control.DeliveryCommand.Execute(null);
+        Assert.IsType<DeliveryJobScreenViewModel>(vm.CurrentScreen).MainButtonCommand.Execute(null);
+        var hub = Assert.IsType<DeliveryHubScreenViewModel>(vm.CurrentScreen);
+        hub.ChooseCareerCommand.Execute(hub.Columns[0].Cells[0]);
+        hub.OpenCareerCommand.Execute(null);
+
+        DriverState banked = driverStore.Saved[^1];
+        Assert.NotNull(banked.Career);
+        Assert.Equal(0, banked.Career!.CredP);
+        Assert.Equal("Grocers and Sons", Assert.Single(banked.Career.Owned!).Name);
+
+        // A relaunch reads the banked career instead of the StartCredP seed.
+        var restarted = Create(catalog: catalog, hubs: hubs, savedDriver: banked);
+        var restartedControl = FinishIntro(restarted);
+        restartedControl.DeliveryCommand.Execute(null);
+        var board = Assert.IsType<DeliveryJobScreenViewModel>(restarted.Vm.CurrentScreen);
+        Assert.Equal("Credibility Points: 0", board.CredPLine);
+        Assert.True(board.HasStores);
     }
 
     [Fact]
@@ -3839,8 +4189,8 @@ public sealed class MainViewModelTests
     public void TaxiXp_OwnedCar_UsesItsClassAndGlobalRarity()
     {
         // The real class/rarity feed: a class-15 car ranked 2nd of 3 earns
-        // 8.2 * 15 * 2 / 100 = 2.46 XP, contributes its rounded 8 km to the
-        // car board and 8 km to the country aggregate.
+        // 0.06 * 15 * 2 / 100 = 0.018 XP, contributes its rounded 1 km to the
+        // car board and 1 km to the country aggregate.
         var pool = new List<CarSpec>
         {
             new("ks_test_sedan", 2020, "Test", "Sedan", Passengers: 4, Class: 15),
@@ -3864,15 +4214,15 @@ public sealed class MainViewModelTests
 
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
-        Assert.Equal(2.46, wallet.Xp, precision: 9);
+        Assert.Equal(0.018, wallet.Xp, precision: 9);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(
-            "XP: (8.2 km × class 15 × rarity 2) / 100 × street knowledge 100%",
+            "XP: (0.1 km × class 15 × rarity 2) / 100 × street knowledge 100%",
             receipt.XpCalcLine);
         Assert.True(receipt.HasRarityLine);
         Assert.Contains("2nd most commonly used", receipt.RarityLine, StringComparison.Ordinal);
-        Assert.Equal(("ks_test_sedan", 8), Assert.Single(rarity.Recorded));
-        Assert.Equal(("Germany", 8), Assert.Single(telemetry.CountryPushes));
+        Assert.Equal(("ks_test_sedan", 1), Assert.Single(rarity.Recorded));
+        Assert.Equal(("Germany", 1), Assert.Single(telemetry.CountryPushes));
     }
 
     [Fact]
@@ -3908,10 +4258,10 @@ public sealed class MainViewModelTests
         Assert.Equal(0.0, wallet.Xp);
         // The 4-seat fare still pays, and the starter bonus rides along even
         // for an unowned car (it is a payout line, not career progress).
-        Assert.Equal(454.22, wallet.Cash);
+        Assert.Equal(27.94, wallet.Cash);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(
-            "XP: (8.2 km × class 0 × rarity 0) / 100 × street knowledge 100%",
+            "XP: (0.1 km × class 0 × rarity 0) / 100 × street knowledge 100%",
             receipt.XpCalcLine);
         Assert.Contains("0.00", receipt.XpLine, StringComparison.Ordinal);
         Assert.False(receipt.HasRarityLine);
@@ -3921,7 +4271,7 @@ public sealed class MainViewModelTests
         Assert.Empty(rivals.Pushed);
         // The settle still banks the cash; the zone counter stays put.
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(454.22, saved.Cash);
+        Assert.Equal(27.94, saved.Cash);
         Assert.Equal(0.0, saved.Xp);
         Assert.Equal(0, saved.ExpansionJobs);
     }
@@ -3950,8 +4300,8 @@ public sealed class MainViewModelTests
 
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
-        Assert.Equal(2.46, wallet.Xp, precision: 9);
-        Assert.Equal(("ks_test_sedan", 8), Assert.Single(rarity.Recorded));
+        Assert.Equal(0.018, wallet.Xp, precision: 9);
+        Assert.Equal(("ks_test_sedan", 1), Assert.Single(rarity.Recorded));
     }
 
     [Fact]

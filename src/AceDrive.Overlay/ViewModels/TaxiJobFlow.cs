@@ -34,7 +34,6 @@ public sealed class TaxiJobFlow
     private readonly GameClock _game;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
-    private readonly TaxiDriveMeter _meter;
     private readonly GameStateSaver _saver;
     private readonly IRivalsService _rivals;
     private readonly TripBreakdowns _breakdowns;
@@ -58,6 +57,9 @@ public sealed class TaxiJobFlow
     // when the ask only promised a tip, or was declined.
     private RideConditionMonitor? _conditionMonitor;
     private double? _trackLengthMeters;
+    // The car's last normalised lap position: the ACCEPT moment turns it into
+    // the job's approach distance. Null until the first live poll.
+    private double? _playerPosition;
 
     public TaxiJobFlow(
         TaxiJobProposer proposals, AddressMap addressMap, ICarBrandSource carBrands,
@@ -65,7 +67,7 @@ public sealed class TaxiJobFlow
         CustomerRequestTable requestTable, PolicePatrolPlanner? police,
         TaxiRules taxiRules, FareTable fares, Garage garage, DriverWallet wallet,
         IFriendshipStore friends, FleetService fleet, GameClock game, IClock clock,
-        VoiceBeat beat, TaxiDriveMeter meter, GameStateSaver saver, IRivalsService rivals,
+        VoiceBeat beat, GameStateSaver saver, IRivalsService rivals,
         TripBreakdowns breakdowns, ITelemetryHud? hud, ILog log)
     {
         _proposals = proposals;
@@ -84,7 +86,6 @@ public sealed class TaxiJobFlow
         _game = game;
         _clock = clock;
         _beat = beat;
-        _meter = meter;
         _saver = saver;
         _rivals = rivals;
         _breakdowns = breakdowns;
@@ -103,7 +104,7 @@ public sealed class TaxiJobFlow
     /// <summary>True from ACCEPT to the receipt: a call must not open the panel.</summary>
     public bool InProgress => _job.Phase is JobPhase.ToPickup or JobPhase.EnRoute;
 
-    /// <summary>True while the paid leg runs: the meter and the patrols are live.</summary>
+    /// <summary>True while the paid leg runs: the patrols and the promise monitor are live.</summary>
     public bool LegActive => _job.Phase == JobPhase.EnRoute;
 
     public ICommand PickupCommand { get; }
@@ -112,6 +113,14 @@ public sealed class TaxiJobFlow
 
     /// <summary>Closed-lap length from the telemetry map, for the patrol geometry.</summary>
     public void SetTrackLength(double meters) => _trackLengthMeters = meters;
+
+    /// <summary>
+    /// Feeds the car's live lap position; the ACCEPT moment reads the last one
+    /// to price the drive from where the job started to the pickup. One field
+    /// assignment per poll, no allocation on the hot path.
+    /// </summary>
+    public void ObservePosition(double? normalizedPosition) =>
+        _playerPosition = normalizedPosition;
 
     /// <summary>
     /// The proposal page, built once and reused like the delivery board: the
@@ -148,21 +157,12 @@ public sealed class TaxiJobFlow
     }
 
     /// <summary>
-    /// The paid leg: bank the distance the meter measured, reprice the fare and
-    /// run the speed-challenge patrols. The odometer already banked the wear per
-    /// poll, so nothing here touches the car's condition.
+    /// The paid leg: run the speed-challenge patrols and the passenger's
+    /// promise monitor. The job's fare comes from the calculated distance set
+    /// at ACCEPT, so the odometer and the driven path never move it.
     /// </summary>
-    public void AdvanceLeg(TelemetrySample sample, double dt)
+    public void AdvanceLeg(TelemetrySample sample)
     {
-        double before = _meter.DistanceKm;
-        _meter.Add(sample.SpeedKmh, dt);
-        if (_job.Phase == JobPhase.EnRoute && _meter.DistanceKm != before)
-        {
-            _job.DistanceKm = _meter.DistanceKm;
-            _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
-            _host.RefreshJob();
-        }
-
         if (_job.Phase == JobPhase.EnRoute && _job.SpeedChallengeAgreed)
         {
             CheckPolice(sample);
@@ -191,8 +191,13 @@ public sealed class TaxiJobFlow
         if (job is null) return;
         _job = job;
         _job.Phase = JobPhase.ToPickup;
-        _job.DistanceKm = 0.0;
-        _job.Fare = 0.0;
+        // The chargeable distance is fixed here: the drive from where the job
+        // started to the pickup plus the pickup-to-drop-off leg, both on the
+        // closed lap. Neither the odometer nor a detour can move the fare.
+        _job.DistanceKm = TaxiJobDistance.Kilometers(
+            _addressMap, _playerPosition, _job.PickupAddress, _job.DropoffAddress,
+            TrackLengthMeters());
+        _job.Fare = TaxiFare.ComputeBase(_job.DistanceKm, _fares);
         _job.Patrols = [];
         _job.FinedPatrolIds.Clear();
         _job.WarnedPatrolIds.Clear();
@@ -202,7 +207,6 @@ public sealed class TaxiJobFlow
         _speedChallengeArmed = false;
         _conditionMonitor = null;
         _pendingRequest = null;
-        _meter.Reset();
         ShowPickupGuidance();
         _host.HidePanel();
         _log.LogInfo($"job accepted: {job.Customer.Full} {job.PickupName} -> {job.DropoffName}");
@@ -241,10 +245,7 @@ public sealed class TaxiJobFlow
             return;
         }
 
-        _meter.Reset();
         _job.Phase = JobPhase.EnRoute;
-        _job.DistanceKm = 0.0;
-        _job.Fare = TaxiFare.ComputeBase(0.0, _fares);
         _log.LogInfo($"job pickup: {_job.PickupName}");
         // The drop-off task text goes up first: the player must read where to
         // drive before an ask may replace the HUD line. Unity rolls the special

@@ -140,6 +140,52 @@ public sealed class AddressBookTests
     }
 
     [Fact]
+    public void NeighbourStreets_AreTheRowsOnEitherSideOfTheClosedLap()
+    {
+        var ring = new AddressMap(
+            "Germany", "Test", 400.0, 30.0,
+            [
+                new AddressStreet("a", "A", 0.0, 0.25),
+                new AddressStreet("b", "B", 0.25, 0.5),
+                new AddressStreet("c", "C", 0.5, 0.75),
+                new AddressStreet("d", "D", 0.75, 1.0),
+            ]);
+
+        Assert.Equal(
+            ["D", "B"],
+            AddressBook.NeighbourStreets(ring, ring.Streets[0]).Select(street => street.Name));
+        Assert.Equal(
+            ["A", "C"],
+            AddressBook.NeighbourStreets(ring, ring.Streets[1]).Select(street => street.Name));
+        Assert.Equal(
+            ["B", "D"],
+            AddressBook.NeighbourStreets(ring, ring.Streets[2]).Select(street => street.Name));
+        Assert.Equal(
+            ["C", "A"],
+            AddressBook.NeighbourStreets(ring, ring.Streets[3]).Select(street => street.Name));
+    }
+
+    [Fact]
+    public void NeighbourStreets_KeepTinyAndUnknownMapsHonest()
+    {
+        // Two rows share the one other street; one row has no neighbour and a
+        // row from another map answers none instead of throwing.
+        Assert.Equal(
+            ["Street 2"],
+            AddressBook.NeighbourStreets(Map, Map.Streets[0]).Select(street => street.Name));
+        Assert.Equal(
+            ["Street 1"],
+            AddressBook.NeighbourStreets(Map, Map.Streets[1]).Select(street => street.Name));
+
+        var single = new AddressMap(
+            "Germany", "Test", 100.0, 30.0,
+            [new AddressStreet("only", "Only", 0.0, 1.0)]);
+        Assert.Empty(AddressBook.NeighbourStreets(single, single.Streets[0]));
+        Assert.Empty(AddressBook.NeighbourStreets(
+            Map, new AddressStreet("elsewhere", "Elsewhere", 0.0, 0.5)));
+    }
+
+    [Fact]
     public void ZoneStreets_LeadsWithTheHomeStreetAndCapsAtTheDiscoveredCount()
     {
         // The interim mapping the Cento Miglia route plans over: the profile's

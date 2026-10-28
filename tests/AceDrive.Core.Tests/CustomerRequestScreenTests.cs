@@ -142,9 +142,17 @@ public sealed class CustomerRequestScreenTests
         Assert.Equal("That is impressive, thank you. I will tip you well.", h.Vm.Feedback);
         Assert.True(h.Vm.FeedbackPositive);
         Assert.False(h.Vm.RequestTextVisible);
-        Assert.True(h.Vm.ShowBack);
-        Assert.Empty(h.Vm.Options);
-        h.Vm.BackCommand.Execute(null);
+        // No BACK on the quiz result: it reads for five seconds and reports.
+        Assert.False(h.Vm.ShowBack);
+        Assert.DoesNotContain("BACK", h.Vm.VoiceActions.Keys);
+        Assert.Empty(h.Outcomes);
+
+        h.Clock.Advance(TimeSpan.FromSeconds(4.9));
+        h.Vm.Tick(h.Clock.UtcNow);
+        Assert.Empty(h.Outcomes);
+
+        h.Clock.Advance(TimeSpan.FromSeconds(0.1));
+        h.Vm.Tick(h.Clock.UtcNow);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
         Assert.True(outcome.TipEligible);
@@ -162,7 +170,10 @@ public sealed class CustomerRequestScreenTests
         Assert.Equal("That can't be right. No tip for you!", h.Vm.Feedback);
         Assert.False(h.Vm.FeedbackPositive);
         Assert.False(h.Vm.RequestTextVisible);
-        h.Vm.BackCommand.Execute(null);
+        Assert.False(h.Vm.ShowBack);
+
+        h.Clock.Advance(TimeSpan.FromSeconds(5));
+        h.Vm.Tick(h.Clock.UtcNow);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
         Assert.False(outcome.TipEligible);
@@ -171,20 +182,25 @@ public sealed class CustomerRequestScreenTests
     }
 
     [Fact]
-    public void QuizOptions_UseTheCategoryUnitAndAnswerOnce()
+    public void QuizOptions_UseNumberButtonsWithTheValueBesideThem()
     {
         Harness h = Build(Quiz());
 
+        Assert.Equal(["ONE", "TWO", "THREE"],
+            h.Vm.Options.Select(option => option.ButtonText));
         Assert.Equal(["1400 kg", "1500 kg", "1600 kg"],
             h.Vm.Options.Select(option => option.Text));
+        Assert.All(h.Vm.Options, option => Assert.True(option.HasReadout));
         Assert.Contains("1400 kg", h.Vm.VoiceActions.Keys);
+        Assert.Contains("ONE", h.Vm.VoiceActions.Keys);
 
         var correct = h.Vm.Options[1].Command;
         correct.Execute(null);
         // A second tap on a stale row must not grade again or overwrite the
         // outcome; the row is removed from the page already.
         correct.Execute(null);
-        h.Vm.BackCommand.Execute(null);
+        h.Clock.Advance(TimeSpan.FromSeconds(5));
+        h.Vm.Tick(h.Clock.UtcNow);
 
         CustomerRequestOutcome outcome = Assert.Single(h.Outcomes);
         Assert.True(outcome.QuizAnsweredCorrectly);

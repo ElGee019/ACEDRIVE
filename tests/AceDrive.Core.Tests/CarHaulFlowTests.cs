@@ -46,7 +46,8 @@ public sealed class CarHaulFlowTests
             new FakeShiftStore(), walletInstance, new DailyStreak(clock, null),
             new OperatingZone(null, seed: 0, AddressMap.Default), trunk, garage, city, hunger, roads,
             shift, new ShiftRecord(null), new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), new WhereIsWillyLedger());
+            new ValuationLedger(), new WhereIsWillyLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0));
         var day = new DayCycle(
             game, shift, new ShiftRecord(null), new FakeShiftStandings(),
             new FakePlayerTelemetry(), new FakeProfileStore(), new FakeRivals(),

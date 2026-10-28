@@ -36,6 +36,13 @@ public static class PoiTypes
     /// </summary>
     public const string CommunityCentre = "communitycenter";
 
+    /// <summary>
+    /// La Strada's magazine office (Unity's "magazine" POI): a story door the
+    /// port lists without an interior yet, so no arrival handler claims it and
+    /// ENTER keeps the log-only fallback.
+    /// </summary>
+    public const string Magazine = "magazine";
+
     /// <summary>The savings bank's interior (PORTPLAN 48).</summary>
     public const string Bank = "bank";
 

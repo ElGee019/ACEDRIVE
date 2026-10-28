@@ -8,69 +8,193 @@
       "id": "street-1",
       "name": "Street 1",
       "fromFraction": 0.0,
-      "toFraction": 0.5
+      "toFraction": 0.03125
     },
     {
       "id": "street-2",
       "name": "Street 2",
-      "fromFraction": 0.5,
-      "toFraction": 1.0
+      "fromFraction": 0.03125,
+      "toFraction": 0.0625
     },
     {
       "id": "street-3",
       "name": "Street 3",
-      "fromFraction": 0.0,
-      "toFraction": 0.5,
-      "fictional": true
+      "fromFraction": 0.0625,
+      "toFraction": 0.09375
     },
     {
       "id": "street-4",
       "name": "Street 4",
-      "fromFraction": 0.5,
-      "toFraction": 1.0,
-      "fictional": true
+      "fromFraction": 0.09375,
+      "toFraction": 0.125
     },
     {
       "id": "street-5",
       "name": "Street 5",
-      "fromFraction": 0.0,
-      "toFraction": 0.5,
-      "fictional": true
+      "fromFraction": 0.125,
+      "toFraction": 0.15625
     },
     {
       "id": "street-6",
       "name": "Street 6",
-      "fromFraction": 0.5,
-      "toFraction": 1.0,
-      "fictional": true
+      "fromFraction": 0.15625,
+      "toFraction": 0.1875
     },
     {
       "id": "street-7",
       "name": "Street 7",
-      "fromFraction": 0.0,
-      "toFraction": 0.5,
-      "fictional": true
+      "fromFraction": 0.1875,
+      "toFraction": 0.21875
     },
     {
       "id": "street-8",
       "name": "Street 8",
-      "fromFraction": 0.5,
-      "toFraction": 1.0,
-      "fictional": true
+      "fromFraction": 0.21875,
+      "toFraction": 0.25
     },
     {
       "id": "street-9",
       "name": "Street 9",
-      "fromFraction": 0.0,
-      "toFraction": 0.5,
-      "fictional": true
+      "fromFraction": 0.25,
+      "toFraction": 0.28125
     },
     {
       "id": "street-10",
       "name": "Street 10",
+      "fromFraction": 0.28125,
+      "toFraction": 0.3125
+    },
+    {
+      "id": "street-11",
+      "name": "Street 11",
+      "fromFraction": 0.3125,
+      "toFraction": 0.34375
+    },
+    {
+      "id": "street-12",
+      "name": "Street 12",
+      "fromFraction": 0.34375,
+      "toFraction": 0.375
+    },
+    {
+      "id": "street-13",
+      "name": "Street 13",
+      "fromFraction": 0.375,
+      "toFraction": 0.40625
+    },
+    {
+      "id": "street-14",
+      "name": "Street 14",
+      "fromFraction": 0.40625,
+      "toFraction": 0.4375
+    },
+    {
+      "id": "street-15",
+      "name": "Street 15",
+      "fromFraction": 0.4375,
+      "toFraction": 0.46875
+    },
+    {
+      "id": "street-16",
+      "name": "Street 16",
+      "fromFraction": 0.46875,
+      "toFraction": 0.5
+    },
+    {
+      "id": "street-17",
+      "name": "Street 17",
       "fromFraction": 0.5,
-      "toFraction": 1.0,
-      "fictional": true
+      "toFraction": 0.53125
+    },
+    {
+      "id": "street-18",
+      "name": "Street 18",
+      "fromFraction": 0.53125,
+      "toFraction": 0.5625
+    },
+    {
+      "id": "street-19",
+      "name": "Street 19",
+      "fromFraction": 0.5625,
+      "toFraction": 0.59375
+    },
+    {
+      "id": "street-20",
+      "name": "Street 20",
+      "fromFraction": 0.59375,
+      "toFraction": 0.625
+    },
+    {
+      "id": "street-21",
+      "name": "Street 21",
+      "fromFraction": 0.625,
+      "toFraction": 0.65625
+    },
+    {
+      "id": "street-22",
+      "name": "Street 22",
+      "fromFraction": 0.65625,
+      "toFraction": 0.6875
+    },
+    {
+      "id": "street-23",
+      "name": "Street 23",
+      "fromFraction": 0.6875,
+      "toFraction": 0.71875
+    },
+    {
+      "id": "street-24",
+      "name": "Street 24",
+      "fromFraction": 0.71875,
+      "toFraction": 0.75
+    },
+    {
+      "id": "street-25",
+      "name": "Street 25",
+      "fromFraction": 0.75,
+      "toFraction": 0.78125
+    },
+    {
+      "id": "street-26",
+      "name": "Street 26",
+      "fromFraction": 0.78125,
+      "toFraction": 0.8125
+    },
+    {
+      "id": "street-27",
+      "name": "Street 27",
+      "fromFraction": 0.8125,
+      "toFraction": 0.84375
+    },
+    {
+      "id": "street-28",
+      "name": "Street 28",
+      "fromFraction": 0.84375,
+      "toFraction": 0.875
+    },
+    {
+      "id": "street-29",
+      "name": "Street 29",
+      "fromFraction": 0.875,
+      "toFraction": 0.90625
+    },
+    {
+      "id": "street-30",
+      "name": "Street 30",
+      "fromFraction": 0.90625,
+      "toFraction": 0.9375
+    },
+    {
+      "id": "street-31",
+      "name": "Street 31",
+      "fromFraction": 0.9375,
+      "toFraction": 0.96875
+    },
+    {
+      "id": "street-32",
+      "name": "Street 32",
+      "fromFraction": 0.96875,
+      "toFraction": 1.0
     }
   ]
 }

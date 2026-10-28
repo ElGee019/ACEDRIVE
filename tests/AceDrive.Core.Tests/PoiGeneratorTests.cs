@@ -6,6 +6,10 @@ namespace AceDrive.Core.Tests;
 public sealed class PoiGeneratorTests
 {
     private static readonly string[] StreetNames = ["Street 1", "Street 2"];
+    // The free rows around Street 3 on the five-row ring, and the two rows
+    // the friends' draw must never take on the six-row ring.
+    private static readonly string[] StreetThreeNeighbours = ["Street 2", "Street 4"];
+    private static readonly string[] HomeAndMaxsRows = ["Street 1", "Street 2"];
 
     [Fact]
     public void Spawn_ReturnsANamedHouseOnTheMap()
@@ -148,6 +152,89 @@ public sealed class PoiGeneratorTests
         var generator = new PoiGenerator(empty, PoiCatalog.Default, seed: 0);
 
         Assert.Null(generator.DrawAddress());
+    }
+
+    [Fact]
+    public void PickConnectingStreet_PicksANeighbourOfTheAnchor()
+    {
+        AddressMap ring = Ring(5);
+        var generator = new PoiGenerator(ring, PoiCatalog.Default, seed: 1);
+        AddressStreet home = ring.Streets[2];
+
+        AddressStreet picked = Assert.IsType<AddressStreet>(
+            generator.PickConnectingStreet([home], [home]));
+
+        Assert.Contains(picked.Name, StreetThreeNeighbours);
+    }
+
+    [Fact]
+    public void PickConnectingStreet_ExcludesEveryUsedRow()
+    {
+        // The friends' draw: two anchors, both already in use, so every draw
+        // has to land on one of their free neighbours.
+        AddressMap ring = Ring(6);
+        var generator = new PoiGenerator(ring, PoiCatalog.Default, seed: 2);
+        AddressStreet[] used = [ring.Streets[0], ring.Streets[1]];
+
+        for (int i = 0; i < 50; i++)
+        {
+            AddressStreet picked = Assert.IsType<AddressStreet>(
+                generator.PickConnectingStreet(used, used));
+            Assert.DoesNotContain(picked.Name, HomeAndMaxsRows);
+        }
+    }
+
+    [Fact]
+    public void PickConnectingStreet_WrapsAroundTheStartLine()
+    {
+        // The lap is closed: Street 1 connects to Street 4 as well as Street 2.
+        AddressMap ring = Ring(4);
+        var generator = new PoiGenerator(ring, PoiCatalog.Default, seed: 3);
+        AddressStreet home = ring.Streets[0];
+
+        AddressStreet picked = Assert.IsType<AddressStreet>(
+            generator.PickConnectingStreet([home], [home]));
+
+        Assert.Contains(picked.Name, StreetThreeNeighbours);
+    }
+
+    [Fact]
+    public void PickConnectingStreet_FallsBackWhenTheMapHasNoFrontier()
+    {
+        var generator = new PoiGenerator(AddressMap.Default, PoiCatalog.Default, seed: 4);
+        AddressStreet home = AddressMap.Default.Streets[0];
+        AddressStreet other = AddressMap.Default.Streets[1];
+
+        // Two rows: Max still gets the only neighbour.
+        Assert.Equal(
+            "Street 2",
+            Assert.IsType<AddressStreet>(
+                generator.PickConnectingStreet([home], [home])).Name);
+        // Both rows used: no frontier and no unused row, so an anchor answers
+        // instead of leaving the door unplaced.
+        Assert.NotNull(generator.PickConnectingStreet([home, other], [home, other]));
+    }
+
+    [Fact]
+    public void PickConnectingStreet_NullForAnEmptyMap()
+    {
+        var map = new AddressMap("Germany", "Brands", 100.0, 30.0, []);
+        var generator = new PoiGenerator(map, PoiCatalog.Default, seed: 0);
+
+        Assert.Null(generator.PickConnectingStreet([], []));
+    }
+
+    // A closed ring of equal slices: every row meets its two neighbours.
+    private static AddressMap Ring(int streets)
+    {
+        double step = 1.0 / streets;
+        var rows = new List<AddressStreet>(streets);
+        for (int i = 0; i < streets; i++)
+        {
+            rows.Add(new AddressStreet(
+                $"street-{i + 1}", $"Street {i + 1}", i * step, (i + 1) * step));
+        }
+        return new AddressMap("Germany", "Brands", 300.0, 30.0, rows);
     }
 
     [Fact]

@@ -59,15 +59,16 @@ public sealed class NavigationTests
         // One instance per service graph: the saver writes the same stores the
         // assertions read.
         var willyLedger = new WhereIsWillyLedger();
+        // One career instance the saver, the POI world and the navigator share.
+        var career = new DeliveryCareer(HubCatalog.Default, 0);
         var saver = new GameStateSaver(
             clock, game, new FakeGameClockStore(), new FakeDriverStore(), garageStore,
             new FakeCityStore(), new FakeHungerStore(), roadTests, shiftStore,
             wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
             new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), willyLedger);
+            new ValuationLedger(), willyLedger, career);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
-        var career = new DeliveryCareer(HubCatalog.Default, 0);
         var directory = new PoiDirectory();
         IReadOnlyList<CarSpec> poolCars = pool;
         var day = new DayCycle(
@@ -97,7 +98,7 @@ public sealed class NavigationTests
             new FleetService(
                 garageInstance, poolCars, game, wallet, InsuranceRules.Default, log,
                 brands, new FakeContentSource(TestSession.EmptyContent)),
-            game, clock, beat, meter, saver, rivals, breakdowns, null, log);
+            game, clock, beat, saver, rivals, breakdowns, null, log);
         var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());

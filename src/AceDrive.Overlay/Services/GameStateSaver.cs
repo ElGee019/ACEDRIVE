@@ -5,9 +5,9 @@ namespace AceDrive.Overlay.Services;
 /// <summary>
 /// One place that banks the live session to disk. Every state owner
 /// (wallet + trunk, streak, zone, garage, city, hunger, road test, weekly
-/// market valuation, missing-person stamp) contributes its slice of a save, so
-/// a save from any path can never clobber another owner with stale numbers —
-/// the caller never assembles a snapshot itself.
+/// market valuation, missing-person stamp, delivery career) contributes its
+/// slice of a save, so a save from any path can never clobber another owner
+/// with stale numbers — the caller never assembles a snapshot itself.
 /// All stores swallow their own I/O, so none of these methods throw.
 /// </summary>
 public sealed class GameStateSaver
@@ -29,6 +29,7 @@ public sealed class GameStateSaver
     private readonly VisitLedger _visits;
     private readonly ValuationLedger _valuation;
     private readonly WhereIsWillyLedger _willy;
+    private readonly DeliveryCareer _career;
     private readonly Trunk _trunk;
     private readonly Garage _garage;
     private readonly CityEconomy _city;
@@ -47,7 +48,7 @@ public sealed class GameStateSaver
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
         TaxiShift shift, ShiftRecord shifts, JobLedger jobs,
         DestinationPins pins, VisitLedger visits, ValuationLedger valuation,
-        WhereIsWillyLedger willy)
+        WhereIsWillyLedger willy, DeliveryCareer career)
     {
         _clock = clock;
         _game = game;
@@ -66,6 +67,7 @@ public sealed class GameStateSaver
         _visits = visits;
         _valuation = valuation;
         _willy = willy;
+        _career = career;
         _trunk = trunk;
         _garage = garage;
         _city = city;
@@ -139,9 +141,10 @@ public sealed class GameStateSaver
     public void SaveShift() => _shiftStore.Save(_shift.Snapshot());
 
     /// <summary>
-    /// The driver file (PORTPLAN 51 interim): every scalar owner contributes,
-    /// plus the standings the caller just refreshed. A null snapshot keeps the
-    /// last known board (OfflineRivals seeds it from the driver save at boot).
+    /// The driver file (PORTPLAN 51 interim): every owner contributes its
+    /// slice, plus the standings the caller just refreshed. A null snapshot
+    /// keeps the last known board (OfflineRivals seeds it from the driver save
+    /// at boot).
     /// </summary>
     public void SaveDriver(RivalsResult? standings) =>
         _driver.Save(_wallet.Snapshot() with
@@ -193,5 +196,10 @@ public sealed class GameStateSaver
             // (ToWhereIsWilly.md §2.9): the search itself is session state, so
             // a restart inside the run reopens the row with nothing paid.
             LastWillyDate = _willy.LastCompletedDate,
+            // The delivery career (PORTPLAN 18/51): the CredP left, the hubs
+            // bought and each hub's ramp count. Every career mutation is
+            // followed by this save, so a closed overlay reopens the career
+            // instead of a seed that forgets what was paid for it.
+            Career = _career.Snapshot(),
         });
 }

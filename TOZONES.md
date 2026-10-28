@@ -54,7 +54,7 @@ on its own.
 |---|---|
 | POI screens in scope | **Only the families the zone spawns** (car wash, bank, insurance, dealer, mechanic, grocery, coffee). The five business interiors + the store page already exist; this slice verifies and wires them for freshly placed doors. No generic "place" page, no fuel-station/La Strada page (PORTPLAN 37 declined). |
 | POI timing + naming | **Unity's curves and the name pool stay untouched** (car wash at 6 streets, dealer at 10 jobs/37 streets, mechanic at 36 jobs, insurance 13, bank 15, stores per owned hub). Demo invention is limited to the **street identities** (Street 3, 4, …). |
-| Fictional street geometry | **Label streets onto the existing 1,929 m lap.** Street 3+ reuse the two half-lap spans; house numbers, drive-to guidance and distances resolve. Known limitation: a fictional street's doors coincide in space with Street 1/2's doors (§10). |
+| Street geometry | **Split the existing 1,929 m lap into thirty-two 3-house streets.** Each row owns one contiguous 1/32 slice (60.28 m, 30 m spacing), so house numbers, drive-to guidance and distances resolve and every door has its own spot. Story doors join the ring's neighbours (§4.1). Temporary until the real free-roam map lands (§10). |
 | Zone standings | **Wire the existing Firestore board** behind a new `IZoneStandings` seam with an offline null-object, and show rank + delta on the expansion page. |
 
 ---
@@ -89,29 +89,34 @@ on its own.
 
 ### 4.1 Street model (data)
 
-`Data/address_map.json` grows the fictional pool:
+`Data/address_map.json` splits the lap into short streets:
 
-```json
-{ "id": "street-3", "name": "Street 3", "fromFraction": 0.0, "toFraction": 0.5, "fictional": true }
-```
-
-* Street 1 (`0.0–0.5`) and Street 2 (`0.5–1.0`) stay exactly as they are.
-* Street 3 … Street 10 alternate the two half-lap spans, 33 house numbers each
-  (30 m spacing on the 1,929 m lap). Eight fictional streets give nine
-  expansions from a fresh career — enough for the whole POI ladder (dealer at
-  37 streets is out of reach, but the mechanic is job-gated at 36 and stays
-  reachable).
-* `Core/AddressStreet` gains `bool Fictional = false` (last optional
-  parameter, so every existing construction keeps compiling). Why the flag:
-  it keeps `AddressBook.MapLengthKm` meaning *the placeholder area's base
-  length* (1.929 km, the boot seed for the zone and the starter bonus), and it
-  labels the rows a real map will replace later. Without it the boot zone
-  length would jump to 9.645 km and quietly nerf the starter bonus. The street
-  pool itself is fixed content: nothing fetches or appends streets at runtime.
-* `Core/AddressMap.Default` **stays at two streets** (it is the shipped
-  fallback and the deterministic test fixture; `AddressPlanTests` pins it).
-  A fallback build without `address_map.json` still expands through Street 2
-  and then reports the pool as exhausted — degraded content, never a crash.
+* Thirty-two streets tile the lap: Street 1 … Street 32 own one contiguous
+  slice each (`i/32 … (i+1)/32`), so no two rows share a house's spot and a
+  car anywhere on the lap resolves to the street it is on.
+* 1,929 m / 32 = 60.28 m per street: two 30 m gaps plus the tail, so every row
+  counts 0, 30, 60 m = **3 house numbers** at the shipped spacing.
+  Thirty-two is the most streets that fit while every one keeps 3 houses;
+  thirty-one (62.23 m) would also fit, thirty-three (58.45 m) would drop to 2
+  numbers. The extra rows grow the ladder to thirty-one expansions from a
+  fresh career, enough for the street-paced businesses (the dealer at 37
+  streets stays out of reach).
+* The map's row order is the lap order: `AddressBook.NeighbourStreets` answers
+  the rows on either side (the first and last rows meet), and the
+  introduction's story doors walk that ring so the tour stays in one
+  neighbourhood — Max's grocery beside the home street, the friends on a row
+  connecting home or Max's, then the community centre and the door-only La
+  Strada on further connecting rows.
+* No `fictional` flag ships now: each row is a real slice, so
+  `AddressBook.MapLengthKm` still sums to the 1.929 km lap (the boot seed for
+  the zone and the starter bonus). `Core/AddressStreet.Fictional` stays in the
+  model for a map whose labels reuse a span; the shipped map no longer needs
+  it. The street pool itself is fixed content: nothing fetches or appends
+  streets at runtime.
+* `Core/AddressMap.Default` **stays at two streets** (it is the fallback and the
+  deterministic test fixture; `AddressPlanTests` pins it). A fallback build
+  without `address_map.json` still expands through Street 2 and then reports the
+  pool as exhausted — degraded content, never a crash.
 
 ### 4.2 The operating zone owns the addressable area (Core)
 
@@ -145,8 +150,8 @@ public AddressStreet? NextStreet { get; }   // null once the pool is exhausted
 
 No new `AddressBook` lookup is needed (`ZoneStreets`, `MapLengthKm`,
 `AverageStreetLengthKm` already exist); `MapLengthKm` and
-`AverageStreetLengthKm` both count the non-fictional rows only, so the
-placeholder's base length stays 1.929 km.
+`AverageStreetLengthKm` both count the non-fictional rows, and the thirty-two
+shipped slices sum to the same 1.929 km base.
 
 ### 4.3 Growth returns what happened (Core record)
 
@@ -320,7 +325,8 @@ handler registration, never a branch in the entry path.
 
 ## 5. Data and content
 
-* `Data/address_map.json`: add Street 3 … Street 10 (fictional), as above.
+* `Data/address_map.json`: split the lap into Street 1 … Street 32 (thirty-two
+  3-house slices), as above.
 * `Data/pois.json`: unchanged (Unity's curves, name patterns, categories).
 * `Resources/Strings.resx` + `Strings.nl.resx` (placeholders must survive
   translation, AGENTS.md › Data-driven):
@@ -417,7 +423,7 @@ Every new collaborator gets a fake (`FakeZoneStandings`), one file each.
 
 | Phase | Content | Files (new → touched) |
 |---|---|---|
-| **P1 — addressable zone** | `Fictional` street flag, Street 3…10 data, `OperatingZone(map, homeStreetId)`, `ZoneMap`, `NextStreet`, `MapLengthKm` over base streets, `ZoneExpansion` record, `ZoneGrowth.Expand()` returning it | `Core/ZoneExpansion.cs`; `Core/AddressStreet.cs`, `Core/AddressBook.cs`, `Core/OperatingZone.cs`, `Overlay/ViewModels/ZoneGrowth.cs`, `App.xaml.cs`, `TestSession.cs`, `tests/*` |
+| **P1 — addressable zone** | `Fictional` street flag, Street 1…32 data (thirty-two 3-house slices), `OperatingZone(map, homeStreetId)`, `ZoneMap`, `NextStreet`, `MapLengthKm` over base streets, `ZoneExpansion` record, `ZoneGrowth.Expand()` returning it | `Core/ZoneExpansion.cs`; `Core/AddressStreet.cs`, `Core/AddressBook.cs`, `Core/OperatingZone.cs`, `Overlay/ViewModels/ZoneGrowth.cs`, `App.xaml.cs`, `TestSession.cs`, `tests/*` |
 | **P2 — POIs at the threshold** | `PoiSpawner` addressable + opened street, `PoiWorld.Grow(expansion)` returning doors, adoption order | `Core/PoiSpawner.cs`, `Overlay/ViewModels/PoiWorld.cs`, `App.xaml.cs`, tests |
 | **P3 — expansion page** | VM + view + DataTemplate, `PoiTypeLabels`, resx en/nl, `Navigation.ShowZoneExpansion` + addresses builder, pending hand-off in `MainViewModel` | `Overlay/ViewModels/ZoneExpansionScreenViewModel.cs`, `Overlay/Views/ZoneExpansionScreenView.xaml(.cs)`, `Overlay/ViewModels/PoiTypeLabels.cs`; `MainWindow.xaml`, `Navigation.cs`, `MainViewModel.cs`, resx, tests |
 | **P4 — zone standings** | `IZoneStandings`, offline null-object, Firestore implementation, `ZoneStandingsBlock`, wiring + fake | `Services/IZoneStandings.cs`, `Services/OfflineZoneStandings.cs`; `Services/FirestoreZoneStandings.cs`, `App.xaml.cs`, `Navigation.cs`, `tests/Fakes/FakeZoneStandings.cs`, tests |
@@ -433,12 +439,11 @@ the docs.
 
 ## 10. Risks and limitations
 
-* **Coincident geometry.** A fictional street reuses a half-lap span, so two
-  doors on different streets can sit at the same lap offset. Guidance, radius
-  and race maths stay valid, but the town is not spatially consistent until
-  the real map lands. This is the accepted cost of the "label onto the lap"
-  decision (§2).
-* **The street pool is fixed and ends at Street 10.** After that the zone is
+* **The short streets are a stand-in.** Thirty-two 3-house slices tile the
+  Brands Hatch Indy lap only so every door is reachable until the real
+  free-roam map lands. House spacing stays 30 m and the street names stay
+  placeholders; the real map replaces the rows, not the lookups.
+* **The street pool is fixed and ends at Street 32.** After that the zone is
   complete: the growth logs the completion once and the counter stays due, but
   no further expansion page appears. Changing the set is a content decision,
   not a runtime discovery feature — nothing is fetched or appended online.

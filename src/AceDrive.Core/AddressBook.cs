@@ -150,6 +150,48 @@ public static class AddressBook
     }
 
     /// <summary>
+    /// The streets that connect to this one: its neighbours on the closed lap.
+    /// The map's row order is the lap order, so row i meets row i-1 and i+1,
+    /// and the last row meets the first. One row has no neighbour and two rows
+    /// answer the other row once; a row that is not on the map answers none.
+    /// </summary>
+    public static IReadOnlyList<AddressStreet> NeighbourStreets(
+        AddressMap map, AddressStreet? street)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        if (street is null || map.Streets is not { Count: > 1 } streets)
+        {
+            return [];
+        }
+
+        int index = StreetIndex(streets, street);
+        if (index < 0)
+        {
+            return [];
+        }
+
+        AddressStreet previous = streets[(index - 1 + streets.Count) % streets.Count];
+        AddressStreet next = streets[(index + 1) % streets.Count];
+        return string.Equals(previous.Id, next.Id, StringComparison.OrdinalIgnoreCase)
+            ? [previous]
+            : [previous, next];
+    }
+
+    private static int StreetIndex(
+        IReadOnlyList<AddressStreet> streets, AddressStreet street)
+    {
+        for (int i = 0; i < streets.Count; i++)
+        {
+            if (string.Equals(streets[i].Id, street.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
     /// The player's home door from the saved profile. Null when the profile
     /// is missing, the street id is unknown, or the saved number no longer
     /// exists on that street (a hand-edited map or an old save); the radius
@@ -209,8 +251,9 @@ public static class AddressBook
 
     /// <summary>
     /// Closed-lap distance between two houses: the shorter way around the
-    /// circuit, so Street 2 No. 33 is next door to Street 1 No. 1. Infinity
-    /// when either address does not resolve, which keeps it out of a radius.
+    /// circuit, so the last house of one street is next door to the first
+    /// house of the next. Infinity when either address does not resolve, which
+    /// keeps it out of a radius.
     /// </summary>
     public static double DistanceMeters(AddressMap map, AddressLocation a, AddressLocation b) =>
         DistanceMeters(map, a, b, map.TrackLengthMeters);

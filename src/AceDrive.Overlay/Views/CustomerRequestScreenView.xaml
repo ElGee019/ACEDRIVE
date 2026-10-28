@@ -3,8 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Customer request page (PORTPLAN 11, Unity CustomerRequestScreen):
-         the ask, the answer countdown (19 s), three quiz values or
-         ACCEPT/DECLINE, then feedback and BACK. A forced speed challenge
+         the ask, the answer countdown (19 s), three numbered quiz values
+         (ONE/TWO/THREE, the delivery page's store rows) or ACCEPT/DECLINE,
+         then feedback. A quiz result has no BACK: it reads for five seconds
+         and returns to the task text by itself. A forced speed challenge
          reuses the page as a short read-in: its delivery clock instead of
          the answer countdown, no buttons, then it dismisses itself. The host
          ticks the clocks. -->
@@ -45,8 +47,34 @@
             <ItemsControl ItemsSource="{Binding Options}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Content="{Binding Text}" Command="{Binding Command}"
-                                HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
+                        <!-- The number button names the slot and the value
+                             reads beside it, exactly like the delivery page's
+                             store rows. ACCEPT / DECLINE have no separate
+                             read-out, so their button spans the row. -->
+                        <Grid Margin="0,2">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="{Binding ButtonText}"
+                                    Command="{Binding Command}" MinWidth="72"
+                                    VerticalAlignment="Center" HorizontalAlignment="Left">
+                                <Button.Style>
+                                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding HasReadout}" Value="False">
+                                                <Setter Property="Grid.ColumnSpan" Value="2"/>
+                                                <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Button.Style>
+                            </Button>
+                            <TextBlock Grid.Column="1" Text="{Binding Text}"
+                                       Foreground="#FFF" FontSize="13" TextWrapping="Wrap"
+                                       VerticalAlignment="Center" Margin="8,0,0,0"
+                                       Visibility="{Binding HasReadout, Converter={StaticResource BoolToVis}}"/>
+                        </Grid>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>

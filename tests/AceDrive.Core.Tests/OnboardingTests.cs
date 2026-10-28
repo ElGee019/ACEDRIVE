@@ -586,6 +586,7 @@ public sealed class OnboardingTests
                 MaxStoreId: "max-grocery",
                 MaxStoreAddress: new AddressLocation("Street 1", 12, HouseSide.Left),
                 CommunityCentreAddress: new AddressLocation("Street 2", 7, HouseSide.Right),
+                LaStradaAddress: new AddressLocation("Street 3", 2, HouseSide.Left),
                 Stage: OnboardingStage.VoiceInfo);
             store.Save(state);
             Assert.Equal(state, new JsonOnboardingStore(file, new TestLog()).Load());

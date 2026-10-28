@@ -149,17 +149,14 @@ public partial class App : Application, IDisposable
         // The delivery distance-charge table rides beside the taxi fares:
         // one file each, so balance edits never collide.
         var deliveryFares = new JsonFareStore(_log).LoadDelivery();
-        // The career state is the delivery side's wallet + hub list. A new
-        // driver starts with nothing; only Max's first store visit after the
-        // introduction hands over the intro CredP (Unity firstSceneComplete +
-        // hasSeenMaxJobIntro, PORTPLAN 5/51). The banked visit restores that
-        // gift on relaunch until the persistent career save lands.
+        // The introduction's banked visit: a new driver starts with nothing and
+        // only Max's first store visit after the introduction hands over the
+        // intro CredP (Unity firstSceneComplete + hasSeenMaxJobIntro, PORTPLAN
+        // 5/51). The career itself resumes from the driver save below; this flag
+        // only seeds a save written before the career persisted.
         var onboardingStore = new JsonOnboardingStore(_log);
         OnboardingState onboardingProgress = onboardingStore.Load();
         bool introGiftClaimed = onboardingProgress.MaxDeliveryIntroSeen;
-        var deliveryCareer = new DeliveryCareer(
-            new JsonHubCatalog(_log).Load(),
-            introGiftClaimed ? deliveryCatalog.StartCredP : 0);
 
         // The town (PORTPLAN 25): each store starts at the rules' citizen
         // value, its people drift with how full the shelves are and demand
@@ -219,6 +216,19 @@ public partial class App : Application, IDisposable
         var driverStore = new JsonDriverStore(_log);
         DriverState? savedDriver = driverStore.Load();
         var driver = new DriverWallet(savedDriver);
+        // The delivery career (PORTPLAN 18/51): the CredP balance, the hubs
+        // bought and each hub's ramp count resume from the driver save, so a
+        // restart reopens the career instead of losing it. A save written
+        // before the career persisted has no career block: its hub doors are
+        // still in the address directory, so the ownership is recovered from
+        // them once, and only a genuinely new career falls back to the banked
+        // intro visit's gift.
+        var hubCatalog = new JsonHubCatalog(_log).Load();
+        var deliveryCareer = savedDriver?.Career is { } savedCareer
+            ? new DeliveryCareer(hubCatalog, savedCareer)
+            : new DeliveryCareer(hubCatalog,
+                DeliveryCareerRecovery.Recover(hubCatalog, poiDirectory.All)
+                ?? new DeliveryCareerState(introGiftClaimed ? deliveryCatalog.StartCredP : 0));
         // The lifetime settled-job total (PORTPLAN 24, Unity jobsCompleted):
         // the dealer and mechanic POIs gate on it, so it must survive a
         // restart beside the cash it was earned with.
@@ -411,7 +421,7 @@ public partial class App : Application, IDisposable
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
             garage, city, hunger, roadTests, shift, shifts, jobs, pins, visits,
-            valuation, willyLedger);
+            valuation, willyLedger, deliveryCareer);
         // The panel, its page and the activity stamp: view state with an owner
         // the view binds through the shell, not state the coordinator holds.
         var shell = new OverlayShell();
@@ -482,7 +492,7 @@ public partial class App : Application, IDisposable
         var taxi = new TaxiJobFlow(
             taxiProposals, addressMap, carBrands, cars, requests, requestTable,
             police, taxiRules, fares, garage, driver, friendships, fleet, game, wall,
-            beat, meter, saver, rivals, breakdowns, hud, _log);
+            beat, saver, rivals, breakdowns, hud, _log);
         // The delivery run from DELIVER to receipt, with its own board page.
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,

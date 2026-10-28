@@ -99,7 +99,7 @@ coordinator. Pages take commands from the domain that owns them.
 
 | Collaborator | Owns (state) | Public surface | Reporting host |
 |---|---|---|---|
-| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_conditionMonitor`, `_trackLengthMeters` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample, dt)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength` | `ITaxiJobHost` (8 members) |
+| `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_conditionMonitor`, `_trackLengthMeters`, `_playerPosition` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength`, `ObservePosition` | `ITaxiJobHost` (8 members) |
 | `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
 | `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
@@ -124,7 +124,7 @@ coordinator. Pages take commands from the domain that owns them.
 After the split `MainViewModel` is a coordinator, not an owner:
 
 - lifecycle: `Start`, `Poll`, `Dispose`, the timer;
-- the 10 Hz loop: feed the meter, tick `TaxiJobFlow`, `DayCycle`, `WorldTicks`,
+- the 10 Hz loop: feed the delivery meter, tick `TaxiJobFlow`, `DayCycle`, `WorldTicks`,
   the Cento entry, the valuation and the missing-person run, apply
   `ReadoutPaint` — 59 code lines, not 229;
 - intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
@@ -163,7 +163,7 @@ stores + saved state
       └ WorldTicks (game clock, city, hunger, fleet, board, career, saver, rivals)
       └ DriverCatchUp (onboarding store, garage, streak, wallet, rng, saver, rivals)
       └ ZoneGrowth (zone, map, onboarding store, profile store, online, log)
-      └ TaxiJobFlow (meter, saver, proposals, requests, police, wallet, breakdowns, …)
+      └ TaxiJobFlow (saver, proposals, requests, police, wallet, breakdowns, …)
       └ DeliveryFlow (board, career, city, meter, breakdowns)
       └ CarHaulFlow (watcher, pool, wallet, DayCycle, saver; the legs come later)
       └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)

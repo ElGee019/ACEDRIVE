@@ -18,7 +18,9 @@ public sealed record AddressMap(
     /// Brands Hatch Indy as the stand-in free-roam map: Street 1 covers the
     /// first half of the lap, Street 2 the second half. 1,929 m is the
     /// circuit's official length; the last few metres of each street simply
-    /// have no further house number.
+    /// have no further house number. The shipped data file splits the same lap
+    /// into thirty-two 3-house streets so every address is reachable; this
+    /// two-street pair is only the fallback when that file is missing.
     /// </summary>
     public static readonly AddressMap Default = new(
         "Germany",

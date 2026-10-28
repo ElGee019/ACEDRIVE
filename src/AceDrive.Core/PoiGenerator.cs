@@ -97,6 +97,90 @@ public sealed class PoiGenerator
     }
 
     /// <summary>
+    /// Picks a street in the story's neighbourhood: a neighbour of one of
+    /// <paramref name="anchors"/> that is not in <paramref name="used"/>, so a
+    /// new door joins the streets the story already reached instead of landing
+    /// across the map (Unity's connected-street discovery, on the placeholder
+    /// lap). When the map has no frontier left it falls back to any unused
+    /// row, then to an anchor, so a tiny map still places every door. Null
+    /// only when the map has no rows. Advances this generator's seeded stream.
+    /// </summary>
+    public AddressStreet? PickConnectingStreet(
+        IReadOnlyList<AddressStreet> anchors, IReadOnlyList<AddressStreet> used)
+    {
+        if (_map.Streets is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        var candidates = new List<AddressStreet>();
+        AddNeighbours(anchors, used, candidates);
+        if (candidates.Count == 0)
+        {
+            AddUnused(used, candidates);
+        }
+        if (candidates.Count == 0 && anchors is { Count: > 0 })
+        {
+            candidates.AddRange(anchors);
+        }
+
+        return candidates.Count == 0 ? null : candidates[_rng.Next(candidates.Count)];
+    }
+
+    private void AddNeighbours(
+        IReadOnlyList<AddressStreet> anchors, IReadOnlyList<AddressStreet> used,
+        List<AddressStreet> candidates)
+    {
+        if (anchors is not { Count: > 0 })
+        {
+            return;
+        }
+
+        foreach (AddressStreet anchor in anchors)
+        {
+            foreach (AddressStreet neighbour in AddressBook.NeighbourStreets(_map, anchor))
+            {
+                if (!ContainsStreet(used, neighbour)
+                    && !ContainsStreet(candidates, neighbour))
+                {
+                    candidates.Add(neighbour);
+                }
+            }
+        }
+    }
+
+    private void AddUnused(
+        IReadOnlyList<AddressStreet> used, List<AddressStreet> candidates)
+    {
+        foreach (AddressStreet street in _map.Streets)
+        {
+            if (street is null)
+            {
+                continue;
+            }
+
+            if (!ContainsStreet(used, street) && !ContainsStreet(candidates, street))
+            {
+                candidates.Add(street);
+            }
+        }
+    }
+
+    private static bool ContainsStreet(
+        IReadOnlyList<AddressStreet> streets, AddressStreet street)
+    {
+        foreach (AddressStreet candidate in streets)
+        {
+            if (string.Equals(candidate.Id, street.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Rebuilds a previously banked POI from its id and address without
     /// advancing the RNG. Null when the content table no longer carries the
     /// business, so an edited data file degrades to a fresh draw.
