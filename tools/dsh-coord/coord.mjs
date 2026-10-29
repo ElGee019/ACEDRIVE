@@ -421,8 +421,12 @@ function cmdRelease({ positional, flags }) {
   process.stdout.write(ok ? `released ${resource}\n` : `no claim on ${resource}\n`);
 }
 
-function runGit(args, root) {
-  const r = spawnSync('git', args, { cwd: root, stdio: 'inherit' });
+function runGit(args, root, extraEnv = undefined) {
+  const r = spawnSync('git', args, {
+    cwd: root,
+    stdio: 'inherit',
+    env: extraEnv ? { ...process.env, ...extraEnv } : process.env,
+  });
   return r.status === null ? 1 : r.status;
 }
 
@@ -443,7 +447,8 @@ function cmdPush({ positional, flags }) {
   appendLog(dir, { ts: now(), from: id, kind: 'push-start', text: `${remote}/${branch}` });
   try {
     const args = ['push', ...(flags.remote ? [remote] : []), ...positional.slice(1)];
-    return runGit(args.length > 1 ? args : ['push'], root);
+    // The pre-push hook must recognize this same session, or it would block its own push.
+    return runGit(args.length > 1 ? args : ['push'], root, { COORD_ID: id });
   } finally {
     release(dir, resource, id);
     appendLog(dir, { ts: now(), from: id, kind: 'push-end', text: `${remote}/${branch}` });
@@ -458,7 +463,7 @@ function cmdCommit({ positional, flags }) {
   acquire(dir, 'commit', { owner: id, ttlMs: 2 * 60_000, reason: 'git commit', waitMs: Number(flags.wait || 0) * 1000 });
   appendLog(dir, { ts: now(), from: id, kind: 'commit-start', text: '' });
   try {
-    return runGit(['commit', ...positional.slice(1)], root);
+    return runGit(['commit', ...positional.slice(1)], root, { COORD_ID: id });
   } finally {
     release(dir, 'commit', id);
     appendLog(dir, { ts: now(), from: id, kind: 'commit-end', text: '' });
