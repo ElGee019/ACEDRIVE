@@ -155,6 +155,17 @@ check('installer reports hooks', r.status === 0 && /installed pre-push/.test(r.t
 const hook = fs.readFileSync(path.join(tmp, '.git', 'hooks', 'pre-push'), 'utf8');
 check('pre-push hook calls the guard', hook.includes('guard push') && hook.includes('coord.mjs'), hook);
 
+// --- a linked worktree shares the main checkout's board -----------------
+const wtPath = path.join(tmp, '.agents', 'worktrees', 'wt-a');
+git(['worktree', 'add', '-q', '-b', 'wt-branch', wtPath]);
+run(['claim', 'push:origin/main', '--as', 'session-a', '--ttl', '60']);
+const wtStatus = capture(process.execPath, [coord, 'status', '--as', 'session-b'], {
+  cwd: wtPath,
+  env: { COORD_ROOT: wtPath, COORD_TMP: scratch },
+}).text;
+check('worktree sees the main checkout board', wtStatus.includes('push:origin/main'), wtStatus);
+run(['release', 'push:origin/main', '--as', 'session-a']);
+
 // --- token cost sanity ---------------------------------------------------
 const statusOut = run(['status', '--as', 'session-a']).text;
 check('status stays compact (< 1200 chars)', statusOut.length < 1200, `${statusOut.length} chars`);

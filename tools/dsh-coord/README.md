@@ -72,6 +72,23 @@ Two layers, because they fail differently:
 Leases expire (10 min default, 5 min for push), so a crashed or killed session cannot
 wedge the repository. `--ttl` and `--wait` are per-call.
 
+## Worktrees
+
+Isolation is a separate decision from coordination, and the two combine:
+
+- **Parallel work on different areas** — one git worktree per session
+  (`dsh-experimental-worktree`). Each session gets its own branch, index, working tree, and
+  `bin/`/`obj/`, so concurrent builds stop fighting over MSBuild's file locks and a
+  `reset --hard` only destroys your own work.
+- **Small jobs (docs + code)** — one checkout, `coord` only. The merge ceremony of a
+  worktree costs more than the overlap it prevents.
+- **Either way** — the shared remote is the one resource you cannot fork, so pushes go
+  through `coord push`.
+
+The board follows the repository, not the checkout: `coord` resolves its store from
+`git rev-parse --git-common-dir` back to the main checkout, so every worktree reads and
+writes the same `.dsh-coord`. `COORD_DIR` overrides that if you ever need to.
+
 ## Design notes
 
 - **Identity is explicit.** There is no reliable way to derive a stable per-session id
@@ -79,6 +96,9 @@ wedge the repository. `--ttl` and `--wait` are per-call.
   `COORD_ID` per session and remove that step.
 - **No file locks.** Path claims are advisory and only warn; the hard guarantees are on
   commit and push. Use one git worktree per session if you want real isolation.
+- **One board per repository.** State lives in the main checkout's `.dsh-coord` even when
+  the session runs in a linked worktree, because the store must be shared for the
+  sessions to see each other.
 - **On demand only.** Nothing is injected into the system prompt, so sessions pay for
   coordination only when they call it, and prompt caches are untouched.
 - **Bounded output.** `status` is ~15 lines; a full push/commit cycle costs on the order
@@ -90,6 +110,9 @@ wedge the repository. `--ttl` and `--wait` are per-call.
   The hooks catch them where hooks run; otherwise this is a convention with teeth only
   where you wire it in.
 - `claim edit:<path>` does not block writes, it only surfaces overlap in `status`.
+- Worktrees isolate the checkout, not external paths: a shared `dist/`, `%AppData%` state,
+  a signing certificate, or absolute paths inside build scripts stay shared and can still
+  collide.
 - Sessions that never heartbeat (`status`, `say`, `inbox`, `claim`, `push`, `commit`, or
   `heartbeat` all refresh it) disappear from `others` after 45 minutes.
 - Under a sandbox that forbids pipe creation, git's shell-based transports and hooks can

@@ -103,10 +103,20 @@ function repoRoot(explicit) {
   return top ? path.resolve(top) : process.cwd();
 }
 
+// One board per repository, not per checkout: a linked git worktree has its own
+// root and working tree, so the store is resolved from the shared git directory
+// back to the main checkout. COORD_DIR overrides everything.
+function boardRoot(root) {
+  const common = git(['rev-parse', '--git-common-dir'], root);
+  if (!common) return root;
+  const abs = path.resolve(root, common);
+  return path.basename(abs) === '.git' ? path.dirname(abs) : root;
+}
+
 function store(root) {
   const dir = process.env.COORD_DIR
     ? path.resolve(process.env.COORD_DIR)
-    : path.join(root, '.dsh-coord');
+    : path.join(boardRoot(root), '.dsh-coord');
   for (const sub of ['sessions', 'claims', 'cursor']) {
     fs.mkdirSync(path.join(dir, sub), { recursive: true });
   }

@@ -237,7 +237,13 @@ shared state:
 - Never `git reset --hard`, `checkout -B`, `stash`, or `clean` while another
   session is active - that rewrites their uncommitted work too.
 
+- Parallel work on different areas: use one git worktree per session
+  (`dsh-experimental-worktree`); each gets its own branch, index, and bin/obj.
+  Small jobs (docs + code) stay in this checkout with coord only. Worktrees
+  still share one coord board and still lease the remote.
+
 Details and limits: `tools/dsh-coord/README.md`.
+
 ## Token optimization (do not read — churn noise)
 
 `bin/`, `obj/`, `TestResults/`, `.vs/`, `*.user`, generated designer files.
