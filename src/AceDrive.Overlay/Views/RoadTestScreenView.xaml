@@ -1,0 +1,206 @@
+<UserControl x:Class="AceDrive.Overlay.Views.RoadTestScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- A leg that was already driven keeps its button on the page so the
+             test centre reads as one checklist: the shared button look says
+             nothing about being disabled, so the spent leg greys its text and
+             outline out instead of looking as live as the leg still on offer. -->
+        <Style x:Key="RoadTestLegButton" TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="#FF6E7479"/>
+                    <Setter Property="BorderBrush" Value="#FF3D444A"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- One board-row shape for both lists on the result view: the car's
+             board (rank, player, reading) and the all-cars record book (rank,
+             car, reading). Shared here instead of pasted twice, so the two
+             boards keep the same column rhythm and the same teal highlight. -->
+        <DataTemplate x:Key="RoadTestBoardRow">
+            <Grid Margin="0,1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="28"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="{Binding PositionText}" Foreground="#FFBFC4C9"
+                           FontSize="13" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Name}"
+                           FontSize="14"
+                           TextTrimming="CharacterEllipsis"
+                           VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#FFF"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOwn}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Grid.Column="2" Text="{Binding Result}"
+                           FontSize="14"
+                           VerticalAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="#FFF"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsOwn}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
+    <!-- La Strada's road-test page (PORTPLAN 49, Unity RoadTestScreen). Two
+         phases share the skeleton: the test centre (the week's car under the
+         title, the two legs with their briefs, and the photo mission Unity only
+         reveals once both legs ran) and the result (the finish sentence, the
+         car's board with the player's own row highlighted, and the all-cars
+         record book under it). The page paints only what the flow hands it: it
+         owns no clock and never reads a board itself. Same page skeleton as the
+         valuation and receipt pages: title band, centred body, buttons at the
+         bottom. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding Title}"/>
+        <!-- Line 2 is the car under test (Unity names it on the screen); the
+             venue itself is the place the page was opened from. -->
+        <TextBlock Grid.Row="1" Text="{Binding CarName}" Foreground="#FF97EAD2"
+                   FontSize="13" FontWeight="Bold" TextAlignment="Center"
+                   TextWrapping="Wrap" Margin="0,0,0,10"/>
+        <!-- Test centre: both legs with their briefs, then the photo mission
+             once both have been driven. When the car at the door is not this
+             week's pick, the legs give way to the line naming the car to enter:
+             the board rows are the pick's, so only that car may set them. -->
+        <StackPanel Grid.Row="2" VerticalAlignment="Center" Margin="16,0"
+                    Visibility="{Binding IsReady, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="{Binding PickRequiredText}" Foreground="#FFFF9E64" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"
+                       Visibility="{Binding ShowPickRequired, Converter={StaticResource BoolToVis}}"/>
+            <StackPanel Visibility="{Binding DrivesThePick, Converter={StaticResource BoolToVis}}">
+                <Button Content="{Binding AccelLabel}" Command="{Binding AccelCommand}"
+                        Padding="4" HorizontalAlignment="Stretch"
+                        IsEnabled="{Binding CanAccel}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource RoadTestLegButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding AccelFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <TextBlock Text="{Binding AccelText}" Foreground="#FFBFC4C9" FontSize="12"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="4,4,4,10"/>
+                <Button Content="{Binding BrakeLabel}" Command="{Binding BrakeCommand}"
+                        Padding="4" HorizontalAlignment="Stretch"
+                        IsEnabled="{Binding CanBrake}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource RoadTestLegButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding BrakeFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <TextBlock Text="{Binding BrakeText}" Foreground="#FFBFC4C9" FontSize="12"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="4,4,4,10"/>
+                <Button Content="{Binding PhotoLabel}" Command="{Binding PhotoCommand}"
+                        Padding="4" HorizontalAlignment="Stretch"
+                        Visibility="{Binding ShowPhoto, Converter={StaticResource BoolToVis}}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource RoadTestLegButton}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PhotoFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- Unity's photo brief: any location on the map, so this
+                     week's shoot differs from the last one. -->
+                <TextBlock Text="{Binding PhotoText}" Foreground="#FFBFC4C9" FontSize="12"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="4,4,4,0"
+                           Visibility="{Binding ShowPhoto, Converter={StaticResource BoolToVis}}"/>
+            </StackPanel>
+        </StackPanel>
+        <!-- Result: the finish sentence, the car's board and the all-cars
+             record book Unity paints beside it. The player's own row is the only
+             highlighted one on the car's board; a run outside the visible top
+             slice is repeated under Unity's separator row. On the all-cars book
+             the car under test is the highlighted row instead: the page has no
+             single player row there. -->
+        <StackPanel Grid.Row="2" Margin="16,0"
+                    Visibility="{Binding IsResults, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="{Binding ResultText}" Foreground="#FFF" FontSize="16"
+                       FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock Text="{Binding BoardTitle}" Style="{StaticResource FormLabel}"
+                       TextAlignment="Center" Margin="0,12,0,4"/>
+            <TextBlock Text="{Binding WaitingText}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center"
+                       Visibility="{Binding IsWaiting, Converter={StaticResource BoolToVis}}"/>
+            <ItemsControl ItemsSource="{Binding Rows}"
+                          ItemTemplate="{StaticResource RoadTestBoardRow}"
+                          Visibility="{Binding HasBoard, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding AllCarsTitle}" Style="{StaticResource FormLabel}"
+                       TextAlignment="Center" Margin="0,12,0,4"
+                       Visibility="{Binding HasAllCarsBoard, Converter={StaticResource BoolToVis}}"/>
+            <ItemsControl ItemsSource="{Binding AllCarsRows}"
+                          ItemTemplate="{StaticResource RoadTestBoardRow}"
+                          Visibility="{Binding HasAllCarsBoard, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+        <!-- Bottom band: the page's verbs. CONTINUE after a run (back to the
+             test centre, the visit stays), BACK underneath only while the
+             pick's car is at the door: the wrong-car view keeps the visit open
+             so the player can swap cars and still take the tests. Teal is the
+             shared voice-ack highlight, one flash per button. -->
+        <StackPanel Grid.Row="3">
+            <Button Content="{Binding ContinueLabel}" Command="{Binding ContinueCommand}"
+                    Padding="4" Margin="0,0,0,6" HorizontalAlignment="Stretch"
+                    Visibility="{Binding IsResults, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{Binding BackLabel}" Command="{Binding BackCommand}"
+                    Padding="4" HorizontalAlignment="Stretch"
+                    Visibility="{Binding ShowBack, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

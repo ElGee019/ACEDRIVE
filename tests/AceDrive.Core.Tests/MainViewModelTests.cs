@@ -1602,32 +1602,33 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void TapRoadTestDay_MarksTestedAndSwitches()
+    public void TapRoadTestDay_StartsTheDriveAndKeepsThePick()
     {
-        // Manual stand-in until the road-test drive flow lands: tapping the
-        // Tuesday button inside its gate banks the running car and shows the
-        // next pick. The strip opens on Monday, so carry the clock over first.
+        // The Tuesday row drives the road test (PORTPLAN 49): the tap pins La
+        // Strada and hides the panel, and the pick stays on offer because only a
+        // complete test (brake and photo too) may move it. The strip opens on
+        // Monday, so carry the clock over first.
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
         var bank = new FakeRoadTestStore();
-        var session = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
+        var session = Create(
+            speedKmh: 0f, log: log, roads: roads, roadTestStore: bank,
+            progress: FinishedTour());
         var (vm, clock, _, _) = session;
-        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(53)); // across Monday midnight: Tuesday noon
         vm.Poll();
         string first = TuesdayButton(calendar);
         Assert.NotEqual(string.Empty, first);
+        string? pick = roads.Current?.Key;
 
         calendar.DayCommand.Execute(3);
-        string second = TuesdayButton(calendar);
-        Assert.NotEqual(string.Empty, second);
-        Assert.NotEqual(first, second);
-        Assert.Contains(log.Infos, m => m.StartsWith("road test done:", StringComparison.Ordinal));
-        // Completion is the only thing allowed to move the car, and the new
-        // pick hits disk at once so the next session opens on it.
-        RoadTestSnapshot saved = Assert.Single(bank.Saved);
-        Assert.Equal(roads.Current?.Id, saved.CarId);
+
+        Assert.Equal(RoadTestPhase.Driving, session.RoadTest.Phase);
+        Assert.Equal(pick, roads.Current?.Key);
+        Assert.Equal(first, TuesdayButton(calendar));
+        Assert.Contains(log.Infos, m => m.StartsWith("road test begun:", StringComparison.Ordinal));
+        Assert.Empty(bank.Saved);
     }
 
     [Fact]
@@ -1635,13 +1636,14 @@ public sealed class MainViewModelTests
     {
         // Tuesday night: the day matches but the 8pm gate is shut. The tap
         // still acknowledges with the one-beat teal glow, then answers with
-        // the COME BACK hint instead of banking the car.
+        // the COME BACK hint instead of starting the drive.
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
         var bank = new FakeRoadTestStore();
-        var session = Create(speedKmh: 0f, log: log, roads: roads, roadTestStore: bank);
+        var session = Create(
+            speedKmh: 0f, log: log, roads: roads, roadTestStore: bank,
+            progress: FinishedTour());
         var (vm, clock, _, _) = session;
-        session.Story.FinishDialogue();
         var calendar = ShowCalendar(vm);
         clock.Advance(TimeSpan.FromMinutes(75)); // 2.2 s per game minute: Tuesday 22:0x
         calendar.DayCommand.Execute(3);
@@ -1650,8 +1652,57 @@ public sealed class MainViewModelTests
         clock.Advance(TimeSpan.FromSeconds(0.51)); // the beat drains on the poll
         vm.Poll();
         Assert.Equal("COME BACK ON TUESDAY BETWEEN 8am AND 8pm", TuesdayButton(calendar));
-        Assert.DoesNotContain(log.Infos, m => m.StartsWith("road test done:", StringComparison.Ordinal));
+        Assert.Equal(RoadTestPhase.Idle, session.RoadTest.Phase);
         Assert.Empty(bank.Saved);
+    }
+
+    [Fact]
+    public void TapSaturday_RunsTheTouristenfahrtenDeliveriesToTheirReceipts()
+    {
+        // Saturday is the run's own row: the tap draws a shop and 1-3 corners,
+        // the companion guides the pickup, and each corner ENTER settles one
+        // order through the shared delivery receipt. CONTINUE either pins the
+        // next corner or hands the player back to the calendar.
+        var log = new TestLog();
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
+        var session = Create(
+            speedKmh: 0f, log: log, hud: hud, wallet: wallet,
+            progress: FinishedTour(),
+            gameStart: new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc));
+        var (vm, _, _, _) = session;
+        CalendarScreenViewModel calendar = ShowCalendar(vm);
+
+        calendar.DayCommand.Execute(7);
+
+        Assert.False(vm.IsShown);
+        Assert.Equal(
+            "HudTouristenPickupDrive",
+            Assert.IsType<HudJobGuidance>(hud.JobGuidance).DriveKey);
+        Assert.Contains(
+            log.Infos,
+            line => line.StartsWith("touristenfahrten started:", StringComparison.Ordinal));
+
+        hud.RaiseJobEnter(); // load the goods at the shop
+        Assert.Equal(
+            "HudTouristenDropoffDrive",
+            Assert.IsType<HudJobGuidance>(hud.JobGuidance).DriveKey);
+
+        int guard = 0;
+        while (!vm.IsShown && guard++ < 4)
+        {
+            hud.RaiseJobEnter(); // deliver the current corner
+            var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
+            Assert.True(wallet.Cash > 0.0);
+            Assert.True(vm.IsShown);
+            receipt.ContinueCommand.Execute(null);
+        }
+
+        Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
+        Assert.Contains(
+            log.Infos,
+            line => line.StartsWith("touristenfahrten complete:", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -2041,6 +2092,16 @@ public sealed class MainViewModelTests
         menu.CalendarCommand.Execute(null);
         return Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
     }
+
+    // A career past the introduction, with the tour's La Strada door banked: the
+    // road-test row pins that door, so a leg without it never starts (PORTPLAN 49).
+    private static OnboardingState FinishedTour() => OnboardingState.Fresh with
+    {
+        BirthdayDone = true,
+        CommunityCentreDone = true,
+        LaStradaAddress = new AddressLocation(
+            AddressMap.Default.Streets[0].Name, 2, HouseSide.Left),
+    };
 
     [Fact]
     public void ToggleShow_FlipsVisibility()

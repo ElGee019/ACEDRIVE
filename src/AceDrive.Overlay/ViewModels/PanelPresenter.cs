@@ -20,6 +20,7 @@ public sealed class PanelPresenter
     private readonly Navigation _nav;
     private readonly TaxiJobFlow _taxi;
     private readonly DeliveryFlow _delivery;
+    private readonly TouristenfahrtenFlow _touristen;
     private readonly IClock _clock;
     private readonly ILog _log;
 
@@ -34,12 +35,14 @@ public sealed class PanelPresenter
 
     public PanelPresenter(
         OverlayShell shell, Navigation navigation, TaxiJobFlow taxi,
-        DeliveryFlow delivery, IClock clock, ILog log)
+        DeliveryFlow delivery, TouristenfahrtenFlow touristen,
+        IClock clock, ILog log)
     {
         _shell = shell;
         _nav = navigation;
         _taxi = taxi;
         _delivery = delivery;
+        _touristen = touristen;
         _clock = clock;
         _log = log;
     }
@@ -176,10 +179,11 @@ public sealed class PanelPresenter
         Hidden?.Invoke(this, EventArgs.Empty);
     }
 
-    // The flows own their runs: a live taxi ride or delivery run is work in
-    // progress, and the call gate reads the same definition the idle-shift
-    // rule does.
-    private bool JobInProgress => _taxi.InProgress || _delivery.InProgress;
+    // The flows own their runs: a live taxi ride, delivery run or Touristenfahrten
+    // run is work in progress, and the call gate reads the same definition the
+    // idle-shift rule does.
+    private bool JobInProgress =>
+        _taxi.InProgress || _delivery.InProgress || _touristen.InProgress;
 
     private void Reveal(object screen, string logLine)
     {

@@ -63,7 +63,7 @@
                         <TextBlock Grid.Row="0" Text="{Binding BannerText}"
                                    Foreground="#FFFFFFFF" FontSize="16"
                                    TextWrapping="Wrap"
-                                   Visibility="{Binding HasBanner, Converter={StaticResource BoolToVis}}"/>
+                                   Visibility="{Binding ShowBanner, Converter={StaticResource BoolToVis}}"/>
                         <!-- Remaining distance to the pinned leg (a taxi job
                              or an intro drive) or a transient host notice
                              (police fine) over the speed-challenge clock. The
@@ -126,6 +126,37 @@
                             </Button.Style>
                         </Button>
                     </Grid>
+
+                    <!-- Road test (PORTPLAN 49): the task sentence a page hands
+                         over, the start counter (or its halt line while the car
+                         is still rolling) and the running three-decimal clock.
+                         It sits outside the task-text block on purpose: entering
+                         La Strada consumes the arrival (HasTaskText goes down),
+                         while the leg being timed still has to be readable. The
+                         flow owns the clock; this window only paints one reading
+                         per poll. The photo mission hands the same block its
+                         brief with no clock and the PHOTOSHOOT button instead. -->
+                    <StackPanel Grid.Row="0" Grid.ColumnSpan="2"
+                                VerticalAlignment="Center"
+                                Visibility="{Binding HasRoadTest, Converter={StaticResource BoolToVis}}">
+                        <TextBlock Text="{Binding RoadTestTaskText}"
+                                   Foreground="#FFFFFFFF" FontSize="15"
+                                   TextAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding RoadTestClockText}"
+                                   FontFamily="{StaticResource TourneyThin}"
+                                   FontSize="34" TextAlignment="Center"
+                                   Foreground="#FF97EAD2"
+                                   Visibility="{Binding HasRoadTestClock, Converter={StaticResource BoolToVis}}"/>
+                        <!-- The photo mission's shutter: the leg is not timed, so
+                             the clock above hides and this button takes its place.
+                             Clicking it prices the shoot at the car's live
+                             position and opens the road test's receipt. -->
+                        <Button Content="{Binding PhotoshootText}"
+                                Command="{Binding PhotoshootCommand}"
+                                HorizontalAlignment="Center" Margin="0,2,0,0"
+                                FontSize="16" Padding="12,4"
+                                Visibility="{Binding HasPhotoshoot, Converter={StaticResource BoolToVis}}"/>
+                    </StackPanel>
 
                     <StackPanel Grid.Row="1" Grid.Column="0" VerticalAlignment="Bottom">
                         <TextBlock Text="{Binding AddressLabel}"

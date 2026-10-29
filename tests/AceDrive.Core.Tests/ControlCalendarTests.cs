@@ -26,8 +26,16 @@ public sealed class ControlCalendarTests
         Assert.Equal(ControlCalendar.Willy, ControlCalendar.Week[2].EventId);
         Assert.Null(ControlCalendar.Week[3].EventId);
         Assert.Equal(ControlCalendar.Pancakes, ControlCalendar.Week[4].EventId);
-        Assert.Null(ControlCalendar.Week[5].EventId);
         Assert.Equal(ControlCalendar.CentoMiglia, ControlCalendar.Week[6].EventId);
+    }
+
+    [Fact]
+    public void Week_SaturdayHostsTheTouristenfahrtenRun()
+    {
+        // The run is the port's own event: no Unity row, but a real flow behind
+        // the Saturday button (TouristenfahrtenFlow).
+        Assert.Equal(7, ControlCalendar.Week[5].DayOfWeek);
+        Assert.Equal(ControlCalendar.Touristenfahrten, ControlCalendar.Week[5].EventId);
     }
 
     [Fact]

@@ -20,7 +20,8 @@ internal sealed class TestSessionResult
         MainViewModel vm, FakeClock clock, FakeTelemetry tel, FakeStore store,
         OnboardingFlow story, TodoBoard todos, ValuationFlow valuation,
         ValuationLedger ledger, IValuationBoard board,
-        WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger)
+        WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
+        RoadTestFlow roadTest)
     {
         Vm = vm;
         Clock = clock;
@@ -33,6 +34,7 @@ internal sealed class TestSessionResult
         Board = board;
         Willy = willy;
         WillyLedger = willyLedger;
+        RoadTest = roadTest;
     }
 
     public MainViewModel Vm { get; }
@@ -64,6 +66,8 @@ internal sealed class TestSessionResult
     /// <summary>The missing-person run's persisted completion stamp.</summary>
     public WhereIsWillyLedger WillyLedger { get; }
 
+    /// <summary>The road test's flow (PORTPLAN 49).</summary>
+    public RoadTestFlow RoadTest { get; }
     public void Deconstruct(
         out MainViewModel vm, out FakeClock clock, out FakeTelemetry tel,
         out FakeStore store)

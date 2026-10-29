@@ -10,5 +10,12 @@ namespace AceDrive.Overlay.Localization;
 public static class AddressFormatter
 {
     public static string Format(AddressLocation address) =>
-        Strings.Format("HudAddress", address.StreetName, address.HouseNumber);
+        Format(address.StreetName, address.HouseNumber);
+
+    /// <summary>
+    /// The same shape from a street and number already held apart (a receipt
+    /// that stores the two fields rather than a resolved location).
+    /// </summary>
+    public static string Format(string streetName, int houseNumber) =>
+        Strings.Format("HudAddress", streetName, houseNumber);
 }

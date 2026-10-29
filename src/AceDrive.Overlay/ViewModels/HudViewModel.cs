@@ -66,6 +66,14 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // paints it in place of the task text and lets its buttons run.
     private CustomerRequestScreenViewModel? _request;
 
+    // The road test's live block (either leg): the task sentence's resource key,
+    // the target speed the key prints and the reading already painted. The flow
+    // owns the clock, so these are kept to repaint the sentence on a language
+    // or unit switch.
+    private string _roadTestTaskKey = string.Empty;
+    private double _roadTestTargetKmh;
+    private HudRoadTestReadout? _roadTest;
+
     // The line under the banner: the remaining distance to the pinned leg (a
     // taxi job or an intro drive), or a transient host notice (the notice
     // wins). Both are empty with no leg.
@@ -124,6 +132,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 ? rules.DisplayDistanceStepMeters
                 : TaxiRules.Default.DisplayDistanceStepMeters;
         EnterCommand = new RelayCommand(Enter);
+        PhotoshootCommand = new RelayCommand(Photoshoot);
     }
 
     /// <summary>Track line while live, or the waiting/EVO status when not.</summary>
@@ -254,6 +263,74 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     public bool HasReputation => _reputation is not null;
 
     /// <summary>
+    /// True while a road-test leg paints its block: the task sentence and the
+    /// countdown or running time. It replaces the banner — a leg being timed
+    /// has no door left to drive to — and clears when the run ends.
+    /// </summary>
+    public bool HasRoadTest => _roadTest is not null;
+
+    /// <summary>True while the destination banner has the top line.</summary>
+    public bool ShowBanner => HasBanner && _roadTest is null;
+
+    /// <summary>
+    /// The road-test task sentence ("Let's see how fast you can get from
+    /// 0-60 km/h."), empty with no leg. Formatted from the stored key so a
+    /// language or miles/kilometres switch repaints the target it names.
+    /// </summary>
+    public string RoadTestTaskText
+    {
+        get => _roadTestTaskText;
+        private set => SetField(ref _roadTestTaskText, value);
+    }
+    private string _roadTestTaskText = string.Empty;
+
+    /// <summary>The counter digit or the running three-decimal time, empty with no leg.</summary>
+    public string RoadTestClockText
+    {
+        get => _roadTestClockText;
+        private set
+        {
+            if (SetField(ref _roadTestClockText, value))
+            {
+                OnPropertyChanged(nameof(HasRoadTestClock));
+            }
+        }
+    }
+    private string _roadTestClockText = string.Empty;
+
+    /// <summary>
+    /// True while the block paints a reading (the counter, the stopwatch, the
+    /// brake distance). The photo mission is not timed, so its block shows the
+    /// drive-anywhere brief and the PHOTOSHOOT button instead of an empty clock
+    /// line.
+    /// </summary>
+    public bool HasRoadTestClock => _roadTestClockText.Length > 0;
+
+    /// <summary>
+    /// True while the road test's photo mission is up: the companion offers the
+    /// PHOTOSHOOT button that takes the shot wherever the car is parked.
+    /// </summary>
+    public bool HasPhotoshoot => _photoshoot;
+    private bool _photoshoot;
+
+    /// <summary>"PHOTOSHOOT"; bindable so a language switch repaints it.</summary>
+    public string PhotoshootText
+    {
+        get => _photoshootText;
+        private set => SetField(ref _photoshootText, value);
+    }
+    private string _photoshootText = Strings.Get("HudPhotoshoot");
+
+    /// <summary>Takes the photo-mission shot; the host prices and banks it.</summary>
+    public RelayCommand PhotoshootCommand { get; }
+
+    /// <summary>
+    /// Raised when the player on the photo mission asks for the shot. The host
+    /// owns what it means, exactly like the arrival's ENTER.
+    /// </summary>
+    public event EventHandler? PhotoshootRequested;
+
+    /// <summary>
     /// True once the walk's closing car page has handed the errand over. The
     /// window binds its visibility to this so the intro pages own the screen
     /// first.
@@ -264,12 +341,15 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         private set => SetField(ref _isRevealed, value);
     }
 
-    /// <summary>True while a destination is pinned; hides the top block otherwise.</summary>
+    /// <summary>True while the destination is pinned; hides the top block otherwise.</summary>
     public bool HasDestination
     {
         get => _hasDestination;
         private set => SetField(ref _hasDestination, value);
     }
+
+    /// <summary>The unit the readouts are in; follows the settings page live.</summary>
+    public MileageUnit Units => _preferences.Units;
 
     /// <summary>
     /// True while the live car is not the garage's current car. The career
@@ -417,11 +497,18 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         MileageLabel = Strings.Get("HudMileageLabel");
         AddressLabel = Strings.Get("HudAddressLabel");
         _wrongCarWarning = Strings.Get("HudWrongCar");
+        PhotoshootText = Strings.Get("HudPhotoshoot");
         // A notice is already-formatted host copy; a language switch would
         // leave it stale, so drop it with the old strings.
         SetNoticeText(string.Empty);
         RepaintDestination();
         RepaintReputation();
+        // The road-test sentence names the target speed in the player's unit,
+        // so a unit flip mid-run repaints it like the mileage readout.
+        if (_roadTest is not null)
+        {
+            RoadTestTaskText = FormatRoadTestTask(_roadTestTaskKey, _roadTestTargetKmh);
+        }
         Refresh(_lastSample, _lastOdometerKm, _lastGameRunning, _lastWrongCar, force: true);
     }
 
@@ -533,6 +620,45 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     }
 
     /// <summary>
+    /// Shows the road test's live block (the task sentence and the countdown or
+    /// running time), or clears it with null. The road-test flow owns the
+    /// clock: it hands one reading per poll while the leg runs, and the HUD
+    /// repaints only the reading that moved. The task sentence is formatted
+    /// here from its stored key so the unit and language switch still repaint.
+    /// </summary>
+    public void SetRoadTest(HudRoadTestReadout? readout)
+    {
+        bool wasShown = _roadTest is not null;
+        bool hadPhotoshoot = _photoshoot;
+        string taskKey = readout?.TaskKey ?? string.Empty;
+        double targetKmh = readout?.TargetKmh ?? 0.0;
+        _roadTest = readout;
+        _photoshoot = readout?.Photoshoot ?? false;
+        if (!string.Equals(taskKey, _roadTestTaskKey, StringComparison.Ordinal)
+            || targetKmh != _roadTestTargetKmh)
+        {
+            _roadTestTaskKey = taskKey;
+            _roadTestTargetKmh = targetKmh;
+            RoadTestTaskText = taskKey.Length > 0
+                ? FormatRoadTestTask(taskKey, targetKmh)
+                : string.Empty;
+        }
+
+        RoadTestClockText = readout?.ClockText ?? string.Empty;
+        if (hadPhotoshoot != _photoshoot)
+        {
+            OnPropertyChanged(nameof(HasPhotoshoot));
+        }
+        if (wasShown == (_roadTest is not null))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(HasRoadTest));
+        OnPropertyChanged(nameof(ShowBanner));
+    }
+
+    /// <summary>
     /// Shows a transient line under the banner. The host formats the copy; the
     /// HUD only owns its expiry, on the clock rather than a tick count.
     /// </summary>
@@ -596,14 +722,31 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         OnPropertyChanged(nameof(ShowEnterButton));
     }
 
-    // BannerText and HasBanner are one state machine (warning > destination), so
-    // every input change repaints through here instead of each setter raising
-    // the pair on its own.
+    // BannerText, HasBanner and ShowBanner are one state machine (the warning
+    // outranks the destination, the road-test block outranks both), so every
+    // input change repaints through here instead of each setter raising the
+    // trio on its own.
     private void RepaintBanner()
     {
         OnPropertyChanged(nameof(BannerText));
         OnPropertyChanged(nameof(HasBanner));
+        OnPropertyChanged(nameof(ShowBanner));
     }
+
+    // The road test's sentence: the target is the leg's own speed (60 for the
+    // accel run, 100 for the brake run) in the player's unit, so a miles player
+    // reads "0-37 mph" for the same 60 km/h the clock measures (cars.json's
+    // Acceleration column stays the metric one). A zero target names a line
+    // with no placeholders, like the halt ask.
+    private string FormatRoadTestTask(string key, double targetKmh) =>
+        targetKmh > 0.0
+            ? Strings.Format(
+                key,
+                RoadTestRules.DisplaySpeed(targetKmh, _preferences.Units),
+                Strings.Get(_preferences.Units == MileageUnit.Miles
+                    ? "RoadTestUnitMph"
+                    : "RoadTestUnitKmh"))
+            : Strings.Get(key);
 
     // The counter is a sentence with the race's number in it, so a language
     // switch repaints it from the stored reading like the banner's copy.
@@ -623,10 +766,11 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         if (_jobGuidance is { } job)
         {
             DestinationText = AtDestination
-                ? Strings.Format(job.ArrivedKey, job.TargetName)
+                ? Strings.Format(job.ArrivedKey, Args(job.ArrivedArgs, job.TargetName))
                 : Strings.Format(
-                    job.DriveKey, job.TargetName, job.Target.StreetName,
-                    job.Target.HouseNumber, _map.City);
+                    job.DriveKey,
+                    Args(job.DriveArgs, job.TargetName, job.Target.StreetName,
+                        job.Target.HouseNumber, _map.City));
             SetAction(job.ActionKey);
         }
         else if (_destination is { } poi)
@@ -638,7 +782,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 ?? (person ? "HudArrivedPerson" : "HudArrived");
             DestinationText = AtDestination
                 ? arrivedKey.Length > 0
-                    ? Strings.Format(arrivedKey, poi.Name)
+                    ? Strings.Format(arrivedKey, Args(_copy?.ArrivedArgs, poi.Name))
                     : string.Empty
                 : DriveTo(poi);
             SetAction(_copy?.ActionKey ?? (person ? "HudPickUp" : "HudEnter"));
@@ -650,6 +794,27 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         }
 
         RepaintBanner();
+    }
+
+    // The values one drive/arrival key formats: the leg's own list when the
+    // flow supplied one (the Touristenfahrten order and dropoff names), the
+    // shared address shape otherwise. Allocates only on a repaint (a pinned
+    // leg or an arrival edge), never per tick.
+    private static object?[] Args(
+        IReadOnlyList<string>? supplied, params object?[] fallback)
+    {
+        if (supplied is null)
+        {
+            return fallback;
+        }
+
+        var values = new object?[supplied.Count];
+        for (int i = 0; i < supplied.Count; i++)
+        {
+            values[i] = supplied[i];
+        }
+
+        return values;
     }
 
     // Label and spoken words come from one action key: the label localizes,
@@ -667,10 +832,8 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     private string DriveTo(PointOfInterest poi) =>
         Strings.Format(
             _copy?.DriveKey ?? "HudDestination",
-            poi.Name,
-            poi.Address.StreetName,
-            poi.Address.HouseNumber,
-            _map.City);
+            Args(_copy?.DriveArgs, poi.Name,
+                poi.Address.StreetName, poi.Address.HouseNumber, _map.City));
 
     private void Enter()
     {
@@ -684,6 +847,20 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         _beat.Cancel();
         FlashEnter();
         RaiseEnter();
+    }
+
+    // The photo mission's shutter. A click is newer input than a pending voice
+    // tap here too, so the deferred acknowledgment goes. The host decides
+    // whether the shot can be priced (a missing position keeps the mission up).
+    private void Photoshoot()
+    {
+        if (!HasPhotoshoot)
+        {
+            return;
+        }
+
+        _beat.Cancel();
+        PhotoshootRequested?.Invoke(this, EventArgs.Empty);
     }
 
     // The pinned job leg owns ENTER while it is up; otherwise the story

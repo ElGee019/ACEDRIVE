@@ -101,4 +101,61 @@ public sealed class JsonRoadTestStoreTests
         }
         finally { Directory.Delete(dir); }
     }
+
+    [Fact]
+    public void RoundTrip_KeepsTheReceiptRecord()
+    {
+        string file = Path.GetTempFileName();
+        try
+        {
+            var log = new TestLog();
+            var record = new RoadTestRecord(
+                NaturalReputation: 3,
+                HasPhoto: true,
+                PhotoStreet: "Street 1",
+                PhotoHouseNumber: 4,
+                PhotoOffsetMeters: 1500.0,
+                LastPeopleReached: 40,
+                LastVariety: 0.5,
+                LastJournalistReputation: 100.0,
+                LastMagazinePrice: 50.0,
+                LastEarnings: 600.0,
+                HighestPeopleReached: 40,
+                HighestJournalistReputation: 100.0,
+                HighestMagazinePrice: 50.0,
+                HighestEarnings: 600.0);
+            var store = new JsonRoadTestStore(file, log);
+
+            store.Save(new RoadTestSnapshot("ks_mazda_mx5_na", ["ks_abarth_695_biposto"], record));
+            RoadTestSnapshot? loaded = store.Load();
+
+            Assert.NotNull(loaded?.Record);
+            Assert.Equal(record, loaded.Record);
+            Assert.Empty(log.Warnings);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void FileWrittenBeforeTheReceipt_OpensAnEmptyRecord()
+    {
+        // The pick file predates the receipt: it must still open, with the
+        // record at its fresh-career defaults, never as a parse failure.
+        string file = Path.GetTempFileName();
+        try
+        {
+            File.WriteAllText(file, """{"CarId":"ks_mazda_mx5_na","TestedIds":[]}""");
+            var log = new TestLog();
+
+            RoadTestSnapshot? loaded = new JsonRoadTestStore(file, log).Load();
+
+            Assert.NotNull(loaded);
+            Assert.Null(loaded.Record);
+            Assert.Empty(log.Warnings);
+            var ledger = new RoadTestLedger(TestRoadCars.Pool, seed: 7, loaded);
+            Assert.Equal(0, ledger.Record.NaturalReputation);
+            Assert.False(ledger.Record.HasPhoto);
+        }
+        finally { File.Delete(file); }
+    }
 }

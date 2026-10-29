@@ -1,13 +1,15 @@
-// Road-test pick rotation (PORTPLAN item 49, port of RoadTestService's
-// pick/tested bookkeeping; the drive flow itself is a later slice). The pick
-// is sticky: it only moves when the road test is completed, never on a week
-// roll or an overlay restart — RoadTestSnapshot carries it between sessions
-// so the button keeps naming the same car until it has been driven.
+// Road-test pick rotation and settled record (PORTPLAN item 49, port of
+// RoadTestService's pick/tested bookkeeping plus PlayerData's lastRoadTest* /
+// highestRoadTest* readings). The pick is sticky: it only moves on MarkTested,
+// never on a week roll or an overlay restart — RoadTestSnapshot carries it
+// between sessions so the button keeps naming the same car until it has been
+// driven. The receipt record travels in the same snapshot: both halves belong
+// to the one weekly event.
 // Draws without replacement: a car cannot repeat until every car ran, then
 // the tested set resets. Randomness is a seeded instance (AGENTS.md), never
 // the shared global, so tests pin the sequence while the app root seeds a
 // fresh draw per launch. State transitions are allocation-free except on
-// rotation, which runs on a manual tap — never in the hot poll.
+// rotation, which the completion path runs — never in the hot poll.
 namespace AceDrive.Core;
 
 public sealed class RoadTestLedger
@@ -34,33 +36,64 @@ public sealed class RoadTestLedger
     public IReadOnlyCollection<string> TestedIds => _tested;
 
     /// <summary>
-    /// The current car was driven: bank it and switch the display to the
-    /// next random pick immediately. This is the only road-test change the
-    /// game offers — a new week or a restart keeps the car. No-op without a
-    /// pool.
+    /// The settled readings a restart reopens: the natural car-journalist
+    /// reputation, the last shoot and the previous issue's numbers with their
+    /// bests. Empty until the first receipt.
+    /// </summary>
+    public RoadTestRecord Record { get; private set; } = RoadTestRecord.Empty;
+
+    /// <summary>
+    /// The current car was fully tested (Unity RoadTestService
+    /// MarkCurrentAsTested): the car is banked, the next random pick becomes the
+    /// display, and the natural car-journalist reputation rises by one point
+    /// (capped), which is what the receipt's formula scales. This is the only
+    /// road-test change the game offers — a new week or a restart keeps the car.
+    /// No-op rotation without a pool; the reputation still counts, because the
+    /// test was driven.
     /// </summary>
     public void MarkTested()
     {
         BankCurrent();
         PickNext();
+        Record = Record with
+        {
+            NaturalReputation =
+                RoadTestAudience.NextNaturalReputation(Record.NaturalReputation),
+        };
     }
 
     /// <summary>
-    /// What a restart must reopen: this car and the bank. Cold path only
-    /// (session start and every completion), so the copy is free of the
-    /// 10 Hz loop.
+    /// Banks a settled receipt: the new readings become the next issue's
+    /// "previously …" baseline and its highs become the bests. Called once per
+    /// receipt, after <see cref="MarkTested"/> raised the natural reputation the
+    /// formula used.
     /// </summary>
-    public RoadTestSnapshot Snapshot() => new(Current?.Key, [.. _tested]);
+    public void RecordReceipt(RoadTestReceipt receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        Record = receipt.ToRecord();
+    }
 
-    // Reopens last session's pick. Keys the current cars.json no longer holds
-    // drop out, so a stale bank cannot hide live cars and a vanished pick
-    // falls through to a fresh draw. A saved folder id (pre-variant file)
-    // still resolves its null-preset row through CarSpec.Key.
+    /// <summary>
+    /// What a restart must reopen: this car, the bank and the settled record.
+    /// Cold path only (session start and every completion), so the copies are
+    /// free of the 10 Hz loop.
+    /// </summary>
+    public RoadTestSnapshot Snapshot() => new(Current?.Key, [.. _tested], Record);
+
+    // Reopens last session's pick and record. Keys the current cars.json no
+    // longer holds drop out, so a stale bank cannot hide live cars and a
+    // vanished pick falls through to a fresh draw. A saved folder id
+    // (pre-variant file) still resolves its null-preset row through CarSpec.Key.
     private void Resume(RoadTestSnapshot? saved)
     {
         if (saved is null)
         {
             return;
+        }
+        if (saved.Record is { } record)
+        {
+            Record = record;
         }
         foreach (string id in saved.TestedIds)
         {

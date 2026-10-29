@@ -13,6 +13,7 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     public bool GameRunning { get; private set; }
     public bool WrongCar { get; private set; }
     public PlayerPreferences? Preferences { get; private set; }
+    public MileageUnit Units { get; set; } = MileageUnit.Kilometres;
     public PointOfInterest? Destination { get; private set; }
     public PointOfInterest? CurrentDestination => Destination;
     public HudDestinationCopy? Copy { get; private set; }
@@ -24,6 +25,8 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     public bool ParkedAtTarget => AtDestination;
     public bool ShowEnterButton => AtDestination;
     public double? Reputation { get; private set; }
+    public HudRoadTestReadout? RoadTest { get; private set; }
+    public int RoadTestCalls { get; private set; }
     public int DestinationEnteredCalls { get; private set; }
     public IReadOnlyList<string> EnterKeywords { get; set; } = ["enter"];
     public bool Revealed { get; private set; }
@@ -38,10 +41,20 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
 
     public event EventHandler? EnterRequested;
     public event EventHandler? JobEnterRequested;
+    public event EventHandler? PhotoshootRequested;
 
     public void Reveal() => Revealed = true;
 
     public void RaiseEnter() => EnterRequested?.Invoke(this, EventArgs.Empty);
+
+    public void RaisePhotoshoot()
+    {
+        PhotoshootRequests++;
+        PhotoshootRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>How many times the photo mission's shutter fired through the HUD.</summary>
+    public int PhotoshootRequests { get; private set; }
 
     public void RaiseJobEnter()
     {
@@ -66,7 +79,11 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
         WrongCar = wrongCar;
     }
 
-    public void ApplyPreferences(PlayerPreferences preferences) => Preferences = preferences;
+    public void ApplyPreferences(PlayerPreferences preferences)
+    {
+        Preferences = preferences;
+        Units = preferences.Units;
+    }
 
     public void SetDestination(PointOfInterest? destination, HudDestinationCopy? copy = null)
     {
@@ -77,6 +94,12 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     public void SetJobGuidance(HudJobGuidance? guidance) => JobGuidance = guidance;
 
     public void SetReputation(double? reputation) => Reputation = reputation;
+
+    public void SetRoadTest(HudRoadTestReadout? readout)
+    {
+        RoadTestCalls++;
+        RoadTest = readout;
+    }
 
     public void DestinationEntered() => DestinationEnteredCalls++;
 

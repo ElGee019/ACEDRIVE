@@ -96,6 +96,15 @@ public sealed class Navigation
     private readonly WhereIsWillyFlow _willy;
     private readonly WhereIsWillyLedger _willyLedger;
 
+    // The road test (PORTPLAN 49): the Tuesday row is its job-centre button, so
+    // the tap sends the player to La Strada and the flow owns the drive, the
+    // 0-60 leg and the result page from there.
+    private readonly RoadTestFlow _roadTest;
+
+    // Saturday's Touristenfahrten delivery run: the row starts the shop-to-corner
+    // run, and the flow owns the pickup, the dropoffs and their receipts.
+    private readonly TouristenfahrtenFlow _touristen;
+
     // The event page's registration draw, the one randomness its ENTER flow
     // owns: a fresh number per entry, never a shared global.
     private readonly Random _rng;
@@ -132,6 +141,10 @@ public sealed class Navigation
     // the same way: the strip owns which weekday hosts the event.
     private readonly int _willyDay = WillyDayOfWeek();
 
+    // Weekday number of the Saturday Touristenfahrten run, read off the same
+    // calendar data so the strip keeps owning which weekday hosts the event.
+    private readonly int _touristenDay = TouristenDayOfWeek();
+
     // TEMPORARY (testing): forwarded to the calendar page so every event row
     // answers on any day and hour (see CalendarScreenViewModel).
     private readonly bool _ignoreEventGates;
@@ -154,6 +167,7 @@ public sealed class Navigation
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
+        RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         Func<string> carBrand, Random rng, ILog log, bool ignoreEventGates = false)
     {
         _shell = shell;
@@ -189,6 +203,8 @@ public sealed class Navigation
         _valuation = valuation;
         _willy = willy;
         _willyLedger = willyLedger;
+        _roadTest = roadTest;
+        _touristen = touristen;
         _carBrand = carBrand;
         _rng = rng;
         _log = log;
@@ -235,12 +251,13 @@ public sealed class Navigation
     // Built once and reused. The taxi entry opens the job proposal page (port
     // of Unity TaxiJobProposalScreen); delivery opens the career page (port
     // of Unity DeliveryJobScreen); the haul settles its placeholder run and
-    // shows the flow's receipt. The weekly strip lives on its own page
-    // (see CalendarPage).
+    // shows the flow's receipt; the police entry is the page's own
+    // placeholder, so it takes no command from here. The weekly strip lives on
+    // its own page (see CalendarPage).
     public MainControlScreenViewModel ControlPage()
     {
         _control ??= new MainControlScreenViewModel(
-            _beat, _todos, _shift,
+            _beat, _clock, _todos, _shift,
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
                 new RelayCommand(SettleHaul), _todos.AcknowledgeCommand),
@@ -399,14 +416,13 @@ public sealed class Navigation
     }
 
     // Built once and reused; boots on the resumed week (if any), not the
-    // stamp default, so the header is right on the first paint. The calendar
-    // day buttons have no destinations until the freeroam map lands, so
-    // tapping the highlighted day just logs — except two events that own a
-    // page: the road-test day, which banks the week's car as tested and
-    // switches to the next pick (manual stand-in until the road-test drive
-    // flow lands), and the Cento Miglia day, which opens the event page.
-    // Off-gate taps never reach this action: the page's own day command warns
-    // them before dispatching.
+    // stamp default, so the header is right on the first paint. Every event row
+    // that owns a page or a leg gets a branch below — the road test sends the
+    // player to La Strada, the Cento Miglia day opens the event page, the
+    // Monday row starts the valuation leg and the Wednesday row the search —
+    // and a placeholder event without a page just logs. Off-gate taps never
+    // reach this action: the page's own day command warns them before
+    // dispatching.
     private CalendarScreenViewModel CalendarPage()
     {
         _openDay ??= new ParameterizedCommand<int>(OnDay);
@@ -419,7 +435,10 @@ public sealed class Navigation
         return _calendar;
     }
 
-    private void OpenCalendar() => ShowScreen(CalendarPage());
+    private void OpenCalendar() => ShowCalendarPage();
+
+    /// <summary>Opens the cached calendar page (a run's receipt CONTINUE lands here).</summary>
+    public void ShowCalendarPage() => ShowScreen(CalendarPage());
 
     private void OnDay(int day)
     {
@@ -434,13 +453,23 @@ public sealed class Navigation
             return;
         }
 
+        // The road test owns the companion while its visit runs (Unity's test
+        // centre is modal): another event cannot start on top of its drive or
+        // its clock. Its own row stays open — that is how a stalled leg is
+        // abandoned and the page reopened.
+        if (_roadTest.InFlight && day != _roadTestDay)
+        {
+            _log.LogInfo($"calendar day {day} refused: the road test is in flight");
+            return;
+        }
+
         if (day == _roadTestDay)
         {
-            string before = DescribeRoadTest();
-            _roads.MarkTested();
-            _saver.SaveRoadTest();
-            _log.LogInfo($"road test done: {before} -> {DescribeRoadTest()}");
-            _calendar?.Refresh();
+            // The road test is a drive now (PORTPLAN 49): the row sends the
+            // player to La Strada and the flow owns the 0-60 leg and its result.
+            // The pick is only banked as tested once the whole test (accel,
+            // brake, photo) is driven, so the row keeps naming the same car.
+            _roadTest.Begin();
             return;
         }
 
@@ -472,7 +501,25 @@ public sealed class Navigation
             return;
         }
 
-        _log.LogInfo($"calendar day {day} tapped while locked: waiting on the freeroam map");
+        // Saturday's Touristenfahrten run: the row is the event's only entry,
+        // so the tap starts the shop-to-corner delivery. The companion can
+        // guide one job at a time, so a live taxi/delivery/Cento job refuses
+        // this row instead of stealing its line.
+        if (day == _touristenDay)
+        {
+            if (_taxi.InProgress || _delivery.InProgress || _cento.InProgress)
+            {
+                _log.LogInfo("touristenfahrten refused: another job owns the companion");
+                return;
+            }
+
+            _touristen.Begin();
+            return;
+        }
+
+        // Only placeholder rows reach this: an event whose page or leg has not
+        // landed yet (Grandma's pancakes).
+        _log.LogInfo($"calendar day {day} tapped: no page behind this event yet");
     }
 
     // The event page per visit, never cached: the reputation it prints and the
@@ -732,6 +779,21 @@ public sealed class Navigation
         foreach (CalendarDay day in ControlCalendar.Week)
         {
             if (day.EventId == ControlCalendar.RoadTest)
+            {
+                return day.DayOfWeek;
+            }
+        }
+
+        return -1;
+    }
+
+    // Touristenfahrten weekday number, read off the same calendar data: the
+    // strip owns which weekday hosts the run, the flow never assumes Saturday.
+    private static int TouristenDayOfWeek()
+    {
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.EventId == ControlCalendar.Touristenfahrten)
             {
                 return day.DayOfWeek;
             }

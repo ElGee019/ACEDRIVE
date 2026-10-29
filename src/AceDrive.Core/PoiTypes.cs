@@ -15,6 +15,20 @@ public static class PoiTypes
     /// <summary>Unity's generated coffee-shop tag (the coffee hub's stores).</summary>
     public const string CoffeeShop = "coffee_shop";
 
+    /// <summary>
+    /// A pizzeria (the Saturday Touristenfahrten run's second pickup kind):
+    /// its own counter and a delivery target, but no shelf layout yet, so no
+    /// store interior claims it.
+    /// </summary>
+    public const string PizzaPlace = "pizza_place";
+
+    /// <summary>
+    /// A Nordschleife corner the Touristenfahrten run delivers to (Brünnchen,
+    /// Pflanzgarten, …): a plain marker, like the valuation venue, with no
+    /// interior and no typed handler; the run watches the arrival itself.
+    /// </summary>
+    public const string TouristenDropoff = "touristen_dropoff";
+
     /// <summary>Max's story-shop tag Unity's special row uses.</summary>
     public const string MaxsGrocery = "maxs_grocery_store";
 

@@ -50,6 +50,9 @@
   <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Bezorg bij {0} op {1} nr. {2} in {3}</value></data>
   <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}. Druk op BEZORG DE GOEDEREN om te lossen.</value></data>
   <data name="HudDeliveryStoreAction" xml:space="preserve"><value>BEZORG DE GOEDEREN</value></data>
+  <data name="HudTouristenPickupDrive" xml:space="preserve"><value>Rijd naar {0} om goederen op te halen voor {1}.</value></data>
+  <data name="HudTouristenPickupArrived" xml:space="preserve"><value>Je bent bij {0}. Druk op OPHALEN om de goederen te laden.</value></data>
+  <data name="HudTouristenDropoffDrive" xml:space="preserve"><value>Bezorg {0} bij {1}.</value></data>
   <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
   <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Snelheidsuitdaging: {0}</value></data>
@@ -132,6 +135,11 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>DOORGAAN MET TAXIDIENST</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>AUTOTRANSPORTKLUS</value></data>
+  <!-- Politieklus (PORTPLAN 41): de knop werkt, maar de klus zelf volgt nog;
+       een tik zet drie seconden BINNENKORT op de knop en daarna de eigen naam
+       terug. -->
+  <data name="ControlPolice" xml:space="preserve"><value>POLITIE</value></data>
+  <data name="ControlPoliceSoon" xml:space="preserve"><value>BINNENKORT</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>KLUSSEN</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TAKENLIJST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
@@ -171,6 +179,19 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Wegtest</value></data>
   <data name="EventWilly" xml:space="preserve"><value>Waar is Willy</value></data>
   <data name="EventPancakes" xml:space="preserve"><value>Oma's pannenkoeken</value></data>
+  <data name="EventTouristenfahrten" xml:space="preserve"><value>Touristenfahrten-bezorgingen</value></data>
+  <data name="TouristenListSeparator" xml:space="preserve"><value>, </value></data>
+  <data name="TouristenListAnd" xml:space="preserve"><value> en </value></data>
+  <data name="TouristenItemLine" xml:space="preserve"><value>{0} × {1}</value></data>
+  <data name="TouristenItemCoffee" xml:space="preserve"><value>koffie</value></data>
+  <data name="TouristenItemBeer" xml:space="preserve"><value>bier</value></data>
+  <data name="TouristenItemCurrywurstPommes" xml:space="preserve"><value>curryworst &amp; patat</value></data>
+  <data name="TouristenItemSchnitzel" xml:space="preserve"><value>schnitzel</value></data>
+  <data name="TouristenItemBratwurstKraut" xml:space="preserve"><value>braadworst &amp; zuurkool</value></data>
+  <data name="TouristenItemPizzaSlice" xml:space="preserve"><value>pizzapunt</value></data>
+  <data name="TouristenItemEspresso" xml:space="preserve"><value>espresso</value></data>
+  <data name="TouristenItemTiramisu" xml:space="preserve"><value>tiramisu</value></data>
+  <data name="TouristenItemSoup" xml:space="preserve"><value>soep</value></data>
   <data name="NoEvent" xml:space="preserve"><value>Geen evenement</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Klik op Max' kruidenier, rijd erheen en ga de winkel binnen.</value></data>
   <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Ga naar de KLUSSEN-pagina, kies BEZORGKLUS en open een carrière naar keuze.</value></data>
@@ -618,4 +639,68 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="WillyReceiptCertificate" xml:space="preserve"><value>Certificaat: {0}</value></data>
   <data name="WillyReceiptCertificateStored" xml:space="preserve"><value>Certificaat toegevoegd aan de kofferbak van je auto.</value></data>
   <data name="WillyReceiptFriendship" xml:space="preserve"><value>Vriendschapsniveau: {0}</value></data>
+
+  <!-- De wegtest (PORTPLAN 49, Unity RoadTestScreen en zijn twee tests). -->
+  <data name="RoadTestTitle" xml:space="preserve"><value>WEGTEST</value></data>
+  <data name="RoadTestStart" xml:space="preserve"><value>0-60</value></data>
+  <data name="RoadTestBrakeStart" xml:space="preserve"><value>100-0</value></data>
+  <data name="RoadTestPhoto" xml:space="preserve"><value>FOTOMISSIE</value></data>
+  <data name="RoadTestAccelIntro" xml:space="preserve"><value>Zet een 0-60 tijd neer die we in ons magazine kunnen publiceren. Laat de auto vanuit stilstand vertrekken. Je ziet de afteltimer in het minivenster.</value></data>
+  <data name="RoadTestBrakeIntro" xml:space="preserve"><value>Doe een 100-0 remtest. Breng de auto naar 100, let op de afteltimer en rem.</value></data>
+  <data name="RoadTestPhotoIntro" xml:space="preserve"><value>Rijd overal over de kaart zodat de fotograaf zijn foto's kan maken. Een andere locatie dan onze vorige shoot houdt het interessant voor onze lezers.</value></data>
+  <data name="RoadTestPhotoNoPosition" xml:space="preserve"><value>Hier is geen adres — rijd een stukje verder en maak de foto opnieuw.</value></data>
+  <data name="RoadTestBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="RoadTestContinue" xml:space="preserve"><value>DOORGAAN</value></data>
+  <data name="RoadTestPickRequired" xml:space="preserve"><value>De wegtest van deze week is voor de {0}. Stap over in die auto.</value></data>
+  <data name="RoadTestBoard" xml:space="preserve"><value>WERELDRANGLIJST</value></data>
+  <data name="RoadTestAllCars" xml:space="preserve"><value>ALLE AUTO'S</value></data>
+  <data name="RoadTestWaiting" xml:space="preserve"><value>Ranglijst ophalen…</value></data>
+  <data name="RoadTestAccelResult" xml:space="preserve"><value>Je ging van 0 naar {0} {1} in {2:0.000} seconden met de {3}.</value></data>
+  <data name="RoadTestBrakeResult" xml:space="preserve"><value>Je ging van {0} {1} naar 0 in {2:0.0} meter met de {3}.</value></data>
+  <data name="RoadTestRowTime" xml:space="preserve"><value>{0:0.000}s</value></data>
+  <data name="RoadTestRowMetres" xml:space="preserve"><value>{0:0.0} m</value></data>
+  <data name="RoadTestTimer" xml:space="preserve"><value>{0:0.000}</value></data>
+  <data name="RoadTestTimerMetres" xml:space="preserve"><value>{0:0.0} m</value></data>
+  <data name="RoadTestUnitKmh" xml:space="preserve"><value>km/u</value></data>
+  <data name="RoadTestUnitMph" xml:space="preserve"><value>mijl/u</value></data>
+  <data name="RoadTestYou" xml:space="preserve"><value>Jij</value></data>
+  <data name="RoadTestSeparatorRank" xml:space="preserve"><value>...</value></data>
+  <data name="RoadTestSeparatorName" xml:space="preserve"><value>---</value></data>
+
+  <!-- De wegtest op de metgezel: per test dezelfde {0}/{1} als de paginatekst;
+       de stilsta-regel heeft geen plaatsaanduidingen en staat er zolang de auto
+       nog rolt bij de starttelling. -->
+  <data name="HudRoadTestTask" xml:space="preserve"><value>Eens zien hoe snel je van 0 naar {0} {1} komt.</value></data>
+  <data name="HudRoadTestHalt" xml:space="preserve"><value>Zet de auto stil om de wegtest te starten.</value></data>
+  <data name="HudRoadTestBrake" xml:space="preserve"><value>Breng de auto naar {0} {1} en rem.</value></data>
+  <data name="HudRoadTestDrive" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3} voor je wegtest.</value></data>
+  <data name="HudRoadTestArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}. Druk op ENTER om je wegtest te starten.</value></data>
+  <data name="HudRoadTestPhoto" xml:space="preserve"><value>Rijd overal over de kaart zodat de fotograaf zijn foto's kan maken.</value></data>
+  <data name="HudPhotoshoot" xml:space="preserve"><value>FOTOSHOOT</value></data>
+
+  <!-- De bon van de wegtest (Unity RoadTestReceiptScreen): per regel de nieuwe
+       waarde met de vorige tussen haakjes, en de formule eronder. {0} bij de
+       fotolocatie is de gedeelde adresvorm; de bereikte-mensen-regel noemt de
+       inwoners van de zone die het magazine kochten. -->
+  <data name="RoadTestReceiptTitle" xml:space="preserve"><value>LA STRADA WEGTESTBON</value></data>
+  <data name="RoadTestReceiptPhoto" xml:space="preserve"><value>Fotolocatie: {0}</value></data>
+  <data name="RoadTestReceiptPeople" xml:space="preserve"><value>{0} mensen van de {1} inwoners hebben La Strada gekocht.</value></data>
+  <data name="RoadTestReceiptPeopleFormula" xml:space="preserve"><value>vrienden ({0}) + kennissen ({1}) × 0,5 = {2:0.#} / 100 × {3} inwoners = {4} mensen</value></data>
+  <data name="RoadTestReceiptVariety" xml:space="preserve"><value>Variatie: {0:0.00}% (eerder {1:0.00}%)</value></data>
+  <data name="RoadTestReceiptVarietyFirst" xml:space="preserve"><value>eerste foto — volle variatie (100%)</value></data>
+  <data name="RoadTestReceiptVarietyFormula" xml:space="preserve"><value>vorige afstand ({0:0.0} km) / grootste afstand in de zone ({1:0.0} km) = {2:0.00}%</value></data>
+  <data name="RoadTestReceiptJournalist" xml:space="preserve"><value>Autojournalist-reputatie: {0:0.00} (eerder {1:0.00})</value></data>
+  <data name="RoadTestReceiptJournalistFormula" xml:space="preserve"><value>reputatie({0}) × testresultaten({1}) × √variatie = {2:0.00}</value></data>
+  <data name="RoadTestReceiptMagazine" xml:space="preserve"><value>Magazineprijs: {0:0.00} CR (eerder {1:0.00})</value></data>
+  <data name="RoadTestReceiptMagazineFormula" xml:space="preserve"><value>autojournalist-reputatie ({0:0.00}) / 2 = {1:0.00}</value></data>
+  <data name="RoadTestReceiptCommission" xml:space="preserve"><value>Commissie: {0:0.00} CR</value></data>
+  <data name="RoadTestReceiptCommissionNote" xml:space="preserve"><value>{0:0.##}% van {1} mensen die ons magazine kopen voor {2:0.00} CR.</value></data>
+  <data name="RoadTestReceiptForfeit" xml:space="preserve"><value>Vast bedrag: {0} CR</value></data>
+  <data name="RoadTestReceiptEarnings" xml:space="preserve"><value>Verdiensten: {0:0.00} CR (eerder {1:0.00})</value></data>
+  <data name="RoadTestReceiptCash" xml:space="preserve"><value>Contant na: {0:0.00} CR</value></data>
+  <data name="RoadTestReceiptBestHeader" xml:space="preserve"><value>— beste —</value></data>
+  <data name="RoadTestReceiptBestPeople" xml:space="preserve"><value>meeste bereikte mensen: {0}</value></data>
+  <data name="RoadTestReceiptBestJournalist" xml:space="preserve"><value>hoogste autojournalist-reputatie: {0:0.00}</value></data>
+  <data name="RoadTestReceiptBestMagazine" xml:space="preserve"><value>hoogste magazineprijs: {0:0.00} CR</value></data>
+  <data name="RoadTestReceiptBestEarnings" xml:space="preserve"><value>hoogste verdiensten: {0:0.00}</value></data>
 </root>

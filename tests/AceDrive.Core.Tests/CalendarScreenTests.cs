@@ -55,6 +55,17 @@ public sealed class CalendarScreenTests
     }
 
     [Fact]
+    public void SaturdayButton_ReadsTouristenfahrtenDeliveries()
+    {
+        // The Saturday row owns the Touristenfahrten run, so the strip renders
+        // its button between Grandma's pancakes and Cento Miglia.
+        var vm = Create();
+        CalendarRow saturday = Assert.Single(vm.Days, d => d.DayLabel == "Saturday");
+        Assert.Equal(7, saturday.DayOfWeek);
+        Assert.Equal("Touristenfahrten Deliveries", saturday.EventLabel);
+    }
+
+    [Fact]
     public void RoadTestButton_NamesRunningCarInCaps()
     {
         // The car rides inside the button outline; the mic still answers to

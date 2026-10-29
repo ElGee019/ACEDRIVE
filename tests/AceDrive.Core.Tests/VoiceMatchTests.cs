@@ -74,6 +74,38 @@ public sealed class VoiceMatchTests
     public void IsWake_AliasesCoverMishearings(string text, string brand, bool expected, string[] aliases) =>
         Assert.Equal(expected, VoiceMatch.IsWake(text, brand, aliases));
 
+    // Live 2026-10-28 Datsun session on the 68 MB mobile model: "datsun" kept
+    // arriving as "that's fun" (15:29:19), "does you" (15:34:12) and "me so"
+    // (15:34:16), plus the 2026-10-27 spellings "nice some", "nice salt",
+    // "knew some" and the fused "godson". Only the brand word is swallowed,
+    // so each logged spelling is carried by the table and the clean "hey"/
+    // "he" interjection door opens it.
+    [Fact]
+    public void IsWake_LoggedDatsunSpellings()
+    {
+        string[] aliases =
+        [
+            "nissan", "dotson", "nice so", "that's fun", "nice some",
+            "nice salt", "me so", "does you", "godson", "knew some",
+        ];
+        Assert.True(VoiceMatch.IsWake("hey that's fun", "datsun", aliases)); // logged 15:29:19
+        Assert.True(VoiceMatch.IsWake("he does you", "datsun", aliases)); // logged 15:34:12
+        Assert.True(VoiceMatch.IsWake("hey me so", "datsun", aliases)); // logged 15:34:16
+        Assert.True(VoiceMatch.IsWake("hey nice some", "datsun", aliases)); // logged 2026-10-27 13:30:13
+        Assert.True(VoiceMatch.IsWake("hey nice salt", "datsun", aliases)); // logged 2026-10-27 08:38:42
+        Assert.True(VoiceMatch.IsWake("hey godson a me so", "datsun", aliases)); // logged 2026-10-27 20:00:51
+        Assert.True(VoiceMatch.IsWake("he knew some", "datsun", aliases)); // logged 2026-10-27 13:59:44
+
+        // "doesn't" stays out on purpose: it is common English, and "he" is one
+        // slip from "hey", so the table would wake on any stray "he doesn't".
+        Assert.False(VoiceMatch.IsWake("he doesn't", "datsun", aliases));
+        // "lisa" stays out for the same reason: with the confusion table's
+        // "a" -> "hey", the 2026-10-27 programming video's "a list of
+        // integers" would open the overlay.
+        var confusions = new Dictionary<string, string> { ["a"] = "hey" };
+        Assert.False(VoiceMatch.IsWake("a list of integers", "datsun", aliases, confusions, isFinal: true));
+    }
+
     [Theory]
     // Non-native speakers land outside the model's hearing of the brand;
     // a clean "hey" buys each brand word one Damerau slip (two for long

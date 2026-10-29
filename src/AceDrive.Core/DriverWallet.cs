@@ -255,6 +255,19 @@ public sealed class DriverWallet
     }
 
     /// <summary>
+    /// One settled road test (PORTPLAN item 49, Unity
+    /// RoadTestReceiptScreen's <c>player.cash += totalEarnings</c>): the issue's
+    /// earnings land in cash and in the lifetime-earned reading. Unity pays no
+    /// XP for a road test, so the XP total stays untouched here too.
+    /// </summary>
+    public void AddRoadTest(RoadTestReceipt receipt)
+    {
+        ArgumentNullException.ThrowIfNull(receipt);
+        Cash = Math.Round(Cash + receipt.Payment, 2, MidpointRounding.AwayFromZero);
+        Earn(receipt.Payment);
+    }
+
+    /// <summary>
     /// One finished Cento Miglia (PORTPLAN 49, Unity CentoMigliaScreen's
     /// ProcessReceiptRewards): the purse — placement earnings plus any Star of
     /// the Show prize — lands in cash, the reputation the race's ticker reached

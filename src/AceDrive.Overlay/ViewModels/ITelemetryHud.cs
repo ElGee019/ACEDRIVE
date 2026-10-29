@@ -34,6 +34,14 @@ public interface ITelemetryHud
     void ApplyPreferences(PlayerPreferences preferences);
 
     /// <summary>
+    /// The unit the player reads right now. The companion is the one owner that
+    /// follows a settings change, so a flow that names a speed in the player's
+    /// own unit (the road test's target) reads it here instead of keeping a
+    /// stale copy of the first-run answer.
+    /// </summary>
+    MileageUnit Units { get; }
+
+    /// <summary>
     /// Pins the destination the story hands over on the HUD, or clears it with
     /// null. <paramref name="copy"/> is an optional story-authored set of
     /// resource keys with the same placeholders as the generic drive-to
@@ -65,6 +73,15 @@ public interface ITelemetryHud
     /// handed, so it never owns a ticker.
     /// </summary>
     void SetReputation(double? reputation);
+
+    /// <summary>
+    /// Shows the road test's live block — the task sentence and the
+    /// countdown/timer — or clears it with null when the leg ends. The road-test
+    /// flow owns the clock; the companion only paints the reading it is handed,
+    /// and the block replaces the banner while it is up, because a leg being
+    /// timed has no destination left to drive to.
+    /// </summary>
+    void SetRoadTest(HudRoadTestReadout? readout);
 
     /// <summary>
     /// True while the car is parked inside the pinned job leg's arrival radius.
@@ -148,4 +165,12 @@ public interface ITelemetryHud
     /// painted.
     /// </summary>
     event EventHandler? JobEnterRequested;
+
+    /// <summary>
+    /// Raised when the player taps the companion's PHOTOSHOOT button while the
+    /// road test's photo mission is up. The host owns what the shot means (the
+    /// flow prices and banks the receipt); the HUD only knows the button was
+    /// offered and pressed.
+    /// </summary>
+    event EventHandler? PhotoshootRequested;
 }

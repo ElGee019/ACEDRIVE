@@ -28,10 +28,10 @@
     <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
          title band on top, BACK in the bottom band. The body is one centred
          stack of three sections, split by the wallet's white rules: the job
-         buttons (Unity JobSelectionScreen order: taxi, then delivery, then the
-         car-hauling placeholder), Sonja's ToDo, then the tips just completed.
-         The weekly calendar strip lives on its own page now, reached from the
-         menu's CALENDAR tile. -->
+         buttons (Unity JobSelectionScreen order: taxi, then delivery, then car
+         hauling, then the police placeholder), Sonja's ToDo, then the tips just
+         completed. The weekly calendar strip lives on its own page now, reached
+         from the menu's CALENDAR tile. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -75,6 +75,21 @@
                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HaulFlash}" Value="True">
+                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+                <!-- The police placeholder: its own flow has not landed, so a
+                     tap only swaps the text for COMING SOON for three seconds
+                     (the view model owns the hold, the glow and the restore). -->
+                <Button Content="{Binding PoliceLabel}"
+                        Command="{Binding PoliceCommand}" Margin="0,0,0,6">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PoliceFlash}" Value="True">
                                     <Setter Property="Foreground" Value="#FF97EAD2"/>
                                 </DataTrigger>
                             </Style.Triggers>

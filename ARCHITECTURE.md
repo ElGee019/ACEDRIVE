@@ -102,6 +102,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_conditionMonitor`, `_trackLengthMeters`, `_playerPosition` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength`, `ObservePosition` | `ITaxiJobHost` (8 members) |
 | `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
 | `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
+| `RoadTestFlow` ✅ | the visit's phase, the pick under test, the page, the leg's clock and the crossing pair, the two board reads (the car's board and the all-cars record book) | `Begin()` (calendar row), `Enter(poi)` (the door — refused unless the announced car is the pick), `Start()` (0-60), `Advance(sample)` (counter/timer/crossing, voiding a run whose car was swapped), `Continue`, `Back`, `Phase`, `InFlight` | `IRoadTestHost` (5 members): reveal the page, show the receipt, hide the panel, show the control page, show the menu page |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
 | `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
 | `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow(expansion)` → the doors it banked, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, bought-car page |
@@ -125,8 +126,8 @@ After the split `MainViewModel` is a coordinator, not an owner:
 
 - lifecycle: `Start`, `Poll`, `Dispose`, the timer;
 - the 10 Hz loop: feed the delivery meter, tick `TaxiJobFlow`, `DayCycle`, `WorldTicks`,
-  the Cento entry, the valuation and the missing-person run, apply
-  `ReadoutPaint` — 59 code lines, not 229;
+  the Cento entry, the valuation, the missing-person run and the road test, apply
+  `ReadoutPaint` — 60 code lines, not 229;
 - intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
 - the panel policy's *call sites*: the navigator's page reports route into
   `PanelPresenter`, which owns the mid-job call gate, which page a call opens
@@ -136,16 +137,16 @@ After the split `MainViewModel` is a coordinator, not an owner:
   reset, app restart, HUD wiring, `SkipShutdownSave`;
 - the bindable readout properties (the target of `ReadoutPaint`).
 
-Constructor: 39 parameters (35 required, 4 optional), all of them finished
+Constructor: 40 parameters (36 required, 4 optional), all of them finished
 services — the root does every `new`. No `MainViewModelDependencies` god record:
 each collaborator takes its own dependencies, which is what makes it testable.
 The game-clock world left in S7, the boot catch-up in S8, the zone expansion in
 S9 and the haul in S10; S11 took the last non-service convenience off the
 surface, so the list is now exactly the collaborators and the view plumbing,
 with nothing waiting for its own slice. The job types and surfaces that landed
-since (Cento race + settle, valuation, Willy, the zone report) joined as finished
-collaborators, which is why the count grew without the coordinator taking on
-logic.
+since (Cento race + settle, valuation, Willy, the zone report, the road test)
+joined as finished collaborators, which is why the count grew without the
+coordinator taking on logic.
 
 ## 5. Construction order in `App.OnStartup`
 
@@ -166,6 +167,7 @@ stores + saved state
       └ TaxiJobFlow (saver, proposals, requests, police, wallet, breakdowns, …)
       └ DeliveryFlow (board, career, city, meter, breakdowns)
       └ CarHaulFlow (watcher, pool, wallet, DayCycle, saver; the legs come later)
+      └ RoadTestFlow (onboarding's La Strada door, road-test board, wallet, HUD)
       └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
           └ Navigation (flows' pages, page data, saver, zone standings, DayCycle's week)
               └ PanelPresenter (shell, pages, the two flows' InProgress)
@@ -181,10 +183,13 @@ stores + saved state
 same late `Attach` the four flows use, and reads the display week off
 `DayCycle` instead of keeping a mirror of it. `CarHaulFlow` takes no host at
 all: the control page's tap calls `Settle`, and the navigator puts the
-returned receipt up with its own `ControlCommand`. The story flow and the voice
-router are root-built too: they take `PanelPresenter`/`StoryHost` instead of
-the coordinator, so nothing but `MainViewModel`'s own late `Attach`s remains
-coordinator-assembled.
+returned receipt up with its own `ControlCommand`. The road test reaches back
+through `IRoadTestHost` (five panel verbs: the page, the receipt, the hide, and
+the two exits, the control page before a run and the menu after the receipt),
+and rejoins the door network as a `RoadTestPoiHandler`, so a stray visit to La
+Strada still opens nothing. The story flow and the voice router are root-built
+too: they take `PanelPresenter`/`StoryHost` instead of the coordinator, so
+nothing but `MainViewModel`'s own late `Attach`s remains coordinator-assembled.
 
 ## 6. Extraction sequence
 

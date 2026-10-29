@@ -18,6 +18,19 @@ internal sealed class FakeFriendshipStore : IFriendshipStore
 
     public FriendshipOutcome RegisterRide(string ownerName) => Apply(ownerName, 1);
 
+    public int CountAtLeast(int level)
+    {
+        int count = 0;
+        foreach (int value in _levels.Values)
+        {
+            if (value >= level)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public void AddFamiliarity(string ownerName, int delta)
     {
         string key = (ownerName ?? "").Trim();

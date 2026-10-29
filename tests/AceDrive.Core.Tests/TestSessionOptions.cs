@@ -95,6 +95,10 @@ internal sealed class TestSessionOptions
     public ResidentBook? Residents { get; init; }
     public WhereIsWillyRules? WillyRules { get; init; }
     public Random? WillyRng { get; init; }
+    // The per-car road-test board the test centre page reads and pushes to,
+    // and the flow's own seeded stream for Unity's reaction hold (PORTPLAN 49).
+    public IRoadTestStandings? RoadTestStandings { get; init; }
+    public Random? RoadTestRng { get; init; }
     // TEMPORARY (testing): opens every calendar event's gates, so a suite can
     // drive an off-day or replayed event. Shipping sessions keep the gates.
     public bool IgnoreEventGates { get; init; }

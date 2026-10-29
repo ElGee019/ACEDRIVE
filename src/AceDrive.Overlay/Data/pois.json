@@ -85,5 +85,17 @@
       "pacing": "ownedCategory",
       "intervalStreets": 14
     }
+  },
+  {
+    "id": "pizza_place",
+    "name": "Pizzeria",
+    "type": "pizza_place",
+    "category": "pizza",
+    "namePattern": "{0}'s Pizzeria",
+    "spawn": {
+      "pacing": "streets",
+      "firstStreets": 1,
+      "intervalStreets": 23
+    }
   }
 ]

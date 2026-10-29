@@ -495,6 +495,15 @@ public sealed class OnboardingTests
         Assert.True(VoiceMatch.IsWake("hey dotson", "datsun", loaded.Aliases["datsun"]));
         Assert.True(VoiceMatch.IsWake("hey datsun", "datsun", loaded.Aliases["datsun"]));
         Assert.True(VoiceMatch.IsWake("hey nissan", "datsun", loaded.Aliases["datsun"]));
+        // 2026-10-28 retest: the same model's next spellings of "datsun" —
+        // "that's fun" (15:29:19), "does you" (15:34:12) and "me so"
+        // (15:34:16) — are in the shipped table, so the live attempts cannot
+        // fall back to silence on this build.
+        Assert.Contains("that's fun", loaded.Aliases["datsun"]);
+        Assert.Contains("does you", loaded.Aliases["datsun"]);
+        Assert.Contains("me so", loaded.Aliases["datsun"]);
+        Assert.True(VoiceMatch.IsWake("hey that's fun", "datsun", loaded.Aliases["datsun"]));
+        Assert.True(VoiceMatch.IsWake("he does you", "datsun", loaded.Aliases["datsun"]));
         Assert.NotEmpty(loaded.PancakeDialogue); // home leg's dialogue ships with the build
         Assert.NotEmpty(loaded.CommunityCentreDialogue); // post-pancake leg's dialogue ships too
         Assert.NotEmpty(loaded.MaxDialogue); // first post-intro Max visit ships its offer

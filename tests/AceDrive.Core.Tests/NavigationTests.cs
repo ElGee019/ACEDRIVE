@@ -25,9 +25,10 @@ public sealed class NavigationTests
     private static (Navigation Nav, OverlayShell Shell, FakeNavigationHost Host,
         FakeClock Clock, TaxiShift Shift, FakeShiftStore ShiftStore,
         RoadTestLedger Roads, FakeRoadTestStore RoadTests,
-        Garage Garage, FakeGarageStore GarageStore, TestLog Log) Create(
+        Garage Garage, FakeGarageStore GarageStore, TestLog Log,
+        RoadTestFlow RoadTest) Create(
         int startWeek = 1, IReadOnlyList<CarSpec>? cars = null, Garage? garage = null,
-        IZoneStandings? zoneStandings = null)
+        IZoneStandings? zoneStandings = null, bool ignoreEventGates = false)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -50,6 +51,15 @@ public sealed class NavigationTests
         var rivals = new FakeRivals();
         var friends = new FakeFriendshipStore();
         var onboarding = new FakeOnboardingStore();
+        // A finished career's La Strada door: the road test's leg pins the door
+        // the tour banks, so the navigator's tap has somewhere to send the
+        // player.
+        onboarding.Save(OnboardingState.Fresh with
+        {
+            BirthdayDone = true,
+            LaStradaAddress = new AddressLocation(
+                AddressMap.Default.Streets[0].Name, 2, HouseSide.Left),
+        });
         // The zone the Cento Miglia gates read: no street discovered yet, so
         // the event opens with every club locked (Unity's fresh-driver state).
         // Its length is the placeholder map's, exactly as the root seeds it.
@@ -129,14 +139,46 @@ public sealed class NavigationTests
             garageInstance, poolCars, WhereIsWillyRules.Default, willyLedger, friends,
             trunk, wallet, null, saver, rivals, beat, () => day.DisplayWeek,
             new Random(0), log);
+        // The road test: its flow owns the drive to La Strada and the 0-60 leg,
+        // so the Tuesday tap goes through it (the board stays offline). The
+        // audience and the settlement read the same city, wallet and friends
+        // the job receipts use.
+        var roadTest = new RoadTestFlow(
+            onboarding, game, clock, roads, null, new FakeRoadTestStandings(),
+            new FakeProfileStore(),
+            new RoadTestSettlement(
+                wallet, roads,
+                new RoadTestAudienceSource(city, board, friends),
+                RoadTestAudienceRules.Default, saver, rivals, beat, log),
+            poolCars, AddressMap.Default, beat, () => null, new Random(0), log,
+            ignoreEventGates);
+        roadTest.Attach(new FakeRoadTestHost());
+        // The Saturday Touristenfahrten run: its own doors, settle and flow, on
+        // the same directory the calendar tests read.
+        var touristen = new TouristenfahrtenFlow(
+            TouristenMenu.Default,
+            new TouristenDoors(
+                directory, new FakePoiDirectoryStore(),
+                new PoiSpawner(
+                    PoiCatalog.Default,
+                    new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
+                AddressMap.Default, TouristenMenu.Default, new Random(0), log),
+            null,
+            new TouristenfahrtenSettlement(
+                wallet, DeliveryFareTable.Default,
+                new FleetService(
+                    garageInstance, poolCars, game, wallet, InsuranceRules.Default,
+                    log, brands, new FakeContentSource(TestSession.EmptyContent)),
+                new FakeCarRarity(), rivals, beat, log),
+            meter, TaxiRules.Default, new Random(0), log);
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
             trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
-            valuation, willy, willyLedger,
-            () => "mazda", new Random(0), log);
+            valuation, willy, willyLedger, roadTest, touristen,
+            () => "mazda", new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The proposal page asks the job's host for the player's door on every
@@ -148,13 +190,13 @@ public sealed class NavigationTests
                 HouseNumberPlan.SideOf(1)),
         });
         return (nav, shell, host, clock, shift, shiftStore, roads, roadTests,
-            garageInstance, garageStore, log);
+            garageInstance, garageStore, log, roadTest);
     }
 
     [Fact]
     public void Menu_IsCachedButTheHomePageIsRebuiltOnEveryVisit()
     {
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
 
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
@@ -173,7 +215,7 @@ public sealed class NavigationTests
     [Fact]
     public void ZoneExpansion_ContinueRunsTheContinuation()
     {
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
         int continued = 0;
 
         nav.ShowZoneExpansion(
@@ -194,7 +236,7 @@ public sealed class NavigationTests
         {
             Result = new ZoneStandingsResult(2, 9, 1, 3, IsFirstTime: false),
         };
-        var (nav, shell, _, _, _, _, _, _, _, _, _) =
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) =
             Create(zoneStandings: standings);
 
         nav.ShowZoneExpansion(
@@ -212,7 +254,7 @@ public sealed class NavigationTests
         // FIND STREET keeps Unity's map contract without a map: the addresses
         // page stands in, and its BACK is the continuation the expansion page
         // would have run.
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
         int continued = 0;
 
         nav.ShowZoneExpansion(
@@ -231,9 +273,9 @@ public sealed class NavigationTests
     }
 
     [Fact]
-    public void RoadTestDay_BanksThePickAndDropsTheCar()
+    public void RoadTestDay_StartsTheDriveAndKeepsThePick()
     {
-        var (nav, shell, _, clock, _, _, roads, roadTests, _, _, log) = Create();
+        var (nav, shell, _, clock, _, _, roads, roadTests, _, _, log, roadTest) = Create();
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
         menu.CalendarCommand.Execute(null);
@@ -246,21 +288,44 @@ public sealed class NavigationTests
             .Single(day => day.EventId == ControlCalendar.RoadTest).DayOfWeek;
         Assert.Equal(3, roadTestDay);
         string first = RoadTestButton(calendar);
+        string? pick = roads.Current?.Key;
 
         calendar.DayCommand.Execute(roadTestDay);
 
-        // The tested car is banked and the next pick takes its place on the
-        // row (PORTPLAN 49: only a driven test may move the offer).
-        RoadTestSnapshot saved = Assert.Single(roadTests.Saved);
-        Assert.Equal(roads.Current?.Id, saved.CarId);
-        Assert.NotEqual(first, RoadTestButton(calendar));
-        Assert.Contains(log.Infos, line => line.StartsWith("road test done:", StringComparison.Ordinal));
+        // The row now drives the test (PORTPLAN 49): the tap pins La Strada and
+        // the pick stays on offer until the whole test has been driven.
+        Assert.Equal(RoadTestPhase.Driving, roadTest.Phase);
+        Assert.Equal(pick, roads.Current?.Key);
+        Assert.Empty(roadTests.Saved);
+        Assert.Equal(first, RoadTestButton(calendar));
+        Assert.Contains(log.Infos, line => line.StartsWith("road test begun:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void RoadTestInFlight_RefusesAnotherEventRow()
+    {
+        // The temporary gate bypass lets a second row reach the dispatcher on
+        // the same afternoon, which is the build the lock has to hold in:
+        // Unity's test centre is modal, so no other event may start over it.
+        var (nav, shell, _, _, _, _, _, _, _, _, log, roadTest) =
+            Create(ignoreEventGates: true);
+        nav.ShowMenuPage();
+        Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
+        var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
+        calendar.DayCommand.Execute(3);
+        Assert.Equal(RoadTestPhase.Driving, roadTest.Phase);
+
+        calendar.DayCommand.Execute(5);
+
+        Assert.Equal(RoadTestPhase.Driving, roadTest.Phase);
+        Assert.Contains(
+            log.Infos, line => line.StartsWith("calendar day 5 refused:", StringComparison.Ordinal));
     }
 
     [Fact]
     public void CentoDay_OpensTheEventPageAndBackReturnsToTheCalendar()
     {
-        var (nav, shell, _, clock, _, _, _, _, _, _, log) = Create();
+        var (nav, shell, _, clock, _, _, _, _, _, _, log, _) = Create();
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
         menu.CalendarCommand.Execute(null);
@@ -292,7 +357,7 @@ public sealed class NavigationTests
     [Fact]
     public void CentoEnter_BuildsTheEventAndReportsIt()
     {
-        var (nav, shell, _, clock, _, _, _, _, _, _, log) = Create();
+        var (nav, shell, _, clock, _, _, _, _, _, _, log, _) = Create();
         nav.ShowMenuPage();
         Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
         clock.Advance(TimeSpan.FromSeconds(
@@ -324,7 +389,7 @@ public sealed class NavigationTests
     [Fact]
     public void DisplayWeekChange_RepaintsTheBuiltPages()
     {
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create(startWeek: 1);
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create(startWeek: 1);
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
         menu.CalendarCommand.Execute(null);
@@ -342,7 +407,7 @@ public sealed class NavigationTests
     {
         // S5: the week lives in the day cycle, so a page built after a roll
         // reads it from the owner instead of a mirror the navigator kept.
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create(startWeek: 4);
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create(startWeek: 4);
 
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
@@ -355,7 +420,7 @@ public sealed class NavigationTests
     [Fact]
     public void TaxiShiftTap_StartsTheShiftBanksItAndOpensTheProposal()
     {
-        var (nav, shell, host, _, shift, shiftStore, _, _, _, _, _) = Create();
+        var (nav, shell, host, _, shift, shiftStore, _, _, _, _, _, _) = Create();
 
         nav.TaxiShiftCommand.Execute(null);
 
@@ -368,7 +433,7 @@ public sealed class NavigationTests
     [Fact]
     public void TaxiShiftTap_OnATimedOutShift_HandsTheCloseToTheCoordinator()
     {
-        var (nav, shell, host, clock, shift, _, _, _, _, _, _) = Create();
+        var (nav, shell, host, clock, shift, _, _, _, _, _, _, _) = Create();
         nav.TaxiShiftCommand.Execute(null);
         clock.Advance(TimeSpan.FromMinutes(TaxiShift.TimeoutMinutes + 1));
 
@@ -385,7 +450,7 @@ public sealed class NavigationTests
     {
         var garage = new Garage(TestRoadCars.Pool);
         garage.Add(TestRoadCars.Pool[0].Key, week: 1);
-        var (nav, shell, _, _, _, _, _, _, _, garageStore, _) = Create(garage: garage);
+        var (nav, shell, _, _, _, _, _, _, _, garageStore, _, _) = Create(garage: garage);
         CarSpec bought = TestRoadCars.Pool[1];
         garage.Add(bought.Key, week: 1);
 
@@ -406,7 +471,7 @@ public sealed class NavigationTests
     public void CarBought_FirstPurchase_HidesTheSecondCarSummary()
     {
         var garage = new Garage(TestRoadCars.Pool);
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create(garage: garage);
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create(garage: garage);
         CarSpec bought = TestRoadCars.Pool[0];
         garage.Add(bought.Key, week: 1);
 
@@ -421,7 +486,7 @@ public sealed class NavigationTests
     {
         // RESET GAME is the story flow's and the session's plumbing, so the
         // menu's tile is a report rather than a page the navigator builds.
-        var (nav, shell, host, _, _, _, _, _, _, _, _) = Create();
+        var (nav, shell, host, _, _, _, _, _, _, _, _, _) = Create();
         nav.ShowMenuPage();
         var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
 
@@ -436,7 +501,7 @@ public sealed class NavigationTests
         // The haul is a job type, not a report: the control page's tap prices
         // the placeholder run, banks it through the flow and puts the flow's
         // own receipt up. CONTINUE is the control page the tap came from.
-        var (nav, shell, _, _, _, _, _, _, _, _, _) = Create();
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
 
         nav.ControlPage().HaulCommand.Execute(null);
 

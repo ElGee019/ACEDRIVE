@@ -237,12 +237,41 @@ internal static class TestSession
             zoneInstance, game, clock, valuationInstance, valuationBoard, garageInstance, pool,
             walletInstance, profiles, options.Hud, saver, rivalsInstance, beat,
             options.ValuationRng ?? new Random(3), logger, options.IgnoreEventGates);
+        // The road test (PORTPLAN 49): its own board, hold stream and flow, on
+        // the same onboarding store the La Strada door is banked in, with the
+        // audience read from the city and friendship stores the receipts use.
+        IRoadTestStandings roadTestStandings =
+            options.RoadTestStandings ?? new FakeRoadTestStandings();
+        var roadTestAudience = new RoadTestAudienceSource(
+            cityInstance, deliveryBoard, friendsInstance);
+        var roadTestSettlementInner = new RoadTestSettlement(
+            walletInstance, roadsInstance, roadTestAudience,
+            RoadTestAudienceRules.Default, saver, rivalsInstance, beat, logger);
+        var roadTestFlow = new RoadTestFlow(
+            onboardingStore, game, clock, roadsInstance, options.Hud, roadTestStandings,
+            profiles, roadTestSettlementInner, pool, map, beat,
+            () => brands.CurrentIdentity,
+            options.RoadTestRng ?? new Random(10), logger,
+            options.IgnoreEventGates);
+        // Saturday's Touristenfahrten run: the shipped content table, the same
+        // directory the world grows, and its own seeded draws.
+        TouristenMenu touristenMenu = TouristenMenu.Default;
+        var touristenDoors = new TouristenDoors(
+            directory, directoryStore, spawnerInstance, map, touristenMenu,
+            new Random(11), logger);
+        var touristenSettlement = new TouristenfahrtenSettlement(
+            walletInstance, deliveryFaresInstance, fleet, rarityInstance,
+            rivalsInstance, beat, logger);
+        var touristenFlow = new TouristenfahrtenFlow(
+            touristenMenu, touristenDoors, options.Hud, touristenSettlement, meter,
+            taxiRulesInstance, new Random(12), logger);
         // The venue's typed handler, registered after its flow exactly like the
         // root does, so ENTER on the pinned house opens the showcase.
         IReadOnlyList<IPoiArrivalHandler> arrivals =
         [
             new WhereIsWillyPoiHandler(willyFlow),
             new ValuationPoiHandler(valuationFlow),
+            new RoadTestPoiHandler(roadTestFlow),
             .. handlers,
         ];
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(arrivals));
@@ -257,11 +286,12 @@ internal static class TestSession
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
-            willyFlow, willyLedgerInstance,
+            willyFlow, willyLedgerInstance, roadTestFlow, touristenFlow,
             () => brands.Brand, new Random(6), logger, options.IgnoreEventGates);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
-        var panel = new PanelPresenter(shell, navigation, taxi, delivery, clock, logger);
+        var panel = new PanelPresenter(
+            shell, navigation, taxi, delivery, touristenFlow, clock, logger);
         var story = new OnboardingFlow(
             onboardingStore, contentSource, profiles,
             options.PlayerNames ?? new OfflinePlayerNameRegistry(), map,
@@ -285,6 +315,7 @@ internal static class TestSession
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
+            roadTestFlow, touristenFlow,
             navigation, readouts, dayCycle,
             todoBoard, pinsInstance,
             options.Hud, options.SaveResets, options.Restarter);
@@ -297,7 +328,7 @@ internal static class TestSession
         return new TestSessionResult(
             vm, clock, tel, store, story, todoBoard,
             valuationFlow, valuationInstance, valuationBoard,
-            willyFlow, willyLedgerInstance);
+            willyFlow, willyLedgerInstance, roadTestFlow);
     }
 
     // The real career opens these through the street/job thresholds; the flow

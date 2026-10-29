@@ -22,6 +22,7 @@ public sealed class MainControlScreenTests
         TodoBoard board = todos ?? DefaultTodoBoard();
         return new MainControlScreenViewModel(
             beat ?? new VoiceBeat(tick),
+            tick,
             board,
             shiftState,
             new ControlActions(
@@ -121,6 +122,7 @@ public sealed class MainControlScreenTests
         Assert.True(vm.VoiceActions.ContainsKey("START TAXI SHIFT"));
         Assert.True(vm.VoiceActions.ContainsKey("DELIVERY JOB"));
         Assert.True(vm.VoiceActions.ContainsKey("CAR HAULING JOB"));
+        Assert.True(vm.VoiceActions.ContainsKey("POLICE"));
         Assert.True(vm.VoiceActions.ContainsKey("BACK"));
     }
 
@@ -188,7 +190,7 @@ public sealed class MainControlScreenTests
         var beat = new VoiceBeat(clock);
         bool fired = false;
         var vm = new MainControlScreenViewModel(
-            beat, DefaultTodoBoard(),
+            beat, clock, DefaultTodoBoard(),
             new TaxiShift(),
             new ControlActions(
                 new RelayCommand(() => { }),
@@ -237,6 +239,88 @@ public sealed class MainControlScreenTests
         Assert.NotNull(label);
         vm.VoiceActions[label].Invoke();
         Assert.True(vm.HaulFlash);
+    }
+
+    // The police entry is a placeholder too (PORTPLAN 41's flow has not
+    // landed): a tap is real — the button is clickable — but the only result
+    // is its own text swapping for COMING SOON and coming back after three
+    // real seconds on the injected clock.
+    [Fact]
+    public void PoliceClick_SaysComingSoonForThreeSecondsThenRestores()
+    {
+        var clock = new FakeClock();
+        var vm = Create(clock);
+        Assert.Equal("POLICE", vm.PoliceLabel);
+
+        vm.PoliceCommand.Execute(null);
+        Assert.Equal("COMING SOON", vm.PoliceLabel);
+
+        clock.Advance(TimeSpan.FromMilliseconds(2999));
+        vm.UpdateFlash();
+        Assert.Equal("COMING SOON", vm.PoliceLabel); // still inside the hold
+
+        clock.Advance(TimeSpan.FromMilliseconds(2));
+        vm.UpdateFlash();
+        Assert.Equal("POLICE", vm.PoliceLabel);
+    }
+
+    [Fact]
+    public void PoliceClick_Again_RestartsTheHold()
+    {
+        var clock = new FakeClock();
+        var vm = Create(clock);
+
+        vm.PoliceCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(2));
+        vm.PoliceCommand.Execute(null); // latest tap wins
+        clock.Advance(TimeSpan.FromSeconds(2));
+        vm.UpdateFlash();
+        Assert.Equal("COMING SOON", vm.PoliceLabel); // two seconds into the second hold
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        vm.UpdateFlash();
+        Assert.Equal("POLICE", vm.PoliceLabel);
+    }
+
+    // Vosk reaches the same command as a click: a spoken "police" glows the
+    // button teal (the voice acknowledgment), says COMING SOON, and the text
+    // outlives the half-second glow.
+    [Theory]
+    [InlineData("police")]
+    [InlineData("the police")]
+    public void Voice_PoliceTap_GlowsAndSaysComingSoon(string spoken)
+    {
+        var clock = new FakeClock();
+        var vm = Create(clock);
+        string? label = VoiceMatch.MatchLabel(spoken, vm.VoiceActions.Keys);
+        Assert.NotNull(label);
+        Assert.Equal("POLICE", label);
+
+        vm.VoiceActions[label].Invoke();
+        Assert.True(vm.PoliceFlash);
+        Assert.Equal("COMING SOON", vm.PoliceLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(0.51));
+        vm.UpdateFlash();
+        Assert.False(vm.PoliceFlash);
+        Assert.Equal("COMING SOON", vm.PoliceLabel); // the text outlives the glow
+
+        clock.Advance(TimeSpan.FromSeconds(2.5));
+        vm.UpdateFlash();
+        Assert.Equal("POLICE", vm.PoliceLabel);
+    }
+
+    [Fact]
+    public void PoliceBack_RestoresTheTextOnTheWayOut()
+    {
+        // The page is cached, so a player who backs out mid-hold must not find
+        // a stale COMING SOON when they come back.
+        var vm = Create();
+        vm.PoliceCommand.Execute(null);
+        Assert.Equal("COMING SOON", vm.PoliceLabel);
+
+        vm.BackCommand.Execute(null);
+        Assert.Equal("POLICE", vm.PoliceLabel);
     }
 
     [Fact]

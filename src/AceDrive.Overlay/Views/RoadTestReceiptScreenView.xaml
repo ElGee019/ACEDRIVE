@@ -1,0 +1,90 @@
+<UserControl x:Class="AceDrive.Overlay.Views.RoadTestReceiptScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- The road test's receipt (PORTPLAN 49, Unity RoadTestReceiptScreen): the
+         car that was tested and the shoot's door, then the issue's readings —
+         the citizens who bought La Strada, variety against the last shoot, the
+         car journalist's reputation, the magazine price, the commission over
+         the forfeit and the earnings — each with the previous issue's line under
+         it (the crowd sentence carries its own count), then the wallet and the
+         personal bests. Type is read at a glance while the car stands: the
+         headline values lead, every formula sits under its value in the dimmer,
+         smaller copy. Nothing is interactive but CONTINUE. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=RoadTestReceiptTitle}"/>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel VerticalAlignment="Center" Margin="0,4">
+                <TextBlock Text="{Binding CarLine}" Foreground="#FFF" FontSize="18"
+                           FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding PhotoLine}" Foreground="#FFBFC4C9" FontSize="14"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,4"
+                           Visibility="{Binding HasPhotoLocation, Converter={StaticResource BoolToVis}}"/>
+                <Border Style="{StaticResource SectionDivider}"/>
+                <TextBlock Text="{Binding PeopleLine}" Foreground="#FFF" FontSize="16"
+                           FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding PeopleFormula}" Foreground="#FF97EAD2" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding VarietyLine}" Foreground="#FFF" FontSize="16"
+                           FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding VarietyFormula}" Foreground="#FF97EAD2" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding JournalistLine}" Foreground="#FFF" FontSize="16"
+                           FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding JournalistFormula}" Foreground="#FF97EAD2" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <TextBlock Text="{Binding MagazineLine}" Foreground="#FFF" FontSize="16"
+                           FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding MagazineFormula}" Foreground="#FF97EAD2" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <Border Style="{StaticResource SectionDivider}"/>
+                <TextBlock Text="{Binding EarningsLine}" Foreground="#FF97EAD2" FontSize="20"
+                           FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding CommissionNote}" Foreground="#FFBFC4C9" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding CommissionLine}" Foreground="#FFBFC4C9" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding ForfeitLine}" Foreground="#FFBFC4C9" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                <TextBlock Text="{Binding CashLine}" Foreground="#FF97EAD2" FontSize="14"
+                           TextAlignment="Center"/>
+                <Border Style="{StaticResource SectionDivider}"/>
+                <TextBlock Text="{Binding BestHeader}" Foreground="#FF97EAD2" FontSize="14"
+                           FontWeight="Bold" TextAlignment="Center" Margin="0,0,0,2"/>
+                <TextBlock Text="{Binding BestPeopleLine}" Foreground="#FFF" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding BestJournalistLine}" Foreground="#FFF" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding BestMagazineLine}" Foreground="#FFF" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap"/>
+                <TextBlock Text="{Binding BestEarningsLine}" Foreground="#FFF" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
+        </ScrollViewer>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=ReceiptContinue}" Padding="4"
+                    HorizontalAlignment="Stretch" Command="{Binding ContinueCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

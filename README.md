@@ -32,7 +32,7 @@ The output is one compressed ~85 MB exe plus a loose `Data\` folder (content
 tables, car thumbnails) and `Assets\Fonts\*-OFL.txt`. Send the folder (or a zip
 of it), never the exe alone: the overlay reads `Data\` beside itself. Publish
 copies the Vosk model from `%APPDATA%\AceDrive\vosk-model` when present
-(~68 MB, voice).
+(~204 MB on disk with the recommended `vosk-model-en-us-0.22-lgraph`, voice).
 
 The Firebase config is **opt-in**: a publish ships no key unless you name one,
 so a demo build cannot carry the production credential by accident. Without a
@@ -54,8 +54,15 @@ dotnet publish src/AceDrive.Overlay -p:PublishProfile=win-x64 `
 always starts at onboarding — even on a machine that already plays AceDrive
 (there is no pre-existing profile to include or overwrite).
 
-The model is never committed; override its path with `-p:VoskModelDir`. The
-published exe is signed after the single-file bundle, because the Build-time
+The model is never committed; override its path with `-p:VoskModelDir`.
+
+Voice needs the folder named `vosk-model`: download a model from
+[alphacephei.com/vosk/models](https://alphacephei.com/vosk/models), extract it
+and rename the folder. Use `vosk-model-en-us-0.22-lgraph` (128 MB download); the
+68 MB `vosk-model-small-en-us-0.15` hears race-car brands poorly ("datsun"
+arrives as "that's fun"), which `Data\brand_aliases.json` can only partly patch.
+
+The published exe is signed after the single-file bundle, because the Build-time
 signature cannot survive bundling. The development certificate is trusted only
 on the machine that made it, so another PC still shows SmartScreen's "Unknown
 publisher" — trust everywhere needs a publicly trusted OV/EV certificate (a

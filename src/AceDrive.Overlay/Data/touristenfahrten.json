@@ -1,0 +1,40 @@
+{
+  "minDropoffs": 1,
+  "maxDropoffs": 3,
+  "minItemsPerOrder": 2,
+  "dropoffs": [
+    { "id": "touristen-brunchen", "name": "Brünnchen" },
+    { "id": "touristen-einfahrt", "name": "Einfahrt" },
+    { "id": "touristen-pflanzgarten", "name": "Pflanzgarten" },
+    { "id": "touristen-adenauer-forst", "name": "Adenauer Forst" },
+    { "id": "touristen-breidscheid", "name": "Breidscheid Bridge" }
+  ],
+  "pickups": [
+    {
+      "kind": "coffee",
+      "poiType": "coffee_shop",
+      "category": "coffee_beans",
+      "names": ["Café am Ring", "Kaffeehaus Sonne", "Rösterei Eifel"],
+      "items": [
+        { "key": "coffee", "nameKey": "TouristenItemCoffee", "price": 3.5, "min": 0, "max": 10 },
+        { "key": "beer", "nameKey": "TouristenItemBeer", "price": 5.5, "min": 0, "max": 10 },
+        { "key": "currywurst_pommes", "nameKey": "TouristenItemCurrywurstPommes", "price": 9.5, "min": 0, "max": 10 },
+        { "key": "schnitzel", "nameKey": "TouristenItemSchnitzel", "price": 19.5, "min": 0, "max": 10 },
+        { "key": "bratwurst_kraut", "nameKey": "TouristenItemBratwurstKraut", "price": 7.0, "min": 0, "max": 10 }
+      ]
+    },
+    {
+      "kind": "pizza",
+      "poiType": "pizza_place",
+      "category": "pizza",
+      "names": ["Pizzeria da Luigi", "Pizzeria Napoli", "Pizza am Ring"],
+      "items": [
+        { "key": "pizza_slice", "nameKey": "TouristenItemPizzaSlice", "price": 5.0, "min": 1, "max": 10 },
+        { "key": "beer", "nameKey": "TouristenItemBeer", "price": 5.5, "min": 0, "max": 10 },
+        { "key": "espresso", "nameKey": "TouristenItemEspresso", "price": 3.0, "min": 0, "max": 10 },
+        { "key": "tiramisu", "nameKey": "TouristenItemTiramisu", "price": 7.0, "min": 0, "max": 10 },
+        { "key": "soup", "nameKey": "TouristenItemSoup", "price": 8.5, "min": 0, "max": 10 }
+      ]
+    }
+  ]
+}

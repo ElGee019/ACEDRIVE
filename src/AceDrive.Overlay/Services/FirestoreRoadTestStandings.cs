@@ -3,29 +3,34 @@ using AceDrive.Core;
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// Per-car road-test boards (PORTPLAN item 49, Unity
-/// RoadTestStandingsService): one doc per (uid, car) holding the best
-/// acceleration time or brake distance. Backend parity only until the
-/// road-test drive metrics land; values are lower-is-better and ties keep
-/// the earlier stamp.
+/// The road-test boards (PORTPLAN item 49, Unity RoadTestStandingsService): one
+/// doc per (uid, car) holding the best acceleration time or brake distance, and
+/// the all-cars record book read off the same docs (each car's best). Values are
+/// lower-is-better and ties keep the earlier stamp.
 /// </summary>
-public sealed class FirestoreRoadTestStandings
+public sealed class FirestoreRoadTestStandings : IRoadTestStandings
 {
     private const int SchemaVersion = 2;
     private readonly IFirestoreDatabase _db;
     private readonly Func<CancellationToken, Task<string?>> _uidAsync;
+    private readonly Func<string?> _uid;
     private readonly IClock _clock;
     private readonly ILog _log;
 
     public FirestoreRoadTestStandings(
         IFirestoreDatabase db, Func<CancellationToken, Task<string?>> uidAsync,
-        IClock clock, ILog log)
+        Func<string?> uid, IClock clock, ILog log)
     {
         _db = db;
         _uidAsync = uidAsync;
+        _uid = uid;
         _clock = clock;
         _log = log;
     }
+
+    public bool IsOnline => true;
+
+    public string? OwnUid => _uid();
 
     /// <summary>
     /// Best-guarded push: an existing lower value is never overwritten. The
@@ -91,7 +96,7 @@ public sealed class FirestoreRoadTestStandings
         return false;
     }
 
-    public async Task<IReadOnlyList<RoadTestEntry>?> LoadTopAsync(
+    public async Task<IReadOnlyList<RoadTestEntry>?> TopAsync(
         RoadTestMetric metric, string carKey, int count,
         CancellationToken cancellationToken = default)
     {
@@ -111,6 +116,29 @@ public sealed class FirestoreRoadTestStandings
             }
         }
         return RoadTestBoard.Top(entries, count);
+    }
+
+    public async Task<IReadOnlyList<RoadTestEntry>?> TopCarsAsync(
+        RoadTestMetric metric, CancellationToken cancellationToken = default)
+    {
+        // The record book reads the whole collection: Firestore cannot group,
+        // so the best-per-car reduction runs here on the parsed rows.
+        IReadOnlyList<FirestoreDocument>? documents =
+            await _db.ListAsync(Collection(metric), cancellationToken).ConfigureAwait(false);
+        if (documents is null)
+        {
+            return null;
+        }
+
+        List<RoadTestEntry> entries = [];
+        foreach (FirestoreDocument doc in documents)
+        {
+            if (Parse(metric, doc) is { } entry)
+            {
+                entries.Add(entry);
+            }
+        }
+        return RoadTestBoard.BestPerCar(entries);
     }
 
     public async Task<RoadTestEntry?> LoadPlayerBestAsync(

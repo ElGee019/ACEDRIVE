@@ -333,21 +333,10 @@ public sealed class JobSettlement
     }
 
     // The class × rarity pair the receipts' XP formula reads for the car
-    // driven now: an owned car answers its catalogue class and its global
-    // rarity rank, a car the fleet cannot resolve keeps the fallback pair,
-    // and an unowned free-roam car answers 0 × 0 (no XP) because it has no
-    // place in the career ledger. Both settles read the same pair.
-    private (int CarClass, int CarRarity) XpCarFacts()
-    {
-        if (_fleet.IsDrivingUnownedCar())
-        {
-            return (0, 0);
-        }
-        CarSpec? car = _fleet.XpCar();
-        int carClass = car is { Class: > 0 } known ? known.Class : FallbackCarClass;
-        int rarity = car is not null ? _rarity.GetRarity(car.Key) : FallbackCarRarity;
-        return (carClass, rarity);
-    }
+    // driven now (the rule lives in DeliveryCarFacts, which the
+    // Touristenfahrten receipt reads too, so the two cannot drift).
+    private (int CarClass, int CarRarity) XpCarFacts() =>
+        DeliveryCarFacts.Of(_fleet, _rarity);
 
     // Unity's whole-km trip unit (Mathf.RoundToInt with a 1 km floor): the
     // country/car aggregates never receive a sub-kilometre or negative sample.

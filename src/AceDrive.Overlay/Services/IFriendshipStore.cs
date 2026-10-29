@@ -10,6 +10,15 @@ public interface IFriendshipStore
     int GetLevel(string ownerName);
 
     /// <summary>
+    /// How many residents sit at or above <paramref name="level"/>. The road
+    /// test's audience counts the crowd from the same persisted levels
+    /// (PORTPLAN item 49, Unity GetFriendCount/GetAcquaintanceCount): the store
+    /// owns the table, so the count is a read of its own data, not a second copy
+    /// of it. A non-positive level counts every resident.
+    /// </summary>
+    int CountAtLeast(int level);
+
+    /// <summary>
     /// Applies one completed ride (+1) and returns the outcome for the
     /// receipt. Never throws (the file sink swallows IO).
     /// </summary>

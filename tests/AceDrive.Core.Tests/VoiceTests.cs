@@ -16,7 +16,7 @@ public sealed class VoiceTests
             ["lotus"] = ["lord of"],
             ["maserati"] = ["majority", "massage therapy", "mother", "missouri", "marseilles variety"],
             ["mazda"] = ["muster", "muslim", "pasta", "many", "me some"],
-            ["datsun"] = ["nissan", "dodson", "nathan", "henderson"],
+            ["datsun"] = ["nissan", "dodson", "nathan", "henderson", "that's fun", "does you", "me so"],
         },
         [new GrandmaCar("ks_mazda_mx5_na", "Mazda MX-5 NA", 1990, 12000, null)],
         [new DialogueLine("GRANDMA", "Happy birthday!"),
@@ -619,6 +619,22 @@ public sealed class VoiceTests
         vm.ToggleShowCommand.Execute(null);
         clock.Advance(TimeSpan.FromSeconds(4));
         mic.Fire("henderson", isFinal: true); // logged live 17:17:36 — one fused word, interjection dead
+        Assert.True(vm.IsShown);
+        // 2026-10-28 retest on the same model: "datsun" now lands as
+        // "that's fun" (15:29:19) and, split into two words, "does you"
+        // (15:34:12); "me so" (15:34:16) is the same swallow. All three are
+        // shipped alias entries, so the retry opens instead of dying.
+        vm.ToggleShowCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(4));
+        mic.Fire("hey that's fun");
+        Assert.True(vm.IsShown);
+        vm.ToggleShowCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(4));
+        mic.Fire("he does you");
+        Assert.True(vm.IsShown);
+        vm.ToggleShowCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(4));
+        mic.Fire("hey me so");
         Assert.True(vm.IsShown);
         vm.Dispose();
     }

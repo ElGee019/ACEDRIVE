@@ -34,6 +34,24 @@ public sealed class JsonFriendshipStore : IFriendshipStore
     public FriendshipOutcome RegisterRide(string ownerName) =>
         Apply(ownerName, 1);
 
+    /// <summary>
+    /// The familiarity bands Unity's road-test audience reads: the values are
+    /// the only state, so the count walks them without copying or sorting the
+    /// table (the flow asks once per receipt, never per tick).
+    /// </summary>
+    public int CountAtLeast(int level)
+    {
+        int count = 0;
+        foreach (int value in _levels.Values)
+        {
+            if (value >= level)
+            {
+                count++;
+            }
+        }
+        return count;
+    }
+
     public void AddFamiliarity(string ownerName, int delta) =>
         _ = Apply(ownerName, delta);
 

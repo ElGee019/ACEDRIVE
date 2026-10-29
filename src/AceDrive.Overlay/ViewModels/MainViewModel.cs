@@ -18,7 +18,8 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed class MainViewModel
     : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
       ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost,
-      IValuationHost, IWhereIsWillyHost, IDisposable
+      IValuationHost, IWhereIsWillyHost, IRoadTestHost, ITouristenfahrtenHost,
+      IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -60,6 +61,14 @@ public sealed class MainViewModel
     // drive home and the receipt. It owns its session state and reaches back
     // only through IWhereIsWillyHost for the panel and the page.
     private readonly WhereIsWillyFlow _willy;
+    // The road test (PORTPLAN 49): the Tuesday row's drive to La Strada, the
+    // 0-60 leg timed on the companion and the result page. It owns its clock
+    // and reaches back only through IRoadTestHost for the panel.
+    private readonly RoadTestFlow _roadTest;
+    // Saturday's Touristenfahrten run: the random shop pickup, the 1-3 corner
+    // dropoffs and their receipts. It owns the run and reaches back only
+    // through ITouristenfahrtenHost for the panel, the receipt and the calendar.
+    private readonly TouristenfahrtenFlow _touristen;
     // The POI world: the business/store/hub doors and the arrival handlers.
     private readonly PoiWorld _poiWorld;
     // The zone growth at the settle hooks: the introduction gate, the street it
@@ -162,7 +171,8 @@ public sealed class MainViewModel
     // rule and the overlay call both read this one definition, so a new leg
     // cannot mean two different things.
     private bool JobInProgress =>
-        _taxi.InProgress || _delivery.InProgress || _cento.InProgress;
+        _taxi.InProgress || _delivery.InProgress || _cento.InProgress
+        || _touristen.InProgress;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
@@ -177,7 +187,8 @@ public sealed class MainViewModel
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
         CentoRaceFlow cento, CentoRaceSettlement centoSettlement,
-        ValuationFlow valuation, WhereIsWillyFlow willy,
+        ValuationFlow valuation, WhereIsWillyFlow willy, RoadTestFlow roadTest,
+        TouristenfahrtenFlow touristen,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
         TodoBoard todos, DestinationPins pins,
         ITelemetryHud? hud = null,
@@ -225,6 +236,14 @@ public sealed class MainViewModel
         _centoSettlement = centoSettlement;
         _valuation = valuation;
         _willy = willy;
+        _roadTest = roadTest;
+        if (_hud is not null)
+        {
+            // The photo mission's shutter: the HUD only knows its button was
+            // offered and pressed; the flow prices and banks the receipt.
+            _hud.PhotoshootRequested += (_, _) => _roadTest.Photoshoot();
+        }
+        _touristen = touristen;
         _poiWorld = poiWorld;
         _zoneGrowth = zoneGrowth;
         // The readout formatter and the session calendar are built by the root
@@ -249,6 +268,8 @@ public sealed class MainViewModel
         _cento.Attach(this);
         _valuation.Attach(this);
         _willy.Attach(this);
+        _roadTest.Attach(this);
+        _touristen.Attach(this);
         _poiWorld.Attach(this);
         // The view binds IsShown/CurrentScreen on this VM, but the shell owns
         // them: forward its notifications so the bindings stay live.
@@ -483,6 +504,23 @@ public sealed class MainViewModel
     void IWhereIsWillyHost.HidePanel() => _panel.Hide();
     void IWhereIsWillyHost.ShowControl() => _nav.ShowControl();
 
+    // The host slice the road test sees: the flow owns the drive, the 0-60
+    // clock, the photo mission and the board; the shell owns the panel, the
+    // receipt page and the way back to the page the player came from.
+    void IRoadTestHost.RevealPage(object page) => _panel.PresentJob(page);
+    void IRoadTestHost.ShowReceipt(object screen) => _panel.PresentJob(screen);
+    void IRoadTestHost.HidePanel() => _panel.Hide();
+    void IRoadTestHost.ShowControl() => _nav.ShowControl();
+    void IRoadTestHost.ShowMenu() => _nav.ShowMenuPage();
+
+    // The host slice the Saturday Touristenfahrten run sees: the flow owns the
+    // run and its doors; the shell owns the panel, the receipt page, the
+    // calendar it returns to and the standings tail the receipt reads.
+    void ITouristenfahrtenHost.HidePanel() => _panel.Hide();
+    void ITouristenfahrtenHost.ShowReceipt(object screen) => _panel.PresentJob(screen);
+    void ITouristenfahrtenHost.GoToCalendar() => _nav.ShowCalendarPage();
+    void ITouristenfahrtenHost.RefreshStandings() => _ = RefreshStandings();
+
     // The host slice the POI world sees: the world owns the doors and the
     // board growth; the navigator owns the board page and the dealer's follow-up.
     void IPoiWorldHost.RefreshBoard() => _delivery.RefreshBoard();
@@ -712,17 +750,21 @@ public sealed class MainViewModel
         // reputation ticker banks the distance this tick covered, so a parked
         // car grows nothing.
         _cento.Advance(s, dt);
+        // The road test's counter, stopwatch and 60 km/h crossing ride the same
+        // loop: the flow reads the live speed and keeps its own clock.
+        _roadTest.Advance(s);
         if ((now - _saver.LastGarageSave).TotalSeconds >= OdometerSaveSec)
         {
             SaveGarage();
         }
 
-        // Meter runs while a paid leg is live: the taxi passenger leg and the
-        // delivery store legs share the one accumulator (the two jobs cannot
-        // overlap). The stalled-frame guard and the speed clamp keep a torn
-        // read from inflating a fare or a delivery charge. The delivery run
-        // resets it when the first store leg starts, so hub pickups are not
-        // charged as delivery distance.
+        // Meter runs while a paid leg is live: the taxi passenger leg, the
+        // delivery store legs and the Touristenfahrten corner legs share the one
+        // accumulator (the jobs cannot overlap). The stalled-frame guard and the
+        // speed clamp keep a torn read from inflating a fare or a delivery
+        // charge. The delivery run resets it when the first store leg starts, so
+        // hub pickups are not charged as delivery distance; the Touristenfahrten
+        // run resets it when the goods load and at every receipt.
         if (_taxi.LegActive)
         {
             // The flow owns the leg: the patrols and the passenger's promise.
@@ -734,6 +776,12 @@ public sealed class MainViewModel
             // The delivery twin: the same shared accumulator, reset by the flow
             // at the first store leg.
             _delivery.Advance(s, dt);
+        }
+        else if (_touristen.InProgress)
+        {
+            // The third consumer: reset when the goods load and after each
+            // receipt, so only the corner legs are priced.
+            _touristen.Advance(s, dt);
         }
     }
 
@@ -855,6 +903,10 @@ public sealed class MainViewModel
         if (_delivery.InProgress)
         {
             _delivery.Deliver();
+        }
+        else if (_touristen.InProgress)
+        {
+            _touristen.Deliver();
         }
         else if (PickupCommand.CanExecute(null))
         {

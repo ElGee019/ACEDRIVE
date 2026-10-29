@@ -63,6 +63,12 @@
   <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Deliver to {0} at {1} No. {2} in {3}</value></data>
   <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>You have arrived at {0}. Press DELIVER ITEMS to unload.</value></data>
   <data name="HudDeliveryStoreAction" xml:space="preserve"><value>DELIVER ITEMS</value></data>
+  <!-- Touristenfahrten's two legs: the shop leg names the dropoff list, the
+       corner leg names the loaded order and where it goes. The placeholders
+       follow the flow's own argument list (see HudJobGuidance.DriveArgs). -->
+  <data name="HudTouristenPickupDrive" xml:space="preserve"><value>Drive to {0} to pick up goods to deliver to {1}.</value></data>
+  <data name="HudTouristenPickupArrived" xml:space="preserve"><value>You are at {0}. Press PICK UP to load the goods.</value></data>
+  <data name="HudTouristenDropoffDrive" xml:space="preserve"><value>Drop off {0} at {1}.</value></data>
   <!-- Speed-challenge police (PORTPLAN 11, Phase C): a warning on approach and
        the fine notice when a patrol catches the car over its limit. -->
   <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>
@@ -158,6 +164,11 @@ For instance "{0}".</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>CONTINUE TAXI SHIFT</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>CAR HAULING JOB</value></data>
+  <!-- Police job entry (PORTPLAN 41): the door is live and speakable, but its
+       flow has not landed, so a tap swaps the button's own text for the COMING
+       SOON line and restores it three seconds later. -->
+  <data name="ControlPolice" xml:space="preserve"><value>POLICE</value></data>
+  <data name="ControlPoliceSoon" xml:space="preserve"><value>COMING SOON</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>JOBS</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TODO LIST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
@@ -202,6 +213,22 @@ For instance "{0}".</value></data>
   <data name="EventRoadTest" xml:space="preserve"><value>Road test</value></data>
   <data name="EventWilly" xml:space="preserve"><value>Where is Willy</value></data>
   <data name="EventPancakes" xml:space="preserve"><value>Grandma's pancakes</value></data>
+  <data name="EventTouristenfahrten" xml:space="preserve"><value>Touristenfahrten Deliveries</value></data>
+  <!-- The Touristenfahrten run's order copy: one line per item and the two
+       list separators, so a translator owns the wording and the punctuation.
+       The item names stay singular because the count leads the line. -->
+  <data name="TouristenListSeparator" xml:space="preserve"><value>, </value></data>
+  <data name="TouristenListAnd" xml:space="preserve"><value> and </value></data>
+  <data name="TouristenItemLine" xml:space="preserve"><value>{0} × {1}</value></data>
+  <data name="TouristenItemCoffee" xml:space="preserve"><value>coffee</value></data>
+  <data name="TouristenItemBeer" xml:space="preserve"><value>beer</value></data>
+  <data name="TouristenItemCurrywurstPommes" xml:space="preserve"><value>currywurst &amp; pommes</value></data>
+  <data name="TouristenItemSchnitzel" xml:space="preserve"><value>schnitzel</value></data>
+  <data name="TouristenItemBratwurstKraut" xml:space="preserve"><value>bratwurst &amp; kraut</value></data>
+  <data name="TouristenItemPizzaSlice" xml:space="preserve"><value>pizza slice</value></data>
+  <data name="TouristenItemEspresso" xml:space="preserve"><value>espresso</value></data>
+  <data name="TouristenItemTiramisu" xml:space="preserve"><value>tiramisu</value></data>
+  <data name="TouristenItemSoup" xml:space="preserve"><value>soup</value></data>
   <data name="NoEvent" xml:space="preserve"><value>No event</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Click Max's Grocery Store, drive there and enter the store.</value></data>
   <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Go to the JOBS page, select DELIVERY JOB and open a career of choice.</value></data>
@@ -811,4 +838,79 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="WillyReceiptCertificate" xml:space="preserve"><value>Certificate: {0}</value></data>
   <data name="WillyReceiptCertificateStored" xml:space="preserve"><value>Certificate added to the trunk of your car.</value></data>
   <data name="WillyReceiptFriendship" xml:space="preserve"><value>Friendship level: {0}</value></data>
+
+  <!-- The road test (PORTPLAN 49, Unity RoadTestScreen and its two legs). The
+       task sentences' {0}/{1} are the target speed and its unit, so a miles
+       player reads the same 60 or 100 km/h converted (37/62 mph); the result
+       lines add the reading and the car under test. The row readings keep
+       "{time:F3}s" for the accel board and metres for the brake board. -->
+  <data name="RoadTestTitle" xml:space="preserve"><value>ROAD TEST</value></data>
+  <data name="RoadTestStart" xml:space="preserve"><value>0-60</value></data>
+  <data name="RoadTestBrakeStart" xml:space="preserve"><value>100-0</value></data>
+  <data name="RoadTestPhoto" xml:space="preserve"><value>PHOTO MISSION</value></data>
+  <data name="RoadTestAccelIntro" xml:space="preserve"><value>Set a 0-60 time we can publish in our magazine. Launch the car from 0. You will see the countdown timer on the mini window.</value></data>
+  <data name="RoadTestBrakeIntro" xml:space="preserve"><value>Take a 100-0 braking test. Bring the car to 100, watch the countdown timer and brake.</value></data>
+  <!-- Unity's photo-op brief: any spot on the map, so this week's shoot is not
+       last week's. The companion shows the same sentence while the mission runs. -->
+  <data name="RoadTestPhotoIntro" xml:space="preserve"><value>Drive anywhere across the map so the photographer can get his shots. Switching up the location from our last shoot will keep things interesting for our readers.</value></data>
+  <data name="RoadTestPhotoNoPosition" xml:space="preserve"><value>No address here — drive on a little and take the shot again.</value></data>
+  <data name="RoadTestBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="RoadTestContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="RoadTestPickRequired" xml:space="preserve"><value>This week's test is for the {0}. Change into that car.</value></data>
+  <data name="RoadTestBoard" xml:space="preserve"><value>GLOBAL LEADERBOARD</value></data>
+  <data name="RoadTestAllCars" xml:space="preserve"><value>ALL CARS</value></data>
+  <data name="RoadTestWaiting" xml:space="preserve"><value>Reading the leaderboard…</value></data>
+  <data name="RoadTestAccelResult" xml:space="preserve"><value>You went from 0 to {0} {1} in {2:0.000} seconds driving the {3}.</value></data>
+  <data name="RoadTestBrakeResult" xml:space="preserve"><value>You went from {0} {1} to 0 in {2:0.0} metres driving the {3}.</value></data>
+  <data name="RoadTestRowTime" xml:space="preserve"><value>{0:0.000}s</value></data>
+  <data name="RoadTestRowMetres" xml:space="preserve"><value>{0:0.0} m</value></data>
+  <data name="RoadTestTimer" xml:space="preserve"><value>{0:0.000}</value></data>
+  <data name="RoadTestTimerMetres" xml:space="preserve"><value>{0:0.0} m</value></data>
+  <data name="RoadTestUnitKmh" xml:space="preserve"><value>km/h</value></data>
+  <data name="RoadTestUnitMph" xml:space="preserve"><value>mph</value></data>
+  <data name="RoadTestYou" xml:space="preserve"><value>You</value></data>
+  <data name="RoadTestSeparatorRank" xml:space="preserve"><value>...</value></data>
+  <data name="RoadTestSeparatorName" xml:space="preserve"><value>---</value></data>
+
+  <!-- The road test's receipt (PORTPLAN 49, Unity RoadTestReceiptScreen): one
+       reading per line with the previous issue's in brackets, and its own
+       formula line underneath. {0} on the crowd line is the shared address
+       shape; the formula lines keep every operand so a translator can reorder
+       but never drop a number. The crowd line is the issue's own sentence: the
+       people the shoot reached out of the zone's citizens, who bought the
+       magazine. -->
+  <data name="RoadTestReceiptTitle" xml:space="preserve"><value>LA STRADA ROAD TEST RECEIPT</value></data>
+  <data name="RoadTestReceiptPhoto" xml:space="preserve"><value>Photo location: {0}</value></data>
+  <data name="RoadTestReceiptPeople" xml:space="preserve"><value>{0} people from {1} citizens have bought La Strada.</value></data>
+  <data name="RoadTestReceiptPeopleFormula" xml:space="preserve"><value>friends ({0}) + acquaintances ({1}) × 0.5 = {2:0.#} / 100 × {3} citizens = {4} people</value></data>
+  <data name="RoadTestReceiptVariety" xml:space="preserve"><value>Variety: {0:0.00}% (previously {1:0.00}%)</value></data>
+  <data name="RoadTestReceiptVarietyFirst" xml:space="preserve"><value>first photo — full variety (100%)</value></data>
+  <data name="RoadTestReceiptVarietyFormula" xml:space="preserve"><value>last distance ({0:0.0} km) / max distance in zone ({1:0.0} km) = {2:0.00}%</value></data>
+  <data name="RoadTestReceiptJournalist" xml:space="preserve"><value>Car journalist reputation: {0:0.00} (previously {1:0.00})</value></data>
+  <data name="RoadTestReceiptJournalistFormula" xml:space="preserve"><value>reputation({0}) × test results({1}) × √variety = {2:0.00}</value></data>
+  <data name="RoadTestReceiptMagazine" xml:space="preserve"><value>Magazine price: {0:0.00} CR (previously {1:0.00})</value></data>
+  <data name="RoadTestReceiptMagazineFormula" xml:space="preserve"><value>car journalist reputation ({0:0.00}) / 2 = {1:0.00}</value></data>
+  <data name="RoadTestReceiptCommission" xml:space="preserve"><value>Commission: {0:0.00} CR</value></data>
+  <data name="RoadTestReceiptCommissionNote" xml:space="preserve"><value>{0:0.##}% of {1} people buying our magazine at {2:0.00} CR.</value></data>
+  <data name="RoadTestReceiptForfeit" xml:space="preserve"><value>Forfeit: {0} CR</value></data>
+  <data name="RoadTestReceiptEarnings" xml:space="preserve"><value>Earnings: {0:0.00} CR (previously {1:0.00})</value></data>
+  <data name="RoadTestReceiptCash" xml:space="preserve"><value>Cash after: {0:0.00} CR</value></data>
+  <data name="RoadTestReceiptBestHeader" xml:space="preserve"><value>— best —</value></data>
+  <data name="RoadTestReceiptBestPeople" xml:space="preserve"><value>most people reached: {0}</value></data>
+  <data name="RoadTestReceiptBestJournalist" xml:space="preserve"><value>highest car journalist reputation: {0:0.00}</value></data>
+  <data name="RoadTestReceiptBestMagazine" xml:space="preserve"><value>highest magazine price: {0:0.00} CR</value></data>
+  <data name="RoadTestReceiptBestEarnings" xml:space="preserve"><value>highest earnings: {0:0.00}</value></data>
+
+  <!-- The companion's road-test block: each task line carries the same {0}/{1}
+       target-and-unit pair as its page brief, so both name the same number; the
+       halt line has no placeholders (a zero target makes the HUD skip the
+       formatter's speed pair) and stands in while the car is still rolling at
+       the accel start counter. -->
+  <data name="HudRoadTestTask" xml:space="preserve"><value>Let's see how fast you can get from 0-{0} {1}.</value></data>
+  <data name="HudRoadTestHalt" xml:space="preserve"><value>Bring the car to a halt to start the road test.</value></data>
+  <data name="HudRoadTestBrake" xml:space="preserve"><value>Bring the car to {0} {1}, then brake.</value></data>
+  <data name="HudRoadTestDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3} for your road test.</value></data>
+  <data name="HudRoadTestArrived" xml:space="preserve"><value>You have arrived at {0}. Enter to start your road test.</value></data>
+  <data name="HudRoadTestPhoto" xml:space="preserve"><value>Drive anywhere across the map so the photographer can get his shots.</value></data>
+  <data name="HudPhotoshoot" xml:space="preserve"><value>PHOTOSHOOT</value></data>
 </root>

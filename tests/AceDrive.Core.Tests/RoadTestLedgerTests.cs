@@ -151,4 +151,90 @@ public sealed class RoadTestLedgerTests
         Assert.Equal("m2 g87 coupe", ledger.Current?.Model);
         Assert.Contains("ks_bmw_m2_coupe#preset_m2_mperf_1", ledger.TestedIds);
     }
+
+    [Fact]
+    public void MarkTested_RaisesTheNaturalReputationOnce()
+    {
+        var ledger = TestRoadCars.Ledger(seed: 7);
+        Assert.Equal(0, ledger.Record.NaturalReputation);
+
+        ledger.MarkTested();
+
+        // Unity MarkCurrentAsTested's reputation tail: one point per driven test.
+        Assert.Equal(1, ledger.Record.NaturalReputation);
+    }
+
+    [Fact]
+    public void MarkTested_StopsTheNaturalReputationAtTheCap()
+    {
+        var ledger = TestRoadCars.Ledger(seed: 7);
+        for (int i = 0; i <= RoadTestAudience.MaxNaturalReputation; i++)
+        {
+            ledger.MarkTested();
+        }
+
+        Assert.Equal(
+            RoadTestAudience.MaxNaturalReputation, ledger.Record.NaturalReputation);
+    }
+
+    [Fact]
+    public void RecordReceipt_BanksTheIssueAndKeepsTheBests()
+    {
+        var ledger = TestRoadCars.Ledger(seed: 7);
+
+        ledger.RecordReceipt(Receipt(people: 40, earnings: 600.0));
+        // The builder folds the previous record's bests into the receipt, so a
+        // weaker second issue arrives with the old highs and keeps them.
+        ledger.RecordReceipt(Receipt(people: 10, earnings: 430.0) with
+        {
+            HighestPeopleReached = 40,
+            HighestEarnings = 600.0,
+        });
+
+        // The last issue is the next one's baseline; the bests never fall.
+        Assert.Equal(10, ledger.Record.LastPeopleReached);
+        Assert.Equal(430.0, ledger.Record.LastEarnings, precision: 6);
+        Assert.Equal(40, ledger.Record.HighestPeopleReached);
+        Assert.Equal(600.0, ledger.Record.HighestEarnings, precision: 6);
+        Assert.True(ledger.Record.HasPreviousPhoto);
+        Assert.Equal("Street 1", ledger.Record.PhotoStreet);
+    }
+
+    [Fact]
+    public void Resume_ReopensTheReceiptRecord()
+    {
+        var first = TestRoadCars.Ledger(seed: 7);
+        first.MarkTested();
+        first.RecordReceipt(Receipt(people: 40, earnings: 600.0));
+
+        var restarted = TestRoadCars.Ledger(seed: 99, saved: first.Snapshot());
+
+        Assert.Equal(first.Current?.Key, restarted.Current?.Key);
+        Assert.Equal(1, restarted.Record.NaturalReputation);
+        Assert.Equal(600.0, restarted.Record.LastEarnings, precision: 6);
+        Assert.Equal(40, restarted.Record.HighestPeopleReached);
+        Assert.Equal("Street 1", restarted.Record.PhotoStreet);
+    }
+
+    // A settled issue with the numbers the assertions read; the audience math
+    // itself is covered by RoadTestReceiptBuilderTests.
+    private static RoadTestReceipt Receipt(int people, double earnings) =>
+        new("1990 MAZDA MX-5 NA", "Street 1", 4, 0.0,
+            Citizens: 1000, Friends: 3, Acquaintances: 2,
+            PeopleReached: people, PreviousPeopleReached: 0,
+            Variety: 0.5, PreviousVariety: 0.0,
+            ResultReputation: 50, NaturalReputation: 1,
+            JournalistReputation: 25.0, PreviousJournalistReputation: 0.0,
+            MagazinePrice: 12.5, PreviousMagazinePrice: 0.0,
+            Forfeit: RoadTestAudienceRules.Default.BaseForfeit,
+            CommissionPercent: RoadTestAudienceRules.Default.CommissionPercent,
+            Commission: earnings - RoadTestAudienceRules.Default.BaseForfeit,
+            Earnings: earnings, PreviousEarnings: 0.0,
+            HighestPeopleReached: people,
+            HighestJournalistReputation: 25.0,
+            HighestMagazinePrice: 12.5,
+            HighestEarnings: earnings,
+            FirstPhoto: false,
+            DistanceKm: 5.0,
+            MaxDistanceKm: 10.0);
 }

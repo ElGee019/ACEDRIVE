@@ -122,6 +122,12 @@
         <DataTemplate DataType="{x:Type vm:ValuationScreenViewModel}">
             <views:ValuationScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:RoadTestScreenViewModel}">
+            <views:RoadTestScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:RoadTestReceiptScreenViewModel}">
+            <views:RoadTestReceiptScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:WhereIsWillyScreenViewModel}">
             <views:WhereIsWillyScreenView/>
         </DataTemplate>

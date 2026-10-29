@@ -290,6 +290,7 @@ public partial class App : Application, IDisposable
         IZoneStandings zoneStandings;
         IPlayerNameRegistry playerNames;
         IValuationBoard valuationBoard;
+        IRoadTestStandings roadTestStandings;
         FirebaseOptions? firebaseOptions = FirebaseOptions.TryLoad(_log);
         if (firebaseOptions is not null)
         {
@@ -350,6 +351,13 @@ public partial class App : Application, IDisposable
                     _firebase.Database, _firebase.UidAsync, wall, _log),
                 () => _firebase?.Session.Uid, _log, _firebase.StopToken);
             valuationBoard = _valuationBoard;
+            // The per-car road-test boards (PORTPLAN 49): one doc per (uid, car)
+            // holding the best 0-60 run, read once after each test and pushed
+            // best-guarded. No watcher: a board is only looked at on the result
+            // page.
+            roadTestStandings = new FirestoreRoadTestStandings(
+                _firebase.Database, _firebase.UidAsync, () => _firebase?.Session.Uid,
+                wall, _log);
         }
         else
         {
@@ -367,6 +375,9 @@ public partial class App : Application, IDisposable
             // No backend: the list is empty and the house entry is the only
             // opponent, exactly like Unity's unconfigured build.
             valuationBoard = new OfflineValuationBoard();
+            // No backend: the road-test page keeps the row the player just
+            // drove, like Unity's local board when the list load fails.
+            roadTestStandings = new OfflineRoadTestStandings();
         }
         // The zone board loads in the background from boot, so the first
         // expansion page already has a rank (the offline null-object no-ops).
@@ -443,11 +454,33 @@ public partial class App : Application, IDisposable
             willyRules, willyLedger, friendships, trunk, driver, hud, saver,
             rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log,
             ignoreEventGates: IgnoreEventGatesForTesting);
+        // The road test (PORTPLAN 49): its own flow owns the drive to La Strada,
+        // the 0-60 leg, the photo mission and the receipt page, so the
+        // coordinator only forwards the calendar tap, the poll and the
+        // companion's PHOTOSHOOT tap. Its reaction hold draws on its own seeded
+        // stream, offset from the other launch draws. The audience reads the
+        // same city and friendship stores the job settles do, and the settle
+        // banks into the same wallet and saver.
+        var roadTestAudience = new RoadTestAudienceSource(
+            city, deliveryBoard, friendships);
+        // The issue's balance (forfeit, magazine divisor, commission) is content:
+        // Data/road_test.json, with Unity's values as the fallback.
+        RoadTestAudienceRules roadTestAudienceRules =
+            new JsonRoadTestRulesStore(_log).Load();
+        var roadTestSettlement = new RoadTestSettlement(
+            driver, roadTests, roadTestAudience, roadTestAudienceRules,
+            saver, rivals, beat, _log);
+        var roadTestFlow = new RoadTestFlow(
+            onboardingStore, game, wall, roadTests, hud, roadTestStandings,
+            profileStore, roadTestSettlement, cars, addressMap, beat,
+            () => carBrands.CurrentIdentity, new Random(taxiSeed + 10), _log,
+            ignoreEventGates: IgnoreEventGatesForTesting);
         // The quest's marker handler joins the typed arrival list first, so a
         // Willy marker can never fall through to a business interior.
         IPoiArrivalHandler[] poiHandlers =
         [
             new WhereIsWillyPoiHandler(willyFlow),
+            new RoadTestPoiHandler(roadTestFlow),
             new StorePoiHandler(stores, trunk, driver, garage, friendships, beat),
         ];
         // The session-start catch-up (PORTPLAN items 30/47): the starter car a
@@ -521,6 +554,20 @@ public partial class App : Application, IDisposable
         // of falling through to a business interior.
         poiHandlers = [.. poiHandlers, new ValuationPoiHandler(valuationFlow)];
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(poiHandlers));
+        // Saturday's Touristenfahrten run: its own content table, door service,
+        // settle and flow. The run is lap catering around the circuit, so its
+        // shop/landmark doors may sit outside the operating zone and draw over
+        // the whole placeholder map; the directory banks them like any other
+        // discovered door.
+        TouristenMenu touristenMenu = new JsonTouristenMenu(_log).Load();
+        var touristenDoors = new TouristenDoors(
+            poiDirectory, poiStore, poiSpawner, addressMap, touristenMenu,
+            new Random(taxiSeed + 11), _log);
+        var touristenSettlement = new TouristenfahrtenSettlement(
+            driver, deliveryFares, fleet, rarity, rivals, beat, _log);
+        var touristen = new TouristenfahrtenFlow(
+            touristenMenu, touristenDoors, hud, touristenSettlement, meter,
+            taxiRules, new Random(taxiSeed + 12), _log);
         // The page graph: the control page, the menu and every tile behind
         // them, with their own caches. It takes the flows (their pages are
         // theirs) and the session's data; the coordinator attaches as its host
@@ -537,7 +584,7 @@ public partial class App : Application, IDisposable
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
-            valuationFlow, willyFlow, willyLedger,
+            valuationFlow, willyFlow, willyLedger, roadTestFlow, touristen,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
             () => carBrands.Brand, new Random(taxiSeed + 6), _log,
@@ -546,7 +593,8 @@ public partial class App : Application, IDisposable
         // or a job page does, and hiding. The story flow, the voice router and
         // the coordinator share this one instance, so the root can build the
         // two host reads the coordinator used to assemble.
-        var panel = new PanelPresenter(shell, navigation, taxi, delivery, wall, _log);
+        var panel = new PanelPresenter(
+            shell, navigation, taxi, delivery, touristen, wall, _log);
         // The introduction walk and its errand: it reports through its own
         // host (page swaps, panel reveals, the shared driver save), so it is
         // built here like every other collaborator. Its car brand is read live
@@ -588,6 +636,7 @@ public partial class App : Application, IDisposable
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
+            roadTestFlow, touristen,
             navigation, readouts, dayCycle,
             todoBoard, pins,
             hud,

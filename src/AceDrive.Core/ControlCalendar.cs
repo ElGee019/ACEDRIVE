@@ -13,6 +13,9 @@ public static class ControlCalendar
     public const string RoadTest = "RoadTest";
     public const string Willy = "Willy";
     public const string Pancakes = "Pancakes";
+    // Saturday's Touristenfahrten delivery run: a real event with its own flow
+    // (TouristenfahrtenFlow), the only calendar row without a Unity source.
+    public const string Touristenfahrten = "Touristenfahrten";
 
     // Event days are open 8am-8pm (companion parity).
     public const int OpenFromHour = 8;
@@ -34,7 +37,7 @@ public static class ControlCalendar
         new(4, Willy),
         new(5, null),
         new(6, Pancakes),
-        new(7, null),
+        new(7, Touristenfahrten),
         new(1, CentoMiglia),
     ];
 

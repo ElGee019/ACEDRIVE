@@ -220,6 +220,24 @@ Working code that violates these rules still fails review.
   install dir; the overlay lives in `%LocalAppData%\AceDrive`, settings in
   `%AppData%\AceDrive`.
 
+## Concurrent sessions (same checkout)
+
+Several agent sessions may run in this folder at once (context fills, a new
+session starts). They share one working tree, so coordinate before touching
+shared state:
+
+- Start: `node tools/dsh-coord/coord.mjs init --as <name> --note "<task>"`,
+  then pass `--as <name>` (or `set COORD_ID=<name>`) on every later call.
+- Before commit/push: `node tools/dsh-coord/coord.mjs status --as <name>`.
+  Another active session, or a held claim, means: no raw `git commit` / `git push`.
+- Commit: `node tools/dsh-coord/coord.mjs commit --as <name> --wait 120 -m "..."`.
+- Push: `node tools/dsh-coord/coord.mjs push --as <name> --wait 300 -- origin <branch>`.
+- Announce rebases/resets: `node tools/dsh-coord/coord.mjs say "rebasing main, hold pushes" --as <name>`.
+- Read what others said: `node tools/dsh-coord/coord.mjs inbox --as <name>`.
+- Never `git reset --hard`, `checkout -B`, `stash`, or `clean` while another
+  session is active - that rewrites their uncommitted work too.
+
+Details and limits: `tools/dsh-coord/README.md`.
 ## Token optimization (do not read — churn noise)
 
 `bin/`, `obj/`, `TestResults/`, `.vs/`, `*.user`, generated designer files.

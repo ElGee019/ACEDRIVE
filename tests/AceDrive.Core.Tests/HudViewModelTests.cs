@@ -687,6 +687,41 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void JobGuidance_UsesItsOwnPlaceholdersWhenSupplied()
+    {
+        // The Touristenfahrten legs carry their own arguments: the drive line
+        // names the order and the corner, not the shared address shape.
+        var vm = Create();
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Brünnchen", new AddressLocation("Street 1", 17, HouseSide.Right),
+            "HudTouristenDropoffDrive", "HudDeliveryStoreArrived",
+            "HudDeliveryStoreAction", 25.0,
+            DriveArgs: ["2 × coffee", "Brünnchen"]));
+
+        vm.Update(Sample(position: 0.25f, speedKmh: 50f), 10.0, gameRunning: true);
+
+        Assert.Equal("Drop off 2 × coffee at Brünnchen.", vm.DestinationText);
+    }
+
+    [Fact]
+    public void JobGuidance_ArrivalLineKeepsTheSharedDeliveryCopy()
+    {
+        var vm = Create();
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Brünnchen", new AddressLocation("Street 1", 1, HouseSide.Right),
+            "HudTouristenDropoffDrive", "HudDeliveryStoreArrived",
+            "HudDeliveryStoreAction", 25.0,
+            DriveArgs: ["2 × coffee", "Brünnchen"]));
+
+        vm.Update(Sample(position: 0.999f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        Assert.Equal(
+            "You have arrived at Brünnchen. Press DELIVER ITEMS to unload.",
+            vm.DestinationText);
+        Assert.Equal("DELIVER ITEMS", vm.EnterText);
+    }
+
+    [Fact]
     public void JobGuidance_EnterRaisesTheJobEventOnly()
     {
         var vm = Create();
@@ -1124,5 +1159,116 @@ public sealed class HudViewModelTests
         vm.SetReputation(1.00002);    // the next shown digit
 
         Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void SetRoadTest_ShowsTheTaskAndClockInPlaceOfTheBanner()
+    {
+        HudViewModel vm = Create();
+        vm.SetDestination(new PointOfInterest(
+            "la_strada", "La Strada",
+            new AddressLocation(AddressMap.Default.Streets[0].Name, 2, HouseSide.Left),
+            PoiTypes.Magazine));
+        Assert.True(vm.ShowBanner);
+
+        vm.SetRoadTest(new HudRoadTestReadout(
+            "HudRoadTestTask", "3", RoadTestRules.TargetSpeedKmh));
+
+        // The leg being timed has no door left to drive to: the block owns the
+        // slot the drive-to sentence had.
+        Assert.True(vm.HasRoadTest);
+        Assert.False(vm.ShowBanner);
+        Assert.Equal("Let's see how fast you can get from 0-60 km/h.", vm.RoadTestTaskText);
+        Assert.Equal("3", vm.RoadTestClockText);
+
+        vm.SetRoadTest(new HudRoadTestReadout(
+            "HudRoadTestTask", "0.042", RoadTestRules.TargetSpeedKmh));
+
+        Assert.Equal("0.042", vm.RoadTestClockText);
+
+        vm.SetRoadTest(null);
+
+        Assert.False(vm.HasRoadTest);
+        Assert.Equal(string.Empty, vm.RoadTestTaskText);
+        Assert.Equal(string.Empty, vm.RoadTestClockText);
+        Assert.True(vm.ShowBanner);
+    }
+
+    [Fact]
+    public void PhotoshootButton_AppearsOnlyForThePhotoMission()
+    {
+        HudViewModel vm = Create();
+        int requests = 0;
+        vm.PhotoshootRequested += (_, _) => requests++;
+
+        // A timed leg shows its clock and no shutter.
+        vm.SetRoadTest(new HudRoadTestReadout(
+            "HudRoadTestTask", "3", RoadTestRules.TargetSpeedKmh));
+        Assert.False(vm.HasPhotoshoot);
+        Assert.True(vm.HasRoadTestClock);
+
+        vm.PhotoshootCommand.Execute(null);
+        Assert.Equal(0, requests);
+
+        // The photo mission: the brief, no clock, and the button that fires.
+        vm.SetRoadTest(new HudRoadTestReadout(
+            "HudRoadTestPhoto", string.Empty, TargetKmh: 0.0, Photoshoot: true));
+
+        Assert.True(vm.HasPhotoshoot);
+        Assert.False(vm.HasRoadTestClock);
+        Assert.Equal("PHOTOSHOOT", vm.PhotoshootText);
+        Assert.StartsWith("Drive anywhere across the map", vm.RoadTestTaskText);
+
+        vm.PhotoshootCommand.Execute(null);
+        Assert.Equal(1, requests);
+
+        // The shot closes the mission: the block and its button go with it.
+        vm.SetRoadTest(null);
+        Assert.False(vm.HasPhotoshoot);
+        Assert.False(vm.HasRoadTest);
+    }
+
+    [Fact]
+    public void ApplyPreferences_RepaintsTheRoadTestTargetInTheNewUnit()
+    {
+        HudViewModel vm = Create();
+        vm.SetRoadTest(new HudRoadTestReadout(
+            "HudRoadTestTask", "2", RoadTestRules.TargetSpeedKmh));
+
+        vm.ApplyPreferences(PlayerPreferences.Default with { Units = MileageUnit.Miles });
+
+        // 60 km/h is still the run; a miles player reads the same target
+        // converted (Unity's own metric stays the 60 km/h column).
+        Assert.Equal("Let's see how fast you can get from 0-37 mph.", vm.RoadTestTaskText);
+        Assert.Equal("2", vm.RoadTestClockText);
+    }
+
+    [Fact]
+    public void SetRoadTest_FormatsTheBrakeLineInThePlayersUnit()
+    {
+        HudViewModel vm = Create(
+            preferences: PlayerPreferences.Default with { Units = MileageUnit.Miles });
+
+        vm.SetRoadTest(new HudRoadTestReadout(
+            "HudRoadTestBrake", "4.2 m", RoadTestRules.BrakeStartSpeedKmh));
+
+        // The brake leg's own target, not the accel leg's: the same 100 km/h
+        // gate in the unit the speedometer shows.
+        Assert.Equal("Bring the car to 62 mph, then brake.", vm.RoadTestTaskText);
+        Assert.Equal("4.2 m", vm.RoadTestClockText);
+    }
+
+    [Fact]
+    public void SetRoadTest_FormatsTheHaltLineWithoutPlaceholders()
+    {
+        HudViewModel vm = Create();
+
+        vm.SetRoadTest(new HudRoadTestReadout("HudRoadTestHalt", "5", 0.0));
+
+        // A zero target names a line without placeholders: the formatter must
+        // not print a stray speed pair next to the halt ask.
+        Assert.True(vm.HasRoadTest);
+        Assert.Equal("Bring the car to a halt to start the road test.", vm.RoadTestTaskText);
+        Assert.Equal("5", vm.RoadTestClockText);
     }
 }

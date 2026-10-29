@@ -125,10 +125,11 @@ public sealed class GameStateSaver
     public void SaveHunger() => _hungerStore.Save(_hunger.Snapshot());
 
     /// <summary>
-    /// Banks the road-test pick. Two moments need it: a session opening (a
-    /// rebuild/Stop-Debugging kills the process before any test is driven, and
-    /// the next session must offer that very same car) and a completion (the
-    /// only event allowed to move the car).
+    /// Banks the road-test pick and its settled receipt record. Two moments
+    /// need it: a session opening (a rebuild/Stop-Debugging kills the process
+    /// before any test is driven, and the next session must offer that very
+    /// same car) and a completion (the only event allowed to move the car, and
+    /// the one that lands the new readings and bests).
     /// </summary>
     public void SaveRoadTest() => _roadTestStore.Save(_roads.Snapshot());
 
