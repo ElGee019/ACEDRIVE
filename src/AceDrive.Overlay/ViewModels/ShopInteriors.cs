@@ -104,7 +104,7 @@ public sealed class ShopInteriors
                 // writes; the host banks the cash and the condition.
                 if (_garage.Current is { HasInsurance: true } insured && repair.Cost > 0.0)
                 {
-                    _wallet.AddInsurancePayout(repair.Cost * 0.9);
+                    _wallet.AddInsurancePayout(repair.Cost * InsuranceRules.RepairPayoutFraction);
                 }
                 onChanged();
                 _saver.SaveGarage();

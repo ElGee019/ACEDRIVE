@@ -321,6 +321,30 @@ public sealed class TaxiJobFlow
         return true;
     }
 
+    /// <summary>
+    /// The crash that ends a ride (Unity's accident arrival: FailJobOnRoadService
+    /// runs with the friendship penalty). The customer loses one familiarity
+    /// and the job is abandoned with no fare, no tip and no receipt — it cannot
+    /// be resumed. Returns the customer's name so the caller's repair prompt can
+    /// say who lost the friendship, or null when no job was live.
+    /// </summary>
+    public string? FailForAccident()
+    {
+        if (!InProgress)
+        {
+            return null;
+        }
+
+        string customer = _job.Customer.BaseName;
+        _friends.AddFamiliarity(customer, -1);
+        _log.LogWarning($"taxi job ended by accident: {_job.Customer.Full} " +
+            $"{_job.PickupName} -> {_job.DropoffName}, friendship -1");
+        // AbandonJob clears the request, the challenge and the companion line;
+        // the receipt never runs, so the ride pays nothing.
+        AbandonJob();
+        return customer;
+    }
+
     // The customer is at the drop-off door: settle, show the receipt and drop
     // the HUD guidance.
     private void ConfirmDropoff()

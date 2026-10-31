@@ -156,6 +156,32 @@ public sealed class DeliveryFlow
     }
 
     /// <summary>
+    /// The crash that ends a run (Unity's delivery accident): the cargo is
+    /// lost — the goods were paid at DELIVER, so nothing is refunded — every
+    /// producing hub's owner loses one familiarity, and the run is dropped
+    /// without a receipt. Returns false when no run was live.
+    /// </summary>
+    public bool FailForAccident()
+    {
+        if (_job is not { IsComplete: false } run)
+        {
+            return false;
+        }
+
+        foreach (string owner in SourceOwners(run.Run))
+        {
+            _friends.AddFamiliarity(owner, -1);
+        }
+
+        _log.LogWarning($"delivery run ended by accident: {run.Run.StoreKeys.Count} stores lost, " +
+            $"€{run.Run.PaidForGoods:0.00} cargo, friendship -1 per hub owner");
+        // Stop drops the run and the companion's leg; the shells' saves follow
+        // in the caller, like the breakdown path.
+        Stop();
+        return true;
+    }
+
+    /// <summary>
     /// Drops the run and its companion line once it settled. The board page
     /// stays: the receipt's CONTINUE lands back on it with the cart emptied.
     /// </summary>

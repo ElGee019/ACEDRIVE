@@ -886,6 +886,12 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="HudWillySearchDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3} and look for the missing elder.</value></data>
   <data name="HudWillyFound" xml:space="preserve"><value>Well that's a relief. All well and good! Missing person found. Now bring {0} back home.</value></data>
   <data name="HudDrive" xml:space="preserve"><value>DRIVE</value></data>
+  <!-- The crash that ends a job (Unity's accident arrival): the sentence names
+       the impact speed, then who lost the friendship; the one button pays the
+       crash bill and hands the panel back to the main page. -->
+  <data name="HudAccidentRideLost" xml:space="preserve"><value>Accident! {0} km/h impact — the ride is over. {1} lost 1 friendship. Repair the car to continue.</value></data>
+  <data name="HudAccidentCargoLost" xml:space="preserve"><value>Accident! {0} km/h impact — the cargo is lost and the hub owner lost 1 friendship. Repair the car to continue.</value></data>
+  <data name="HudAccidentRepair" xml:space="preserve"><value>REPAIR THE CAR</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Drive {0} home to {1} No. {2} in {3}</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>DROP OFF</value></data>
   <data name="HudWillyWrongAddress" xml:space="preserve"><value>This is not {0}'s home address. {0} is still out there somewhere...</value></data>

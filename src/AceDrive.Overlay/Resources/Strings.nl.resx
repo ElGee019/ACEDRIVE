@@ -673,6 +673,9 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="HudWillySearchDrive" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3} en zoek de vermiste oudere.</value></data>
   <data name="HudWillyFound" xml:space="preserve"><value>Gelukkig maar, alles goed en wel! Vermiste gevonden. Breng {0} nu naar huis.</value></data>
   <data name="HudDrive" xml:space="preserve"><value>RIJDEN</value></data>
+  <data name="HudAccidentRideLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de rit is voorbij. {1} verloor 1 vriendschap. Repareer de auto om verder te gaan.</value></data>
+  <data name="HudAccidentCargoLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de lading is verloren en de hubeigenaar verloor 1 vriendschap. Repareer de auto om verder te gaan.</value></data>
+  <data name="HudAccidentRepair" xml:space="preserve"><value>REPAREER DE AUTO</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Breng {0} naar huis, naar {1} nr. {2} in {3}</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>AFZETTEN</value></data>
   <data name="HudWillyWrongAddress" xml:space="preserve"><value>Dit is niet het huisadres van {0}. {0} is nog steeds ergens daarbuiten...</value></data>

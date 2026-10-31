@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows.Input;
 using System.Windows.Threading;
 using AceDrive.Core;
@@ -179,6 +180,11 @@ public sealed class MainViewModel
     private DateTime _lastTick;
     private bool _disposed;
 
+    // The repair prompt the last crash left on the companion, or null. The
+    // action button's slot is shared, so the tap is answered for the flow that
+    // put the prompt up instead of for whoever registered last.
+    private HudTaskPrompt? _accidentPrompt;
+
     // A job is live from ACCEPT (the drive to the pickup) until the drop-off
     // settles, or from DELIVER until the last store is served. The idle-shift
     // rule and the overlay call both read this one definition, so a new leg
@@ -252,9 +258,10 @@ public sealed class MainViewModel
         _willy = willy;
         if (_hud is not null)
         {
-            // The found step's DRIVE button lives on the companion (the run
-            // keeps the panel down); the HUD only knows it was pressed.
-            _hud.TaskActionRequested += (_, _) => _willy.DriveHome();
+            // The companion's action button: the found step's DRIVE home, or
+            // the crash repair, whichever prompt is on the slot now. The HUD
+            // only knows the button was pressed.
+            _hud.TaskActionRequested += (_, _) => OnTaskAction();
         }
         _roadTest = roadTest;
         if (_hud is not null)
@@ -787,9 +794,7 @@ public sealed class MainViewModel
         if (_fleet.ObserveAccident(s, now) is { } accident)
         {
             SaveGarage();
-            _hud?.ShowNotice(
-                Strings.Format("AccidentNotice", accident.ImpactSpeedKmh, accident.RepairCost),
-                TimeSpan.FromSeconds(AccidentNoticeSec));
+            EndJobForAccident(accident);
         }
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
@@ -835,6 +840,88 @@ public sealed class MainViewModel
             // receipt, so only the corner legs are priced.
             _touristen.Advance(s, dt);
         }
+    }
+
+    // A crash that lands while a job is live ends it (Unity's accident
+    // arrival): the ride or the run is dropped without a receipt and its
+    // customer loses a friendship, and the companion offers the repair instead
+    // of the drive line. A crash outside a job keeps the plain notice — the
+    // mechanic's body repair is the way back from it.
+    private void EndJobForAccident(AccidentDamage accident)
+    {
+        if (_taxi.FailForAccident() is { } customer)
+        {
+            ShowAccidentRepair("HudAccidentRideLost", accident, customer);
+            return;
+        }
+
+        if (_delivery.FailForAccident())
+        {
+            ShowAccidentRepair("HudAccidentCargoLost", accident, null);
+            return;
+        }
+
+        _hud?.ShowNotice(
+            Strings.Format("AccidentNotice", accident.ImpactSpeedKmh, accident.RepairCost),
+            TimeSpan.FromSeconds(AccidentNoticeSec));
+    }
+
+    // The repair prompt: the crash sentence plus the one button that pays the
+    // bill. The prompt is kept, not just handed over, so the button's tap is
+    // answered only while this prompt is still the one on the slot.
+    private void ShowAccidentRepair(
+        string textKey, AccidentDamage accident, string? customer)
+    {
+        var prompt = new HudTaskPrompt(
+            textKey,
+            [
+                accident.ImpactSpeedKmh.ToString("0", CultureInfo.CurrentCulture),
+                customer ?? string.Empty,
+            ],
+            "HudAccidentRepair");
+        _accidentPrompt = prompt;
+        _hud?.SetTaskPrompt(prompt);
+    }
+
+    // The companion's one action button: the crash repair while its prompt is
+    // up, the missing-person run's DRIVE home otherwise.
+    private void OnTaskAction()
+    {
+        if (_accidentPrompt is { } prompt && _hud?.CurrentTaskPrompt == prompt)
+        {
+            RepairAfterAccident();
+            return;
+        }
+
+        _willy.DriveHome();
+    }
+
+    // REPAIR THE CAR: the bill the mechanic would quote for the dents (the
+    // car's value times its outstanding body damage) is taken in full — cash
+    // never goes negative, like the tow fee — and an insured car claims the
+    // Unity share into the broker's escrow. The repair clears the dents and the
+    // main page comes back up.
+    private void RepairAfterAccident()
+    {
+        _accidentPrompt = null;
+        _hud?.SetTaskPrompt(null);
+        if (_garage.Current is { BodyDamage: > 0.0 } car && _garage.SpecOf(car) is { } spec)
+        {
+            double bill = AccidentRules.RepairCost(spec.Price, car.BodyDamage);
+            double paid = _wallet.ChargeUnavoidable(bill);
+            double claim = car.HasInsurance ? paid * InsuranceRules.RepairPayoutFraction : 0.0;
+            _wallet.AddInsurancePayout(claim);
+            car.RepairBody();
+            SaveGarage();
+            SaveDriver(_rivals.LastResult);
+            _log.LogInfo($"[Accident] body repaired: bill {bill:0.00} CR, paid {paid:0.00} CR, " +
+                $"insurance {claim:0.00} CR, cash {_wallet.Cash:0.00}");
+        }
+
+        // The repair ends the interruption the way Unity's RepairScreen does:
+        // the main page comes back up, with the panel revealed (the HUD owned
+        // the screen while the job ran).
+        _panel.ShowMenu();
     }
 
     // Copies the paint the readout formatter returned: a null member means the

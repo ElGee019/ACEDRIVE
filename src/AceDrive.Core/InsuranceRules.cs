@@ -12,6 +12,11 @@ public sealed record InsuranceRules(
     double MinimumDailyCost,
     int ChargeHour)
 {
+    /// <summary>The share of a repair bill an insured car claims back (Unity
+    /// RepairScreen's insurance tail: 90%, the remaining 10% being the
+    /// deductible). The payout lands in the broker's escrow, never in cash.</summary>
+    public const double RepairPayoutFraction = 0.9;
+
     /// <summary>Unity's shipped config (GameTimeConfig.insurancePremiumRate
     /// 0.0005, InsurancePricing.BaseIncreaseFactor 1.15, MinimumDailyCost 1,
     /// the charge firing at game hour 01).</summary>

@@ -96,6 +96,9 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
     /// <summary>The task prompt the host handed the companion, or null.</summary>
     public HudTaskPrompt? TaskPrompt { get; private set; }
 
+    /// <summary>The prompt the host would find on the slot right now.</summary>
+    public HudTaskPrompt? CurrentTaskPrompt => TaskPrompt;
+
     /// <summary>How often the task prompt was handed over (edges, not polls).</summary>
     public int TaskPromptCalls { get; private set; }
 

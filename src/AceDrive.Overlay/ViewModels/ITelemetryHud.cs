@@ -99,6 +99,13 @@ public interface ITelemetryHud
     void SetTaskPrompt(HudTaskPrompt? prompt);
 
     /// <summary>
+    /// The prompt on the slot now, or null. A host with more than one prompt
+    /// owner reads it to answer the tap for the flow that actually put the
+    /// button up, instead of the last flow that registered.
+    /// </summary>
+    HudTaskPrompt? CurrentTaskPrompt { get; }
+
+    /// <summary>
     /// Raised when the player taps the task prompt's action button. The host
     /// owns what it means; the HUD only knows the button was offered and pressed.
     /// </summary>

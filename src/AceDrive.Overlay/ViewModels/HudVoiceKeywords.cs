@@ -61,6 +61,10 @@ internal static class HudVoiceKeywords
     // one habit the model hears reliably working on every button.
     private static readonly string[] Drive = ["enter", "drive"];
 
+    // The crash repair says what it does: the clean phrase and the short one,
+    // beside the shared "enter".
+    private static readonly string[] Repair = ["enter", "repair", "repair the car"];
+
     /// <summary>Keywords for one action resource key; unknown keys answer "enter".</summary>
     public static IReadOnlyList<string> For(string actionKey) => actionKey switch
     {
@@ -69,6 +73,7 @@ internal static class HudVoiceKeywords
         "HudDeliveryStoreAction" or "HudTouristenDeliverAction" => Deliver,
         "HudPancakes" => Pancakes,
         "HudDrive" => Drive,
+        "HudAccidentRepair" => Repair,
         // The missing-person run's clears: the receipt's read continues and the
         // wrong address is acknowledged with the one word the model hears.
         "HudWillyContinue" => Enter,

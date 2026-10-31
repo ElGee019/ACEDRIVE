@@ -456,6 +456,9 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         RepaintTaskPrompt();
     }
 
+    /// <summary>The prompt on the slot now, or null when nothing is offered.</summary>
+    public HudTaskPrompt? CurrentTaskPrompt => _taskPrompt;
+
     /// <summary>
     /// True while the car is parked on the destination house. The drive-to
     /// sentence swaps for the arrival sentence and the ENTER button; walking

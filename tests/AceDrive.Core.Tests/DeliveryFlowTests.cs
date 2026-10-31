@@ -147,6 +147,33 @@ public sealed class DeliveryFlowTests
     }
 
     [Fact]
+    public void FailForAccident_DropsTheRunAndChargesTheHubOwner()
+    {
+        var friends = new FakeFriendshipStore();
+        var (flow, host, _) = Build(OwnedGroceryCareer(), friends: friends);
+        flow.Start(Cart(Post, Bakery));
+
+        Assert.True(flow.FailForAccident());
+
+        Assert.False(flow.InProgress);
+        Assert.Equal(1, host.Clears);
+        Assert.Empty(host.Settled); // the lost cargo is never priced
+        var (owner, delta) = Assert.Single(friends.Deltas);
+        Assert.Equal("Elena Marchetti", owner);
+        Assert.Equal(-1, delta);
+    }
+
+    [Fact]
+    public void FailForAccident_OutsideARun_DoesNothing()
+    {
+        var (flow, host, _) = Build(OwnedGroceryCareer());
+
+        Assert.False(flow.FailForAccident());
+
+        Assert.Equal(0, host.Clears);
+    }
+
+    [Fact]
     public void Stop_DropsTheRunAndTheCompanionLine_ButKeepsTheBoard()
     {
         var (flow, host, _) = Build(OwnedGroceryCareer());
