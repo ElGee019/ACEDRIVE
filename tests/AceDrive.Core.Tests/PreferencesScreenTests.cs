@@ -128,6 +128,22 @@ public sealed class PreferencesScreenTests
     }
 
     [Fact]
+    public void SettingsVoiceQuit_RunsTheExit_ButNeverRegistersReset()
+    {
+        bool quit = false;
+        var vm = QuitPage(() => quit = true);
+
+        // QUIT is a plain button on the settings page, so the mic reaches it;
+        // the destructive RESET GAME stays off the microphone on purpose.
+        Assert.True(vm.VoiceActions.ContainsKey("quit"));
+        Assert.False(vm.VoiceActions.ContainsKey("reset game"));
+
+        vm.VoiceActions["quit"]();
+
+        Assert.True(quit);
+    }
+
+    [Fact]
     public void SettingsActionLabel_FollowsLanguageChange()
     {
         CultureInfo original = CultureInfo.CurrentUICulture;

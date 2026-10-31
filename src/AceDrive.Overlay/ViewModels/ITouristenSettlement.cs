@@ -11,10 +11,12 @@ namespace AceDrive.Overlay.ViewModels;
 public interface ITouristenSettlement
 {
     /// <summary>
-    /// Banks one delivered dropoff and shows its receipt. The receipt's
-    /// CONTINUE runs <paramref name="continueAction"/>.
+    /// Banks one delivered dropoff and shows its receipt.
+    /// <paramref name="payoutMultiplier"/> is what the shops pay for the goods
+    /// today: 1.0 on an ordinary day, the race calendar's bonus while an event
+    /// runs. The receipt's CONTINUE runs <paramref name="continueAction"/>.
     /// </summary>
     void Settle(
-        TouristenDropoff dropoff, double distanceKm,
+        TouristenDropoff dropoff, double distanceKm, double payoutMultiplier,
         ITouristenfahrtenHost host, Action continueAction);
 }

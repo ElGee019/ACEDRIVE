@@ -2,7 +2,7 @@ using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>Counts the panel, receipt and calendar edges of a Touristenfahrten run.</summary>
+/// <summary>Counts the panel, briefing, receipt and calendar edges of a Touristenfahrten run.</summary>
 internal sealed class FakeTouristenHost : ITouristenfahrtenHost
 {
     public int HidePanelCalls { get; private set; }
@@ -11,9 +11,13 @@ internal sealed class FakeTouristenHost : ITouristenfahrtenHost
 
     public int RefreshStandingsCalls { get; private set; }
 
+    public List<object> Briefings { get; } = [];
+
     public List<object> Receipts { get; } = [];
 
     public void HidePanel() => HidePanelCalls++;
+
+    public void ShowBriefing(object screen) => Briefings.Add(screen);
 
     public void ShowReceipt(object screen) => Receipts.Add(screen);
 

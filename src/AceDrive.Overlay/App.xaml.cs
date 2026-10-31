@@ -537,9 +537,16 @@ public partial class App : Application, IDisposable
         var cento = new CentoRaceFlow(driver, garage, beat, _log);
         var centoSettlement = new CentoRaceSettlement(
             driver, garage, trunk, centoRaceRules, new Random(taxiSeed + 7), beat, _log);
-        // The car haul (PORTPLAN 20): settle-only today, so the tap prices the
-        // placeholder leg, banks it and hands back the flow's own receipt.
-        var haul = new CarHaulFlow(carBrands, cars, driver, dayCycle, saver, beat, _log);
+        // The car haul (PORTPLAN 20): draws the offer, owns the pickup and
+        // delivery legs and settles the receipt; the control page's CAR HAULING
+        // entry opens its page and the companion carries each leg. Development
+        // policy: no loyalty floor and no daily cap yet — CarHaulPolicy.Unity
+        // is the one-line swap when those rules ship.
+        var haul = new CarHaulFlow(
+            brands, cars, poiDirectory, zone, addressMap,
+            () => AddressBook.Home(addressMap, profileStore.Load()),
+            poiNames, driver, friendships, game, taxiRules, beat, _log,
+            CarHaulPolicy.Development, new Random(taxiSeed + 13));
         // The weekly market valuation (PORTPLAN 49): its own flow owns the
         // Monday week, the venue leg and the live/offline comparison, so the
         // coordinator only forwards the calendar tap, the poll and the one
@@ -560,6 +567,11 @@ public partial class App : Application, IDisposable
         // the whole placeholder map; the directory banks them like any other
         // discovered door.
         TouristenMenu touristenMenu = new JsonTouristenMenu(_log).Load();
+        // The real-world Nürburgring calendar: its events title the run's
+        // briefing page and pay the goods bonus while they run. Loaded here,
+        // once, beside the run's own table.
+        TouristenRaceCalendar touristenWeekends =
+            new JsonTouristenRaceCalendar(_log).Load();
         var touristenDoors = new TouristenDoors(
             poiDirectory, poiStore, poiSpawner, addressMap, touristenMenu,
             new Random(taxiSeed + 11), _log);
@@ -567,7 +579,7 @@ public partial class App : Application, IDisposable
             driver, deliveryFares, fleet, rarity, rivals, beat, _log);
         var touristen = new TouristenfahrtenFlow(
             touristenMenu, touristenDoors, hud, touristenSettlement, meter,
-            taxiRules, new Random(taxiSeed + 12), _log);
+            taxiRules, beat, wall, touristenWeekends, new Random(taxiSeed + 12), _log);
         // The page graph: the control page, the menu and every tile behind
         // them, with their own caches. It takes the flows (their pages are
         // theirs) and the session's data; the coordinator attaches as its host
@@ -589,20 +601,23 @@ public partial class App : Application, IDisposable
             // off the same launch seed the other draws use.
             () => carBrands.Brand, new Random(taxiSeed + 6), _log,
             ignoreEventGates: IgnoreEventGatesForTesting);
+        // The mic is built by the root and handed to both sides that need it:
+        // the coordinator owns its session lifecycle, the story flow only gets
+        // the two verbs the consent page's answer needs, and the panel hands it
+        // the wake-only/listening switch. The constrained wake decoder is built
+        // from the content tables once, here, because its grammar is a model
+        // artefact: alias edits still reach the full decoder while running.
+        IVoiceListener voice = CreateVoice(_log, WakePhrases.From(content.Content));
         // The panel's reveal policy: what a call opens, what revealing a POI
         // or a job page does, and hiding. The story flow, the voice router and
         // the coordinator share this one instance, so the root can build the
         // two host reads the coordinator used to assemble.
         var panel = new PanelPresenter(
-            shell, navigation, taxi, delivery, touristen, wall, _log);
+            shell, navigation, taxi, delivery, touristen, voice, wall, _log);
         // The introduction walk and its errand: it reports through its own
         // host (page swaps, panel reveals, the shared driver save), so it is
         // built here like every other collaborator. Its car brand is read live
         // off the watcher, the week off the calendar.
-        // The mic is built by the root and handed to both sides that need it:
-        // the coordinator owns its session lifecycle, the story flow only gets
-        // the two verbs the consent page's answer needs.
-        IVoiceListener voice = CreateVoice(_log);
         var story = new OnboardingFlow(
             onboardingStore, content, profileStore, playerNames, addressMap, playerName,
             poiGenerator, poiDirectory, poiStore, poiArrivals, trunk,
@@ -635,7 +650,7 @@ public partial class App : Application, IDisposable
             rivals,
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
+            taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             roadTestFlow, touristen,
             navigation, readouts, dayCycle,
             todoBoard, pins,
@@ -718,7 +733,8 @@ public partial class App : Application, IDisposable
     // EVO_MIC optionally pins the input (substring, e.g. "Intel" or the
     // headphone array); unset follows the Windows default capture device,
     // which is what the Sound settings "mic turned on" toggle routes.
-    private static IVoiceListener CreateVoice(FileLogger log)
+    private static IVoiceListener CreateVoice(
+        FileLogger log, IReadOnlyList<string> wakePhrases)
     {
         string[] candidates =
         [
@@ -732,7 +748,9 @@ public partial class App : Application, IDisposable
         {
             if (dir.Length > 0 && Directory.Exists(dir))
             {
-                return new VoskListener(dir, log, micPreference: Environment.GetEnvironmentVariable("EVO_MIC"));
+                return new VoskListener(
+                    dir, log, micPreference: Environment.GetEnvironmentVariable("EVO_MIC"),
+                    wakePhrases: wakePhrases);
             }
         }
 

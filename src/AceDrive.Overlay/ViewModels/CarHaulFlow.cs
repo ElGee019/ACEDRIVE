@@ -6,86 +6,265 @@ using AceDrive.Overlay.Services;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The car-hauling job (PORTPLAN item 20, Unity CarHaulingScreen): the third
-/// job type, settle-only today.
+/// The car-hauling job (PORTPLAN item 20, Unity JobSelectionScreen's car-haul
+/// button + MapScreen's pickup/arrival branches): draws the offer, owns the
+/// run's phase, pins each leg on the companion and settles the delivery into
+/// the receipt. The shell reaches it through <see cref="ICarHaulHost"/>, so no
+/// window, file or HWND lives here.
 ///
-/// With no driving slice the dealer-pickup / borrowed-leg / customer legs have
-/// no inputs yet, so the placeholder haul is a fixed delivery leg that settles
-/// the moment the tap lands and shows its receipt. The settle stays whole here
-/// — the car's band, the rating behind the rate, the wallet and the checkpoint
-/// bank — and grows its legs here, never as branches in the coordinator's
-/// page path. The receipt is the flow's page like the taxi proposal and the
-/// delivery board: the caller puts it up with its own BACK command, so no host
-/// is needed and the flow stays a leaf.
+/// Time is game minutes (<see cref="GameClock.GameMinute"/>), never wall clock:
+/// Unity stamps both delivery-leg ends on the game clock and pays the
+/// difference. The loyalty and one-per-day rules live in
+/// <see cref="CarHaulPolicy"/> so turning them on later is a composition-root
+/// change, not a branch here.
 /// </summary>
 public sealed class CarHaulFlow
 {
-    private readonly ICarBrandSource _brands;
+    private readonly IBrandMileageStore _brands;
     private readonly IReadOnlyList<CarSpec> _cars;
+    private readonly PoiDirectory _pois;
+    private readonly OperatingZone _zone;
+    private readonly AddressMap _map;
+    private readonly Func<AddressLocation?> _home;
+    private readonly ProceduralNameGenerator _names;
     private readonly DriverWallet _wallet;
-    private readonly DayCycle _day;
-    private readonly GameStateSaver _saver;
+    private readonly IFriendshipStore _friendships;
+    private readonly GameClock _game;
+    private readonly TaxiRules _rules;
     private readonly VoiceBeat _beat;
     private readonly ILog _log;
+    private readonly CarHaulPolicy _policy;
+    private readonly Random _rng;
 
-    // Car-haul placeholder until the drive slice feeds the legs: a 30-minute
-    // delivery leg (Unity stamps both leg ends in in-game minutes; the settle
-    // prices the difference).
-    private const int PlaceholderHaulMinutes = 30;
+    // WHY late: the host is the coordinator, built after this flow; the attach
+    // closes in its constructor, before any page tap or arrival can reach here.
+    private ICarHaulHost _host = null!;
+    private ICommand _back = null!;
+    private CarHaulOffer? _offer;
+    private CarHaulRun? _run;
+    // Session-only until the driver save carries it (the policy's daily cap is
+    // off today): the stamp Unity writes on delivery.
+    private DateTime? _lastDeliveredOn;
 
     public CarHaulFlow(
-        ICarBrandSource brands, IReadOnlyList<CarSpec> cars, DriverWallet wallet,
-        DayCycle day, GameStateSaver saver, VoiceBeat beat, ILog log)
+        IBrandMileageStore brands, IReadOnlyList<CarSpec> cars, PoiDirectory pois,
+        OperatingZone zone, AddressMap map, Func<AddressLocation?> home,
+        ProceduralNameGenerator names, DriverWallet wallet, IFriendshipStore friendships,
+        GameClock game, TaxiRules rules, VoiceBeat beat, ILog log,
+        CarHaulPolicy policy, Random rng)
     {
+        ArgumentNullException.ThrowIfNull(brands);
+        ArgumentNullException.ThrowIfNull(cars);
+        ArgumentNullException.ThrowIfNull(pois);
+        ArgumentNullException.ThrowIfNull(zone);
+        ArgumentNullException.ThrowIfNull(map);
+        ArgumentNullException.ThrowIfNull(home);
+        ArgumentNullException.ThrowIfNull(names);
+        ArgumentNullException.ThrowIfNull(wallet);
+        ArgumentNullException.ThrowIfNull(friendships);
+        ArgumentNullException.ThrowIfNull(game);
+        ArgumentNullException.ThrowIfNull(rules);
+        ArgumentNullException.ThrowIfNull(beat);
+        ArgumentNullException.ThrowIfNull(log);
+        ArgumentNullException.ThrowIfNull(policy);
+        ArgumentNullException.ThrowIfNull(rng);
+
         _brands = brands;
         _cars = cars;
+        _pois = pois;
+        _zone = zone;
+        _map = map;
+        _home = home;
+        _names = names;
         _wallet = wallet;
-        _day = day;
-        _saver = saver;
+        _friendships = friendships;
+        _game = game;
+        _rules = rules;
         _beat = beat;
         _log = log;
+        _policy = policy;
+        _rng = rng;
+    }
+
+    public void Attach(ICarHaulHost host)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        _host = host;
+    }
+
+    /// <summary>True while an accepted haul is still in progress.</summary>
+    public bool Active => _run is not null;
+
+    /// <summary>
+    /// The CAR HAULING tap: draws an offer when none is running, otherwise
+    /// reopens the active leg's page. An unavailable draw keeps the control
+    /// page and flashes the hint instead of opening an empty one.
+    /// </summary>
+    public object Open(ICommand back, object controlPage)
+    {
+        ArgumentNullException.ThrowIfNull(back);
+        ArgumentNullException.ThrowIfNull(controlPage);
+        _back = back;
+
+        if (_run is null)
+        {
+            if (!_policy.CanOffer(_game.GameNow, _lastDeliveredOn, haulInProgress: false)
+                || !TryDrawOffer())
+            {
+                _host.ShowNotice(Strings.Get("HaulUnavailable"));
+                return controlPage;
+            }
+        }
+
+        return BuildPage();
     }
 
     /// <summary>
-    /// Settles the placeholder haul straight into its receipt (the taxi
-    /// ACCEPT skip's third use). Unity's receipt names the hauled car — a
-    /// brand-new customer order waiting at a dealer; with no dealer or offers
-    /// yet the customer's car is the one being driven now, and the pool row
-    /// resolves its display name and real class band through the watcher's
-    /// identity. The settled cash is progress the player can see, so the
-    /// calendar is banked at once like the paid jobs' checkpoint.
+    /// The companion's ENTER at the pinned leg: PICK UP at the dealer, then
+    /// DELIVER THE CAR at the customer. Called from the one HUD event, so a
+    /// parked car confirms exactly the leg the companion is showing.
     /// </summary>
-    public CarHaulReceiptScreenViewModel Settle(ICommand backCommand)
+    public void ConfirmArrival()
     {
-        CarSpec? car = _brands.CurrentIdentity?.FindIn(_cars);
-        string carName = car is not null
-            ? $"{car.Brand} {car.Model}".ToUpperInvariant()
-            : Strings.Get("HaulReceiptCarUnknown");
-        int carClass = car is { Class: > 0 } ? car.Class : JobSettlement.FallbackCarClass;
-        if (car is { Class: > 0 })
+        if (_run is null)
         {
-            _log.LogInfo($"haul car: {carName} class {carClass}");
-        }
-        else
-        {
-            // Class comes from the cars.json column; a row without one (or an
-            // unknown car) keeps the placeholder band and says so.
-            _log.LogInfo($"haul car: {carName} class {carClass} (placeholder, no pool class)");
+            return;
         }
 
-        CarHaulReceipt receipt = CarHaulReceiptBuilder.Build(
-            carName, carClass, DriverRatingPercent, PlaceholderHaulMinutes);
-        _wallet.AddHaul(receipt);
-        _saver.SaveClock(_day.DisplayWeek);
-        _log.LogInfo($"haul settled: {carName} minutes={receipt.DriveMinutes} " +
-            $"tier={receipt.Tier} rate={receipt.RatePerMin:0.00}/min " +
-            $"earned={receipt.TotalEarned:0.00} wallet={_wallet.Cash:0.00}");
-        return new CarHaulReceiptScreenViewModel(receipt, _wallet, _beat, backCommand);
+        if (_run.Phase == CarHaulPhase.Offered)
+        {
+            if (_run.PickUp(_run.Offer.Dealer.Id))
+            {
+                // Unity stamps the delivery leg when DRIVE is pressed on the
+                // customer marker; the overlay has no separate DRIVE page, so
+                // the pickup itself starts the leg before the player moves.
+                _run.BeginDelivery(_game.GameMinute);
+                PinCustomer();
+                _host.ShowPage(BuildPage());
+                _host.RefreshControl();
+                _log.LogInfo($"haul picked up: {_run.Offer.Car.Brand} " +
+                    $"{_run.Offer.Car.Model} at {_run.Offer.Dealer.Name}");
+            }
+            return;
+        }
+
+        if (_run.Phase == CarHaulPhase.PickedUp)
+        {
+            Settle();
+        }
     }
 
-    // The persisted skills average, rounded to the whole percent the haul
-    // receipt and the fleet's insurance math take (Unity uses the float
-    // overall directly; the receipt model is an int).
-    private int DriverRatingPercent =>
-        (int)Math.Round(_wallet.Rating.Overall, MidpointRounding.AwayFromZero);
+    private bool TryDrawOffer()
+    {
+        _offer = new CarHaulOfferService(_rng).TryDraw(
+            _cars, _pois.All, _zone.ZoneMap, _home(), LoyaltyPercent, _ => _names.Next(), _policy);
+        return _offer is not null;
+    }
+
+    // Unity's BrandLoyaltyPct: never-driven brands answer 0 (not the curve's
+    // 1% floor), so the policy's "any driven brand" reading stays honest.
+    private double LoyaltyPercent(string brand)
+    {
+        double km = _brands.GetKm(brand);
+        return km > 0.0 ? BrandLoyalty.Rate(km) * 100.0 : 0.0;
+    }
+
+    private void Accept()
+    {
+        if (_offer is null)
+        {
+            return;
+        }
+
+        _run = new CarHaulRun(_offer);
+        _offer = null;
+        PinDealer();
+        _host.ShowPage(BuildPage());
+        _host.RefreshControl();
+        _log.LogInfo($"haul accepted: {_run.Offer.Car.Brand} {_run.Offer.Car.Model} " +
+            $"from {_run.Offer.Dealer.Name}, tier {_run.Offer.PayoutTier}");
+    }
+
+    private void Settle()
+    {
+        CarHaulRun run = _run!;
+        if (!run.Deliver(_game.GameMinute))
+        {
+            return;
+        }
+
+        CarHaulOffer offer = run.Offer;
+        // Unity credits the dealer POI's friendship by one; a job without a
+        // dealer on the map (or an ownerless row) settles with the box hidden
+        // instead of inventing a stranger.
+        FriendshipResult? friendship = null;
+        if (offer.Dealer.OwnerName.Length > 0)
+        {
+            FriendshipOutcome outcome = _friendships.RegisterRide(offer.Dealer.OwnerName);
+            friendship = new FriendshipResult(
+                outcome.OwnerName, outcome.Level, outcome.TierIncreased);
+        }
+
+        int rating = (int)Math.Round(
+            _wallet.Rating.Overall, MidpointRounding.AwayFromZero);
+        CarHaulReceipt receipt = CarHaulReceiptBuilder.Build(
+            CarDisplay(offer.Car),
+            offer.Car.Class,
+            rating,
+            run.DriveMinutes,
+            friendship?.OwnerName ?? "",
+            friendship?.Level ?? 0,
+            friendship?.TierIncreased ?? false);
+
+        _wallet.AddHaul(receipt);
+        _lastDeliveredOn = _game.GameNow;
+        _run = null;
+        _host.PinTarget(null);
+        _host.ShowReceipt(new CarHaulReceiptScreenViewModel(
+            receipt, _wallet, _beat, _back));
+        _host.RefreshControl();
+        _log.LogInfo($"haul settled: {receipt.CarName} minutes={receipt.DriveMinutes} " +
+            $"tier={receipt.Tier} earned={receipt.TotalEarned:0.00} " +
+            $"wallet={_wallet.Cash:0.00}");
+    }
+
+    private void PinDealer()
+    {
+        CarHaulOffer offer = _run!.Offer;
+        _host.PinTarget(new HudJobGuidance(
+            offer.Dealer.Name,
+            offer.Dealer.Address,
+            "HudHaulToDealer",
+            "HudHaulArrivedDealer",
+            "HudPickUp",
+            _rules.ArrivalRadiusMeters,
+            DriveArgs: [CarDisplay(offer.Car)]));
+    }
+
+    private void PinCustomer()
+    {
+        CarHaulOffer offer = _run!.Offer;
+        _host.PinTarget(new HudJobGuidance(
+            offer.Customer.BaseName,
+            offer.CustomerAddress,
+            "HudHaulToCustomer",
+            "HudHaulArrivedCustomer",
+            "HudHaulDeliverCar",
+            _rules.ArrivalRadiusMeters));
+    }
+
+    private CarHaulScreenViewModel BuildPage()
+    {
+        CarHaulOffer offer = _run?.Offer ?? _offer!;
+        return new CarHaulScreenViewModel(
+            offer,
+            _run?.Phase ?? CarHaulPhase.Offered,
+            _map.City,
+            new RelayCommand(Accept),
+            _back,
+            _beat,
+            isOffer: _run is null);
+    }
+
+    private static string CarDisplay(CarSpec car) => $"{car.Brand} {car.Model}";
 }

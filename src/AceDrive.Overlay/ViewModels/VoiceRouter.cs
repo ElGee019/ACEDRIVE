@@ -10,6 +10,12 @@ namespace AceDrive.Overlay.ViewModels;
 /// mute state so one utterance fires one button, and nothing about screens or
 /// HWNDs beyond the panel presenter and the content tables it is handed.
 ///
+/// The wake word arrives through two channels and they share one cooldown: the
+/// full decoder's text (a garbled "hey dotson" still matches through the alias
+/// tables) and the constrained wake grammar the listener feeds while the panel
+/// is down (<see cref="HandleWake"/>), which cannot hear anything but a wake
+/// phrase. Both end in the same brand gate, so "hey audi" never wakes a Datsun.
+///
 /// The dependencies are named directly (panel, driven car, content, HUD, clock)
 /// instead of behind a <c>IVoiceHost</c>: the root builds this router, so the
 /// interface that only existed to keep it off the coordinator's surface has no
@@ -89,16 +95,7 @@ public sealed class VoiceRouter
 
         if (!_panel.IsShown)
         {
-            string brand = _carBrands.Brand;
-            if (VoiceMatch.IsWake(text, brand, AliasesFor(brand), Content.Confusions, isFinal))
-            {
-                DateTime now = _clock.UtcNow;
-                if ((now - _lastWake).TotalSeconds < WakeCooldownSec) return;
-                _lastWake = now;
-                _log.LogInfo($"wake heard: {text}");
-                _panel.Show();
-            }
-
+            TryWake(text, isFinal, fromGrammar: false);
             return;
         }
 
@@ -106,6 +103,45 @@ public sealed class VoiceRouter
         {
             Tap(screen, text, isFinal);
         }
+    }
+
+    /// <summary>
+    /// A hit from the constrained wake decoder (<see cref="IVoiceListener.WakeHeard"/>),
+    /// which is fed only while the panel is down. The grammar carries every
+    /// brand's phrase and the unknown token, so the driven brand is still the
+    /// gate: "hey nissan" wakes a Datsun, "hey audi" does not.
+    /// </summary>
+    public void HandleWake(string text, bool isFinal)
+    {
+        if (_panel.IsShown)
+        {
+            return;
+        }
+
+        TryWake(text, isFinal, fromGrammar: true);
+    }
+
+    // The wake word, whichever decoder reported it. The cooldown is shared, so
+    // one utterance can never open the panel twice (the two decoders report the
+    // same speech at the same time). Both decoders report every partial, so the
+    // content bundle is read once per call: its loader stats the data folder.
+    private void TryWake(string text, bool isFinal, bool fromGrammar)
+    {
+        OnboardingContent content = Content;
+        string brand = _carBrands.Brand;
+        if (!VoiceMatch.IsWake(text, brand, AliasesFor(content, brand), content.Confusions, isFinal))
+        {
+            return;
+        }
+
+        DateTime now = _clock.UtcNow;
+        if ((now - _lastWake).TotalSeconds < WakeCooldownSec) return;
+        _lastWake = now;
+        // WHY the decoder is named in the log: the two paths fail differently
+        // (a garbled free transcript vs a grammar the model cannot pronounce),
+        // and the next tuning session reads these lines to tell them apart.
+        _log.LogInfo(fromGrammar ? $"wake heard (grammar): {text}" : $"wake heard: {text}");
+        _panel.Show();
     }
 
     // Matches the spoken words against one screen's labels and fires the tap.
@@ -172,29 +208,46 @@ public sealed class VoiceRouter
     }
 
     // HUD action voice tap: only while the button is up, and only a finished
-    // utterance. The keywords follow the button's meaning (ENTER, PICK UP,
-    // DROP OFF); the HUD owns the teal acknowledgment and the half-second
-    // wait, while the host still owns what entering means.
+    // utterance. Two buttons share the path: the task prompt's own action (the
+    // found-elder news and its DRIVE, up whether or not the car is parked) and
+    // the arrival button (ENTER, PICK UP, DROP OFF). The keywords follow the
+    // button's meaning; the HUD owns the teal acknowledgment and the half-second
+    // wait, while the host still owns what the tap means.
     private bool TryEnterPoi(string text)
     {
-        if (_hud is not { ShowEnterButton: true } hud)
+        if (_hud is not { } hud)
         {
             return false;
         }
-        if (VoiceMatch.MatchLabel(text, hud.EnterKeywords, Content.Confusions) is null)
+
+        if (hud.ShowTaskAction)
+        {
+            return TapHud(text, hud.TaskKeywords, hud.RequestTaskAction);
+        }
+
+        if (!hud.ShowEnterButton)
+        {
+            return false;
+        }
+
+        return TapHud(text, hud.EnterKeywords, hud.RequestEnter);
+    }
+
+    private bool TapHud(string text, IReadOnlyList<string> keywords, Action tap)
+    {
+        if (VoiceMatch.MatchLabel(text, keywords, Content.Confusions) is null)
         {
             return false;
         }
 
         _panel.RecordActivity();
         _log.LogInfo($"voice button: {text}");
-        hud.RequestEnter();
+        tap();
         return true;
     }
 
-    private string[] AliasesFor(string brand)
+    private static string[] AliasesFor(OnboardingContent content, string brand)
     {
-        OnboardingContent content = Content;
         if (content.Aliases.TryGetValue(brand, out string[]? hit)) return hit;
         return content.Aliases.TryGetValue(VoiceMatch.Normalize(brand), out string[]? norm) ? norm : [];
     }

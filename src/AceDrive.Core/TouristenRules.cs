@@ -4,10 +4,11 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// The three draws one run needs: which pickup shop kind a fresh door is (and
-/// its company name), which 1-3 dropoffs the run visits, and the order each
-/// dropoff takes. Quantity ranges and the two-item floor come from the menu
-/// data; nothing here hardcodes a number beyond the math itself.
+/// The four draws one run needs: which pickup shop kind a fresh door is (and
+/// its company name), which 1-3 dropoffs the run visits, the one job order the
+/// shop loads, and the split of that order into one share per dropoff. Quantity
+/// ranges and the per-dropoff floor come from the menu data; nothing here
+/// hardcodes a number beyond the math itself.
 /// </summary>
 public static class TouristenRules
 {
@@ -75,11 +76,13 @@ public static class TouristenRules
     }
 
     /// <summary>
-    /// One dropoff's order: every item rolls its own range, then the draw tops
-    /// the order up to <paramref name="minItems"/> by adding units to random
-    /// items that still have room (the pizza's guaranteed slice means it only
-    /// needs one more). A range table with no capacity left stops the top-up
-    /// instead of looping.
+    /// The run's one job order: every item rolls its own range, then the draw
+    /// tops the order up to <paramref name="minItems"/> by adding units to
+    /// random items that still have room (the pizza's guaranteed slice means it
+    /// only needs one more). A range table with no capacity left stops the
+    /// top-up instead of looping. The caller passes the floor for the whole
+    /// load, so every dropoff still clears the menu's per-dropoff minimum once
+    /// <see cref="SplitOrder"/> divides it.
     /// </summary>
     public static TouristenOrder DrawOrder(
         TouristenPickup pickup, int minItems, Random rng)
@@ -127,5 +130,76 @@ public static class TouristenRules
         }
 
         return new TouristenOrder(lines);
+    }
+
+    /// <summary>
+    /// Divides the run's one job order across <paramref name="parts"/> dropoffs
+    /// the way a shop would pack it: one unit per stop first, so no stop is told
+    /// to deliver nothing while the load can fill it, then every remaining unit
+    /// goes to a randomly drawn stop. The shares are deliberately uneven — one
+    /// corner may get most of the load, the next a couple of items — and only
+    /// the line identity (key, name key, unit price) is kept per unit; the
+    /// quantities are what split. A load smaller than the dropoff list leaves
+    /// the last shares empty, and the caller skips those stops.
+    /// </summary>
+    public static IReadOnlyList<TouristenOrder> SplitOrder(
+        TouristenOrder order, int parts, Random rng)
+    {
+        ArgumentNullException.ThrowIfNull(order);
+        ArgumentNullException.ThrowIfNull(rng);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(parts);
+
+        var shares = new List<TouristenOrderLine>[parts];
+        for (int part = 0; part < parts; part++)
+        {
+            shares[part] = [];
+        }
+
+        var units = new List<TouristenOrderLine>();
+        foreach (TouristenOrderLine line in order.Lines)
+        {
+            for (int unit = 0; unit < line.Quantity; unit++)
+            {
+                units.Add(line);
+            }
+        }
+
+        // The guaranteed one-per-stop pass is what keeps every driven stop in
+        // the run once the load is big enough; everything after it is the
+        // random deal that makes the shares uneven.
+        int guaranteed = Math.Min(parts, units.Count);
+        for (int part = 0; part < guaranteed; part++)
+        {
+            AddUnit(shares[part], units[part]);
+        }
+
+        for (int unit = guaranteed; unit < units.Count; unit++)
+        {
+            AddUnit(shares[rng.Next(parts)], units[unit]);
+        }
+
+        var split = new List<TouristenOrder>(parts);
+        foreach (List<TouristenOrderLine> share in shares)
+        {
+            split.Add(new TouristenOrder(share));
+        }
+
+        return split;
+    }
+
+    // One unit onto a share, merged into the line it belongs to: a share lists
+    // each item once, in the order the deal first reached it.
+    private static void AddUnit(List<TouristenOrderLine> share, TouristenOrderLine line)
+    {
+        for (int i = 0; i < share.Count; i++)
+        {
+            if (string.Equals(share[i].Key, line.Key, StringComparison.Ordinal))
+            {
+                share[i] = share[i] with { Quantity = share[i].Quantity + 1 };
+                return;
+            }
+        }
+
+        share.Add(line with { Quantity = 1 });
     }
 }

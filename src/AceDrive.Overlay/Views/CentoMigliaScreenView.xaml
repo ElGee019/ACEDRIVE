@@ -23,10 +23,18 @@
         <TextBlock Grid.Row="2" Style="{StaticResource PageBody}" Text="{Binding ReputationLine}"/>
         <Grid Grid.Row="3">
             <!-- CentoA: the clubs, each with the reputation level it asks for.
-                 The list starts under the header and runs the panel's width,
-                 like Unity's 500-of-1200 button column scaled to this panel. -->
-            <StackPanel VerticalAlignment="Top"
+                 The column runs the panel's width, like Unity's 500-of-1200
+                 button column scaled to this panel, and sits in the middle of
+                 the leftover height: the page has few rows above it, so a
+                 top-aligned list left the buttons hanging under the header
+                 with the whole lower half of the screen empty. The welcome
+                 line travels with the list - it introduces the clubs, so it
+                 belongs above the first button and leaves with them when a
+                 tier's detail takes the body. -->
+            <StackPanel VerticalAlignment="Center"
                         Visibility="{Binding IsTierList, Converter={StaticResource BoolToVis}}">
+                <TextBlock Style="{StaticResource PageBody}" Text="{loc:Loc Key=CentoWelcome}"
+                           Margin="0,0,0,10"/>
                 <ItemsControl ItemsSource="{Binding Tiers}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>

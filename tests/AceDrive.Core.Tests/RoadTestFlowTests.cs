@@ -41,18 +41,26 @@ public sealed class RoadTestFlowTests
     };
 
     [Fact]
-    public void CalendarTap_PinsLaStradaAndKeepsThePick()
+    public void CalendarTap_OpensTheBriefingWithTheCarAndVenue()
     {
         var (session, hud, _, roads, bank) = Create();
         string? pick = roads.Current?.Key;
+        string? destinationBefore = hud.Destination?.Id;
 
         TapTheRoadTestRow(session);
 
-        Assert.Equal(RoadTestPhase.Driving, session.RoadTest.Phase);
-        Assert.Equal("HudRoadTestDrive", hud.Copy?.DriveKey);
-        Assert.Equal(StoryLaStrada.Definition.Id, hud.Destination?.Id);
-        Assert.Equal(1, hud.ShowTaskTextCalls);
-        Assert.False(session.Vm.IsShown);
+        var page = Assert.IsType<RoadTestBriefingScreenViewModel>(session.Vm.CurrentScreen);
+        Assert.True(session.Vm.IsShown);
+        // The tap explains the week first: no drive is pinned until START.
+        Assert.Equal(RoadTestPhase.Idle, session.RoadTest.Phase);
+        Assert.Equal(destinationBefore, hud.Destination?.Id);
+        Assert.Null(hud.Copy);
+        Assert.Equal(0, hud.ShowTaskTextCalls);
+        // The briefing names the week's car on the cover and the door to drive to.
+        Assert.Contains(CarTitles.Of(roads.Current!), page.IntroLine);
+        Assert.Contains(LaStradaDoor.StreetName, page.VenueLine);
+        Assert.StartsWith("La Strada will feature", page.IntroLine, StringComparison.Ordinal);
+        Assert.Equal("START DRIVE", page.StartLabel);
         // The pick is only banked once the whole test is driven, so the row and
         // the disk both keep naming the same car.
         Assert.Equal(pick, roads.Current?.Key);
@@ -60,10 +68,49 @@ public sealed class RoadTestFlowTests
     }
 
     [Fact]
+    public void BriefingStart_PinsLaStradaAndHidesThePanel()
+    {
+        var (session, hud, _, roads, bank) = Create();
+        string? pick = roads.Current?.Key;
+        TapTheRoadTestRow(session);
+        var page = Assert.IsType<RoadTestBriefingScreenViewModel>(session.Vm.CurrentScreen);
+
+        page.StartCommand.Execute(null);
+
+        Assert.Equal(RoadTestPhase.Driving, session.RoadTest.Phase);
+        Assert.Equal("HudRoadTestDrive", hud.Copy?.DriveKey);
+        Assert.Equal(StoryLaStrada.Definition.Id, hud.Destination?.Id);
+        Assert.Equal(1, hud.ShowTaskTextCalls);
+        Assert.False(session.Vm.IsShown);
+        Assert.Equal(pick, roads.Current?.Key);
+        Assert.Empty(bank.Saved);
+    }
+
+    [Fact]
+    public void BriefingBack_LeavesWithoutADrive()
+    {
+        var (session, hud, _, _, bank) = Create();
+        string? destinationBefore = hud.Destination?.Id;
+        TapTheRoadTestRow(session);
+        var page = Assert.IsType<RoadTestBriefingScreenViewModel>(session.Vm.CurrentScreen);
+
+        page.BackCommand.Execute(null);
+
+        Assert.Equal(RoadTestPhase.Idle, session.RoadTest.Phase);
+        Assert.Equal(destinationBefore, hud.Destination?.Id);
+        Assert.Null(hud.Copy);
+        Assert.Empty(bank.Saved);
+        // BACK returns the calendar the row was tapped on, not the jobs page;
+        // nothing was started and nothing moved.
+        Assert.IsType<CalendarScreenViewModel>(session.Vm.CurrentScreen);
+    }
+
+    [Fact]
     public void EnterAtTheDoor_OpensTheTestCentrePage()
     {
         var (session, hud, _, roads, _) = Create();
         TapTheRoadTestRow(session);
+        StartTheDrive(session);
         hud.AtDestination = true;
 
         hud.RaiseEnter();
@@ -498,6 +545,39 @@ public sealed class RoadTestFlowTests
     }
 
     [Fact]
+    public void WeissachAtTheDoor_IsNotTheStandardPick()
+    {
+        // The standard 992 GT3 RS and its Weissach package are two catalogue
+        // rows: the package is a different car, so it may not run the test the
+        // standard car was drawn for.
+        var standard = new CarSpec(
+            "ks_porsche_992_gt3_rs", 2021, "Porsche", "992 GT3 RS");
+        var weissach = standard with
+        {
+            Model = "992 GT3 RS Weissach",
+            Preset = "preset_gt3rs_mech_2",
+        };
+        var pool = new List<CarSpec> { standard, weissach };
+        var roads = new RoadTestLedger(
+            pool, seed: 7, new RoadTestSnapshot(standard.Key, [], null));
+        var (session, hud, board, _, _) = Create(
+            brands: new FakeCarBrandSource
+            {
+                CurrentIdentity = new CarIdentity(standard.Id, weissach.Preset),
+            },
+            cars: pool,
+            roads: roads);
+
+        RoadTestScreenViewModel page = OpenTestCentre(session, hud);
+
+        Assert.False(page.DrivesThePick);
+        Assert.True(page.ShowPickRequired);
+        Assert.False(page.AccelCommand.CanExecute(null));
+        Assert.False(page.BrakeCommand.CanExecute(null));
+        Assert.Empty(board.Pushed);
+    }
+
+    [Fact]
     public void SwappingToThePickAtTheDoor_ReArmsThePageWithoutLeavingTheVisit()
     {
         var brands = new FakeCarBrandSource { CurrentIdentity = MazdaIdentity };
@@ -670,12 +750,14 @@ public sealed class RoadTestFlowTests
             FakeRoadTestStandings? board = null,
             MileageUnit units = MileageUnit.Kilometres,
             FakeCarBrandSource? brands = null,
-            DriverWallet? wallet = null)
+            DriverWallet? wallet = null,
+            IReadOnlyList<CarSpec>? cars = null,
+            RoadTestLedger? roads = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var hud = new FakeTelemetryHud { Units = units };
         var standings = board ?? new FakeRoadTestStandings();
-        var roads = TestRoadCars.Ledger();
+        var roadsInstance = roads ?? TestRoadCars.Ledger();
         var bank = new FakeRoadTestStore();
         TestSessionResult session = TestSession.Create(new TestSessionOptions
         {
@@ -683,7 +765,8 @@ public sealed class RoadTestFlowTests
             Hud = hud,
             RoadTestStandings = standings,
             RoadTestStore = bank,
-            Roads = roads,
+            Roads = roadsInstance,
+            Cars = cars,
             // The wallet the receipt pays into: the default session wallet is
             // fine for the leg tests, a suite that reads the payout hands one in.
             Wallet = wallet,
@@ -696,7 +779,7 @@ public sealed class RoadTestFlowTests
             // calendar's, which CalendarScreenTests covers.
             IgnoreEventGates = true,
         });
-        return (session, hud, standings, roads, bank);
+        return (session, hud, standings, roadsInstance, bank);
     }
 
     // The Tuesday row, opened the way the player reaches it: a call, the menu's
@@ -716,10 +799,17 @@ public sealed class RoadTestFlowTests
         TestSessionResult session, FakeTelemetryHud hud)
     {
         TapTheRoadTestRow(session);
+        StartTheDrive(session);
         hud.AtDestination = true;
         hud.RaiseEnter();
         return Assert.IsType<RoadTestScreenViewModel>(session.Vm.CurrentScreen);
     }
+
+    // The briefing's START: the page the row opens hands the flow its drive, the
+    // way a player leaves the explanation for La Strada.
+    private static void StartTheDrive(TestSessionResult session) =>
+        Assert.IsType<RoadTestBriefingScreenViewModel>(session.Vm.CurrentScreen)
+            .StartCommand.Execute(null);
 
     // Real time only: the poll reads the fake clock, so advancing it and calling
     // the poll is exactly what one 10 Hz tick does live.

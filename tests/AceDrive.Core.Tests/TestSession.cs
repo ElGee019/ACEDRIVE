@@ -227,10 +227,14 @@ internal static class TestSession
         var centoSettlement = new CentoRaceSettlement(
             walletInstance, garageInstance, trunkInstance, CentoRaceRules.Default,
             options.Rng ?? new Random(0), beat, logger);
-        // The haul settle: the same watcher, pool and wallet the assertions
-        // read, and the calendar whose week its checkpoint banks.
+        // The car haul (PORTPLAN 20): the offer draw and the two legs on the
+        // same directory, wallet and friendship store the assertions read.
         var haul = new CarHaulFlow(
-            brands, pool, walletInstance, dayCycle, saver, beat, logger);
+            brandMileageInstance, pool, directory, zoneInstance, map,
+            () => AddressBook.Home(map, profiles.Load()),
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            walletInstance, friendsInstance, game, taxiRulesInstance, beat, logger,
+            CarHaulPolicy.Development, new Random(13));
         // The weekly market valuation (PORTPLAN 49): the same ledger, board and
         // wallet the assertions read, with a pinned draw stream of its own.
         var valuationFlow = new ValuationFlow(
@@ -262,9 +266,11 @@ internal static class TestSession
         var touristenSettlement = new TouristenfahrtenSettlement(
             walletInstance, deliveryFaresInstance, fleet, rarityInstance,
             rivalsInstance, beat, logger);
+        TouristenRaceCalendar touristenWeekends =
+            options.TouristenWeekends ?? TouristenRaceCalendar.None;
         var touristenFlow = new TouristenfahrtenFlow(
             touristenMenu, touristenDoors, options.Hud, touristenSettlement, meter,
-            taxiRulesInstance, new Random(12), logger);
+            taxiRulesInstance, beat, clock, touristenWeekends, new Random(12), logger);
         // The venue's typed handler, registered after its flow exactly like the
         // root does, so ENTER on the pinned house opens the showcase.
         IReadOnlyList<IPoiArrivalHandler> arrivals =
@@ -291,7 +297,7 @@ internal static class TestSession
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(
-            shell, navigation, taxi, delivery, touristenFlow, clock, logger);
+            shell, navigation, taxi, delivery, touristenFlow, voiceInstance, clock, logger);
         var story = new OnboardingFlow(
             onboardingStore, contentSource, profiles,
             options.PlayerNames ?? new OfflinePlayerNameRegistry(), map,
@@ -314,7 +320,7 @@ internal static class TestSession
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
+            taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             roadTestFlow, touristenFlow,
             navigation, readouts, dayCycle,
             todoBoard, pinsInstance,

@@ -14,8 +14,9 @@ namespace AceDrive.Core;
 /// <param name="Dropoffs">Places a run may deliver to, drawn without repeats.</param>
 /// <param name="MinDropoffs">Fewest dropoffs one run carries.</param>
 /// <param name="MaxDropoffs">Most dropoffs one run carries.</param>
-/// <param name="MinItemsPerOrder">Fewest items one dropoff's order holds; the
-/// draw tops every order up to it.</param>
+/// <param name="MinItemsPerOrder">Fewest items the run's whole job order holds
+/// per dropoff: the draw floors the load at this times the stop count, and the
+/// random split deals it out so a share can land well under the floor.</param>
 public sealed record TouristenMenu(
     IReadOnlyList<TouristenPickup> Pickups,
     IReadOnlyList<TouristenDropoffDefinition> Dropoffs,

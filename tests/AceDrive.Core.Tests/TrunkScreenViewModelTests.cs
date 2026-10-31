@@ -134,6 +134,30 @@ public sealed class TrunkScreenViewModelTests
     }
 
     [Fact]
+    public void VoiceActions_EatAStackByName_AndKeepBack()
+    {
+        var (vm, trunk, _, events) = Create(
+            items: [new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 2 }]);
+
+        // The EAT label is the same on every row, so the stack's own name is
+        // what a spoken bite answers; BACK still answers its label.
+        Assert.True(vm.VoiceActions.ContainsKey("MAPLE SYRUP"));
+        Assert.True(vm.VoiceActions.ContainsKey("BACK"));
+
+        vm.VoiceActions["MAPLE SYRUP"]();
+
+        Assert.Equal(1, trunk.Items.Single().Quantity);
+        Assert.Equal(["eaten"], events);
+        // The stacks were rebuilt, so the keys follow the list: the eaten row
+        // still answers while it has a unit left.
+        Assert.True(vm.VoiceActions.ContainsKey("MAPLE SYRUP"));
+
+        vm.VoiceActions["MAPLE SYRUP"]();
+        Assert.True(vm.IsTrunkEmpty);
+        Assert.DoesNotContain("MAPLE SYRUP", vm.VoiceActions.Keys);
+    }
+
+    [Fact]
     public void Open_SplitsFoodFromTheGloveCompartment()
     {
         // The certificate is not a catalogue row: Unity keeps it in the glove

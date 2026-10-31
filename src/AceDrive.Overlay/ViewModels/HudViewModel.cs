@@ -66,6 +66,12 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // paints it in place of the task text and lets its buttons run.
     private CustomerRequestScreenViewModel? _request;
 
+    // The flow-authored task in the banner slot (the found-elder news and its
+    // DRIVE button), with its sentence formatted from the resource table so a
+    // language switch repaints it. A destination or job leg supersedes it.
+    private HudTaskPrompt? _taskPrompt;
+    private string _taskPromptText = string.Empty;
+
     // The road test's live block (either leg): the task sentence's resource key,
     // the target speed the key prints and the reading already painted. The flow
     // owns the clock, so these are kept to repaint the sentence on a language
@@ -97,6 +103,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // then the deferred voice tap acts. Cleared by the 10 Hz poll on expiry.
     private bool _enterFlash;
     private DateTime _enterFlashUntil;
+
+    // The task prompt's button uses the same acknowledgment beat.
+    private bool _taskFlash;
+    private DateTime _taskFlashUntil;
 
     // The live header is the cached static TrackInfo object; comparing the
     // record is enough on the hot path (no string formatting when it matches).
@@ -133,6 +143,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 : TaxiRules.Default.DisplayDistanceStepMeters;
         EnterCommand = new RelayCommand(Enter);
         PhotoshootCommand = new RelayCommand(Photoshoot);
+        TaskCommand = new RelayCommand(TaskAction);
     }
 
     /// <summary>Track line while live, or the waiting/EVO status when not.</summary>
@@ -371,15 +382,79 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     }
 
     /// <summary>
-    /// The warning when the wrong car is driven, else the destination line. The
-    /// HUD's top line binds this one property so both states share its
-    /// position and font.
+    /// The warning when the wrong car is driven, else the flow-authored task
+    /// prompt, else the destination line. The HUD's top line binds this one
+    /// property so every state shares its position and font.
     /// </summary>
     public string BannerText =>
-        WrongCar ? _wrongCarWarning : DestinationText;
+        WrongCar ? _wrongCarWarning : _taskPrompt is not null ? _taskPromptText : DestinationText;
 
-    /// <summary>True while the warning or a destination has a top line.</summary>
-    public bool HasBanner => WrongCar || HasDestination;
+    /// <summary>True while the warning, a task prompt or a destination has a top line.</summary>
+    public bool HasBanner => WrongCar || HasDestination || _taskPrompt is not null;
+
+    /// <summary>"DRIVE"; empty with no task prompt.</summary>
+    public string TaskActionText =>
+        _taskPrompt is { } prompt ? Strings.Get(prompt.ActionKey) : string.Empty;
+
+    /// <summary>
+    /// True while the task prompt's action button is up. It needs no arrival
+    /// (the found-elder prompt is up the moment the shop is parked at), so the
+    /// race/enter rule does not apply here.
+    /// </summary>
+    public bool ShowTaskAction => _taskPrompt is not null && !_entered;
+
+    /// <summary>
+    /// Spoken words the prompt's button answers to ("drive", plus the shared
+    /// "enter"); empty with no prompt, so a stray word can never tap a button
+    /// that is not up.
+    /// </summary>
+    public IReadOnlyList<string> TaskKeywords =>
+        _taskPrompt is { } prompt ? HudVoiceKeywords.For(prompt.ActionKey) : [];
+
+    /// <summary>Teal voice acknowledgment on the prompt's button for one beat.</summary>
+    public bool TaskFlash
+    {
+        get => _taskFlash;
+        private set => SetField(ref _taskFlash, value);
+    }
+
+    /// <summary>
+    /// Voice activation: glows the prompt's button for the shared beat, then
+    /// raises <see cref="TaskActionRequested"/>. A click bypasses the wait.
+    /// </summary>
+    public void RequestTaskAction()
+    {
+        if (!ShowTaskAction)
+        {
+            return;
+        }
+
+        TaskFlash = true;
+        _taskFlashUntil = _beat.Deadline();
+        _beat.Defer(() =>
+        {
+            TaskFlash = false;
+            TaskActionRequested?.Invoke(this, EventArgs.Empty);
+        });
+    }
+
+    /// <summary>Taps the task prompt's action; the host owns what it means.</summary>
+    public RelayCommand TaskCommand { get; }
+
+    /// <summary>Raised when the task prompt's action button is pressed.</summary>
+    public event EventHandler? TaskActionRequested;
+
+    /// <summary>
+    /// Shows a one-off task in the banner slot with its own action button, or
+    /// clears it with null. A destination or a job leg handed over later takes
+    /// the slot back, so a stale prompt can never outlive the step that put it
+    /// up (see <see cref="SetDestination"/>).
+    /// </summary>
+    public void SetTaskPrompt(HudTaskPrompt? prompt)
+    {
+        _taskPrompt = prompt;
+        RepaintTaskPrompt();
+    }
 
     /// <summary>
     /// True while the car is parked on the destination house. The drive-to
@@ -419,9 +494,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// True while the task text is up: the drive-to/arrival line, the distance
     /// and the action button. Entering the pinned door consumes the arrival,
     /// so the block hides until a new destination is pinned or the car parks
-    /// there again; a customer request swaps it out on its own.
+    /// there again; a customer request swaps it out on its own. A task prompt
+    /// keeps the slot up by its own right (nothing there was entered).
     /// </summary>
-    public bool HasTaskText => !_entered;
+    public bool HasTaskText => !_entered || _taskPrompt is not null;
 
     // WHY the label check: a Cento Miglia leg carries no action (the start
     // opens its own page, the finish settles itself), so the arrival must not
@@ -499,8 +575,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         _wrongCarWarning = Strings.Get("HudWrongCar");
         PhotoshootText = Strings.Get("HudPhotoshoot");
         // A notice is already-formatted host copy; a language switch would
-        // leave it stale, so drop it with the old strings.
+        // leave it stale, so drop it with the old strings. The task prompt
+        // keeps its keys instead, so it repaints like the banner does.
         SetNoticeText(string.Empty);
+        RepaintTaskPrompt();
         RepaintDestination();
         RepaintReputation();
         // The road-test sentence names the target speed in the player's unit,
@@ -521,6 +599,20 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// </summary>
     public void SetDestination(PointOfInterest? destination, HudDestinationCopy? copy = null)
     {
+        // A new leg takes the banner back from a one-off task prompt: the
+        // prompt belongs to the step it announced, never to the leg after it.
+        if (_taskPrompt is not null)
+        {
+            SetTaskPrompt(null);
+        }
+
+        // WHY the arrival survives a re-pin of the same door: a flow re-pins
+        // its own door when the car gets there, to swap the action (the
+        // missing-person run's DROP OFF). The car has not moved, so dropping
+        // the parked state would hide the button that re-pin just enabled
+        // until the next poll — or for good, if nobody polls again.
+        bool sameDoor = destination is not null && _destination is not null
+            && destination.Address == _destination.Address;
         _destination = destination;
         _copy = copy;
         // A fresh leg has not been entered yet, even when the previous door
@@ -529,7 +621,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         // A taxi leg already pinned keeps the banner: the job outranks a story
         // destination until it settles.
         HasDestination = destination is not null || _jobGuidance is not null;
-        AtDestination = false;
+        AtDestination = sameDoor && AtDestination;
         RepaintDestination();
         // The distance line follows whatever the banner now shows (a pinned
         // intro leg included), so repaint it from the last live sample without
@@ -558,6 +650,12 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     /// </summary>
     public void SetJobGuidance(HudJobGuidance? guidance)
     {
+        // The same rule as a destination: the job's leg owns the banner.
+        if (_taskPrompt is not null)
+        {
+            SetTaskPrompt(null);
+        }
+
         _jobGuidance = guidance;
         // A new leg is never already entered: its action button must come back.
         SetEntered(false);
@@ -720,6 +818,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         _entered = entered;
         OnPropertyChanged(nameof(HasTaskText));
         OnPropertyChanged(nameof(ShowEnterButton));
+        OnPropertyChanged(nameof(ShowTaskAction));
     }
 
     // BannerText, HasBanner and ShowBanner are one state machine (the warning
@@ -731,6 +830,38 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         OnPropertyChanged(nameof(BannerText));
         OnPropertyChanged(nameof(HasBanner));
         OnPropertyChanged(nameof(ShowBanner));
+    }
+
+    // The prompt's sentence is formatted from its key and values on every
+    // repaint, so the unit/language switch reaches it like the banner. The
+    // action label is a key of its own; the button's visibility follows the
+    // same latch the task text uses.
+    private void RepaintTaskPrompt()
+    {
+        _taskPromptText = _taskPrompt is { } prompt
+            ? prompt.Args is { Count: > 0 } args
+                ? Strings.Format(prompt.TextKey, [.. args])
+                : Strings.Get(prompt.TextKey)
+            : string.Empty;
+        OnPropertyChanged(nameof(BannerText));
+        OnPropertyChanged(nameof(HasBanner));
+        OnPropertyChanged(nameof(ShowBanner));
+        OnPropertyChanged(nameof(HasTaskText));
+        OnPropertyChanged(nameof(TaskActionText));
+        OnPropertyChanged(nameof(ShowTaskAction));
+    }
+
+    // The prompt's one button. A click is newer input than a pending voice
+    // tap, so the deferred acknowledgment goes; the host decides the step.
+    private void TaskAction()
+    {
+        if (!ShowTaskAction)
+        {
+            return;
+        }
+
+        _beat.Cancel();
+        TaskActionRequested?.Invoke(this, EventArgs.Empty);
     }
 
     // The road test's sentence: the target is the leg's own speed (60 for the
@@ -767,10 +898,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         {
             DestinationText = AtDestination
                 ? Strings.Format(job.ArrivedKey, Args(job.ArrivedArgs, job.TargetName))
-                : Strings.Format(
-                    job.DriveKey,
-                    Args(job.DriveArgs, job.TargetName, job.Target.StreetName,
-                        job.Target.HouseNumber, _map.City));
+                : Strings.Format(job.DriveKey, JobDriveArgs(job));
             SetAction(job.ActionKey);
         }
         else if (_destination is { } poi)
@@ -812,6 +940,31 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         for (int i = 0; i < supplied.Count; i++)
         {
             values[i] = supplied[i];
+        }
+
+        return values;
+    }
+
+    // A job leg's drive line always starts with the shared address shape ({0}
+    // name, {1} street, {2} number, {3} city) — every leg must name where it
+    // sends the player — and the leg's own values follow it ({4}…, the
+    // Touristenfahrten order or dropoff list). A leg with no extras formats the
+    // shared four alone.
+    private object?[] JobDriveArgs(HudJobGuidance job)
+    {
+        if (job.DriveArgs is not { Count: > 0 } extra)
+        {
+            return [job.TargetName, job.Target.StreetName, job.Target.HouseNumber, _map.City];
+        }
+
+        var values = new object?[4 + extra.Count];
+        values[0] = job.TargetName;
+        values[1] = job.Target.StreetName;
+        values[2] = job.Target.HouseNumber;
+        values[3] = _map.City;
+        for (int i = 0; i < extra.Count; i++)
+        {
+            values[4 + i] = extra[i];
         }
 
         return values;
@@ -887,6 +1040,11 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         if (_enterFlash && _beat.IsDue(_enterFlashUntil))
         {
             EnterFlash = false;
+        }
+
+        if (_taskFlash && _beat.IsDue(_taskFlashUntil))
+        {
+            TaskFlash = false;
         }
     }
 

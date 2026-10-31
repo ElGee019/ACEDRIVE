@@ -246,6 +246,73 @@ public sealed class VoiceTests
     }
 
     [Fact]
+    public void WakeGrammarHit_OpensThePanel_WhenTheFreeTranscriptNeverNamesTheWake()
+    {
+        // Live 2026-10-30 (the big model): "hey datsun" reached the log as
+        // "the henderson" and "the be some the have nice of the have nissan".
+        // The first never woke (the clipped-hey door wants the brand, not an
+        // alias); the constrained decoder hears the phrase itself and does.
+        var (vm, _, mic, car) = Create();
+        car.Primed = "datsun";
+        vm.Start();
+        Assert.False(vm.IsShown);
+
+        mic.Fire("the henderson", isFinal: true);
+        Assert.False(vm.IsShown); // logged miss: no interjection left
+
+        mic.FireWake("hey dotson");
+        Assert.True(vm.IsShown);
+        vm.Dispose();
+    }
+
+    [Fact]
+    public void WakeGrammarHit_ForAnotherBrand_DoesNotWake()
+    {
+        // The grammar carries every brand's phrase, so the driven brand still
+        // gates the wake (Unity's "hey {brand}").
+        var (vm, _, mic, car) = Create();
+        car.Primed = "datsun";
+        vm.Start();
+
+        mic.FireWake("hey audi");
+
+        Assert.False(vm.IsShown);
+        vm.Dispose();
+    }
+
+    [Fact]
+    public void WakeGrammarHit_WhileThePanelIsShown_IsIgnored()
+    {
+        var (vm, _, mic, _) = Create();
+        mic.Fire("hey mazda");
+        Assert.True(vm.IsShown);
+        object? screen = vm.CurrentScreen;
+
+        mic.FireWake("hey mazda");
+
+        Assert.True(vm.IsShown);
+        Assert.Same(screen, vm.CurrentScreen);
+        vm.Dispose();
+    }
+
+    [Fact]
+    public void WakeListening_FollowsThePanel()
+    {
+        // The constrained decoder is fed only while the panel is down: a shown
+        // page needs the HUD's keywords and its own labels from the full
+        // vocabulary, and a hidden one can only use a wake word.
+        var (vm, _, mic, _) = CreateIntroduced();
+        vm.Show();
+        Assert.False(mic.WakeListening);
+
+        vm.ToggleShowCommand.Execute(null); // hide: the drive is next
+        Assert.True(mic.WakeListening);
+
+        vm.Show();
+        Assert.False(mic.WakeListening);
+    }
+
+    [Fact]
     public void Idle_HidesAfterFifteenSeconds()
     {
         var (vm, clock, _, _) = CreateIntroduced();

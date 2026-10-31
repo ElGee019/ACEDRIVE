@@ -113,6 +113,50 @@ public sealed class StoreScreenViewModelTests
     }
 
     [Fact]
+    public void VoiceActions_SelectByName_AndStepTheQuantity()
+    {
+        var (vm, _, _, _, _, _) = Create();
+
+        // Every shelf row answers its own name; the two symbol buttons answer
+        // the English words the mic can actually hear.
+        Assert.True(vm.VoiceActions.ContainsKey("MAPLE SYRUP"));
+        Assert.True(vm.VoiceActions.ContainsKey("increase"));
+        Assert.True(vm.VoiceActions.ContainsKey("decrease"));
+        Assert.True(vm.VoiceActions.ContainsKey("BUY"));
+        Assert.True(vm.VoiceActions.ContainsKey("BACK"));
+
+        vm.VoiceActions["MAPLE SYRUP"]();
+        Assert.Equal("  x  MAPLE SYRUP", vm.SelectionText);
+        Assert.Equal("1", vm.QuantityText);
+
+        vm.VoiceActions["increase"]();
+        Assert.Equal("2", vm.QuantityText);
+        vm.VoiceActions["decrease"]();
+        Assert.Equal("1", vm.QuantityText);
+
+        vm.VoiceActions["BUY"]();
+        Assert.Equal(MapleReceipt, vm.BoughtLines);
+    }
+
+    [Fact]
+    public void VoiceActions_SkipSoldOutRows_AndSurviveAPurchase()
+    {
+        var (vm, _, _, _, _, _) = Create();
+
+        Row(vm, "MAPLE SYRUP").SelectCommand.Execute(null);
+        vm.BuyCommand.Execute(null);
+
+        // A purchase rebuilds the rows; the spoken names must point at the
+        // rows on screen, not at the ones the receipt replaced.
+        var restocked = Row(vm, "BANANA");
+        vm.VoiceActions["BANANA"]();
+        Assert.True(restocked.IsSelected);
+
+        var empty = Create(stock: 0).Vm;
+        Assert.DoesNotContain("SOLD OUT", empty.VoiceActions.Keys);
+    }
+
+    [Fact]
     public void ChangeQuantity_ClampsToZeroAndStock()
     {
         var (vm, _, _, _, _, _) = Create(stock: 3);

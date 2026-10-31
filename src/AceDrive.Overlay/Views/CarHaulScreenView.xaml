@@ -1,0 +1,63 @@
+<UserControl x:Class="AceDrive.Overlay.Views.CarHaulScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Car-haul offer / active-leg page (PORTPLAN item 20, Unity
+         JobSelectionScreen's car-haul button + the map's pickup banner). The
+         same page covers both states: the customer's new car waiting at a
+         dealer, the dealer's address, the customer's address and the pay tier;
+         ACCEPT only exists while the offer waits, and the task line only exists
+         after it was accepted. CONTINUE-style teal is the shared voice ack. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=HaulOfferTitle}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
+            <TextBlock Text="{Binding CarLine}" Foreground="#FF97EAD2" FontSize="24"
+                       FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"
+                       Margin="0,2,0,12"/>
+            <TextBlock Text="{Binding DealerLine}" Foreground="#FFF" FontSize="16"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding CustomerLine}" Foreground="#FFF" FontSize="16"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,10"/>
+            <TextBlock Text="{Binding TierLine}" Foreground="#FFBFC4C9" FontSize="14"
+                       TextAlignment="Center" Margin="0,0,0,6"/>
+            <TextBlock Text="{Binding TaskLine}" Foreground="#FF97EAD2" FontSize="16"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,8,0,0"
+                       Visibility="{Binding IsJob, Converter={StaticResource BoolToVis}}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=HaulAccept}" Command="{Binding AcceptCommand}"
+                    Margin="0,0,0,6"
+                    Visibility="{Binding IsOffer, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding AcceptFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

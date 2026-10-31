@@ -1,0 +1,57 @@
+<UserControl x:Class="AceDrive.Overlay.Views.TouristenBriefingScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- The Touristenfahrten run's briefing page: what the calendar's Saturday
+         row opens before the run draws its shop and corners. Same skeleton as
+         the road test's and the market valuation's briefings: title band, body,
+         the verbs flush at the bottom (START above BACK). The body takes the
+         middle of the panel so the text sits centred instead of hugging the
+         title. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding Title}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
+            <!-- What the Saturday asks: the shop order, the corner stops and
+                 the two HUD verbs, in the briefings' body size. -->
+            <TextBlock Text="{Binding IntroLine}" Foreground="#FFF" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Verb band: START rides above BACK, both flush with the panel edge
+             like the other briefings; teal is the shared voice-ack highlight. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{Binding StartLabel}" Command="{Binding StartCommand}"
+                    Padding="4" Margin="0,0,0,6" HorizontalAlignment="Stretch">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StartFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=TouristenBack}" Command="{Binding BackCommand}"
+                    Padding="4" HorizontalAlignment="Stretch">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

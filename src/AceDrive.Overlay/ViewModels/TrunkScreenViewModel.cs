@@ -14,8 +14,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// Unity's page also lists the reward-card slots; those are not part of this
 /// port yet, so the page ends after the glove compartment.
 /// Voice parity with the other pages: BACK navigates, so its voice tap glows
-/// teal first and the page waits out the shared beat. EAT has no voice entry —
-/// several rows answer the same label, so there is no unambiguous target.
+/// teal first and the page waits out the shared beat. Every food stack also
+/// answers its own name ("sandwich"), because the EAT button alone is the same
+/// label on every row and so could not say which stack a spoken bite meant.
 /// </summary>
 public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
 {
@@ -42,7 +43,6 @@ public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
         EatCommand = new ParameterizedCommand<TrunkItemRow>(Eat);
         BackCommand = new RelayCommand(Back);
         Rebuild();
-        RebuildVoice();
     }
 
     /// <summary>One EAT tap: consumes the row's stack one unit at a time.</summary>
@@ -124,6 +124,9 @@ public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
         HungerAmber = _hunger.IsAmber;
         OnPropertyChanged(nameof(IsTrunkEmpty));
         OnPropertyChanged(nameof(IsCompartmentEmpty));
+        // The spoken names follow the stacks: a bite rebuilds the list, and a
+        // name that stayed keyed to an eaten row would answer nothing.
+        RebuildVoice();
     }
 
     // One bite: the Core rule decides whether the stack and the catalogue row
@@ -153,14 +156,21 @@ public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
 
     private void RebuildVoice()
     {
-        VoiceActions = new Dictionary<string, Action>
+        var actions = new Dictionary<string, Action>();
+        // Each food stack answers its name: the row's own identity is what the
+        // page shows beside its EAT button, and it keeps the spoken bite
+        // unambiguous where the shared EAT label would not be.
+        foreach (TrunkItemRow row in Rows)
         {
-            // Back navigates: glow first, act at the end of the shared beat.
-            [Strings.Get("TrunkBack")] = () =>
-            {
-                BackFlash = true;
-                _beat.Defer(Back);
-            },
+            TrunkItemRow hit = row;
+            actions[hit.Name] = () => Eat(hit);
+        }
+        // Back navigates: glow first, act at the end of the shared beat.
+        actions[Strings.Get("TrunkBack")] = () =>
+        {
+            BackFlash = true;
+            _beat.Defer(Back);
         };
+        VoiceActions = actions;
     }
 }

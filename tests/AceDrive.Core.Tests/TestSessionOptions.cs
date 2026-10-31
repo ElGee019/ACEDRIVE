@@ -99,6 +99,10 @@ internal sealed class TestSessionOptions
     // and the flow's own seeded stream for Unity's reaction hold (PORTPLAN 49).
     public IRoadTestStandings? RoadTestStandings { get; init; }
     public Random? RoadTestRng { get; init; }
+    // The real-world Nürburgring calendar the briefing title and the race
+    // weekend bonus read: none by default, so a suite that does not care sees
+    // the run's own title and ordinary prices.
+    public TouristenRaceCalendar? TouristenWeekends { get; init; }
     // TEMPORARY (testing): opens every calendar event's gates, so a suite can
     // drive an off-day or replayed event. Shipping sessions keep the gates.
     public bool IgnoreEventGates { get; init; }

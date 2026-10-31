@@ -89,6 +89,9 @@
         <DataTemplate DataType="{x:Type vm:DeliveryReceiptScreenViewModel}">
             <views:DeliveryReceiptScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CarHaulScreenViewModel}">
+            <views:CarHaulScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:CarHaulReceiptScreenViewModel}">
             <views:CarHaulReceiptScreenView/>
         </DataTemplate>
@@ -119,14 +122,23 @@
         <DataTemplate DataType="{x:Type vm:BreakdownScreenViewModel}">
             <views:BreakdownScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:ValuationBriefingScreenViewModel}">
+            <views:ValuationBriefingScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ValuationScreenViewModel}">
             <views:ValuationScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:RoadTestBriefingScreenViewModel}">
+            <views:RoadTestBriefingScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:RoadTestScreenViewModel}">
             <views:RoadTestScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:RoadTestReceiptScreenViewModel}">
             <views:RoadTestReceiptScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TouristenBriefingScreenViewModel}">
+            <views:TouristenBriefingScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:WhereIsWillyScreenViewModel}">
             <views:WhereIsWillyScreenView/>
@@ -146,9 +158,12 @@
         <Border BorderBrush="#FFFFFFFF" BorderThickness="2" CornerRadius="8" Padding="10">
             <!-- Screens only, companion parity. Scroll: fixed size can clip taller pages.
                  Horizontal scroll stays off so long lines wrap inside the
-                 window width instead of growing it. -->
+                 window width instead of growing it. The host is named because
+                 the window blanks it before hiding (MainWindow.ApplyShown): a
+                 hidden layered window keeps its last painted frame, and the next
+                 Show() would flash that stale page before the new one. -->
             <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <ContentControl Content="{Binding CurrentScreen}"/>
+                <ContentControl x:Name="PageHost" Content="{Binding CurrentScreen}"/>
             </ScrollViewer>
         </Border>
     </Border>

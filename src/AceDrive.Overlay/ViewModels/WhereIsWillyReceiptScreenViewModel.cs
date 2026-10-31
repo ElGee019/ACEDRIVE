@@ -10,7 +10,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// fee with every multiplier that priced it, the certificate and the friendship
 /// the run left behind. The flow has already paid and stamped by the time this
 /// page is built — the receipt only prints the numbers it was handed — and
-/// CONTINUE closes it back onto the control page.
+/// CONTINUE closes it back onto the main page.
 /// </summary>
 public sealed class WhereIsWillyReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {
@@ -34,7 +34,7 @@ public sealed class WhereIsWillyReceiptScreenViewModel : ViewModelBase, IVoiceSc
     /// <summary>"MISSING PERSON RECEIPT".</summary>
     public string Title { get; } = Strings.Get("WillyReceiptTitle");
 
-    /// <summary>"Returned: Klaus Berger and some colleagues".</summary>
+    /// <summary>"Returned: Klaus Berger" — the plain name, no ride suffix.</summary>
     public string ReturnedLine => Strings.Format("WillyReceiptReturned", _receipt.PersonName);
 
     /// <summary>"Found at: Klaus's Coffee Shop".</summary>

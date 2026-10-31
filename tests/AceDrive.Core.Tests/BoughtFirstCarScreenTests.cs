@@ -59,4 +59,20 @@ public sealed class BoughtFirstCarScreenTests
         vm.KeepCommand.Execute(null);
         Assert.Equal(["drive", "keep"], clicks);
     }
+
+    [Fact]
+    public void BothButtons_AnswerTheirSpokenLabels()
+    {
+        var (vm, clicks) = Create(secondCar: false);
+
+        // The page is the only way out of a purchase, so the mic has to reach
+        // both choices, not just the mouse.
+        Assert.True(vm.VoiceActions.ContainsKey("DRIVE IT"));
+        Assert.True(vm.VoiceActions.ContainsKey("KEEP CURRENT"));
+
+        vm.VoiceActions["DRIVE IT"]();
+        vm.VoiceActions["KEEP CURRENT"]();
+
+        Assert.Equal(["drive", "keep"], clicks);
+    }
 }

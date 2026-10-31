@@ -14,6 +14,7 @@ internal sealed class FakeRoadTestHost : IRoadTestHost
     public int ShowReceiptCalls { get; private set; }
     public int HideCalls { get; private set; }
     public int ShowControlCalls { get; private set; }
+    public int ShowCalendarCalls { get; private set; }
     public int ShowMenuCalls { get; private set; }
 
     public void RevealPage(object page)
@@ -31,6 +32,8 @@ internal sealed class FakeRoadTestHost : IRoadTestHost
     public void HidePanel() => HideCalls++;
 
     public void ShowControl() => ShowControlCalls++;
+
+    public void ShowCalendar() => ShowCalendarCalls++;
 
     public void ShowMenu() => ShowMenuCalls++;
 }

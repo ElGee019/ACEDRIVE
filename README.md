@@ -58,9 +58,16 @@ The model is never committed; override its path with `-p:VoskModelDir`.
 
 Voice needs the folder named `vosk-model`: download a model from
 [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models), extract it
-and rename the folder. Use `vosk-model-en-us-0.22-lgraph` (128 MB download); the
-68 MB `vosk-model-small-en-us-0.15` hears race-car brands poorly ("datsun"
-arrives as "that's fun"), which `Data\brand_aliases.json` can only partly patch.
+and rename the folder. Two models fit this overlay:
+`vosk-model-en-us-0.22-lgraph` (128 MB download, 204 MB on disk) decodes more
+words correctly but is **not real-time on every machine**: measured on a 28 W
+laptop (Core 7 240H) it costs ~2× the length of the audio, so the capture thread
+falls behind, drops buffers and every transcript turns to garbage — the exact
+symptom in the 2026-10-28/30 logs. The 68 MB `vosk-model-small-en-us-0.15` keeps
+up (well under real time) but hears race-car brands poorly ("datsun" arrives as
+"that's fun"); `Data\brand_aliases.json` carries those garbles, and the wake
+grammar below removes the rest of that handicap. Start with the small model
+unless the CPU is fast enough for the lgraph one.
 
 The published exe is signed after the single-file bundle, because the Build-time
 signature cannot survive bundling. The development certificate is trusted only
@@ -72,6 +79,21 @@ unblocks the zip, extracts it and chooses More info → Run anyway.
 `dotnet format ACEDRIVE.slnx --verify-no-changes` must pass before
 committing; CI enforces it. Fix findings by hand — never run unattended
 fixer passes (one once removed a needed using via an IDE0005 false positive).
+
+## Voice
+
+Say **"hey {brand}"** of the car you are driving ("hey datsun", "hey nissan")
+while the overlay is hidden to open it; `Ctrl+Shift+C` does the same without a
+mic. `Data/brand_aliases.json` lists the mishearings the English model already
+produced ("hey dotson", "hey nissan"), so a brand it cannot spell still wakes.
+
+Two decoders share the model: the full vocabulary answers command words while
+the panel is up, and a grammar built only from `hey {brand}` and those aliases
+runs while the panel is down. The grammar is what keeps engine and room noise
+from arriving as a sentence ("the be some the have nice … nissan"); everything
+outside the phrases decodes to `[unk]` and matches nothing. Phrases the model
+cannot pronounce are dropped whole at startup — the log line
+`wake grammar: N/M phrase(s), K dropped` says what survived.
 
 ## Using the test shell over EVO
 

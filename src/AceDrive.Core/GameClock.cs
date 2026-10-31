@@ -31,4 +31,13 @@ public sealed class GameClock
 
     /// <summary>Calendar day, 1=Sunday..7=Saturday (Unity day numbering).</summary>
     public int Today => ControlCalendar.ToDayOfWeek(GameNow);
+
+    /// <summary>
+    /// Whole game minutes since the calendar's zero point. Unity's
+    /// <c>CurrentGameMinute()</c> is nonzero from the first minute, so the
+    /// job legs stamp this at each end and price the difference: a game-time
+    /// drive is paid in game minutes rather than real seconds, and a pause
+    /// cannot inflate a haul.
+    /// </summary>
+    public long GameMinute => (long)(GameNow - DateTime.MinValue).TotalMinutes;
 }

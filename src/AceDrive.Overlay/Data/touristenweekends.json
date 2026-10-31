@@ -1,0 +1,20 @@
+{
+  "bonusMultiplier": 2.0,
+  "weekends": [
+    { "start": "2027-03-20", "end": "2027-03-20", "name": "NLS Round 1" },
+    { "start": "2027-04-02", "end": "2027-04-04", "name": "ADAC 24h Test Days" },
+    { "start": "2027-04-17", "end": "2027-04-17", "name": "NLS Round 2" },
+    { "start": "2027-04-30", "end": "2027-05-02", "name": "ADAC 24h Nürburgring Qualifiers" },
+    { "start": "2027-05-27", "end": "2027-05-30", "name": "55th ADAC RAVENOL 24h Nürburgring" },
+    { "start": "2027-06-11", "end": "2027-06-13", "name": "ADAC Nürburgring Classic" },
+    { "start": "2027-07-03", "end": "2027-07-03", "name": "NLS Round 3" },
+    { "start": "2027-08-07", "end": "2027-08-07", "name": "NLS Round 4" },
+    { "start": "2027-08-13", "end": "2027-08-15", "name": "54th BELMOT Oldtimer Grand Prix" },
+    { "start": "2027-08-20", "end": "2027-08-22", "name": "DTM Nürburgring" },
+    { "start": "2027-08-27", "end": "2027-08-29", "name": "GT World Challenge Europe" },
+    { "start": "2027-09-11", "end": "2027-09-11", "name": "NLS Round 5" },
+    { "start": "2027-09-12", "end": "2027-09-12", "name": "NLS Round 6" },
+    { "start": "2027-09-25", "end": "2027-09-25", "name": "NLS Round 7" },
+    { "start": "2027-10-09", "end": "2027-10-09", "name": "NLS Round 8" }
+  ]
+}

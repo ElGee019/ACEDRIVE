@@ -102,7 +102,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_conditionMonitor`, `_trackLengthMeters`, `_playerPosition` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength`, `ObservePosition` | `ITaxiJobHost` (8 members) |
 | `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
 | `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
-| `RoadTestFlow` ✅ | the visit's phase, the pick under test, the page, the leg's clock and the crossing pair, the two board reads (the car's board and the all-cars record book) | `Begin()` (calendar row), `Enter(poi)` (the door — refused unless the announced car is the pick), `Start()` (0-60), `Advance(sample)` (counter/timer/crossing, voiding a run whose car was swapped), `Continue`, `Back`, `Phase`, `InFlight` | `IRoadTestHost` (5 members): reveal the page, show the receipt, hide the panel, show the control page, show the menu page |
+| `RoadTestFlow` ✅ | the visit's phase, the pick under test, the page, the leg's clock and the crossing pair, the two board reads (the car's board and the all-cars record book) | `Begin()` (calendar row → the week's briefing), `BeginDrive()` (briefing START), `CloseBriefing()` (briefing BACK), `Enter(poi)` (the door — refused unless the announced car is the pick), `Start()` (0-60), `Advance(sample)` (counter/timer/crossing, voiding a run whose car was swapped), `Continue`, `Back`, `Phase`, `InFlight` | `IRoadTestHost` (6 members): reveal the page, show the receipt, hide the panel, show the control page, return to the calendar, show the menu page |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
 | `DeliveryBoard` ✅ | the live catalogue (a holder, so a new shop replaces it) | `Catalog`, `Add(store)` | none |
 | `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow(expansion)` → the doors it banked, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, bought-car page |
@@ -184,8 +184,9 @@ same late `Attach` the four flows use, and reads the display week off
 `DayCycle` instead of keeping a mirror of it. `CarHaulFlow` takes no host at
 all: the control page's tap calls `Settle`, and the navigator puts the
 returned receipt up with its own `ControlCommand`. The road test reaches back
-through `IRoadTestHost` (five panel verbs: the page, the receipt, the hide, and
-the two exits, the control page before a run and the menu after the receipt),
+through `IRoadTestHost` (six panel verbs: the page, the receipt, the hide, and
+the three exits — the calendar the briefing was opened from, the control page
+before a run and the menu after the receipt),
 and rejoins the door network as a `RoadTestPoiHandler`, so a stray visit to La
 Strada still opens nothing. The story flow and the voice router are root-built
 too: they take `PanelPresenter`/`StoryHost` instead of the coordinator, so

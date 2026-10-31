@@ -5,18 +5,23 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The Saturday Touristenfahrten run: pick up a shop order (coffee or pizza),
-/// then drive it to 1-3 Nordschleife corners, one receipt per dropoff. The
-/// calendar row starts it; the companion guides every leg with its own task
-/// text (the dropoff list on the way to the shop, the loaded order on the way
-/// to a corner), and the HUD's action button confirms each stop
-/// (PICK UP, then DELIVER ITEMS).
+/// then drive it to 1-3 Nordschleife corners, one receipt per dropoff. The shop
+/// loads one job order and the flow splits it across the drawn corners, so each
+/// stop carries its own share of the goods. The calendar row opens the run's
+/// briefing page; the briefing's START draws the run and the companion then
+/// guides every leg with its own task text (the dropoff list on the
+/// way to the shop, the loaded share on the way to a corner), and the HUD's
+/// action button confirms each stop (PICK UP, then DELIVER).
 ///
 /// The receipt's CONTINUE is what moves the run on: it pins the next dropoff
 /// and hides the panel again, or lands back on the calendar after the last one.
 /// The shared drive meter prices each corner leg (reset when the goods load and
 /// at every CONTINUE, so the pickup drive is not charged), exactly like the
-/// career delivery run. The run is session state like a delivery run: a process
-/// death loses it, and the doors it opened stay banked in the POI directory.
+/// career delivery run. While a real-world event runs at the Nürburgring (the
+/// calendar the briefing's title reads), the shops pay double for the goods, so
+/// the same Saturday is worth a detour. The run is session state like a
+/// delivery run: a process death loses it, and the doors it opened stay banked in
+/// the POI directory.
 /// </summary>
 public sealed class TouristenfahrtenFlow
 {
@@ -25,6 +30,9 @@ public sealed class TouristenfahrtenFlow
     private readonly ITelemetryHud? _hud;
     private readonly ITouristenSettlement _settlement;
     private readonly TaxiDriveMeter _meter;
+    private readonly VoiceBeat _beat;
+    private readonly IClock _clock;
+    private readonly TouristenRaceCalendar _weekends;
     private readonly double _arrivalRadiusMeters;
     private readonly Random _rng;
     private readonly ILog _log;
@@ -43,16 +51,23 @@ public sealed class TouristenfahrtenFlow
     public TouristenfahrtenFlow(
         TouristenMenu menu, ITouristenDoors doors, ITelemetryHud? hud,
         ITouristenSettlement settlement, TaxiDriveMeter meter, TaxiRules taxiRules,
+        VoiceBeat beat, IClock clock, TouristenRaceCalendar weekends,
         Random rng, ILog log)
     {
         ArgumentNullException.ThrowIfNull(taxiRules);
         ArgumentNullException.ThrowIfNull(meter);
+        ArgumentNullException.ThrowIfNull(beat);
+        ArgumentNullException.ThrowIfNull(clock);
+        ArgumentNullException.ThrowIfNull(weekends);
 
         _menu = menu;
         _doors = doors;
         _hud = hud;
         _settlement = settlement;
         _meter = meter;
+        _beat = beat;
+        _clock = clock;
+        _weekends = weekends;
         _arrivalRadiusMeters = taxiRules.ArrivalRadiusMeters;
         _rng = rng;
         _log = log;
@@ -65,12 +80,38 @@ public sealed class TouristenfahrtenFlow
     public bool InProgress => _run is not null;
 
     /// <summary>
-    /// The calendar row's tap: draws the pickup shop, 1-3 dropoffs and each
-    /// dropoff's order, pins the shop and gets the panel out of the companion's
-    /// way. A run already in progress is left alone; a missing door refuses the
-    /// run instead of pinning a destination that cannot be reached.
+    /// The calendar row's tap: the run's briefing page, never the run itself.
+    /// The page names the Saturday's shape (a shop order out to 1-3
+    /// Nordschleife corners) and wears the real-world event running today when
+    /// the calendar names one; its START draws and pins the run (<see
+    /// cref="StartRun"/>), its BACK hands the panel back to the calendar with
+    /// nothing drawn. A live run owns the HUD, so a second tap is ignored
+    /// instead of stacking a briefing over it.
     /// </summary>
     public void Begin()
+    {
+        if (_run is not null)
+        {
+            _log.LogInfo("touristenfahrten ignored: a run is already in progress");
+            return;
+        }
+
+        string title = TouristenCopy.WeekendTitle(_weekends.Find(RealToday()));
+        _host.ShowBriefing(new TouristenBriefingScreenViewModel(
+            title, StartRun, new RelayCommand(CloseBriefing), _beat));
+        _log.LogInfo($"touristenfahrten briefing open: {title}");
+    }
+
+    /// <summary>
+    /// The briefing's START: draws the pickup shop, 1-3 dropoffs and the one
+    /// job order, splits that order so every stop carries its part, pins the
+    /// shop and gets the panel out of the companion's way. Split from
+    /// <see cref="Begin"/> so the Saturday is read before a run that leaves the
+    /// panel starts. A run already in progress is left alone; a missing door
+    /// refuses the run instead of pinning a destination that cannot be
+    /// reached.
+    /// </summary>
+    public void StartRun()
     {
         if (_run is not null)
         {
@@ -87,17 +128,36 @@ public sealed class TouristenfahrtenFlow
 
         IReadOnlyList<TouristenDropoffDefinition> places =
             TouristenRules.DrawDropoffs(_menu, _rng);
-        var dropoffs = new List<TouristenDropoff>(places.Count);
-        foreach (TouristenDropoffDefinition place in places)
+        if (places.Count == 0)
         {
-            if (_doors.Dropoff(place) is not { } door)
+            _log.LogWarning("touristenfahrten not started: no dropoff place");
+            return;
+        }
+
+        // One job order for the whole load, drawn with the menu's per-dropoff
+        // floor times the stop count so there is a stop's worth of goods to deal
+        // out, then split unevenly so each corner carries its own part.
+        TouristenOrder jobOrder = TouristenRules.DrawOrder(
+            kind, _menu.MinItemsPerOrder * places.Count, _rng);
+        IReadOnlyList<TouristenOrder> shares =
+            TouristenRules.SplitOrder(jobOrder, places.Count, _rng);
+        var dropoffs = new List<TouristenDropoff>(places.Count);
+        for (int i = 0; i < places.Count; i++)
+        {
+            TouristenOrder share = shares[i];
+            if (share.ItemCount == 0)
             {
-                _log.LogWarning($"touristenfahrten dropoff skipped: {place.Name}");
+                _log.LogWarning($"touristenfahrten dropoff skipped: {places[i].Name} got no share");
                 continue;
             }
 
-            dropoffs.Add(new TouristenDropoff(
-                door, TouristenRules.DrawOrder(kind, _menu.MinItemsPerOrder, _rng)));
+            if (_doors.Dropoff(places[i]) is not { } door)
+            {
+                _log.LogWarning($"touristenfahrten dropoff skipped: {places[i].Name}");
+                continue;
+            }
+
+            dropoffs.Add(new TouristenDropoff(door, share));
         }
 
         if (dropoffs.Count == 0)
@@ -116,8 +176,28 @@ public sealed class TouristenfahrtenFlow
     }
 
     /// <summary>
+    /// The briefing's BACK: nothing was drawn, so the calendar the row was
+    /// tapped on comes back and the next tap draws a fresh run.
+    /// </summary>
+    public void CloseBriefing()
+    {
+        _host.GoToCalendar();
+        _log.LogInfo("touristenfahrten briefing closed: no run started");
+    }
+
+    // The real-world calendar date the Nürburgring events are listed in. UTC on
+    // purpose: the data file is authored as days, and a second time-zone rule
+    // would only move the bonus edge by an hour without making it clearer.
+    private DateOnly RealToday() => DateOnly.FromDateTime(_clock.UtcNow);
+
+    // What one delivered order pays while the real-world calendar runs an
+    // event: the briefing page's title names the same event, so the doubled
+    // money and the page can never disagree about whether it is a race weekend.
+    private double PayoutMultiplier => _weekends.Multiplier(RealToday());
+
+    /// <summary>
     /// The one HUD ENTER: at the shop it loads the goods and pins the first
-    /// corner; at a corner it settles that order through the receipt. The
+    /// corner; at a corner it settles that stop's share through the receipt. The
     /// receipt's CONTINUE is what advances the run (see ContinueAfterReceipt).
     /// </summary>
     public void Deliver()
@@ -145,7 +225,8 @@ public sealed class TouristenfahrtenFlow
         }
 
         _awaitingReceipt = true;
-        _settlement.Settle(dropoff, _meter.DistanceKm, _host, ContinueAfterReceipt);
+        _settlement.Settle(
+            dropoff, _meter.DistanceKm, PayoutMultiplier, _host, ContinueAfterReceipt);
     }
 
     // The receipt's CONTINUE: the delivered dropoff is behind the player, so
@@ -187,18 +268,20 @@ public sealed class TouristenfahrtenFlow
         _log.LogInfo($"touristenfahrten complete: {run.Dropoffs.Count} dropoff(s)");
     }
 
-    // The pickup leg: the shop plus the run's whole dropoff list, so the player
-    // reads what they are loading for before they arrive.
+    // The pickup leg: the shop's own address (the HUD's shared four) plus the
+    // run's whole dropoff list, so the player reads what they are loading for
+    // before they arrive.
     private void PinPickup(TouristenRun run) =>
         _hud?.SetJobGuidance(new HudJobGuidance(
             run.Pickup.Name, run.Pickup.Address,
             "HudTouristenPickupDrive", "HudTouristenPickupArrived", "HudPickUp",
             _arrivalRadiusMeters,
-            DriveArgs: [run.Pickup.Name, TouristenCopy.Names(run.Dropoffs)]));
+            DriveArgs: [TouristenCopy.Names(run.Dropoffs)]));
 
-    // The corner leg: the order on board and where it goes. The arrival line
-    // and the DELIVER ITEMS button are the delivery run's own, so the two jobs
-    // read the same wording at a door.
+    // The corner leg: the share on board and where it goes, over the corner's
+    // own address. The DELIVER button and its arrival line are the run's own,
+    // so the delivery career's "DELIVER ITEMS" wording never leaks onto a
+    // corner where the player unloads a customer's takeaway.
     private void PinDropoff(TouristenRun run)
     {
         if (run.Current is not { } dropoff)
@@ -208,9 +291,11 @@ public sealed class TouristenfahrtenFlow
 
         _hud?.SetJobGuidance(new HudJobGuidance(
             dropoff.Door.Name, dropoff.Door.Address,
-            "HudTouristenDropoffDrive", "HudDeliveryStoreArrived", "HudDeliveryStoreAction",
+            "HudTouristenDropoffDrive",
+            "HudTouristenDropoffArrived",
+            "HudTouristenDeliverAction",
             _arrivalRadiusMeters,
-            DriveArgs: [TouristenCopy.Order(dropoff.Order), dropoff.Door.Name]));
+            DriveArgs: [TouristenCopy.Order(dropoff.Order)]));
     }
 
     /// <summary>

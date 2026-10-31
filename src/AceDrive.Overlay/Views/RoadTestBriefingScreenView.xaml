@@ -1,0 +1,61 @@
+<UserControl x:Class="AceDrive.Overlay.Views.RoadTestBriefingScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- The road test's briefing page (PORTPLAN 49): what the calendar's Tuesday
+         row opens before the companion pins La Strada. Unity starts the drive
+         from the job-centre button, so the port spells the week's test out
+         before a leg that cannot be cancelled. Same skeleton as the market
+         valuation's briefing: title band, body, the verbs flush at the bottom
+         (START above BACK). The body takes the middle of the panel so the text
+         sits centred instead of hugging the title. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding Title}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
+            <!-- Where the test is held, then the week's terms: the venue stays
+                 teal like the other briefings' subject line, the copy white. -->
+            <TextBlock Text="{Binding VenueLine}" Foreground="#FF97EAD2" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,12"/>
+            <TextBlock Text="{Binding IntroLine}" Foreground="#FFF" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- Verb band: START DRIVE rides above BACK, both flush with the panel
+             edge like the showcase page; teal is the shared voice-ack
+             highlight. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{Binding StartLabel}" Command="{Binding StartCommand}"
+                    Padding="4" Margin="0,0,0,6" HorizontalAlignment="Stretch">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StartFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=RoadTestBack}" Command="{Binding BackCommand}"
+                    Padding="4" HorizontalAlignment="Stretch">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -12,6 +12,14 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 internal static class TouristenCopy
 {
+    /// <summary>
+    /// The briefing page's title: the real-world Nürburgring event running today
+    /// when the calendar names one (the title then reads as the event itself),
+    /// otherwise the run's own weekend title from resx.
+    /// </summary>
+    public static string WeekendTitle(TouristenRaceWeekend? weekend) =>
+        weekend is { Name.Length: > 0 } ? weekend.Name : Strings.Get("TouristenTitle");
+
     /// <summary>The run's dropoff names, e.g. "Brünnchen, Einfahrt and Pflanzgarten".</summary>
     public static string Names(IReadOnlyList<TouristenDropoff> dropoffs)
     {

@@ -29,8 +29,11 @@ public static class WhereIsWillyReceiptBuilder
         int visits = Math.Max(0, attempts);
         int shops = Math.Max(0, shopCount);
         double average = WhereIsWillyRules.AverageCarValue(ownedCars);
+        // WHY BaseName: a resident's drawn identity can still carry a ride's
+        // companion suffix ("and some colleagues"), and the receipt returns one
+        // elder, not a group (the quest page's intro makes the same call).
         return new WhereIsWillyReceipt(
-            person.Name.Full,
+            person.Name.BaseName,
             person.Name.FirstName,
             shop.Name,
             rules.Reward(average, shops, visits),

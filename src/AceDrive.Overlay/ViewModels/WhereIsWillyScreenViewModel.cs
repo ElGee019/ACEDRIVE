@@ -5,12 +5,13 @@ using AceDrive.Overlay.Localization;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The weekly missing-person quest page (ToWhereIsWilly.md §3.4), the port's
-/// stand-in for Unity's map while the search is on (adaptation A1). The phase
-/// decides the layout: the search lists the town's coffee shops with Unity's
-/// intro sentence and offers GIVE UP once a visit has failed; the found phase
-/// names the elder's home address and offers the one DRIVE HOME row. BACK keeps
-/// the run alive and hands the player back to the companion.
+/// The weekly missing-person quest page (ToWhereIsWilly.md Â§3.4), the port's
+/// stand-in for Unity's map while the search runs (adaptation A1): Unity's
+/// intro sentence and the town's coffee shops, with GIVE UP once a visit has
+/// failed. The found step is not a page â€” the companion announces it and its
+/// DRIVE button (HudTaskPrompt) â€” so this page only ever paints the search.
+/// BACK is its one exit: on the untouched page the flow declines the run and
+/// lands back on the calendar, once a shop is pinned it only hides the page.
 ///
 /// The page formats DATA it is handed (the drawn elder, the town, the shops)
 /// and never draws, prices or pays anything: every row reports its tap to the
@@ -19,64 +20,43 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed class WhereIsWillyScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly Action<PointOfInterest> _onShop;
-    private readonly Action _onHome;
     private readonly Action _onGiveUp;
     private readonly ICommand _backCommand;
     private readonly VoiceBeat _beat;
-    private readonly string _firstName;
 
     public WhereIsWillyScreenViewModel(
-        WhereIsWillyPhase phase, Resident person, AddressLocation home, string town,
-        IReadOnlyList<PointOfInterest> shops, bool showNotHere,
-        Action<PointOfInterest> onShop, Action onHome, Action onGiveUp,
+        Resident person, string town, IReadOnlyList<PointOfInterest> shops,
+        bool showNotHere, Action<PointOfInterest> onShop, Action onGiveUp,
         ICommand backCommand, VoiceBeat beat)
     {
         ArgumentNullException.ThrowIfNull(person);
         ArgumentNullException.ThrowIfNull(shops);
         ArgumentNullException.ThrowIfNull(onShop);
-        ArgumentNullException.ThrowIfNull(onHome);
         ArgumentNullException.ThrowIfNull(onGiveUp);
         ArgumentNullException.ThrowIfNull(backCommand);
         ArgumentNullException.ThrowIfNull(beat);
 
-        Phase = phase;
         _onShop = onShop;
-        _onHome = onHome;
         _onGiveUp = onGiveUp;
         _backCommand = backCommand;
         _beat = beat;
-        _firstName = person.Name.FirstName;
         // WHY BaseName and not Full: a resident's drawn identity can still carry
         // the ride's companion suffix ("and some friends"), and a missing-person
         // sentence about one elder must not claim a whole group vanished.
-        IntroLine = Strings.Format("WillyIntro", person.Name.BaseName, _firstName, town);
-        FoundLine = Strings.Format("WillyFound", HomeAddress(home, town), _firstName);
+        IntroLine = Strings.Format("WillyIntro", person.Name.BaseName, person.Name.FirstName, town);
         Shops = BuildRows(shops);
-        ShowNotHere = showNotHere && IsSearching;
+        ShowNotHere = showNotHere;
         SelectShopCommand = new ParameterizedCommand<WillyShopRow>(SelectShop);
-        DriveHomeCommand = new RelayCommand(DriveHome);
         GiveUpCommand = new RelayCommand(GiveUp);
         BackCommand = new RelayCommand(Back);
         RebuildVoice();
     }
-
-    /// <summary>The quest's phase this page was built for (search or found).</summary>
-    public WhereIsWillyPhase Phase { get; }
 
     /// <summary>Unity's screen title.</summary>
     public string Title { get; } = Strings.Get("WillyTitle");
 
     /// <summary>Unity's two-sentence intro, the town and the elder already in it.</summary>
     public string IntroLine { get; }
-
-    /// <summary>Unity's found sentence, naming the short home address.</summary>
-    public string FoundLine { get; }
-
-    /// <summary>True for the search layout.</summary>
-    public bool IsSearching => Phase == WhereIsWillyPhase.Searching;
-
-    /// <summary>True for the found layout.</summary>
-    public bool IsFound => Phase == WhereIsWillyPhase.Found;
 
     /// <summary>The town's coffee shops, each row pinning one door.</summary>
     public IReadOnlyList<WillyShopRow> Shops { get; }
@@ -88,24 +68,19 @@ public sealed class WhereIsWillyScreenViewModel : ViewModelBase, IVoiceScreen
     public string NotHereLine { get; } = Strings.Get("WillyNotHere");
 
     /// <summary>GIVE UP only exists once a visit has failed (Unity's rule).</summary>
-    public bool CanGiveUp => IsSearching && ShowNotHere;
+    public bool CanGiveUp => ShowNotHere;
 
     /// <summary>GIVE UP's label.</summary>
     public string GiveUpLabel { get; } = Strings.Get("WillyGiveUp");
 
-    /// <summary>The found page's one row: "DRIVE {first} HOME".</summary>
-    public string DriveHomeLabel => Strings.Format("WillyDriveHome", _firstName);
-
     /// <summary>Pins the tapped coffee shop and closes the page.</summary>
     public ICommand SelectShopCommand { get; }
-
-    /// <summary>Pins the elder's door and closes the page.</summary>
-    public ICommand DriveHomeCommand { get; }
 
     /// <summary>Clears the run: offered only after a failed visit.</summary>
     public ICommand GiveUpCommand { get; }
 
-    /// <summary>Hides the page and keeps the run alive for the calendar row.</summary>
+    /// <summary>The page's way out: the flow decides between declining the run
+    /// (search page, before a shop tap) and leaving it running.</summary>
     public ICommand BackCommand { get; }
 
     /// <summary>Teal-glow acknowledgment for the navigating BACK tap.</summary>
@@ -136,13 +111,6 @@ public sealed class WhereIsWillyScreenViewModel : ViewModelBase, IVoiceScreen
         _beat.Cancel();
         GiveUpFlash = false;
         _onShop(row.Poi);
-    }
-
-    private void DriveHome()
-    {
-        _beat.Cancel();
-        BackFlash = false;
-        _onHome();
     }
 
     private void GiveUp()
@@ -176,10 +144,6 @@ public sealed class WhereIsWillyScreenViewModel : ViewModelBase, IVoiceScreen
         {
             actions[row.Name] = () => SelectShop(row);
         }
-        if (IsFound)
-        {
-            actions[DriveHomeLabel] = DriveHome;
-        }
         if (CanGiveUp)
         {
             actions[GiveUpLabel] = () =>
@@ -197,9 +161,4 @@ public sealed class WhereIsWillyScreenViewModel : ViewModelBase, IVoiceScreen
         };
         VoiceActions = actions;
     }
-
-    // The port's one address shape with the city appended, the same pair the
-    // companion prints (adaptation A2).
-    private static string HomeAddress(AddressLocation home, string town) =>
-        Strings.Format("HudAddressWithCity", AddressFormatter.Format(home), town);
 }

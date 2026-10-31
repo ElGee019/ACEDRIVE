@@ -8,30 +8,77 @@ using Vosk;
 
 namespace AceDrive.Overlay.Services;
 
-/// <summary>Mic -&gt; Vosk offline STT -&gt; text fragments. Owns the audio thread.</summary>
+/// <summary>
+/// Mic -&gt; Vosk offline STT -&gt; text fragments. Owns the audio thread. Two
+/// decoders share the one model: the full vocabulary that answers commands, and
+/// a grammar built from the wake phrases that runs only while the panel is down
+/// (see <see cref="VoskWakeGrammar"/>).
+/// </summary>
 public sealed class VoskListener : IVoiceListener
 {
     private readonly string _modelPath;
     private readonly ILog _log;
     private readonly int _sampleRate;
     private readonly string? _micPreference;
+    private readonly IReadOnlyList<string> _wakePhrases;
+    // Guards the two recognizers: the audio thread decodes, the UI thread flips
+    // the wake mode (a panel show/hide), and Vosk has no thread affinity of its
+    // own. Decoding and the mode flip are short; the events fire outside it.
+    private readonly object _gate = new();
     private Model? _model;
     private VoskRecognizer? _rec;
+    private VoskRecognizer? _wakeRec;
     private WaveIn? _mic;
+    private bool _wakeListening;
     private bool _running;
     private bool _disposed;
 
-    public VoskListener(string modelPath, ILog log, int sampleRate = 16000, string? micPreference = null)
+    public VoskListener(
+        string modelPath, ILog log, int sampleRate = 16000, string? micPreference = null,
+        IReadOnlyList<string>? wakePhrases = null)
     {
         _modelPath = modelPath;
         _log = log;
         _sampleRate = sampleRate;
         _micPreference = micPreference;
+        _wakePhrases = wakePhrases ?? [];
     }
 
     public bool IsAvailable => true;
 
     public event EventHandler<VoiceTextEventArgs>? Heard;
+
+    public event EventHandler<VoiceTextEventArgs>? WakeHeard;
+
+    public bool WakeListening
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _wakeListening;
+            }
+        }
+        set
+        {
+            lock (_gate)
+            {
+                if (_wakeListening == value)
+                {
+                    return;
+                }
+
+                _wakeListening = value;
+                // WHY the reset: the constrained decoder heard none of the
+                // audio since the panel went up, so its next result must start
+                // at this boundary instead of continuing a stale utterance.
+                if (value)
+                {
+                    _wakeRec?.Reset();
+                }
+            }
+        }
+    }
 
     public void StartListening()
     {
@@ -48,6 +95,7 @@ public sealed class VoskListener : IVoiceListener
             _model = new Model(_modelPath);
             _rec = new VoskRecognizer(_model, _sampleRate);
             _rec.SetWords(false);
+            _wakeRec = CreateWakeRecognizer(_model);
             int device = ResolveDeviceIndex(ListDeviceNames(), _micPreference, DefaultCaptureName());
             string name = DeviceDisplayName(device);
             _mic = new WaveIn { DeviceNumber = device, WaveFormat = new WaveFormat(_sampleRate, 1) };
@@ -77,19 +125,82 @@ public sealed class VoskListener : IVoiceListener
         Cleanup();
     }
 
+    // The constrained decoder, or null when the model cannot pronounce any wake
+    // phrase: the full decoder then keeps waking exactly as it does today
+    // (never a voice-off start over a grammar detail).
+    private VoskRecognizer? CreateWakeRecognizer(Model model)
+    {
+        // WHY FindWord: a word the model's vocabulary lacks is skipped silently
+        // by Kaldi, so an unusable phrase must be dropped here, whole (see
+        // VoskWakeGrammar).
+        WakeGrammar? grammar = VoskWakeGrammar.Build(
+            _wakePhrases, word => model.FindWord(word) >= 0);
+        if (grammar is null)
+        {
+            _log.LogWarning(
+                "wake grammar: no phrase survived the model vocabulary; " +
+                "wake word falls back to the full decoder");
+            return null;
+        }
+
+        _log.LogInfo(
+            $"wake grammar: {grammar.Kept}/{_wakePhrases.Count} phrase(s), " +
+            $"{grammar.Dropped} dropped");
+        return new VoskRecognizer(model, _sampleRate, grammar.Json);
+    }
+
     private void OnAudio(object? sender, WaveInEventArgs e)
     {
+        // WHY the fragments leave the lock before firing: the handlers flip the
+        // wake mode (a wake shows the panel, a tap can hide it), and taking the
+        // gate from inside a handler would deadlock against the audio thread.
+        string? said = null;
+        string? saidPartial = null;
+        string? wake = null;
+        string? wakePartial = null;
         try
         {
-            if (!_running || _rec is null || e.BytesRecorded == 0) return;
-            if (_rec.AcceptWaveform(e.Buffer, e.BytesRecorded))
+            if (!_running || e.BytesRecorded == 0)
             {
-                Emit(_rec.Result(), isFinal: true);
+                return;
             }
-            else
+
+            lock (_gate)
             {
-                Emit(_rec.PartialResult(), isFinal: false);
+                if (!_running || _rec is null)
+                {
+                    return;
+                }
+
+                if (_rec.AcceptWaveform(e.Buffer, e.BytesRecorded))
+                {
+                    said = _rec.Result();
+                }
+                else
+                {
+                    saidPartial = _rec.PartialResult();
+                }
+
+                // Fed beside the full decoder, never instead of it: the HUD's
+                // ENTER/DROP OFF keywords and a customer request still answer
+                // mid-drive, when no panel is up to match labels on.
+                if (_wakeListening && _wakeRec is { } wakeRec)
+                {
+                    if (wakeRec.AcceptWaveform(e.Buffer, e.BytesRecorded))
+                    {
+                        wake = wakeRec.Result();
+                    }
+                    else
+                    {
+                        wakePartial = wakeRec.PartialResult();
+                    }
+                }
             }
+
+            if (said is not null) Emit(said, isFinal: true, wake: false);
+            if (saidPartial is not null) Emit(saidPartial, isFinal: false, wake: false);
+            if (wake is not null) Emit(wake, isFinal: true, wake: true);
+            if (wakePartial is not null) Emit(wakePartial, isFinal: false, wake: true);
         }
         // WHY: the audio thread has no dispatcher handler, so a dead device
         // or the dispose race mid-callback would take the overlay (and the
@@ -101,7 +212,7 @@ public sealed class VoskListener : IVoiceListener
         }
     }
 
-    private void Emit(string json, bool isFinal)
+    private void Emit(string json, bool isFinal, bool wake)
     {
         try
         {
@@ -110,7 +221,15 @@ public sealed class VoskListener : IVoiceListener
             if (doc.RootElement.TryGetProperty(key, out JsonElement el) &&
                 el.GetString() is { Length: > 0 } text)
             {
-                Heard?.Invoke(this, new VoiceTextEventArgs(text, isFinal));
+                var args = new VoiceTextEventArgs(text, isFinal);
+                if (wake)
+                {
+                    WakeHeard?.Invoke(this, args);
+                }
+                else
+                {
+                    Heard?.Invoke(this, args);
+                }
             }
         }
         // WHY: a torn/mis-shaped fragment (JsonException) or a non-string
@@ -132,8 +251,15 @@ public sealed class VoskListener : IVoiceListener
         }
         _mic?.Dispose();
         _mic = null;
-        _rec?.Dispose();
-        _rec = null;
+        lock (_gate)
+        {
+            _wakeListening = false;
+            _wakeRec?.Dispose();
+            _wakeRec = null;
+            _rec?.Dispose();
+            _rec = null;
+        }
+
         _model?.Dispose();
         _model = null;
     }

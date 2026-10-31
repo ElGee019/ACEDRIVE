@@ -36,7 +36,7 @@ public sealed class WhereIsWillyFlowTests
 
         Assert.True(session.Willy.InFlight);
         Assert.True(session.Vm.IsShown);
-        Assert.Equal(WhereIsWillyPhase.Searching, page.Phase);
+        Assert.Equal(WhereIsWillyPhase.Searching, session.Willy.Phase);
         Assert.Equal(2, page.Shops.Count);
         Assert.All(page.Shops, row => Assert.NotEmpty(row.Address));
         Assert.False(page.CanGiveUp);
@@ -65,11 +65,11 @@ public sealed class WhereIsWillyFlowTests
         Pin(session, hud, HidingShop(search));
         Park(session, hud);
 
-        var found = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
-        Assert.Equal(WhereIsWillyPhase.Found, found.Phase);
-        Assert.Contains("Street 1", found.FoundLine, StringComparison.Ordinal);
-        Assert.DoesNotContain("Street 2", found.FoundLine, StringComparison.Ordinal);
-        Assert.DoesNotContain("Street 3", found.FoundLine, StringComparison.Ordinal);
+        // The drive-home leg names the elder's door: the first DRIVE tap pins
+        // it, so the address the companion would read is the zone's street.
+        hud.RaiseTaskAction();
+        AddressLocation home = Assert.IsType<PointOfInterest>(hud.Destination).Address;
+        Assert.Equal("Street 1", home.StreetName);
     }
 
     [Fact]
@@ -90,23 +90,28 @@ public sealed class WhereIsWillyFlowTests
     }
 
     [Fact]
-    public void ParkingAtTheHidingShop_OpensTheFoundPage()
+    public void ParkingAtTheHidingShop_AnnouncesTheFindOnTheCompanion()
     {
         var hud = new FakeTelemetryHud();
         TestSessionResult session = Create(hud);
         WhereIsWillyScreenViewModel search = Begin(session, hud);
         PointOfInterest hiding = HidingShop(search);
 
-        Pin(session, hud, hiding);
+        // The player's own path: the shop row hides the panel for the drive.
+        search.SelectShopCommand.Execute(search.Shops.Single(row => row.Poi.Id == hiding.Id));
         Park(session, hud);
 
-        var found = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
-        Assert.Equal(WhereIsWillyPhase.Found, found.Phase);
-        Assert.True(session.Vm.IsShown);
+        // No main window: the step is one action, so the companion carries the
+        // news and its DRIVE button, with the panel still down from the drive.
+        Assert.False(session.Vm.IsShown);
+        Assert.Equal(WhereIsWillyPhase.Found, session.Willy.Phase);
+        Assert.True(session.Willy.InFlight);
         // The pinned shop is released, so a stray ENTER cannot open the shop.
         Assert.Null(hud.Destination);
-        Assert.Contains("Missing person found", found.FoundLine, StringComparison.Ordinal);
-        Assert.Contains("DRIVE", found.DriveHomeLabel, StringComparison.Ordinal);
+        HudTaskPrompt prompt = Assert.IsType<HudTaskPrompt>(hud.TaskPrompt);
+        Assert.Equal("HudWillyFound", prompt.TextKey);
+        Assert.Equal("HudDrive", prompt.ActionKey);
+        Assert.NotEmpty(Assert.Single(prompt.Args!));
     }
 
     [Fact]
@@ -122,10 +127,61 @@ public sealed class WhereIsWillyFlowTests
         Park(session, hud);
 
         var page = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
-        Assert.Equal(WhereIsWillyPhase.Searching, page.Phase);
+        Assert.Equal(WhereIsWillyPhase.Searching, session.Willy.Phase);
         Assert.True(page.ShowNotHere);
         Assert.True(page.CanGiveUp);
         Assert.Null(hud.Destination);
+    }
+
+    [Fact]
+    public void FoundRun_WednesdayRowPutsThePromptBackInsteadOfAPage()
+    {
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(hud);
+        WhereIsWillyScreenViewModel search = Begin(session, hud);
+        PointOfInterest hiding = HidingShop(search);
+        search.SelectShopCommand.Execute(search.Shops.Single(row => row.Poi.Id == hiding.Id));
+        Park(session, hud);
+        hud.SetTaskPrompt(null);
+
+        CalendarScreenViewModel calendar = OpenCalendar(session);
+        calendar.DayCommand.Execute(4);
+
+        // The found step is still the companion's: the row only restores the
+        // prompt, it never swaps a page into the panel.
+        Assert.Equal("HudWillyFound", hud.TaskPrompt?.TextKey);
+        Assert.IsType<CalendarScreenViewModel>(session.Vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void DropOff_OpensTheReceiptWithoutTheQuestPageInBetween()
+    {
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(hud, garage: GarageWithTestCar());
+        WhereIsWillyScreenViewModel search = Begin(session, hud);
+        PointOfInterest hiding = HidingShop(search);
+        search.SelectShopCommand.Execute(search.Shops.Single(row => row.Poi.Id == hiding.Id));
+        Park(session, hud);
+        hud.RaiseTaskAction();
+        hud.AtDestination = false;
+        session.Vm.Poll();
+        Park(session, hud);
+
+        // Every page the panel is handed from the DROP OFF tap on.
+        var shown = new List<object?>();
+        session.Vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(MainViewModel.CurrentScreen) or nameof(MainViewModel.IsShown))
+            {
+                shown.Add(session.Vm.CurrentScreen);
+            }
+        };
+
+        hud.RaiseEnter();
+
+        Assert.IsType<WhereIsWillyReceiptScreenViewModel>(session.Vm.CurrentScreen);
+        // The search page must not come back on the way to the receipt.
+        Assert.DoesNotContain(shown, screen => screen is WhereIsWillyScreenViewModel);
     }
 
     [Fact]
@@ -140,12 +196,13 @@ public sealed class WhereIsWillyFlowTests
             hud, wallet, friends, trunk, drivers: drivers, garage: GarageWithTestCar());
 
         WhereIsWillyScreenViewModel search = Begin(session, hud);
-        Pin(session, hud, HidingShop(search));
+        PointOfInterest hiding = HidingShop(search);
+        search.SelectShopCommand.Execute(search.Shops.Single(row => row.Poi.Id == hiding.Id));
         Park(session, hud);
-        var found = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
         double cashBefore = wallet.Cash;
 
-        found.DriveHomeCommand.Execute(null);
+        // The found step is the companion's: its DRIVE button pins the door.
+        hud.RaiseTaskAction();
 
         Assert.False(session.Vm.IsShown);
         Assert.Equal(PoiTypes.Willy, hud.Destination?.Type);
@@ -159,8 +216,10 @@ public sealed class WhereIsWillyFlowTests
         Park(session, hud);
 
         // Home arrival: friendship +1 and the HUD's DROP OFF, no payment yet.
+        // The arrival sentence is left empty on purpose: the button is the
+        // only thing the companion says at the door.
         Assert.Equal("HudWillyDropOff", hud.Copy?.ActionKey);
-        Assert.Equal("HudWillyHomeArrived", hud.Copy?.ArrivedKey);
+        Assert.Equal(string.Empty, hud.Copy?.ArrivedKey);
         string elder = Assert.Single(friends.Names);
         Assert.Equal(1, friends.GetLevel(elder));
         Assert.Equal(cashBefore, wallet.Cash, 6);
@@ -180,9 +239,13 @@ public sealed class WhereIsWillyFlowTests
         Assert.Contains(drivers.Saved, state => state.LastWillyDate == "2026-10-14");
         Assert.False(session.Willy.InFlight);
         Assert.Null(hud.Destination);
+        // The run ended, so its prompt left the companion with it.
+        Assert.Null(hud.TaskPrompt);
 
         receipt.ContinueCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(session.Vm.CurrentScreen);
+        // The weekly run is an event, not a job: CONTINUE lands on the main page,
+        // never the jobs page the search was started from.
+        Assert.IsType<MenuScreenViewModel>(session.Vm.CurrentScreen);
     }
 
     [Fact]
@@ -248,7 +311,7 @@ public sealed class WhereIsWillyFlowTests
         // The next tap draws a fresh search instead of resuming the abandoned one.
         WhereIsWillyScreenViewModel again = Begin(session, hud);
         Assert.True(session.Willy.InFlight);
-        Assert.Equal(WhereIsWillyPhase.Searching, again.Phase);
+        Assert.Equal(WhereIsWillyPhase.Searching, session.Willy.Phase);
         Assert.False(again.CanGiveUp);
     }
 
@@ -339,7 +402,7 @@ public sealed class WhereIsWillyFlowTests
     }
 
     [Fact]
-    public void QuestInFlight_BlocksTheTaxiShiftAndTheDeliveryCareer()
+    public void QuestInFlight_BlocksTheTaxiShift()
     {
         var hud = new FakeTelemetryHud();
         var shift = new TaxiShift();
@@ -347,16 +410,46 @@ public sealed class WhereIsWillyFlowTests
         WhereIsWillyScreenViewModel search = Begin(session, hud);
 
         session.Vm.TaxiShiftCommand.Execute(null);
+
         Assert.False(shift.IsStarted);
         Assert.Same(search, session.Vm.CurrentScreen);
+        Assert.True(session.Willy.InFlight);
+    }
 
-        // The panel goes back to the menu/control page for the delivery tap;
-        // the run stays in flight and the career refuses to open.
-        search.BackCommand.Execute(null);
+    [Fact]
+    public void DispatchedQuest_BlocksTheDeliveryCareer()
+    {
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(hud);
+        WhereIsWillyScreenViewModel search = Begin(session, hud);
+
+        // A pinned shop hides the panel and keeps the run live, so the call
+        // opens the menu; the career entry reads the same lock the shift does.
+        search.SelectShopCommand.Execute(search.Shops[0]);
         OpenControl(session).DeliveryCommand.Execute(null);
 
         Assert.IsType<MainControlScreenViewModel>(session.Vm.CurrentScreen);
         Assert.True(session.Willy.InFlight);
+    }
+
+    [Fact]
+    public void Back_OnTheFirstPage_DeclinesTheRunAndReturnsToTheCalendar()
+    {
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(hud);
+        WhereIsWillyScreenViewModel search = Begin(session, hud);
+
+        // Clicking the calendar row and then BACK is not accepting the run:
+        // nothing is drawn for later, no fee or stamp is written, and the
+        // panel lands back on the calendar it came from instead of hiding or
+        // holding the job centre hostage with an in-flight run.
+        search.BackCommand.Execute(null);
+
+        var calendar = Assert.IsType<CalendarScreenViewModel>(session.Vm.CurrentScreen);
+        Assert.False(session.Willy.InFlight);
+        Assert.Null(session.WillyLedger.LastCompletedDate);
+        Assert.Null(hud.Destination);
+        Assert.Equal("Where is Willy", WillyRow(calendar).EventLabel);
     }
 
     [Fact]
@@ -430,12 +523,14 @@ public sealed class WhereIsWillyFlowTests
         WhereIsWillyScreenViewModel search = Begin(session, hud);
         string[] before = [.. search.Shops.Select(s => s.Poi.Id)];
 
-        search.BackCommand.Execute(null);
+        // A pinned shop leaves the run in flight with the panel down; the
+        // calendar row reopens that same page instead of drawing a new search.
+        search.SelectShopCommand.Execute(search.Shops[0]);
         CalendarScreenViewModel calendar = OpenCalendar(session);
         calendar.DayCommand.Execute(4);
 
         var reopened = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
-        Assert.Equal(WhereIsWillyPhase.Searching, reopened.Phase);
+        Assert.Equal(WhereIsWillyPhase.Searching, session.Willy.Phase);
         Assert.Equal(before, reopened.Shops.Select(s => s.Poi.Id));
     }
 

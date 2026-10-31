@@ -3,8 +3,9 @@ using AceDrive.Core;
 namespace AceDrive.Core.Tests;
 
 /// <summary>
-/// The Touristenfahrten draws: 1-3 distinct corners per run, every order inside
-/// its item ranges and never under the two-item floor, and the shipped prices.
+/// The Touristenfahrten draws: 1-3 distinct corners per run, the job order
+/// inside its item ranges and never under the per-dropoff floor, the uneven
+/// split that keeps every unit and fills each stop, and the shipped prices.
 /// </summary>
 public sealed class TouristenRulesTests
 {
@@ -69,6 +70,93 @@ public sealed class TouristenRulesTests
 
         Assert.Equal(12.5, order.Total, 2);
         Assert.Equal(3, order.ItemCount);
+    }
+
+    [Fact]
+    public void SplitOrder_DealsOneJobOrderOutAndKeepsEveryUnit()
+    {
+        var order = new TouristenOrder(
+        [
+            new TouristenOrderLine("coffee", "TouristenItemCoffee", 4, 3.5),
+            new TouristenOrderLine("beer", "TouristenItemBeer", 3, 5.5),
+            new TouristenOrderLine("soup", "TouristenItemSoup", 2, 8.5),
+        ]);
+
+        for (int seed = 0; seed < 20; seed++)
+        {
+            IReadOnlyList<TouristenOrder> shares =
+                TouristenRules.SplitOrder(order, 3, new Random(seed));
+
+            Assert.Equal(3, shares.Count);
+            Assert.All(shares, share => Assert.True(share.ItemCount >= 1));
+            Assert.Equal(order.ItemCount, shares.Sum(share => share.ItemCount));
+            Assert.Equal(order.Total, shares.Sum(share => share.Total), 2);
+        }
+
+        // A line keeps its own identity and unit price in the share it lands in.
+        IReadOnlyList<TouristenOrder> split = TouristenRules.SplitOrder(order, 3, new Random(1));
+        TouristenOrderLine line = Assert.Single(
+            split[0].Lines, share => share.Key == "coffee");
+        Assert.Equal("TouristenItemCoffee", line.NameKey);
+        Assert.Equal(3.5, line.UnitPrice);
+    }
+
+    [Fact]
+    public void SplitOrder_DoesNotSplitTheLoadEvenly()
+    {
+        var order = new TouristenOrder(
+            [new TouristenOrderLine("coffee", "TouristenItemCoffee", 12, 3.5)]);
+
+        // One seeded deal that lands equal shares is possible; the run must not
+        // produce it on every draw, which is what an even split would.
+        bool uneven = false;
+        for (int seed = 0; seed < 20 && !uneven; seed++)
+        {
+            IReadOnlyList<TouristenOrder> shares =
+                TouristenRules.SplitOrder(order, 3, new Random(seed));
+            uneven = shares[0].ItemCount != shares[1].ItemCount
+                || shares[1].ItemCount != shares[2].ItemCount;
+        }
+
+        Assert.True(uneven);
+    }
+
+    [Fact]
+    public void SplitOrder_LeavesTheLastSharesEmptyWhenTheLoadIsTooSmall()
+    {
+        var order = new TouristenOrder(
+            [new TouristenOrderLine("coffee", "TouristenItemCoffee", 2, 3.5)]);
+
+        IReadOnlyList<TouristenOrder> shares =
+            TouristenRules.SplitOrder(order, 3, new Random(4));
+
+        Assert.Equal(1, shares[0].ItemCount);
+        Assert.Equal(1, shares[1].ItemCount);
+        Assert.Equal(0, shares[2].ItemCount);
+    }
+
+    [Fact]
+    public void SplitOrder_RejectsAZeroDropoffRun()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => TouristenRules.SplitOrder(
+            new TouristenOrder([]), 0, new Random(1)));
+    }
+
+    [Fact]
+    public void SplitOrder_OfTheDrawnJobOrder_FillsEveryDropoffShare()
+    {
+        TouristenPickup coffee = Pickup("coffee");
+        for (int seed = 0; seed < 50; seed++)
+        {
+            TouristenOrder order = TouristenRules.DrawOrder(coffee, 6, new Random(seed));
+
+            IReadOnlyList<TouristenOrder> shares =
+                TouristenRules.SplitOrder(order, 3, new Random(seed));
+
+            Assert.Equal(3, shares.Count);
+            Assert.All(shares, share => Assert.True(share.ItemCount >= 1));
+            Assert.Equal(order.ItemCount, shares.Sum(share => share.ItemCount));
+        }
     }
 
     [Fact]

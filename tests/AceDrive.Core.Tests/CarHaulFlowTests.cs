@@ -1,16 +1,16 @@
 using System.Globalization;
+using System.Windows.Input;
 using AceDrive.Core;
 using AceDrive.Overlay.Localization;
-using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
 /// <summary>
-/// The car-haul settle runs headless: the hauled car's band and the driver's
-/// rating price the placeholder leg, the wallet banks the cash alone, the
-/// calendar takes its checkpoint and the receipt is the caller's to show. The
-/// assertions read the same wallet and clock store the flow writes.
+/// The car-haul job headless (PORTPLAN item 20): the offer draw, ACCEPT, the
+/// dealer pickup, the game-minute delivery leg and the settle. The assertions
+/// read the same wallet and friendship store the flow writes; the fake host
+/// records the pages and the pinned HUD leg in place of the shell.
 /// </summary>
 public sealed class CarHaulFlowTests
 {
@@ -19,111 +19,155 @@ public sealed class CarHaulFlowTests
     public CarHaulFlowTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
-    private static (CarHaulFlow Flow, DriverWallet Wallet, FakeGameClockStore Clocks, TestLog Log)
-        Create(
-            CarIdentity? identity = null, IReadOnlyList<CarSpec>? cars = null,
-            DriverWallet? wallet = null, int startWeek = 3)
+    [Fact]
+    public void Open_DrawsTheOfferAndAcceptPinsTheDealer()
+    {
+        Harness h = Create();
+
+        var page = Assert.IsType<CarHaulScreenViewModel>(h.Flow.Open(Back(), h.Host.ControlPage));
+        Assert.True(page.IsOffer);
+        Assert.Contains("Abarth", page.CarLine);
+
+        page.AcceptCommand.Execute(null);
+
+        Assert.True(h.Flow.Active);
+        var job = Assert.IsType<CarHaulScreenViewModel>(h.Host.Pages[^1]);
+        Assert.False(job.IsOffer);
+        Assert.Contains("Bianchi Cars", job.TaskLine);
+        Assert.Equal("Bianchi Cars", h.Host.Guidance!.TargetName);
+        Assert.Equal(1, h.Host.Refreshes);
+    }
+
+    [Fact]
+    public void ConfirmArrival_PicksUpThenSettlesTheHaul()
+    {
+        Harness h = Create();
+        AcceptOffer(h);
+
+        // PICK UP at the dealer: the car is loaded and the customer leg pins.
+        h.Flow.ConfirmArrival();
+
+        Assert.False(string.IsNullOrWhiteSpace(h.Host.Guidance!.TargetName));
+        Assert.Equal("Street 2", h.Host.Guidance.Target.StreetName);
+
+        // Drive 90 game minutes, then DELIVER THE CAR.
+        h.Clock.Advance(TimeSpan.FromSeconds(GameClock.RealSecondsPerGameMinute * 90));
+        h.Flow.ConfirmArrival();
+
+        Assert.False(h.Flow.Active);
+        var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(h.Host.Receipt);
+        Assert.Equal(90, receipt.Receipt.DriveMinutes);
+        Assert.True(receipt.Receipt.TotalEarned > 0.0);
+        Assert.Equal(h.Wallet.Cash, receipt.Receipt.TotalEarned);
+        Assert.Equal(1, h.Friends.GetLevel("Giulia Bianchi"));
+        Assert.True(receipt.HasFriendship);
+    }
+
+    [Fact]
+    public void ConfirmArrival_WithoutAnAcceptedOffer_DoesNothing()
+    {
+        Harness h = Create();
+        h.Flow.ConfirmArrival();
+        Assert.Null(h.Host.Receipt);
+        Assert.Null(h.Host.Guidance);
+    }
+
+    [Fact]
+    public void Open_WithoutADealerDoor_ShowsTheHintOnTheControlPage()
+    {
+        Harness h = Create(withDealer: false);
+
+        object page = h.Flow.Open(Back(), h.Host.ControlPage);
+
+        Assert.Same(h.Host.ControlPage, page);
+        Assert.Equal(Strings.Get("HaulUnavailable"), h.Host.Notice);
+    }
+
+    [Fact]
+    public void Open_ForANeverDrivenPlayer_ShowsTheHint()
+    {
+        Harness h = Create(brandKm: new Dictionary<string, double>());
+
+        object page = h.Flow.Open(Back(), h.Host.ControlPage);
+
+        Assert.Same(h.Host.ControlPage, page);
+        Assert.Equal(Strings.Get("HaulUnavailable"), h.Host.Notice);
+    }
+
+    [Fact]
+    public void Settle_WithoutADealerOwner_HidesTheFriendship()
+    {
+        Harness h = Create(dealerOwner: "");
+        AcceptOffer(h);
+        h.Flow.ConfirmArrival();
+        h.Clock.Advance(TimeSpan.FromSeconds(GameClock.RealSecondsPerGameMinute * 30));
+        h.Flow.ConfirmArrival();
+
+        var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(h.Host.Receipt);
+        Assert.False(receipt.HasFriendship);
+        Assert.Empty(h.Friends.Names);
+    }
+
+    [Fact]
+    public void Open_ReopensTheActiveLegInsteadOfDrawingAgain()
+    {
+        Harness h = Create();
+        AcceptOffer(h);
+
+        var page = Assert.IsType<CarHaulScreenViewModel>(h.Flow.Open(Back(), h.Host.ControlPage));
+
+        Assert.False(page.IsOffer);
+        Assert.Contains("Bianchi Cars", page.DealerLine);
+    }
+
+    private static Harness Create(
+        bool withDealer = true,
+        string dealerOwner = "Giulia Bianchi",
+        IReadOnlyDictionary<string, double>? brandKm = null)
     {
         var clock = new FakeClock();
         var game = new GameClock(clock, clock.UtcNow);
-        var beat = new VoiceBeat(clock);
-        var log = new TestLog();
-        var walletInstance = wallet ?? new DriverWallet(new DriverState(0.0, 0.0));
-        IReadOnlyList<CarSpec> pool = cars ?? DefaultPool;
-        var brands = new FakeCarBrandSource { CurrentIdentity = identity };
-        var garage = new Garage(pool);
-        var trunk = new Trunk();
-        var hunger = new Hunger(HungerRules.Default);
-        var city = new CityEconomy([], CityRules.Default);
-        var roads = new RoadTestLedger(pool, seed: 0);
-        var shift = new TaxiShift();
-        var clocks = new FakeGameClockStore();
-        // One instance per service graph: the saver writes the wallet and the
-        // clock store the assertions read.
-        var saver = new GameStateSaver(
-            clock, game, clocks, new FakeDriverStore(), new FakeGarageStore(),
-            new FakeCityStore(), new FakeHungerStore(), new FakeRoadTestStore(),
-            new FakeShiftStore(), walletInstance, new DailyStreak(clock, null),
-            new OperatingZone(null, seed: 0, AddressMap.Default), trunk, garage, city, hunger, roads,
-            shift, new ShiftRecord(null), new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), new WhereIsWillyLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0));
-        var day = new DayCycle(
-            game, shift, new ShiftRecord(null), new FakeShiftStandings(),
-            new FakePlayerTelemetry(), new FakeProfileStore(), new FakeRivals(),
-            saver, beat, startWeek, log);
-        var flow = new CarHaulFlow(brands, pool, walletInstance, day, saver, beat, log);
-        return (flow, walletInstance, clocks, log);
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
+        var friends = new FakeFriendshipStore();
+        var host = new FakeCarHaulHost();
+        var directory = new PoiDirectory();
+        if (withDealer)
+        {
+            directory.Add(new PointOfInterest(
+                "dealer-1", "Bianchi Cars",
+                new AddressLocation("Street 1", 4, HouseSide.Left),
+                PoiTypes.Dealer, dealerOwner));
+        }
+
+        var zone = new OperatingZone(
+            new DriverState(0.0, 0.0, StreetIds: ["street-1", "street-2"], ZoneKm: 1.0),
+            seed: 0, AddressMap.Default, homeStreetId: "street-1");
+        var brands = new FakeBrandMileageStore(
+            brandKm ?? new Dictionary<string, double> { ["Abarth"] = 60.0 });
+
+        var flow = new CarHaulFlow(
+            brands,
+            [new CarSpec("ks_abarth_695", 2014, "Abarth", "695 Biposto", Class: 6)],
+            directory, zone, AddressMap.Default,
+            () => new AddressLocation("Street 1", 1, HouseSide.Right),
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            wallet, friends, game, TaxiRules.Default,
+            new VoiceBeat(clock), new TestLog(),
+            CarHaulPolicy.Development, new Random(1));
+        flow.Attach(host);
+
+        return new Harness(flow, wallet, friends, host, clock);
     }
 
-    // The receipt's own zero: a class band, so the placeholder rules do not
-    // decide the tier by accident.
-    private static readonly IReadOnlyList<CarSpec> DefaultPool =
-    [
-        new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
-    ];
-
-    private static RelayCommand Back() => new RelayCommand(() => { });
-
-    [Fact]
-    public void Settle_NamesTheDrivenCarAndPricesItsBand()
+    private static void AcceptOffer(Harness h)
     {
-        var (flow, wallet, _, log) = Create(new CarIdentity("ks_test_hatch", null));
-
-        CarHaulReceiptScreenViewModel receipt = flow.Settle(Back());
-
-        // Class 15 -> tier 6; the wallet's default rating is 20, so the 30-minute
-        // placeholder leg earns 29.88 at 0.996/min.
-        Assert.Equal("TEST HATCH", receipt.CarLine);
-        Assert.Equal("The current class is Tier 6", receipt.TierLine);
-        Assert.Equal("Resulting in a rate of €1.00/min", receipt.RateLine);
-        Assert.Equal("Wallet: €29.88", receipt.WalletLine);
-        Assert.Equal(29.88, wallet.Cash);
-        // Unity's haul pays cash alone: no XP tail on the wallet or the page.
-        Assert.Equal(0.0, wallet.Xp);
-        Assert.Contains(log.Infos, line => line.StartsWith("haul settled:", StringComparison.Ordinal));
+        var page = Assert.IsType<CarHaulScreenViewModel>(h.Flow.Open(Back(), h.Host.ControlPage));
+        page.AcceptCommand.Execute(null);
     }
 
-    [Fact]
-    public void Settle_UnknownCar_KeepsThePlaceholderBand()
-    {
-        var (flow, wallet, _, log) = Create();
+    private static RelayCommand Back() => new(() => { });
 
-        CarHaulReceiptScreenViewModel receipt = flow.Settle(Back());
-
-        Assert.Equal(Strings.Get("HaulReceiptCarUnknown"), receipt.CarLine);
-        // Lowest band (placeholder class 1): 0.83 * (20 * 1 / 100) = 0.166,
-        // cents-rounded to a 0.17 rate; 30 minutes earn 4.98.
-        Assert.Equal("The current class is Tier 1", receipt.TierLine);
-        Assert.Equal("Resulting in a rate of €0.17/min", receipt.RateLine);
-        Assert.Equal(4.98, wallet.Cash);
-        Assert.Contains(
-            log.Infos,
-            line => line.EndsWith("(placeholder, no pool class)", StringComparison.Ordinal));
-    }
-
-    [Fact]
-    public void Settle_BanksTheCalendarAtTheDisplayWeek()
-    {
-        var (flow, _, clocks, _) = Create(new CarIdentity("ks_test_hatch", null), startWeek: 3);
-
-        flow.Settle(Back());
-
-        // Checkpoint bank, like the paid jobs: settled cash is visible progress.
-        Assert.Equal(3, Assert.Single(clocks.Saved).Week);
-    }
-
-    [Fact]
-    public void Settle_HandsTheReceiptBackWithTheCallersContinue()
-    {
-        var (flow, _, _, _) = Create(new CarIdentity("ks_test_hatch", null));
-        bool back = false;
-        var control = new RelayCommand(() => back = true);
-
-        CarHaulReceiptScreenViewModel receipt = flow.Settle(control);
-        receipt.ContinueCommand.Execute(null);
-
-        // The flow owns the page, the caller owns where BACK lands.
-        Assert.True(back);
-    }
+    private sealed record Harness(
+        CarHaulFlow Flow, DriverWallet Wallet, FakeFriendshipStore Friends,
+        FakeCarHaulHost Host, FakeClock Clock);
 }

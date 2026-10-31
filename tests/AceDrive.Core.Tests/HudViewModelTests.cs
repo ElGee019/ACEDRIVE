@@ -50,6 +50,156 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void TaskPrompt_ShowsTheFoundNewsAndItsDriveButton()
+    {
+        // ToWhereIsWilly.md §3.4: the found step is the companion's, not a
+        // page, so the sentence and the verb live in the banner slot.
+        var vm = Create();
+
+        vm.SetTaskPrompt(new HudTaskPrompt("HudWillyFound", ["Luis"], "HudDrive"));
+
+        Assert.True(vm.HasBanner);
+        Assert.True(vm.HasTaskText);
+        Assert.Equal(
+            "Well that's a relief. All well and good! Missing person found. " +
+            "Now bring Luis back home.",
+            vm.BannerText);
+        Assert.Equal("DRIVE", vm.TaskActionText);
+        Assert.True(vm.ShowTaskAction);
+        // The prompt is not a destination: no distance line and no arrival.
+        Assert.False(vm.HasDestination);
+        Assert.False(vm.ShowEnterButton);
+    }
+
+    [Fact]
+    public void TaskCommand_RaisesTheHostTap()
+    {
+        var vm = Create();
+        int fired = 0;
+        vm.TaskActionRequested += (_, _) => fired++;
+        vm.SetTaskPrompt(new HudTaskPrompt("HudWillyFound", ["Luis"], "HudDrive"));
+
+        vm.TaskCommand.Execute(null);
+
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public void TaskCommand_WithNoPrompt_DoesNothing()
+    {
+        var vm = Create();
+        int fired = 0;
+        vm.TaskActionRequested += (_, _) => fired++;
+
+        vm.TaskCommand.Execute(null);
+
+        Assert.Equal(0, fired);
+    }
+
+    [Fact]
+    public void SetDestination_TakesTheBannerBackFromATaskPrompt()
+    {
+        var vm = Create();
+        vm.SetTaskPrompt(new HudTaskPrompt("HudWillyFound", ["Luis"], "HudDrive"));
+
+        vm.SetDestination(new PointOfInterest(
+            "home", "Luis", new AddressLocation("Street 1", 2, HouseSide.Right),
+            PoiTypes.Willy));
+
+        // The drive-home leg owns the slot now: the one-off news is gone.
+        Assert.False(vm.ShowTaskAction);
+        Assert.Equal(string.Empty, vm.TaskActionText);
+        Assert.Equal("Drive to Luis, Street 1 No. 2 in Brands", vm.BannerText);
+    }
+
+    [Fact]
+    public void ApplyPreferences_KeepsTheTaskPromptPainted()
+    {
+        var vm = Create();
+        vm.SetTaskPrompt(new HudTaskPrompt("HudWillyFound", ["Luis"], "HudDrive"));
+
+        vm.ApplyPreferences(new PlayerPreferences(MileageUnit.Miles, UiLanguage.English));
+
+        Assert.True(vm.ShowTaskAction);
+        Assert.Contains("Now bring Luis back home.", vm.BannerText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TaskPrompt_AnswersDriveByVoice()
+    {
+        // The prompt's button is spoken for: "drive" is the word it prints, and
+        // "enter" stays the one every action answers (HudVoiceKeywords).
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        var vm = Create(beat: beat, clock: clock);
+        int fired = 0;
+        vm.TaskActionRequested += (_, _) => fired++;
+        vm.SetTaskPrompt(new HudTaskPrompt("HudWillyFound", ["Luis"], "HudDrive"));
+
+        Assert.Contains("drive", vm.TaskKeywords);
+        Assert.Contains("enter", vm.TaskKeywords);
+
+        vm.RequestTaskAction();
+
+        // The teal acknowledgment rides the shared beat; the tap waits for it.
+        Assert.True(vm.TaskFlash);
+        Assert.Equal(0, fired);
+
+        clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
+        beat.Poll();
+
+        Assert.False(vm.TaskFlash);
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public void TaskPrompt_NoPrompt_AnswersNoVoiceWord()
+    {
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        var vm = Create(beat: beat, clock: clock);
+        int fired = 0;
+        vm.TaskActionRequested += (_, _) => fired++;
+
+        Assert.Empty(vm.TaskKeywords);
+        vm.RequestTaskAction();
+        clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
+        beat.Poll();
+
+        Assert.Equal(0, fired);
+        Assert.False(vm.TaskFlash);
+    }
+
+    [Fact]
+    public void RepinningTheSameDoor_KeepsTheArrivalAndItsButton()
+    {
+        // The missing-person run re-pins its own door on arrival to swap the
+        // action to DROP OFF. The car has not moved, so the arrival (and the
+        // button the re-pin just enabled) must survive the re-pin.
+        var vm = Create();
+        var home = new PointOfInterest(
+            "willy-home", "Luis",
+            new AddressLocation("Street 1", 17, HouseSide.Right), PoiTypes.Willy);
+        var copy = new HudDestinationCopy(
+            "HudWillyHomeDrive", string.Empty, "HudWillyDropOff");
+        vm.SetDestination(home, copy);
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal("DROP OFF", vm.EnterText);
+
+        // The flow's own re-pin: a fresh POI instance at the same address.
+        vm.SetDestination(
+            new PointOfInterest(
+                "willy-home", "Luis",
+                new AddressLocation("Street 1", 17, HouseSide.Right), PoiTypes.Willy),
+            copy);
+
+        Assert.True(vm.AtDestination);
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal("DROP OFF", vm.EnterText);
+    }
+
+    [Fact]
     public void Reveal_TurnsTheCompanionOn()
     {
         var vm = Create();
@@ -687,20 +837,43 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
-    public void JobGuidance_UsesItsOwnPlaceholdersWhenSupplied()
+    public void JobGuidance_UsesItsOwnPlaceholdersAfterTheAddress()
     {
-        // The Touristenfahrten legs carry their own arguments: the drive line
-        // names the order and the corner, not the shared address shape.
+        // The Touristenfahrten legs carry their own values after the shared
+        // address shape: the drive line names the street and the order, not
+        // only the corner.
         var vm = Create();
         vm.SetJobGuidance(new HudJobGuidance(
             "Brünnchen", new AddressLocation("Street 1", 17, HouseSide.Right),
             "HudTouristenDropoffDrive", "HudDeliveryStoreArrived",
             "HudDeliveryStoreAction", 25.0,
-            DriveArgs: ["2 × coffee", "Brünnchen"]));
+            DriveArgs: ["2 × coffee"]));
 
         vm.Update(Sample(position: 0.25f, speedKmh: 50f), 10.0, gameRunning: true);
 
-        Assert.Equal("Drop off 2 × coffee at Brünnchen.", vm.DestinationText);
+        Assert.Equal(
+            "Drop off 2 × coffee at Brünnchen, Street 1 No. 17 in Brands.",
+            vm.DestinationText);
+    }
+
+    [Fact]
+    public void JobGuidance_PickupLineNamesTheShopAddress()
+    {
+        // Same shape for the pickup leg: the shop's own address in the line the
+        // player follows to load the goods.
+        var vm = Create();
+        vm.SetJobGuidance(new HudJobGuidance(
+            "Test Café", new AddressLocation("Street 1", 17, HouseSide.Right),
+            "HudTouristenPickupDrive", "HudTouristenPickupArrived",
+            "HudPickUp", 25.0,
+            DriveArgs: ["Brünnchen and Pflanzgarten"]));
+
+        vm.Update(Sample(position: 0.25f, speedKmh: 50f), 10.0, gameRunning: true);
+
+        Assert.Equal(
+            "Drive to Test Café, Street 1 No. 17 in Brands to pick up goods to " +
+            "deliver to Brünnchen and Pflanzgarten.",
+            vm.DestinationText);
     }
 
     [Fact]
@@ -711,7 +884,7 @@ public sealed class HudViewModelTests
             "Brünnchen", new AddressLocation("Street 1", 1, HouseSide.Right),
             "HudTouristenDropoffDrive", "HudDeliveryStoreArrived",
             "HudDeliveryStoreAction", 25.0,
-            DriveArgs: ["2 × coffee", "Brünnchen"]));
+            DriveArgs: ["2 × coffee"]));
 
         vm.Update(Sample(position: 0.999f, speedKmh: 0f), 10.0, gameRunning: true);
 
@@ -719,6 +892,26 @@ public sealed class HudViewModelTests
             "You have arrived at Brünnchen. Press DELIVER ITEMS to unload.",
             vm.DestinationText);
         Assert.Equal("DELIVER ITEMS", vm.EnterText);
+    }
+
+    [Fact]
+    public void Destination_EmptyArrivalKey_LeavesOnlyTheButton()
+    {
+        // The missing-person home leg: the arrival is its DROP OFF button alone
+        // (no "welcome home" sentence), so the line stays empty at the door.
+        var vm = Create();
+        vm.SetDestination(
+            new PointOfInterest(
+                "willy-home", "Luis",
+                new AddressLocation("Street 1", 17, HouseSide.Right), PoiTypes.Willy),
+            new HudDestinationCopy("HudWillyHomeDrive", string.Empty, "HudWillyDropOff"));
+
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        Assert.True(vm.AtDestination);
+        Assert.Equal(string.Empty, vm.DestinationText);
+        Assert.Equal("DROP OFF", vm.EnterText);
+        Assert.True(vm.ShowEnterButton);
     }
 
     [Fact]

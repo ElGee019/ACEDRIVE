@@ -91,12 +91,15 @@ public static class RoadTestRules
     /// announced one yet. WHY unknown counts as a match: the log watcher catches
     /// the spawn a moment after a fresh session, and the HUD's wrong-car warning
     /// treats the same silence as "no mismatch" — refusing a test on a guess
-    /// would lock the road test out of every cold start.
+    /// would lock the road test out of every cold start. The pool decides
+    /// whether a base row stands for an unmodelled preset or is its own car.
     /// </summary>
-    public static bool DrivesThePick(CarIdentity? live, CarSpec pick)
+    public static bool DrivesThePick(
+        CarIdentity? live, CarSpec pick, IReadOnlyList<CarSpec> pool)
     {
         ArgumentNullException.ThrowIfNull(pick);
-        return live is null || live.Matches(pick.Key);
+        ArgumentNullException.ThrowIfNull(pool);
+        return live is null || live.Matches(pick, pool);
     }
 
     /// <summary>

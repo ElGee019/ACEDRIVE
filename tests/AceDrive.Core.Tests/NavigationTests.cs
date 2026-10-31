@@ -112,7 +112,13 @@ public sealed class NavigationTests
         var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
-        var haul = new CarHaulFlow(brands, poolCars, wallet, day, saver, beat, log);
+        var haul = new CarHaulFlow(
+            new FakeBrandMileageStore(), poolCars, directory, zoneInstance,
+            AddressMap.Default, () => null,
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            wallet, friends, game, TaxiRules.Default, beat, log,
+            CarHaulPolicy.Development, new Random(13));
+        haul.Attach(new FakeCarHaulHost());
         // The weekly market valuation's flow: the calendar's Monday tap starts
         // its drive leg, so the navigator needs the real flow (the list stays
         // empty offline, which is the page's own fallback path).
@@ -170,7 +176,8 @@ public sealed class NavigationTests
                     garageInstance, poolCars, game, wallet, InsuranceRules.Default,
                     log, brands, new FakeContentSource(TestSession.EmptyContent)),
                 new FakeCarRarity(), rivals, beat, log),
-            meter, TaxiRules.Default, new Random(0), log);
+            meter, TaxiRules.Default, beat, clock, TouristenRaceCalendar.None,
+            new Random(0), log);
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
@@ -273,7 +280,7 @@ public sealed class NavigationTests
     }
 
     [Fact]
-    public void RoadTestDay_StartsTheDriveAndKeepsThePick()
+    public void RoadTestDay_OpensTheBriefingThenStartsTheDrive()
     {
         var (nav, shell, _, clock, _, _, roads, roadTests, _, _, log, roadTest) = Create();
         nav.ShowMenuPage();
@@ -292,8 +299,16 @@ public sealed class NavigationTests
 
         calendar.DayCommand.Execute(roadTestDay);
 
-        // The row now drives the test (PORTPLAN 49): the tap pins La Strada and
-        // the pick stays on offer until the whole test has been driven.
+        // The row opens the week's briefing first (PORTPLAN 49): the pick and the
+        // row stay put and nothing is pinned until START. The briefing page's own
+        // buttons are the flow tests' subject, so its START is BeginDrive here.
+        Assert.Equal(RoadTestPhase.Idle, roadTest.Phase);
+        Assert.Empty(roadTests.Saved);
+
+        roadTest.BeginDrive();
+
+        // START drives the test: La Strada is pinned and the pick stays on offer
+        // until the whole test has been driven.
         Assert.Equal(RoadTestPhase.Driving, roadTest.Phase);
         Assert.Equal(pick, roads.Current?.Key);
         Assert.Empty(roadTests.Saved);
@@ -313,6 +328,7 @@ public sealed class NavigationTests
         Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
         var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
         calendar.DayCommand.Execute(3);
+        roadTest.BeginDrive();
         Assert.Equal(RoadTestPhase.Driving, roadTest.Phase);
 
         calendar.DayCommand.Execute(5);
@@ -496,21 +512,17 @@ public sealed class NavigationTests
     }
 
     [Fact]
-    public void HaulDoor_SettlesTheFlowAndItsReceipt_WithoutTheCoordinator()
+    public void HaulDoor_WithoutADrivenBrand_KeepsTheControlPage()
     {
-        // The haul is a job type, not a report: the control page's tap prices
-        // the placeholder run, banks it through the flow and puts the flow's
-        // own receipt up. CONTINUE is the control page the tap came from.
+        // The car haul draws its offer from the brands the player has driven
+        // (PORTPLAN 20): an un-driven career keeps the control page instead of
+        // opening an empty offer page.
         var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
 
         nav.ControlPage().HaulCommand.Execute(null);
 
-        var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(shell.CurrentScreen);
-        Assert.NotEmpty(receipt.CarLine);
-        receipt.ContinueCommand.Execute(null);
         Assert.IsType<MainControlScreenViewModel>(shell.CurrentScreen);
     }
-
     private static string RoadTestButton(CalendarScreenViewModel calendar) =>
         Assert.Single(calendar.Days, day => day.DayOfWeek == 3).EventLabel;
 }

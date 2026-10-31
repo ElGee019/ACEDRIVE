@@ -1,22 +1,69 @@
 using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
 /// <summary>
-/// The Saturday run headless: the pickup leg names the dropoff list, the
-/// pickup ENTER pins the first order, each corner ENTER settles exactly one
+/// The Saturday run headless: the calendar tap opens the briefing and draws
+/// nothing, the briefing's START draws the shop and 1-3 corners and splits one
+/// job order across them, the pickup leg names the dropoff list, the pickup
+/// ENTER pins the first corner's share, each corner ENTER settles exactly one
 /// order through its receipt, CONTINUE moves to the next corner, and the last
 /// CONTINUE hands the player back to the calendar.
 /// </summary>
 public sealed class TouristenfahrtenFlowTests
 {
     [Fact]
-    public void Begin_PinsThePickupWithTheDropoffList()
+    public void Begin_OpensTheBriefingWithoutDrawingTheRun()
     {
         Harness run = Create();
+
         run.Flow.Begin();
+
+        var page = Assert.IsType<TouristenBriefingScreenViewModel>(
+            Assert.Single(run.Host.Briefings));
+        Assert.False(run.Flow.InProgress);
+        Assert.Equal(0, run.Doors.PickupCalls);
+        Assert.Equal(0, run.Host.HidePanelCalls);
+        Assert.Null(run.Hud.JobGuidance);
+        // An ordinary day wears the run's own weekend title.
+        Assert.Equal("TOURISTENFAHRTEN WEEKEND", page.Title);
+        Assert.Equal("START DRIVE", page.StartLabel);
+    }
+
+    [Fact]
+    public void Begin_OnARaceWeekend_TitlesTheBriefingWithTheEvent()
+    {
+        // The real-world calendar names the event: the page reads as the NLS
+        // round, not as the generic weekend.
+        Harness run = Create(weekends: RaceWeekend("NLS Round 1"));
+
+        run.Flow.Begin();
+
+        var page = Assert.IsType<TouristenBriefingScreenViewModel>(
+            Assert.Single(run.Host.Briefings));
+        Assert.Equal("NLS Round 1", page.Title);
+    }
+
+    [Fact]
+    public void Deliver_OnARaceWeekend_PricesTheGoodsWithTheBonus()
+    {
+        Harness run = Create(weekends: RaceWeekend("NLS Round 1"));
+        StartBriefing(run);
+        run.Flow.Deliver(); // load the goods
+        run.Flow.Deliver(); // settle the corner
+
+        Assert.Equal(
+            2.0, Assert.Single(run.Settlement.Deliveries).PayoutMultiplier);
+    }
+
+    [Fact]
+    public void BriefingStart_DrawsAndPinsThePickupWithTheDropoffList()
+    {
+        Harness run = Create();
+        StartBriefing(run);
 
         Assert.True(run.Flow.InProgress);
         Assert.Equal(1, run.Host.HidePanelCalls);
@@ -24,21 +71,65 @@ public sealed class TouristenfahrtenFlowTests
         Assert.Equal("HudTouristenPickupDrive", guidance.DriveKey);
         Assert.Equal("HudTouristenPickupArrived", guidance.ArrivedKey);
         Assert.Equal("HudPickUp", guidance.ActionKey);
-        Assert.Equal("Test Café|Brünnchen", string.Join('|', guidance.DriveArgs!));
+        // The leg's own values follow the shared address shape the HUD adds.
+        Assert.Equal("Brünnchen", Assert.Single(guidance.DriveArgs!));
+    }
+
+    [Fact]
+    public void BriefingBack_ReturnsToTheCalendarWithoutDrawingTheRun()
+    {
+        Harness run = Create();
+        run.Flow.Begin();
+        var page = Assert.IsType<TouristenBriefingScreenViewModel>(
+            Assert.Single(run.Host.Briefings));
+
+        page.BackCommand.Execute(null);
+
+        Assert.Equal(1, run.Host.CalendarCalls);
+        Assert.False(run.Flow.InProgress);
+        Assert.Equal(0, run.Doors.PickupCalls);
+        Assert.Equal(0, run.Host.HidePanelCalls);
+        Assert.Null(run.Hud.JobGuidance);
+    }
+
+    [Fact]
+    public void Briefing_AnswersByVoice_GlowThenStart()
+    {
+        Harness run = Create();
+        run.Flow.Begin();
+        var page = Assert.IsType<TouristenBriefingScreenViewModel>(
+            Assert.Single(run.Host.Briefings));
+
+        page.VoiceActions["START DRIVE"]();
+
+        // The glow ack owns the first beat; the run is drawn only after it.
+        Assert.True(page.StartFlash);
+        Assert.False(run.Flow.InProgress);
+        run.Clock.Advance(VoiceBeat.Duration);
+        run.Beat.Poll();
+
+        Assert.True(run.Flow.InProgress);
+        page.VoiceActions[Strings.Get("TouristenBack")]();
+        Assert.True(page.BackFlash);
     }
 
     [Fact]
     public void Deliver_AtTheShop_PinsTheFirstCornerWithItsOrder()
     {
         Harness run = Create();
-        run.Flow.Begin();
+        StartBriefing(run);
         run.Flow.Deliver();
 
         HudJobGuidance guidance = Assert.IsType<HudJobGuidance>(run.Hud.JobGuidance);
         Assert.Equal("HudTouristenDropoffDrive", guidance.DriveKey);
-        Assert.Equal("HudDeliveryStoreArrived", guidance.ArrivedKey);
-        Assert.Equal("HudDeliveryStoreAction", guidance.ActionKey);
-        Assert.Equal("2 × coffee|Brünnchen", string.Join('|', guidance.DriveArgs!));
+        Assert.Equal("HudTouristenDropoffArrived", guidance.ArrivedKey);
+        Assert.Equal("HudTouristenDeliverAction", guidance.ActionKey);
+        // The corner's own copy: the button prints DELIVER, not the delivery
+        // career's freight wording, and the arrival line names the same word.
+        Assert.Equal("DELIVER", Strings.Get(guidance.ActionKey));
+        Assert.Contains(
+            "DELIVER", Strings.Format(guidance.ArrivedKey, guidance.TargetName));
+        Assert.Equal("2 × coffee", Assert.Single(guidance.DriveArgs!));
         Assert.Equal(0, run.Settlement.SettleCalls);
     }
 
@@ -46,7 +137,7 @@ public sealed class TouristenfahrtenFlowTests
     public void Deliver_AtTheCorner_PricesTheDrivenLegAndSettlesOnce()
     {
         Harness run = Create();
-        run.Flow.Begin();
+        StartBriefing(run);
         Drive(run.Meter, 50f, 14.4); // 0.2 km to the shop: the player's own drive
         run.Flow.Deliver(); // load the goods: the corner legs start at zero
         Assert.Equal(0.0, run.Meter.DistanceKm);
@@ -56,6 +147,8 @@ public sealed class TouristenfahrtenFlowTests
 
         Assert.Equal(1, run.Settlement.SettleCalls);
         Assert.Equal(0.5, run.Settlement.Deliveries[0].DistanceKm, 3);
+        // An ordinary day pays the order's own price: no calendar bonus.
+        Assert.Equal(1.0, run.Settlement.Deliveries[0].PayoutMultiplier);
         Assert.True(run.Flow.InProgress);
 
         // The receipt is up: a second ENTER may not settle the order twice.
@@ -73,9 +166,14 @@ public sealed class TouristenfahrtenFlowTests
     public void Continue_PinsTheNextCornerAndHidesThePanelAgain()
     {
         Harness run = Create(twoStops: true);
-        run.Flow.Begin();
+        StartBriefing(run);
         run.Flow.Deliver(); // load
 
+        // The menu caps the whole job order at two units, and the split's
+        // one-per-stop pass leaves one at each corner: a per-dropoff draw would
+        // have loaded two at every stop instead of dividing the shop's order.
+        Assert.Equal(
+            "1 × coffee", Assert.Single(Assert.IsType<HudJobGuidance>(run.Hud.JobGuidance).DriveArgs!));
         AddressLocation first = Assert.IsType<HudJobGuidance>(run.Hud.JobGuidance).Target;
         Drive(run.Meter, 50f, 36.0); // 0.5 km to the first corner
         run.Flow.Deliver();
@@ -87,7 +185,8 @@ public sealed class TouristenfahrtenFlowTests
         Assert.Equal(0.0, run.Meter.DistanceKm); // the next leg starts at zero
         HudJobGuidance next = Assert.IsType<HudJobGuidance>(run.Hud.JobGuidance);
         Assert.NotEqual(first, next.Target);
-        Assert.Equal("2 × coffee|" + next.TargetName, string.Join('|', next.DriveArgs!));
+        Assert.Equal("1 × coffee", Assert.Single(next.DriveArgs!));
+        Assert.Equal("HudTouristenDeliverAction", next.ActionKey);
 
         Drive(run.Meter, 50f, 7.2); // 0.1 km
         run.Flow.Deliver();
@@ -100,10 +199,33 @@ public sealed class TouristenfahrtenFlowTests
     }
 
     [Fact]
-    public void Begin_WithoutAPickupDoor_DoesNothing()
+    public void Begin_SkipsADropoffThatGetsNoShareOfTheOrder()
+    {
+        // One unit, two drawn corners: the second share is empty, so the run
+        // never opens that door or tells the player to deliver nothing there.
+        Harness run = Create(twoStops: true, maxItems: 1);
+        StartBriefing(run);
+
+        Assert.True(run.Flow.InProgress);
+        Assert.Equal(1, run.Doors.DropoffCalls);
+        HudJobGuidance guidance = Assert.IsType<HudJobGuidance>(run.Hud.JobGuidance);
+        Assert.Equal("HudTouristenPickupDrive", guidance.DriveKey);
+        Assert.Equal("Brünnchen", Assert.Single(guidance.DriveArgs!));
+
+        run.Flow.Deliver(); // load
+        Assert.Equal("1 × coffee", Assert.Single(
+            Assert.IsType<HudJobGuidance>(run.Hud.JobGuidance).DriveArgs!));
+        run.Flow.Deliver();
+        run.Settlement.ContinueReceipt();
+
+        Assert.Equal(1, run.Host.CalendarCalls);
+    }
+
+    [Fact]
+    public void StartRun_WithoutAPickupDoor_DoesNothing()
     {
         Harness run = Create(hasPickup: false);
-        run.Flow.Begin();
+        StartBriefing(run);
 
         Assert.False(run.Flow.InProgress);
         Assert.Equal(0, run.Host.HidePanelCalls);
@@ -111,20 +233,26 @@ public sealed class TouristenfahrtenFlowTests
     }
 
     [Fact]
-    public void Begin_WhileARunIsLive_IsIgnored()
+    public void StartRun_WhileARunIsLive_IsIgnored()
     {
         Harness run = Create();
+        StartBriefing(run);
         run.Flow.Begin();
-        run.Flow.Begin();
+        run.Flow.StartRun();
 
+        // A live run owns the HUD: the row opens no second briefing over it and
+        // START draws nothing new.
+        Assert.Single(run.Host.Briefings);
         Assert.Equal(1, run.Doors.PickupCalls);
         Assert.Equal(1, run.Host.HidePanelCalls);
     }
 
-    private static Harness Create(bool twoStops = false, bool hasPickup = true)
+    private static Harness Create(
+        bool twoStops = false, bool hasPickup = true, int maxItems = 2,
+        TouristenRaceCalendar? weekends = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
-        TouristenMenu menu = Menu(twoStops);
+        TouristenMenu menu = Menu(twoStops, maxItems);
         var doors = new FakeTouristenDoors();
         if (hasPickup)
         {
@@ -148,23 +276,44 @@ public sealed class TouristenfahrtenFlowTests
         var settlement = new FakeTouristenSettlement();
         var host = new FakeTouristenHost();
         var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
         var flow = new TouristenfahrtenFlow(
             menu, doors, hud, settlement, meter, TaxiRules.Default,
-            new Random(7), new TestLog());
+            beat, clock, weekends ?? TouristenRaceCalendar.None, new Random(7), new TestLog());
         flow.Attach(host);
-        return new Harness(flow, hud, host, settlement, doors, meter);
+        return new Harness(flow, hud, host, settlement, doors, meter, clock, beat);
+    }
+
+    // A one-day event on the fake clock's own date (2026-10-12), so a test's
+    // run is on the calendar without moving time first.
+    private static TouristenRaceCalendar RaceWeekend(string name) => new(
+        [new TouristenRaceWeekend(
+            new DateOnly(2026, 10, 12), new DateOnly(2026, 10, 12), name)],
+        2.0);
+
+    // The calendar tap and the briefing's click on START: the two input steps
+    // every leg test needs, so the run itself is what those tests assert.
+    private static void StartBriefing(Harness run)
+    {
+        run.Flow.Begin();
+        Assert.IsType<TouristenBriefingScreenViewModel>(Assert.Single(run.Host.Briefings))
+            .StartCommand.Execute(null);
     }
 
     // One coffee item with a fixed quantity: the order text is then exact
     // ("2 × coffee"), so the assertion pins the populated sentence without
-    // depending on a random draw.
-    private static TouristenMenu Menu(bool twoStops) => TouristenMenu.Default with
+    // depending on a random draw. The menu's floor stays two per dropoff; a
+    // low maxItems caps the whole job order below it, which is what the split
+    // and the skipped-stop tests lean on.
+    private static TouristenMenu Menu(bool twoStops, int maxItems) => TouristenMenu.Default with
     {
         Pickups =
         [
             new TouristenPickup(
                 "coffee", PoiTypes.CoffeeShop, "coffee_beans", ["Test Café"],
-                [new TouristenItemRule("coffee", "TouristenItemCoffee", 3.5, 2, 2)]),
+                [new TouristenItemRule("coffee", "TouristenItemCoffee", 3.5,
+                    Math.Min(2, maxItems), maxItems)]),
         ],
         Dropoffs = twoStops
             ?
@@ -193,5 +342,5 @@ public sealed class TouristenfahrtenFlowTests
     private sealed record Harness(
         TouristenfahrtenFlow Flow, FakeTelemetryHud Hud, FakeTouristenHost Host,
         FakeTouristenSettlement Settlement, FakeTouristenDoors Doors,
-        TaxiDriveMeter Meter);
+        TaxiDriveMeter Meter, FakeClock Clock, VoiceBeat Beat);
 }

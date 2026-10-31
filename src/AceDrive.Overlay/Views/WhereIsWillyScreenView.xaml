@@ -28,17 +28,19 @@
         </Style>
         <Style x:Key="WillyRowLine" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#FFBFC4C9"/>
-            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontSize" Value="13"/>
             <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
         </Style>
     </UserControl.Resources>
     <!-- The weekly missing-person quest page (ToWhereIsWilly.md §3.4), the
-         port's stand-in for Unity's map while the search runs: the search lists
-         the town's coffee shops, the found phase names the elder's home address
-         and offers the one DRIVE HOME row. Same skeleton as the addresses page:
-         title band, body, BACK flush at the bottom. The body takes the middle
-         of the panel (the valuation page's shape) because two shop rows under a
-         top-aligned intro would leave the panel's lower half empty. -->
+         port's stand-in for Unity's map while the search runs: Unity's intro
+         sentence, the town's coffee shops, the failed-visit hint and GIVE UP.
+         The found step is the companion's, not a page (the HUD paints it with
+         its DRIVE button), so this page never grows a second layout. Same
+         skeleton as the addresses page: title band, body, BACK flush at the
+         bottom. The body takes the middle of the panel (the valuation page's
+         shape) because two shop rows under a top-aligned intro would leave the
+         panel's lower half empty. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -50,62 +52,49 @@
                    Text="{Binding Title}"/>
 
         <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
-            <!-- Search phase: Unity's intro sentence, the town's coffee shops,
-                 the failed-visit hint and GIVE UP once a visit has failed. -->
-            <StackPanel Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding IntroLine}" Foreground="#FFF" FontSize="13"
-                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                <ItemsControl ItemsSource="{Binding Shops}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button Style="{StaticResource WillyRowButton}"
-                                    Command="{Binding DataContext.SelectShopCommand,
-                                              RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                    CommandParameter="{Binding}">
-                                <StackPanel>
-                                    <TextBlock Text="{Binding Name}" FontSize="14"
-                                               FontWeight="Bold"
-                                               TextTrimming="CharacterEllipsis"/>
-                                    <TextBlock Text="{Binding Address}"
-                                               Style="{StaticResource WillyRowLine}"/>
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="{Binding NotHereLine}" Foreground="#FF97EAD2" FontSize="12"
-                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0"
-                           Visibility="{Binding ShowNotHere, Converter={StaticResource BoolToVis}}"/>
-                <Button Content="{Binding GiveUpLabel}" Margin="0,8,0,0"
-                        Command="{Binding GiveUpCommand}"
-                        Visibility="{Binding CanGiveUp, Converter={StaticResource BoolToVis}}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding GiveUpFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-            </StackPanel>
-
-            <!-- Found phase: Unity's found sentence naming the home address,
-                 then the one row that pins the elder's door. -->
-            <StackPanel Visibility="{Binding IsFound, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding FoundLine}" Foreground="#FFF" FontSize="13"
-                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
-                <Button Style="{StaticResource WillyRowButton}" Padding="8,10"
-                        Command="{Binding DriveHomeCommand}">
-                    <TextBlock Text="{Binding DriveHomeLabel}" FontSize="14" FontWeight="Bold"
-                               TextAlignment="Center" TextWrapping="Wrap"/>
-                </Button>
-            </StackPanel>
+            <!-- Unity's intro sentence, the town's coffee shops, the
+                 failed-visit hint and GIVE UP once a visit has failed. -->
+            <TextBlock Text="{Binding IntroLine}" Foreground="#FFF" FontSize="15"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+            <ItemsControl ItemsSource="{Binding Shops}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Style="{StaticResource WillyRowButton}"
+                                Command="{Binding DataContext.SelectShopCommand,
+                                          RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontSize="15"
+                                           FontWeight="Bold"
+                                           TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Address}"
+                                           Style="{StaticResource WillyRowLine}"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="{Binding NotHereLine}" Foreground="#FF97EAD2" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,4,0,0"
+                       Visibility="{Binding ShowNotHere, Converter={StaticResource BoolToVis}}"/>
+            <Button Content="{Binding GiveUpLabel}" Margin="0,8,0,0"
+                    Command="{Binding GiveUpCommand}"
+                    Visibility="{Binding CanGiveUp, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding GiveUpFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
         </StackPanel>
 
-        <!-- Button bar: BACK hides the page and keeps the run alive for the
-             calendar row; teal is the shared voice-ack highlight. -->
+        <!-- Button bar: BACK returns to the calendar before the first shop tap
+             and hides the page after it, keeping the run alive for the calendar
+             row; teal is the shared voice-ack highlight. -->
         <StackPanel Grid.Row="2">
             <Button Content="{loc:Loc Key=WillyBack}" Command="{Binding BackCommand}">
                 <Button.Style>

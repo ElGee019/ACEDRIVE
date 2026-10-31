@@ -6,8 +6,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// <summary>
 /// The overlay panel's reveal policy: what a call opens, what revealing a POI,
 /// a job page or an interrupting page does to the panel, how an interruption
-/// hands the player back and what hiding means. The shell owns the state
-/// (visible, page, activity stamp); this decides when that state moves.
+/// hands the player back, what hiding means, and what the mic should listen
+/// for (a shown page hears its command words, a hidden one also feeds the wake
+/// grammar). The shell owns the state (visible, page, activity stamp); this
+/// decides when that state moves.
 ///
 /// WHY it is not the coordinator's: the story flow and the voice router both
 /// reveal pages, and both are built by the root before the coordinator exists.
@@ -21,6 +23,7 @@ public sealed class PanelPresenter
     private readonly TaxiJobFlow _taxi;
     private readonly DeliveryFlow _delivery;
     private readonly TouristenfahrtenFlow _touristen;
+    private readonly IVoiceListener _voice;
     private readonly IClock _clock;
     private readonly ILog _log;
 
@@ -36,13 +39,14 @@ public sealed class PanelPresenter
     public PanelPresenter(
         OverlayShell shell, Navigation navigation, TaxiJobFlow taxi,
         DeliveryFlow delivery, TouristenfahrtenFlow touristen,
-        IClock clock, ILog log)
+        IVoiceListener voice, IClock clock, ILog log)
     {
         _shell = shell;
         _nav = navigation;
         _taxi = taxi;
         _delivery = delivery;
         _touristen = touristen;
+        _voice = voice;
         _clock = clock;
         _log = log;
     }
@@ -84,6 +88,9 @@ public sealed class PanelPresenter
 
         bool firstShow = !_shell.HasBeenShown;
         _shell.SetShown(true);
+        // The mic follows the panel: a shown page hears commands, a hidden one
+        // only a wake word (see IVoiceListener.WakeListening).
+        _voice.WakeListening = false;
         // The first show of a hidden start reveals the page already built in
         // the constructor (the resumed walk page, or the menu past the
         // introduction); every later show opens the menu (Jobs leads to the
@@ -163,6 +170,7 @@ public sealed class PanelPresenter
         RecordActivity();
         _nav.ShowMenuPage();
         _shell.SetShown(true);
+        _voice.WakeListening = false;
         _log.LogInfo("overlay shown (menu)");
     }
 
@@ -175,6 +183,9 @@ public sealed class PanelPresenter
         }
 
         _shell.SetShown(false);
+        // Hidden is the drive: only a wake word can be useful, so the
+        // constrained decoder starts feeding (see IVoiceListener.WakeListening).
+        _voice.WakeListening = true;
         _log.LogInfo("overlay hidden");
         Hidden?.Invoke(this, EventArgs.Empty);
     }
@@ -189,6 +200,7 @@ public sealed class PanelPresenter
     {
         RecordActivity();
         _shell.Reveal(screen);
+        _voice.WakeListening = false;
         _log.LogInfo(logLine);
     }
 }

@@ -125,6 +125,29 @@
                                 </Style>
                             </Button.Style>
                         </Button>
+
+                        <!-- A flow-authored task's own action (the found-elder
+                             news and its DRIVE button, ToWhereIsWilly.md §3.4):
+                             the step is announced on the companion, so the
+                             button sits in the same slot as ENTER. The two are
+                             mutually exclusive — a prompt carries no
+                             destination, and a destination clears the prompt. -->
+                        <Button x:Name="TaskActionButton" Grid.Row="2"
+                                Content="{Binding TaskActionText}"
+                                Command="{Binding TaskCommand}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                FontSize="16" Padding="12,4"
+                                Visibility="{Binding ShowTaskAction, Converter={StaticResource BoolToVis}}">
+                            <Button.Style>
+                                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding TaskFlash}" Value="True">
+                                            <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </Button.Style>
+                        </Button>
                     </Grid>
 
                     <!-- Road test (PORTPLAN 49): the task sentence a page hands

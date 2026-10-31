@@ -96,7 +96,8 @@ public sealed class MainViewModelTests
         StoreCatalog? storeCatalog = null,
         FakeClock? clock = null, FakeCarBrandSource? carBrands = null,
         FakeTelemetry? physics = null,
-        IReadOnlyList<CentoTier>? centoTiers = null) =>
+        IReadOnlyList<CentoTier>? centoTiers = null,
+        TouristenRaceCalendar? touristenWeekends = null) =>
         TestSession.Create(new TestSessionOptions
         {
             SpeedKmh = speedKmh,
@@ -164,6 +165,7 @@ public sealed class MainViewModelTests
             CarBrands = carBrands,
             Physics = physics,
             CentoTiers = centoTiers,
+            TouristenWeekends = touristenWeekends,
         });
 
     // The production way into a business: HOME → ADDRESSES, pin the row, then
@@ -1602,12 +1604,12 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void TapRoadTestDay_StartsTheDriveAndKeepsThePick()
+    public void TapRoadTestDay_OpensTheBriefingThenStartsTheDrive()
     {
-        // The Tuesday row drives the road test (PORTPLAN 49): the tap pins La
-        // Strada and hides the panel, and the pick stays on offer because only a
-        // complete test (brake and photo too) may move it. The strip opens on
-        // Monday, so carry the clock over first.
+        // The Tuesday row drives the road test (PORTPLAN 49): the tap opens the
+        // week's briefing, its START pins La Strada and hides the panel, and the
+        // pick stays on offer because only a complete test (brake and photo too)
+        // may move it. The strip opens on Monday, so carry the clock over first.
         var log = new TestLog();
         var roads = TestRoadCars.Ledger();
         var bank = new FakeRoadTestStore();
@@ -1623,6 +1625,14 @@ public sealed class MainViewModelTests
         string? pick = roads.Current?.Key;
 
         calendar.DayCommand.Execute(3);
+
+        // The first page explains the week; the drive is not pinned yet.
+        var brief = Assert.IsType<RoadTestBriefingScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(RoadTestPhase.Idle, session.RoadTest.Phase);
+        Assert.Contains(log.Infos, m => m.StartsWith("road test briefing open:", StringComparison.Ordinal));
+        Assert.Empty(bank.Saved);
+
+        brief.StartCommand.Execute(null);
 
         Assert.Equal(RoadTestPhase.Driving, session.RoadTest.Phase);
         Assert.Equal(pick, roads.Current?.Key);
@@ -1657,12 +1667,14 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void TapSaturday_RunsTheTouristenfahrtenDeliveriesToTheirReceipts()
+    public void TapSaturday_OpensTheBriefing_ThenRunsTheTouristenfahrtenDeliveries()
     {
-        // Saturday is the run's own row: the tap draws a shop and 1-3 corners,
-        // the companion guides the pickup, and each corner ENTER settles one
-        // order through the shared delivery receipt. CONTINUE either pins the
-        // next corner or hands the player back to the calendar.
+        // Saturday is the run's own row: the tap explains the run first (the
+        // same briefing shape as the road test and the market valuation), then
+        // its START draws a shop and 1-3 corners. The companion guides the
+        // pickup, and each corner ENTER settles one order through the shared
+        // delivery receipt. CONTINUE either pins the next corner or hands the
+        // player back to the calendar.
         var log = new TestLog();
         var hud = new FakeTelemetryHud();
         var wallet = new DriverWallet(new DriverState(0.0, 0.0));
@@ -1674,6 +1686,17 @@ public sealed class MainViewModelTests
         CalendarScreenViewModel calendar = ShowCalendar(vm);
 
         calendar.DayCommand.Execute(7);
+
+        // Nothing is drawn until the page's START: the panel stays up with the
+        // briefing and the HUD is untouched.
+        var briefing = Assert.IsType<TouristenBriefingScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
+        Assert.Null(hud.JobGuidance);
+        Assert.Contains(
+            log.Infos,
+            line => line.StartsWith("touristenfahrten briefing open", StringComparison.Ordinal));
+
+        briefing.StartCommand.Execute(null);
 
         Assert.False(vm.IsShown);
         Assert.Equal(
@@ -1703,6 +1726,60 @@ public sealed class MainViewModelTests
         Assert.Contains(
             log.Infos,
             line => line.StartsWith("touristenfahrten complete:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TapSaturday_OnARaceWeekend_TitlesTheEventAndDoublesTheGoods()
+    {
+        // The real-world calendar is the only difference between the two runs:
+        // the same seeded draws, the same shop and corners, the same zeroed
+        // fare table. A race day titles the page with the event and pays the
+        // goods twice; the wallet's own pre-run balance is not part of the gain.
+        var baseWallet = new DriverWallet(new DriverState(0.0, 0.0));
+        var raceWallet = new DriverWallet(new DriverState(0.0, 0.0));
+        var weekends = new TouristenRaceCalendar(
+            [
+                new TouristenRaceWeekend(
+                    new DateOnly(2026, 10, 12), new DateOnly(2026, 10, 12), "NLS Round 1"),
+            ],
+            2.0);
+
+        (string baseTitle, double baseGain) = DeliverOneDropoff(baseWallet);
+        (string raceTitle, double raceGain) = DeliverOneDropoff(raceWallet, weekends);
+
+        Assert.Equal("NLS Round 1", raceTitle);
+        Assert.NotEqual("NLS Round 1", baseTitle);
+        Assert.True(baseGain > 0.0);
+        Assert.Equal(2 * baseGain, raceGain, 2);
+    }
+
+    // One Saturday delivery to the first receipt (the shop load, then the
+    // corner), reporting the briefing's title and the cash the receipt actually
+    // added. The fare table is zeroed so the gain is the goods alone: the bonus
+    // assertion then stays exact instead of carrying a distance charge.
+    private static (string Title, double Gain) DeliverOneDropoff(
+        DriverWallet wallet, TouristenRaceCalendar? weekends = null)
+    {
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(
+            speedKmh: 0f, hud: hud, wallet: wallet, progress: FinishedTour(),
+            gameStart: new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc),
+            deliveryFares: new DeliveryFareTable([new FareTier(0.0, 0.0)]),
+            touristenWeekends: weekends);
+        // The session's own catch-up may already have paid into the shared
+        // wallet, so only what this run adds is compared.
+        double before = wallet.Cash;
+        CalendarScreenViewModel calendar = ShowCalendar(session.Vm);
+        calendar.DayCommand.Execute(7);
+        var briefing = Assert.IsType<TouristenBriefingScreenViewModel>(
+            session.Vm.CurrentScreen);
+        briefing.StartCommand.Execute(null);
+
+        hud.RaiseJobEnter(); // load the goods at the shop
+        hud.RaiseJobEnter(); // settle the first corner
+
+        Assert.IsType<DeliveryReceiptScreenViewModel>(session.Vm.CurrentScreen);
+        return (briefing.Title, wallet.Cash - before);
     }
 
     [Fact]
@@ -2337,6 +2414,36 @@ public sealed class MainViewModelTests
         Assert.Contains(
             log.Infos,
             line => line.Contains($"entered {expected.Name}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void VoiceDrive_TapsTheCompanionsTaskPrompt()
+    {
+        // The found-elder prompt is spoken for: "drive" on a finished utterance
+        // taps the button the companion is showing (HudVoiceKeywords).
+        var hud = new FakeTelemetryHud();
+        var voice = new FakeVoiceListener();
+        var (vm, _, _, _) = Create(hud: hud, voice: voice);
+        hud.SetTaskPrompt(new HudTaskPrompt("HudWillyFound", ["Luis"], "HudDrive"));
+
+        voice.Fire("drive", isFinal: true);
+
+        Assert.Equal(1, hud.TaskActionVoiceRequests);
+        vm.Dispose();
+    }
+
+    [Fact]
+    public void VoiceDrive_WithNoPrompt_TapsNothing()
+    {
+        var hud = new FakeTelemetryHud();
+        var voice = new FakeVoiceListener();
+        var (vm, _, _, _) = Create(hud: hud, voice: voice);
+
+        voice.Fire("drive", isFinal: true);
+
+        Assert.Equal(0, hud.TaskActionVoiceRequests);
+        Assert.Equal(0, hud.EnterRequests);
+        vm.Dispose();
     }
 
     [Fact]
@@ -3772,60 +3879,44 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void CarHaulTap_SettlesStraightIntoTheReceipt()
+    public void CarHaulTap_WithoutADrivenBrand_StaysOnTheControlPage()
     {
-        // Like the taxi ACCEPT skip (PORTPLAN 20): with no driving slice
-        // the CAR HAUL tap settles a placeholder haul at once — the
-        // hauled car is the driven one, its pool row carries the real
-        // class band — and the receipt shows; CONTINUE returns to the
-        // control page.
+        // The haul draws its offer from the brands the player has driven
+        // (PORTPLAN 20); a brand-new driver has none, so the tap keeps the
+        // control page and the companion flashes the hint.
+        var session = Create(speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
+
+        control.HaulCommand.Execute(null);
+
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+    [Fact]
+    public void CarHaulTap_WithADrivenBrand_OpensTheOffer()
+    {
+        // One driven brand and one car in its band: the tap draws the offer
+        // (car, dealer, customer) and waits for ACCEPT instead of paying out.
         var pool = new List<CarSpec>
         {
             new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
         };
         var wallet = EmptyWallet();
         var session = Create(
-            cars: pool, carKsId: "ks_test_hatch", roads: new RoadTestLedger(pool, seed: 0),
-            wallet: wallet, speedKmh: 0f);
+            cars: pool, wallet: wallet,
+            brandMileage: new FakeBrandMileageStore(
+                new Dictionary<string, double> { ["Test"] = 60.0 }),
+            speedKmh: 0f);
         var (vm, _, _, _) = session;
         var control = FinishIntro(session);
 
         control.HaulCommand.Execute(null);
-        var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
-        // Class 15 -> tier 6: 0.83 * (20 rating * 6 / 100) = 0.996/min,
-        // the 30-minute placeholder leg earns 29.88. No XP rides a haul.
-        Assert.Equal(29.88, wallet.Cash);
-        Assert.Equal(0.0, wallet.Xp);
-        Assert.Equal("TEST HATCH", receipt.CarLine);
-        Assert.Equal("The current class is Tier 6", receipt.TierLine);
-        Assert.Equal("Wallet: €29.88", receipt.WalletLine);
 
-        // CONTINUE hands back to a fresh control page (taxi-receipt rule).
-        receipt.ContinueCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        var offer = Assert.IsType<CarHaulScreenViewModel>(vm.CurrentScreen);
+        Assert.True(offer.IsOffer);
+        Assert.Contains("Test Hatch", offer.CarLine);
+        Assert.Equal(0.0, wallet.Cash);
     }
-
-    [Fact]
-    public void CarHaulTap_UnknownCar_FallsBackCleanly()
-    {
-        // No announced identity: the receipt names the customer's car
-        // instead and prices the lowest band rather than crashing.
-        var wallet = EmptyWallet();
-        var session = Create(wallet: wallet, speedKmh: 0f);
-        var (vm, _, _, _) = session;
-        var control = FinishIntro(session);
-
-        control.HaulCommand.Execute(null);
-        var receipt = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("the customer's new car", receipt.CarLine);
-        // Lowest band (placeholder class 1): 0.83 * (20 * 1 / 100) = 0.166
-        // cents-rewritten to a 0.17 rate, 30 minutes earn 4.98.
-        Assert.Equal(4.98, wallet.Cash);
-        Assert.Equal(0.0, wallet.Xp);
-        Assert.Equal("The current class is Tier 1", receipt.TierLine);
-        Assert.Equal("Resulting in a rate of €0.17/min", receipt.RateLine);
-    }
-
     [Fact]
     public void StreakGrant_OnFirstLaunchOfDay_LandsInWalletAndSave()
     {
@@ -3928,6 +4019,52 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void ZoneExpansion_BanksItsNewDoorOntoTheAddressesPage()
+    {
+        // The expansion page lists the businesses this growth opened; those
+        // doors are real addresses, not a page-only receipt. The directory is
+        // shared by the world and the addresses page, so the door must be there
+        // behind the expansion's FIND STREET and behind HOME -> ADDRESSES on a
+        // later visit. The sixth street is where the car wash's threshold lands
+        // (pois.json firstStreets 6), so this expansion opens the first door;
+        // the directory starts empty so the seeded test doors cannot mask it.
+        var saved = DriverState.Fresh with
+        {
+            StreetIds = ["street-1", "street-2", "street-3", "street-4", "street-5"],
+            ExpansionJobs = 6,
+            ExpansionCount = 5,
+        };
+        var session = Create(
+            speedKmh: 0f, savedDriver: saved, addressMap: RingMap(8),
+            poiDirectory: new PoiDirectory());
+        var (vm, clock, tel, _) = session;
+        session.Story.FinishDialogue();
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        receipt.ContinueCommand.Execute(null);
+
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(vm.CurrentScreen);
+        Assert.NotEmpty(page.BusinessLines);
+
+        page.FindStreetCommand.Execute(null);
+        var stand = Assert.IsType<AddressesScreenViewModel>(vm.CurrentScreen);
+        Assert.All(page.BusinessLines, line => Assert.Contains(
+            stand.Rows, row => line.EndsWith(row.Name, StringComparison.Ordinal)));
+
+        page.ContinueCommand.Execute(null);
+        var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        control.BackCommand.Execute(null);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
+        home.AddressesCommand.Execute(null);
+        var listed = Assert.IsType<AddressesScreenViewModel>(vm.CurrentScreen);
+        Assert.All(page.BusinessLines, line => Assert.Contains(
+            listed.Rows, row => line.EndsWith(row.Name, StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public void ZoneExpansion_OnADeliverySettle_ContinuesToTheDeliveryBoard()
     {
         // The delivery settle is the other place the curve can be reached: the
@@ -3976,24 +4113,25 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void HaulSettle_NeverCountsTheZone()
+    public void HaulTap_NeverCountsTheZone()
     {
         // Unity parity: car-hauling pays cash alone — no expansion counter,
-        // no bank interest (48). The settle also writes no driver save, so
-        // nothing rides the counters in from the tap.
+        // no bank interest (48). The tap only draws an offer and writes
+        // nothing: no wallet move, no bank move, no driver save.
         var wallet = EmptyWallet();
         var drivers = new FakeDriverStore();
         var session = Create(wallet: wallet, driverStore: drivers, speedKmh: 0f);
         var (vm, _, _, _) = session;
         var control = FinishIntro(session);
         int savesBefore = drivers.Saved.Count;
+
         control.HaulCommand.Execute(null);
-        _ = Assert.IsType<CarHaulReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(4.98, wallet.Cash); // the haul paid
-        Assert.Equal(1000.0, wallet.BankBalance); // interest never accrued
+
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(0.0, wallet.Cash);
+        Assert.Equal(1000.0, wallet.BankBalance);
         Assert.Equal(savesBefore, drivers.Saved.Count);
     }
-
     [Fact]
     public void Settle_AccruesInterestIntoTheBank()
     {

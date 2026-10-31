@@ -31,6 +31,12 @@ public sealed class StoreScreenViewModel :
         "StoreFriendshipBff",
     ];
 
+    // The quantity buttons print "+" and "-", so their spoken labels are these
+    // English words (the Vosk model is English whatever the page prints, the
+    // companion's keyword rule).
+    private const string IncreaseKeyword = "increase";
+    private const string DecreaseKeyword = "decrease";
+
     private readonly PointOfInterest _poi;
     private readonly StoreInventory _inventory;
     private readonly Trunk _trunk;
@@ -73,7 +79,6 @@ public sealed class StoreScreenViewModel :
         ReloadCash();
         RebuildItems();
         RepaintSelection();
-        RebuildVoice();
     }
 
     /// <summary>The POI name in Unity's display case ("MAX'S GROCERY STORE").</summary>
@@ -313,6 +318,10 @@ public sealed class StoreScreenViewModel :
         }
         _selected = null;
         _quantity = 0;
+        // The voice rows target the row objects the page is showing: a
+        // purchase rebuilds them, so the names must be pointed at the new
+        // rows or a spoken pick would select a row no longer on screen.
+        RebuildVoice();
     }
 
     // One repaint path for "no selection", a quantity change and a purchase,
@@ -381,16 +390,33 @@ public sealed class StoreScreenViewModel :
 
     private void RebuildVoice()
     {
-        VoiceActions = new Dictionary<string, Action>
+        var actions = new Dictionary<string, Action>();
+        // Every shelf row answers its own name, so the mic selects an item the
+        // way the row button does. A sold-out row is skipped: its label is the
+        // shared SOLD OUT line, not a target of its own (the row's command is
+        // the same guard either way).
+        foreach (StoreItemRowViewModel row in Items)
         {
-            // BUY stays on this page: it acts at once like a click.
-            [Strings.Get("StoreBuy")] = Buy,
-            // BACK navigates: glow first, act at the end of the shared beat.
-            [Strings.Get("StoreBack")] = () =>
+            if (row.IsSoldOut)
             {
-                BackFlash = true;
-                _beat.Defer(Back);
-            },
+                continue;
+            }
+            StoreItemRowViewModel hit = row;
+            actions[hit.Name] = () => Select(hit);
+        }
+        // The quantity buttons print "+" and "-", which no microphone can say:
+        // they answer their English words instead, the companion's keyword
+        // precedent (HudVoiceKeywords), whatever language the page prints.
+        actions[IncreaseKeyword] = () => ChangeQuantity(1);
+        actions[DecreaseKeyword] = () => ChangeQuantity(-1);
+        // BUY stays on this page: it acts at once like a click.
+        actions[Strings.Get("StoreBuy")] = Buy;
+        // BACK navigates: glow first, act at the end of the shared beat.
+        actions[Strings.Get("StoreBack")] = () =>
+        {
+            BackFlash = true;
+            _beat.Defer(Back);
         };
+        VoiceActions = actions;
     }
 }

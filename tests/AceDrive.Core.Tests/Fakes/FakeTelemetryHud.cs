@@ -93,6 +93,44 @@ internal sealed class FakeTelemetryHud : ITelemetryHud
 
     public void SetJobGuidance(HudJobGuidance? guidance) => JobGuidance = guidance;
 
+    /// <summary>The task prompt the host handed the companion, or null.</summary>
+    public HudTaskPrompt? TaskPrompt { get; private set; }
+
+    /// <summary>How often the task prompt was handed over (edges, not polls).</summary>
+    public int TaskPromptCalls { get; private set; }
+
+    /// <summary>How many times the prompt's action button was pressed.</summary>
+    public int TaskActionRequests { get; private set; }
+
+    /// <summary>Voice requests the prompt's action (the router's path).</summary>
+    public int TaskActionVoiceRequests { get; private set; }
+
+    public bool ShowTaskAction => TaskPrompt is not null;
+
+    public IReadOnlyList<string> TaskKeywords { get; set; } = ["enter", "drive"];
+
+    public event EventHandler? TaskActionRequested;
+
+    public void SetTaskPrompt(HudTaskPrompt? prompt)
+    {
+        TaskPromptCalls++;
+        TaskPrompt = prompt;
+    }
+
+    /// <summary>Presses the task prompt's action, as the window's button does.</summary>
+    public void RaiseTaskAction()
+    {
+        TaskActionRequests++;
+        TaskActionRequested?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>The router's voice tap; the HUD would glow first.</summary>
+    public void RequestTaskAction()
+    {
+        TaskActionVoiceRequests++;
+        TaskActionRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     public void SetReputation(double? reputation) => Reputation = reputation;
 
     public void SetRoadTest(HudRoadTestReadout? readout)

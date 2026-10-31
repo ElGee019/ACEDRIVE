@@ -67,6 +67,9 @@ public sealed class RoadTestFlow
     // The roster the all-cars board names its rows from: the board itself only
     // stores car keys, and the overlay is the layer that owns the display name.
     private readonly IReadOnlyDictionary<string, CarSpec> _catalog;
+    // The same catalogue as a pool: identity matching needs the sibling rows,
+    // not only the picked key, to tell the standard car from its variants.
+    private readonly IReadOnlyList<CarSpec> _cars;
     // The address map the photo mission resolves the shoot's door on: the one
     // geometry the HUD's own address line reads, handed in rather than opened.
     private readonly AddressMap _map;
@@ -172,6 +175,7 @@ public sealed class RoadTestFlow
             byKey.TryAdd(car.Key, car);
         }
         _catalog = byKey;
+        _cars = catalog;
         _map = map;
         _beat = beat;
         _liveCar = liveCar;
@@ -190,42 +194,22 @@ public sealed class RoadTestFlow
     public bool InFlight => _phase != RoadTestPhase.Idle;
 
     /// <summary>
-    /// The calendar row's tap (Unity's job-centre button): pins La Strada and
-    /// sends the player off. A page already built is reopened instead of drawing
-    /// a second visit, and an entry gate is re-checked here so a caller can never
-    /// jump it.
+    /// The calendar row's tap (Unity's job-centre button): reveals the week's
+    /// briefing so the player reads what the test is before a drive that cannot
+    /// be cancelled starts (the market valuation's briefing shape). A page
+    /// already built is reopened instead of drawing a second visit, and the
+    /// entry gate is re-checked here so a caller can never jump it.
     /// </summary>
     public void Begin()
     {
-        DateTime now = _game.GameNow;
-        if (!_ignoreEventGates
-            && (ControlCalendar.ToDayOfWeek(now) != _eventDay
-                || !ControlCalendar.IsEventWindow(now.Hour)))
+        if (!GateOpen())
         {
-            _log.LogInfo("road test ignored: outside the event's day and window");
             return;
         }
 
-        if (_phase is RoadTestPhase.Countdown or RoadTestPhase.Timing
-            or RoadTestPhase.BrakeApproach or RoadTestPhase.BrakeTiming
-            or RoadTestPhase.PhotoMission)
+        if (IsLegRunning())
         {
-            // A leg that never ends (a car that cannot reach its target) must
-            // not trap the session: tapping the row again abandons the run
-            // without a result and hands the page back, ready for another try.
-            // Checked before the "page is already built" branch, because the
-            // page instance does exist while its leg runs. The photo mission
-            // rides the same rule: the shoot is not taken, and the test centre
-            // comes back with the mission still on offer.
-            _run = null;
-            _shotSample = null;
-            _hud?.SetRoadTest(null);
-            _phase = _screen is null ? RoadTestPhase.Idle : RoadTestPhase.AtTestCentre;
-            if (_screen is { } page)
-            {
-                _host.RevealPage(page);
-            }
-            _log.LogInfo("road test abandoned: the leg was still running");
+            AbandonRunningLeg();
             return;
         }
 
@@ -251,7 +235,17 @@ public sealed class RoadTestFlow
             return;
         }
 
-        if (!EnsureDoor() || _door is not { } door)
+        PresentBriefing();
+    }
+
+    /// <summary>
+    /// The briefing's START: pins La Strada and sends the player off. Split from
+    /// <see cref="Begin"/> so the week's terms are read before a drive that
+    /// cannot be cancelled starts.
+    /// </summary>
+    public void BeginDrive()
+    {
+        if (!GateOpen() || !EnsureDoor() || _door is not { } door)
         {
             return;
         }
@@ -262,6 +256,17 @@ public sealed class RoadTestFlow
         _log.LogInfo(
             $"road test begun: driving to {AddressFormatter.Format(door.Address)} " +
             $"for {DescribePick()}");
+    }
+
+    /// <summary>
+    /// The briefing's BACK: no drive started, so the calendar the row was tapped
+    /// on comes back (the player's own page, not the jobs page a call opens).
+    /// Nothing of the visit exists yet: no receipt, no result, nothing to save.
+    /// </summary>
+    public void CloseBriefing()
+    {
+        _host.ShowCalendar();
+        _log.LogInfo("road test briefing closed: no drive started");
     }
 
     /// <summary>
@@ -288,7 +293,7 @@ public sealed class RoadTestFlow
 
         _phase = RoadTestPhase.AtTestCentre;
         _pick = car;
-        bool drivesThePick = RoadTestRules.DrivesThePick(_liveCar(), car);
+        bool drivesThePick = RoadTestRules.DrivesThePick(_liveCar(), car, _cars);
         // The arrival is the page now: the companion's drive-to line and its
         // ENTER have done their job, and the test centre is not a place to be
         // guided back into.
@@ -627,7 +632,7 @@ public sealed class RoadTestFlow
     // enter instead of starting a run that could never land on it.
     private bool PickIsAtTheDoor(CarSpec car)
     {
-        if (RoadTestRules.DrivesThePick(_liveCar(), car))
+        if (RoadTestRules.DrivesThePick(_liveCar(), car, _cars))
         {
             return true;
         }
@@ -667,7 +672,7 @@ public sealed class RoadTestFlow
             return;
         }
 
-        bool drivesThePick = RoadTestRules.DrivesThePick(_liveCar(), pick);
+        bool drivesThePick = RoadTestRules.DrivesThePick(_liveCar(), pick, _cars);
         if (drivesThePick == screen.DrivesThePick)
         {
             return;
@@ -759,7 +764,7 @@ public sealed class RoadTestFlow
     }
 
     private bool PickWasKept() =>
-        _pick is null || RoadTestRules.DrivesThePick(_liveCar(), _pick);
+        _pick is null || RoadTestRules.DrivesThePick(_liveCar(), _pick, _cars);
 
     // A run driven in another car cannot land on the pick's row: the visit goes
     // back to the test centre asking for the pick instead of banking it.
@@ -993,6 +998,73 @@ public sealed class RoadTestFlow
         Reset();
         _host.ShowControl();
         _log.LogInfo($"road test {why}");
+    }
+
+    // The row's and the briefing's shared gate: the event's weekday and its
+    // 8am-8pm window. Checked on the tap and again on START, so a page left open
+    // past the window cannot launch a drive the calendar would have refused.
+    private bool GateOpen()
+    {
+        if (_ignoreEventGates)
+        {
+            return true;
+        }
+
+        DateTime now = _game.GameNow;
+        if (ControlCalendar.ToDayOfWeek(now) == _eventDay
+            && ControlCalendar.IsEventWindow(now.Hour))
+        {
+            return true;
+        }
+
+        _log.LogInfo("road test ignored: outside the event's day and window");
+        return false;
+    }
+
+    // The week's terms on a page of their own: the pick, the venue and what the
+    // two legs and the photo ask. Built per tap, like the market valuation's
+    // briefing, so a language switch repaints instead of freezing copy.
+    private void PresentBriefing()
+    {
+        if (_roads.Current is not { } car)
+        {
+            _log.LogWarning("road test not begun: no car to test");
+            return;
+        }
+        if (!EnsureDoor() || _door is not { } door)
+        {
+            return;
+        }
+
+        string venue = AddressFormatter.Format(door.Address);
+        _host.RevealPage(new RoadTestBriefingScreenViewModel(
+            CarTitles.Of(car), Strings.Format("RoadTestBriefVenue", venue),
+            BeginDrive, new RelayCommand(CloseBriefing), _beat));
+        _log.LogInfo($"road test briefing open: {CarTitles.Of(car)} at {venue}");
+    }
+
+    private bool IsLegRunning() =>
+        _phase is RoadTestPhase.Countdown or RoadTestPhase.Timing
+            or RoadTestPhase.BrakeApproach or RoadTestPhase.BrakeTiming
+            or RoadTestPhase.PhotoMission;
+
+    // A leg that never ends (a car that cannot reach its target) must not trap
+    // the session: tapping the row again abandons the run without a result and
+    // hands the page back, ready for another try. Runs before the "page is
+    // already built" branch, because the page instance does exist while its leg
+    // runs. The photo mission rides the same rule: the shot is not taken, and
+    // the test centre comes back with the mission still on offer.
+    private void AbandonRunningLeg()
+    {
+        _run = null;
+        _shotSample = null;
+        _hud?.SetRoadTest(null);
+        _phase = _screen is null ? RoadTestPhase.Idle : RoadTestPhase.AtTestCentre;
+        if (_screen is { } page)
+        {
+            _host.RevealPage(page);
+        }
+        _log.LogInfo("road test abandoned: the leg was still running");
     }
 
     // The visit's session state, dropped by both ways out: nothing here survives

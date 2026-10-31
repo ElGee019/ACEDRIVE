@@ -12,6 +12,12 @@ public interface ITouristenfahrtenHost
     /// <summary>Hides the panel: the HUD drives every leg of the run.</summary>
     void HidePanel();
 
+    /// <summary>
+    /// Reveals the panel on the run's briefing page: the calendar row's tap
+    /// explains the Saturday before the run draws anything.
+    /// </summary>
+    void ShowBriefing(object screen);
+
     /// <summary>Reveals the panel on a receipt page.</summary>
     void ShowReceipt(object screen);
 

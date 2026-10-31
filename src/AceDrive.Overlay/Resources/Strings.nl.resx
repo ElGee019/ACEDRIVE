@@ -50,9 +50,11 @@
   <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Bezorg bij {0} op {1} nr. {2} in {3}</value></data>
   <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}. Druk op BEZORG DE GOEDEREN om te lossen.</value></data>
   <data name="HudDeliveryStoreAction" xml:space="preserve"><value>BEZORG DE GOEDEREN</value></data>
-  <data name="HudTouristenPickupDrive" xml:space="preserve"><value>Rijd naar {0} om goederen op te halen voor {1}.</value></data>
+  <data name="HudTouristenPickupDrive" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3} om goederen op te halen voor {4}.</value></data>
   <data name="HudTouristenPickupArrived" xml:space="preserve"><value>Je bent bij {0}. Druk op OPHALEN om de goederen te laden.</value></data>
-  <data name="HudTouristenDropoffDrive" xml:space="preserve"><value>Bezorg {0} bij {1}.</value></data>
+  <data name="HudTouristenDropoffDrive" xml:space="preserve"><value>Bezorg {4} bij {0}, {1} nr. {2} in {3}.</value></data>
+  <data name="HudTouristenDropoffArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}. Druk op BEZORGEN om te lossen.</value></data>
+  <data name="HudTouristenDeliverAction" xml:space="preserve"><value>BEZORGEN</value></data>
   <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
   <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Snelheidsuitdaging: {0}</value></data>
@@ -162,6 +164,10 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="CentoTitle" xml:space="preserve"><value>CENTO MIGLIA EVENTS</value></data>
   <data name="CentoWeek" xml:space="preserve"><value>Week {0}</value></data>
   <data name="CentoReputation" xml:space="preserve"><value>JOUW CLUBREPUTATIE: {0:0.00000}</value></data>
+  <!-- The page's intro: the elements that grow the club reputation are the
+       driven distance, the car class and the garage size (CentoReputation's
+       GrowthFactor), so the line names exactly those three. -->
+  <data name="CentoWelcome" xml:space="preserve"><value>Welkom bij Cento Miglia. Waar je reputatie opbouwt op basis van de kilometers die je racet, de klasse van de auto waarin je rijdt en hoeveel auto's je bezit.</value></data>
   <data name="CentoTierRequirement" xml:space="preserve"><value>Vereist reputatieniveau {0}</value></data>
   <data name="CentoFreeEntry" xml:space="preserve"><value>Clubreputatie: gratis toegang</value></data>
   <data name="CentoEligibilityReputation" xml:space="preserve"><value>Clubreputatie: {0:0} / {1}</value></data>
@@ -192,6 +198,16 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="TouristenItemEspresso" xml:space="preserve"><value>espresso</value></data>
   <data name="TouristenItemTiramisu" xml:space="preserve"><value>tiramisu</value></data>
   <data name="TouristenItemSoup" xml:space="preserve"><value>soep</value></data>
+  <!-- De briefingspagina van de Touristenfahrten-rit: de zaterdagrij van de
+       kalender opent haar voordat de rit zijn zaak en bochten trekt. De titel
+       is de terugvaloptie voor een gewone dag — tijdens een echt evenement op de
+       Nürburgring draagt de pagina de naam van dat evenement uit
+       Data/touristenweekends.json. Twee alinea's in één waarde; de lege regel
+       hoort bij de tekst, dus een vertaler behoudt ze. -->
+  <data name="TouristenTitle" xml:space="preserve"><value>TOURISTENFAHRTEN-WEEKEND</value></data>
+  <data name="TouristenBriefIntro" xml:space="preserve"><value>Toeschouwers rond de Nordschleife hebben dringend hun favoriete snacks nodig. Gezonde winstmarges hier, met extra bonussen tijdens echte raceweekenden!&#10;&#10;Je weet vast waar de beroemde toeschouwersplekken Brünnchen, Einfahrt, Pflanzgarten, Adenauer Forst en Breidscheid Bridge liggen. Zo niet, dan moet je ze zien te vinden... Doe je research!</value></data>
+  <data name="TouristenBriefStart" xml:space="preserve"><value>START DE RIT</value></data>
+  <data name="TouristenBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="NoEvent" xml:space="preserve"><value>Geen evenement</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Klik op Max' kruidenier, rijd erheen en ga de winkel binnen.</value></data>
   <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Ga naar de KLUSSEN-pagina, kies BEZORGKLUS en open een carrière naar keuze.</value></data>
@@ -336,7 +352,7 @@ Deze klus aannemen?</value></data>
   <data name="WalletOffTheLine" xml:space="preserve"><value>Startreactie: {0:0}%</value></data>
   <data name="WalletBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="ZoneExpansionTitle" xml:space="preserve"><value>WERKGEBIED UITGEBREID</value></data>
-  <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>Nieuwe straat ontdekt</value></data>
+  <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>Nieuwe straat toegevoegd aan je werkgebied</value></data>
   <data name="ZoneExpansionZoneLine" xml:space="preserve"><value>Werkgebied: {0} straten</value></data>
   <data name="ZoneExpansionPreviousArea" xml:space="preserve"><value>Vorige oppervlakte: {0:0.0} km</value></data>
   <data name="ZoneExpansionNewArea" xml:space="preserve"><value>Nieuwe totale oppervlakte: {0:0.0} km</value></data>
@@ -437,7 +453,23 @@ Deze klus aannemen?</value></data>
   <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points verdiend: {0}</value></data>
   <data name="DelReceiptCredPTotal" xml:space="preserve"><value>Totaal Credibility Points: {0}</value></data>
   <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × klasse {1} × zeldzaamheid {2}) / 500 × straatkennis {3}%</value></data>
-  <!-- Autobontraansport: betaling is tijdbasis (klasseband schaalt de
+  <!-- Autotransportklus-pagina (PORTPLAN 20). TERUG hergebruikt
+       DeliveryBack; OPHALEN hergebruikt HudPickUp. {0}/{1}/{2}/{3} zijn de
+       gedeelde naam/straat/nummer/plaats-vorm, {4} is de auto. -->
+  <data name="HaulOfferTitle" xml:space="preserve"><value>AUTOTRANSPORTKLUS</value></data>
+  <data name="HaulOfferCar" xml:space="preserve"><value>Nieuwe auto: {0}</value></data>
+  <data name="HaulOfferDealer" xml:space="preserve"><value>Haal hem op bij {0} — {1} {2}, {3}</value></data>
+  <data name="HaulOfferCustomer" xml:space="preserve"><value>Breng hem naar {0} — {1} {2}, {3}</value></data>
+  <data name="HaulOfferTier" xml:space="preserve"><value>Klasse tier {0}</value></data>
+  <data name="HaulAccept" xml:space="preserve"><value>ACCEPTEREN</value></data>
+  <data name="HaulJobPickUpTask" xml:space="preserve"><value>Haal de {0} op bij {1}.</value></data>
+  <data name="HaulJobDeliverTask" xml:space="preserve"><value>Breng de auto naar {0}.</value></data>
+  <data name="HaulUnavailable" xml:space="preserve"><value>Nog geen autotransportklus beschikbaar.</value></data>
+  <data name="HudHaulToDealer" xml:space="preserve"><value>Rijd naar {0} om de {4} op te halen.</value></data>
+  <data name="HudHaulArrivedDealer" xml:space="preserve"><value>Je bent aangekomen bij {0}.</value></data>
+  <data name="HudHaulToCustomer" xml:space="preserve"><value>Rijd naar {0} om de auto af te leveren.</value></data>
+  <data name="HudHaulArrivedCustomer" xml:space="preserve"><value>Je bent aangekomen bij {0}.</value></data>
+  <data name="HudHaulDeliverCar" xml:space="preserve"><value>LEVER DE AUTO AF</value></data>  <!-- Autobontraansport: betaling is tijdbasis (klasseband schaalt de
        rijrating naar een tarief per minuut, de rijminuten prijsen het
        totaal). Geen XP of wereldstand — Unity boekt alleen het geld.
        Behindnaam {0} plus inhaaltekst voor het onbekende moment waarop
@@ -565,6 +597,12 @@ Deze klus aannemen?</value></data>
        XP-bedrag, zodat een vertaler mag herordenen en nooit mag weglaten. -->
   <data name="ValuationTitle" xml:space="preserve"><value>MARKTWAARDERING</value></data>
   <data name="ValuationVenueLine" xml:space="preserve"><value>De locatie van deze week: {0}</value></data>
+  <!-- De briefingspagina die de maandagrij van de kalender vóór de rit opent:
+       wat de jury vergelijkt, welke termen ze weegt en hoe lang een inzending
+       blijft staan. Drie alinea's in één waarde; de lege regels horen bij de
+       tekst, dus een vertaler behoudt ze. -->
+  <data name="ValuationBriefIntro" xml:space="preserve"><value>Je kunt zelf een auto kiezen die je bezit, om die te laten beoordelen tegen een auto die een andere speler al heeft ingezonden.&#10;&#10;De jury weegt de prijs van je auto, de topsnelheid, het vermogen, het aantal klussen dat je ermee hebt afgerond, de motorconditie en al je tijdritklasseringen met deze auto.&#10;&#10;Je inzending blijft staan tot je een andere auto inzendt, of tot er twee echte dagen voorbij zijn. Zolang ze staat, wordt ze vergeleken met de inzendingen van andere spelers.</value></data>
+  <data name="ValuationBriefStart" xml:space="preserve"><value>START DE RIT</value></data>
   <!-- Twee alinea's in één waarde: de vraag van de pagina (Unity's regel) en de
        termen die de jury weegt. De lege regel hoort bij de tekst, dus een
        vertaler behoudt hem in plaats van de view de onderbreking te laten
@@ -607,20 +645,19 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="ControlGateWillyLocked" xml:space="preserve"><value>ONTGRENDEL EERST DE KOFFIEBONEN-CARRIÈRE</value></data>
 
   <!-- De speurpagina (de kaartvervanger): titel, de twee Unity-taken, de hint
-       na een misse winkel, de vondstzin en de twee werkwoorden. -->
+       na een misse winkel en het ene werkwoord. -->
   <data name="WillyTitle" xml:space="preserve"><value>WAAR IS WILLY</value></data>
-  <data name="WillyIntro" xml:space="preserve"><value>De oude {0} wordt vermist! Kun je onze lieve oudere in een van de koffiebars vinden en {1} naar huis brengen? Selecteer een koffiebar in {2} om uit te zoeken of {1} daar is.</value></data>
+  <data name="WillyIntro" xml:space="preserve"><value>De oude {0} wordt vermist! Kun je onze lieve oudere in een van de koffiebars binnen je werkgebied vinden en {1} naar huis brengen?&#10;&#10;Selecteer een koffiebar in {2} om uit te zoeken of {1} daar is.</value></data>
   <data name="WillyNotHere" xml:space="preserve"><value>Ze zijn hier niet. Rijd naar een andere koffiebar op de kaart, of geef het op.</value></data>
   <data name="WillyGiveUp" xml:space="preserve"><value>ZOEKTOCHT OPGEVEN</value></data>
-  <data name="WillyFound" xml:space="preserve"><value>Gelukkig maar, alles goed en wel! Vermiste gevonden! Selecteer {0} om {1} naar huis te brengen.</value></data>
-  <data name="WillyDriveHome" xml:space="preserve"><value>RIJD {0} NAAR HUIS</value></data>
   <data name="WillyBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="WillyCertificateName" xml:space="preserve"><value>Thuisbreng-certificaat week {0} {1}</value></data>
 
   <!-- De begeleidingsregels van de rit op de companion. -->
   <data name="HudWillySearchDrive" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3} en zoek de vermiste oudere.</value></data>
+  <data name="HudWillyFound" xml:space="preserve"><value>Gelukkig maar, alles goed en wel! Vermiste gevonden. Breng {0} nu naar huis.</value></data>
+  <data name="HudDrive" xml:space="preserve"><value>RIJDEN</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Breng {0} naar huis, naar {1} nr. {2} in {3}</value></data>
-  <data name="HudWillyHomeArrived" xml:space="preserve"><value>Welkom thuis {0}!</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>AFZETTEN</value></data>
   <data name="HudWillyWrongAddress" xml:space="preserve"><value>Dit is niet het huisadres van {0}. {0} is nog steeds ergens daarbuiten...</value></data>
   <data name="HudWillyContinue" xml:space="preserve"><value>DOORGAAN</value></data>
@@ -650,6 +687,9 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="RoadTestPhotoIntro" xml:space="preserve"><value>Rijd overal over de kaart zodat de fotograaf zijn foto's kan maken. Een andere locatie dan onze vorige shoot houdt het interessant voor onze lezers.</value></data>
   <data name="RoadTestPhotoNoPosition" xml:space="preserve"><value>Hier is geen adres — rijd een stukje verder en maak de foto opnieuw.</value></data>
   <data name="RoadTestBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="RoadTestBriefVenue" xml:space="preserve"><value>Testcentrum: La Strada, {0}</value></data>
+  <data name="RoadTestBriefIntro" xml:space="preserve"><value>La Strada zet de {0} deze week op de cover.&#10;&#10;Zet een 0-60 tijd neer en doe een remtest om de technische specificaties te leveren.&#10;&#10;Je tijd wordt vergeleken met de tijden van andere testers om je autojournalist-reputatie te bepalen.&#10;Reputatie, het aantal vrienden dat je hebt en het aantal inwoners bepalen hoeveel exemplaren van het magazine worden verkocht en tegen welke prijs.</value></data>
+  <data name="RoadTestBriefStart" xml:space="preserve"><value>START DE RIT</value></data>
   <data name="RoadTestContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="RoadTestPickRequired" xml:space="preserve"><value>De wegtest van deze week is voor de {0}. Stap over in die auto.</value></data>
   <data name="RoadTestBoard" xml:space="preserve"><value>WERELDRANGLIJST</value></data>

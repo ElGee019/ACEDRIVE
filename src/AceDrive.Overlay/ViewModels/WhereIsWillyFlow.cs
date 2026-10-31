@@ -66,6 +66,9 @@ public sealed class WhereIsWillyFlow
     private int _attempts;
     private bool _missed;
     private WhereIsWillyReceipt? _receipt;
+    // True once the player pinned a shop: the run has begun, so the page's
+    // BACK is the port's "leave the page" affordance instead of a decline.
+    private bool _dispatched;
 
     // TEMPORARY (testing): true skips the Wednesday-window and completed-stamp
     // gates, so the run can start any time and be replayed after it paid. The
@@ -161,7 +164,15 @@ public sealed class WhereIsWillyFlow
             _log.LogInfo("where is willy ignored: this Wednesday is already stamped");
             return;
         }
-        if (_phase is WhereIsWillyPhase.Searching or WhereIsWillyPhase.Found)
+        if (_phase is WhereIsWillyPhase.Found)
+        {
+            // The found step lives on the companion; the row only puts its
+            // prompt back up for a player who left it behind.
+            _hud?.SetTaskPrompt(FoundPrompt());
+            _log.LogInfo("where is willy: found, the companion holds the drive home");
+            return;
+        }
+        if (_phase is WhereIsWillyPhase.Searching)
         {
             _host.PresentQuest(CreateQuestPage());
             return;
@@ -189,6 +200,7 @@ public sealed class WhereIsWillyFlow
         _attempts = 0;
         _missed = false;
         _receipt = null;
+        _dispatched = false;
         _host.PresentQuest(CreateQuestPage());
         _log.LogInfo(
             $"where is willy started: {_elder?.Name.Full} missing in {_zone.ZoneMap.City}, " +
@@ -207,25 +219,27 @@ public sealed class WhereIsWillyFlow
         }
 
         _hud?.SetDestination(shop, new HudDestinationCopy("HudWillySearchDrive"));
+        _dispatched = true;
         _host.HidePanel();
         _log.LogInfo(
             $"where is willy: driving to {shop.Name} at {AddressFormatter.Format(shop.Address)}");
     }
 
     /// <summary>
-    /// The found page's DRIVE HOME row: pins the elder's door. Unity's
-    /// street-name markers have no port equivalent, so the page names the
-    /// address and the companion pins the exact house (adaptation A2).
+    /// The found prompt's DRIVE button (the companion's, not a page's): clears
+    /// the prompt and pins the elder's door. Unity's street-name markers have no
+    /// port equivalent, so the companion carries the address and pins the exact
+    /// house (adaptation A2).
     /// </summary>
-    public void ChooseHome()
+    public void DriveHome()
     {
         if (_phase != WhereIsWillyPhase.Found || _elder is null)
         {
             return;
         }
 
+        _hud?.SetTaskPrompt(null);
         _hud?.SetDestination(HomeMarker(), HomeCopy());
-        _host.HidePanel();
         _log.LogInfo(
             $"where is willy: driving {_elder.Name.FirstName} home to " +
             $"{AddressFormatter.Format(_home)}");
@@ -335,19 +349,37 @@ public sealed class WhereIsWillyFlow
         _log.LogInfo("where is willy abandoned: no fee, no stamp");
     }
 
-    /// <summary>The receipt's CONTINUE: the quest is over, back to the control page.</summary>
+    /// <summary>
+    /// The receipt's CONTINUE: the quest is over, back to the main page — the
+    /// run is an event, not a job, so the receipt never lands on the jobs page
+    /// it was started from.
+    /// </summary>
     public void Continue()
     {
         Reset();
-        _host.ShowControl();
+        _host.ShowMenu();
     }
 
     /// <summary>
-    /// The quest page's BACK: hides the panel and keeps the run alive, so the
-    /// calendar row reopens it. Unity has no such verb because its map never
-    /// leaves the screen; this is the port's one page affordance.
+    /// The quest page's BACK. Before the first shop tap it is Unity's "never
+    /// started it": the draw is dropped (no fee, no stamp, no in-flight lock)
+    /// and the panel lands back on the calendar the run was opened from, so an
+    /// accidental calendar tap cannot hold the job centre hostage. Once a shop
+    /// is pinned the run is live and BACK only hides the page, so the calendar
+    /// row reopens it.
     /// </summary>
-    public void Back() => _host.HidePanel();
+    public void Back()
+    {
+        if (!_dispatched)
+        {
+            Reset();
+            _host.ShowCalendar();
+            _log.LogInfo("where is willy declined: back to the calendar");
+            return;
+        }
+
+        _host.HidePanel();
+    }
 
     // The draw (Unity JobSelectionScreen's Wednesday button): one hiding shop,
     // then one elder — a resident no venue owns, or a freshly banked one when
@@ -407,19 +439,26 @@ public sealed class WhereIsWillyFlow
     }
 
     // The hiding shop's arrival: the fee is priced now (Unity CalculateReward),
-    // the pinned shop is released so a stray ENTER cannot open it, and the page
-    // reports the run's one good news.
+    // the pinned shop is released so a stray ENTER cannot open it, and the
+    // companion carries the one good news with its DRIVE button. WHY not a
+    // page: the player is parked mid-search, and the step is a single action —
+    // the mini window is where they already are.
     private void Find()
     {
         _phase = WhereIsWillyPhase.Found;
         _missed = false;
         _hud?.SetDestination(null);
         _receipt = BuildReceipt();
-        _host.PresentQuest(CreateQuestPage());
+        _hud?.SetTaskPrompt(FoundPrompt());
         _log.LogInfo(
             $"where is willy found at {_shop?.Name}: fee {_receipt.FinderFee} CR " +
             $"after {_attempts} miss(es)");
     }
+
+    // The found task's copy: Unity's sentence, then the button that starts the
+    // drive home. Both stay resource keys so a language switch repaints them.
+    private HudTaskPrompt FoundPrompt() =>
+        new("HudWillyFound", [_elder?.Name.FirstName ?? string.Empty], "HudDrive");
 
     // Any other coffee shop: one attempt is spent, the pin is released and the
     // page offers the abandoned search.
@@ -524,9 +563,8 @@ public sealed class WhereIsWillyFlow
     }
 
     private WhereIsWillyScreenViewModel CreateQuestPage() => new(
-        _phase, _elder!, _home, _zone.ZoneMap.City,
-        _phase == WhereIsWillyPhase.Searching ? Shops() : [],
-        _missed, ChooseCoffeeShop, ChooseHome, Abandon, new RelayCommand(Back), _beat);
+        _elder!, _zone.ZoneMap.City, Shops(), _missed,
+        ChooseCoffeeShop, Abandon, new RelayCommand(Back), _beat);
 
     private List<PointOfInterest> Shops() =>
         [.. WhereIsWillyCandidates.CoffeeShops(_directory.All, _zone.ZoneMap)];
@@ -536,8 +574,12 @@ public sealed class WhereIsWillyFlow
     private PointOfInterest HomeMarker() =>
         new(HomeMarkerId, _elder?.Name.FirstName ?? string.Empty, _home, PoiTypes.Willy);
 
+    // The elder's home leg: the drive line names the address, and the arrival is
+    // its button alone. WHY the empty arrival key: the HUD keeps the arrival
+    // sentence down on purpose for a leg that is nothing but its action, so
+    // DROP OFF is the one thing to read once the car is at the door.
     private static HudDestinationCopy HomeCopy() =>
-        new("HudWillyHomeDrive", "HudWillyHomeArrived", "HudWillyDropOff");
+        new("HudWillyHomeDrive", string.Empty, "HudWillyDropOff");
 
     private static bool IsCoffeeShop(PointOfInterest poi) =>
         string.Equals(poi.Type, PoiTypes.CoffeeShop, StringComparison.OrdinalIgnoreCase);
@@ -545,7 +587,11 @@ public sealed class WhereIsWillyFlow
     private void Reset()
     {
         _phase = WhereIsWillyPhase.Idle;
+        // Every ending funnels through here, so the companion's prompt cannot
+        // outlive the run it announced.
+        _hud?.SetTaskPrompt(null);
         _shop = null;
+        _dispatched = false;
         _elder = null;
         _home = default;
         _shopCount = 0;

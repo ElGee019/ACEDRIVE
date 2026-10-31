@@ -34,6 +34,13 @@ public partial class MainWindow : Window
     // the VM does not forward it.
     private readonly bool _introDone;
 
+    // The deferred hide (ApplyShown): a blank page is painted before the window
+    // goes away, so the frame a layered window keeps for its next Show() is the
+    // chrome instead of the page being replaced.
+    private bool _hidePending;
+    private int _hideTicks;
+    private EventHandler? _hideTick;
+
     public MainWindow(MainViewModel vm, ILog log, bool introDone)
     {
         _vm = vm;
@@ -110,6 +117,7 @@ public partial class MainWindow : Window
         AddHandler(ButtonBase.ClickEvent, new RoutedEventHandler(OnButtonClick));
         Closed += (_, _) =>
         {
+            DetachHideTick();
             try
             {
                 var hwnd = new WindowInteropHelper(this).Handle;
@@ -184,20 +192,101 @@ public partial class MainWindow : Window
     {
         if (_vm.IsShown)
         {
-            if (!IsVisible) Show();
-        }
-        else if (IsVisible)
-        {
-            // WHY: hiding the panel while it owns the foreground (a click on a
-            // form field, then the idle timer) leaves Windows with no active
-            // window to hand input back to, so EVO stays deaf until clicked.
-            bool ownedForeground =
-                Native.IsForeground(new WindowInteropHelper(this).Handle);
-            Hide();
-            if (ownedForeground)
+            CancelPendingHide();
+            if (IsVisible)
             {
-                Native.FocusGame();
+                return;
             }
+
+            // The page the VM handed over while the panel was down has to be in
+            // the tree before the window is presented: Show() displays the frame
+            // the window kept, so laying out first means that frame already
+            // carries the new page.
+            PageHost.Visibility = Visibility.Visible;
+            UpdateLayout();
+            Show();
+            return;
+        }
+
+        if (!IsVisible || _hidePending)
+        {
+            return;
+        }
+
+        ScheduleHide();
+    }
+
+    // WHY the hide is blanked and deferred by one painted frame: a layered
+    // (AllowsTransparency) window keeps the last frame it painted while it is
+    // hidden, and Show() presents that frame before the page handed over since
+    // can be drawn — the missing-person receipt briefly flashed the quest page
+    // it replaced. Blanking the page here, then hiding once the blank frame has
+    // been painted, leaves the window with nothing stale to show.
+    private void ScheduleHide()
+    {
+        _hidePending = true;
+        _hideTicks = 0;
+        PageHost.Visibility = Visibility.Collapsed;
+        UpdateLayout();
+        _hideTick = (_, _) =>
+        {
+            // The first tick paints the blank frame, the second may hide.
+            if (++_hideTicks < 2)
+            {
+                return;
+            }
+
+            FinishHide();
+        };
+        CompositionTarget.Rendering += _hideTick;
+    }
+
+    private void FinishHide()
+    {
+        DetachHideTick();
+        if (!_hidePending)
+        {
+            return;
+        }
+
+        _hidePending = false;
+        // A show cancelled it while the blank frame was being painted.
+        if (_vm.IsShown)
+        {
+            PageHost.Visibility = Visibility.Visible;
+            return;
+        }
+
+        // WHY: hiding the panel while it owns the foreground (a click on a
+        // form field, then the idle timer) leaves Windows with no active
+        // window to hand input back to, so EVO stays deaf until clicked.
+        bool ownedForeground =
+            Native.IsForeground(new WindowInteropHelper(this).Handle);
+        Hide();
+        if (ownedForeground)
+        {
+            Native.FocusGame();
+        }
+    }
+
+    private void CancelPendingHide()
+    {
+        if (!_hidePending)
+        {
+            return;
+        }
+
+        DetachHideTick();
+        _hidePending = false;
+        PageHost.Visibility = Visibility.Visible;
+    }
+
+    private void DetachHideTick()
+    {
+        if (_hideTick is not null)
+        {
+            CompositionTarget.Rendering -= _hideTick;
+            _hideTick = null;
         }
     }
 

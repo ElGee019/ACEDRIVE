@@ -144,34 +144,36 @@ public sealed class ValuationFlow
     }
 
     /// <summary>
-    /// The calendar row's tap (Unity's job-centre button): pins the venue and
-    /// sends the player off. Off-window taps are refused here as well as by the
-    /// calendar page, so a caller can never jump the gate.
+    /// The calendar row's tap (Unity's job-centre button): the week's briefing
+    /// page, never the drive itself. The page names the venue and the jury's
+    /// terms; its START verb runs <see cref="BeginDrive"/>, its BACK hands the
+    /// panel back to the calendar with nothing started. The gate is checked here
+    /// as well as by the calendar page, so a caller can never jump it.
     /// </summary>
-    public void BeginDrive()
+    public void Begin()
     {
-        DateTime now = _game.GameNow;
-        if (!_ignoreEventGates
-            && !ValuationRules.IsWindow(ControlCalendar.ToDayOfWeek(now), now.Hour))
-        {
-            _log.LogInfo("market valuation drive ignored: outside the Monday 8am-8pm window");
-            return;
-        }
-        // One entry a week (Unity's lastValuationGameDay gate): a row whose
-        // showcase was already entered cannot send the player out again.
-        if (_screen is not null
-            || (!_ignoreEventGates && _ledger.HasEntry(ValuationRules.WeekKey(now))))
+        if (!TryStart(out ValuationVenue venue))
         {
             return;
         }
 
-        if (!TryVenue(out ValuationVenue venue))
+        _host.PresentBriefing(new ValuationBriefingScreenViewModel(
+            Strings.Format("ValuationVenueLine", AddressFormatter.Format(venue.Location)),
+            BeginDrive, new RelayCommand(Back), _beat));
+        _log.LogInfo(
+            $"market valuation briefing open at {AddressFormatter.Format(venue.Location)}");
+    }
+
+    /// <summary>
+    /// The briefing's START: pins the venue and sends the player off. Split from
+    /// <see cref="Begin"/> so the week's terms are read before a drive that
+    /// cannot be cancelled starts.
+    /// </summary>
+    public void BeginDrive()
+    {
+        if (!TryStart(out ValuationVenue venue))
         {
-            if (DrawVenue() is not { } drawn)
-            {
-                return;
-            }
-            venue = drawn;
+            return;
         }
 
         PinVenue(venue);
@@ -180,6 +182,50 @@ public sealed class ValuationFlow
         _host.HidePanel();
         _log.LogInfo(
             $"market valuation: driving to {AddressFormatter.Format(venue.Location)}");
+    }
+
+    /// <summary>
+    /// The briefing's BACK: leaves before the drive started, so no venue is
+    /// pinned and the calendar row reads as it did. The draw stays banked — it
+    /// is this week's venue either way.
+    /// </summary>
+    public void Back()
+    {
+        _host.ShowCalendar();
+        _log.LogInfo("market valuation briefing closed: back to the calendar");
+    }
+
+    // The row's and the briefing's shared gate: the Monday window, the one entry
+    // a week and a venue that resolves inside the zone. The draw is banked here,
+    // so the page and the drive it starts always read the same venue.
+    private bool TryStart(out ValuationVenue venue)
+    {
+        venue = null!;
+        DateTime now = _game.GameNow;
+        if (!_ignoreEventGates
+            && !ValuationRules.IsWindow(ControlCalendar.ToDayOfWeek(now), now.Hour))
+        {
+            _log.LogInfo("market valuation ignored: outside the Monday 8am-8pm window");
+            return false;
+        }
+        // One entry a week (Unity's lastValuationGameDay gate): a row whose
+        // showcase was already entered cannot send the player out again.
+        if (_screen is not null
+            || (!_ignoreEventGates && _ledger.HasEntry(ValuationRules.WeekKey(now))))
+        {
+            return false;
+        }
+
+        if (TryVenue(out venue))
+        {
+            return true;
+        }
+        if (DrawVenue() is not { } drawn)
+        {
+            return false;
+        }
+        venue = drawn;
+        return true;
     }
 
     /// <summary>

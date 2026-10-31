@@ -44,6 +44,9 @@ internal static class HudVoiceKeywords
         "job loss", "joke us", "robles", "troubles",
     ];
     // Delivery's two actions: loading the freight and unloading it at a store.
+    // Touristenfahrten's corner prints the shorter DELIVER, and the same words
+    // answer it: the player says what the button says, however many words the
+    // career's freight button happens to print.
     private static readonly string[] Deliver = ["enter", "deliver", "deliver items"];
     // Grandma's arrival button prints PANCAKES!; the plural, the singular and
     // the model's split two-word reading all answer because the trailing
@@ -51,13 +54,19 @@ internal static class HudVoiceKeywords
     private static readonly string[] Pancakes =
         ["enter", "pancakes", "pancake", "pan cakes", "pan cake"];
 
+    // The task prompt's own action (the found-elder news and its DRIVE button):
+    // "drive" is the word the button prints, and the shared "enter" keeps the
+    // one habit the model hears reliably working on every button.
+    private static readonly string[] Drive = ["enter", "drive"];
+
     /// <summary>Keywords for one action resource key; unknown keys answer "enter".</summary>
     public static IReadOnlyList<string> For(string actionKey) => actionKey switch
     {
         "HudPickUp" or "HudJobPickupAction" or "HudDeliveryHubAction" => PickUp,
         "HudJobDropoffAction" or "HudWillyDropOff" => DropOff,
-        "HudDeliveryStoreAction" => Deliver,
+        "HudDeliveryStoreAction" or "HudTouristenDeliverAction" => Deliver,
         "HudPancakes" => Pancakes,
+        "HudDrive" => Drive,
         // The missing-person run's clears: the receipt's read continues and the
         // wrong address is acknowledged with the one word the model hears.
         "HudWillyContinue" => Enter,

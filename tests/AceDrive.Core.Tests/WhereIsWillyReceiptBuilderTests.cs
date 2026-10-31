@@ -89,6 +89,24 @@ public sealed class WhereIsWillyReceiptBuilderTests
     }
 
     [Fact]
+    public void Build_IgnoresTheRideCompanionSuffix()
+    {
+        // A resident's drawn identity can still carry the ride's suffix ("and
+        // some colleagues"): the receipt returns one elder, so it prints the
+        // plain name, the same shape the quest page's intro uses.
+        var person = new Resident(
+            new AddressLocation("Street 1", 12, HouseNumberPlan.SideOf(12)),
+            new ProceduralName("Klaus", "Berger", "and some colleagues"));
+
+        WhereIsWillyReceipt receipt = WhereIsWillyReceiptBuilder.Build(
+            Rules, person, Shop("Café", 1), attempts: 0, ownedCars: [Car(20000.0)],
+            shopCount: 2, week: 1, year: 1924, friendshipLevel: 0);
+
+        Assert.Equal("Klaus Berger", receipt.PersonName);
+        Assert.DoesNotContain("colleagues", receipt.PersonName, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Build_IgnoresNegativeAttemptsAndCounts()
     {
         WhereIsWillyReceipt receipt = WhereIsWillyReceiptBuilder.Build(

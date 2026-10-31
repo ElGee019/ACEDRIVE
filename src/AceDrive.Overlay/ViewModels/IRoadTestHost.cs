@@ -21,6 +21,13 @@ public interface IRoadTestHost
     void ShowControl();
 
     /// <summary>
+    /// Returns to the calendar page the row was tapped on: the briefing's BACK
+    /// leaves the player where they came from, not on the jobs page a call
+    /// opens.
+    /// </summary>
+    void ShowCalendar();
+
+    /// <summary>
     /// Shows the menu page — the page a call opens — for the end of a completed
     /// test: the visit is over, so the player lands on the main page instead of
     /// the jobs page the receipt was opened over.

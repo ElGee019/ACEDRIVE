@@ -20,8 +20,10 @@
                    Text="{Binding Title}"/>
 
         <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
+            <!-- The label names the street below it; wrapped so the longer copy
+                 still fits the narrow overlay panel. -->
             <TextBlock Text="{loc:Loc Key=ZoneExpansionNewStreet}" Foreground="#FFBFC4C9"
-                       FontSize="14" TextAlignment="Center"/>
+                       FontSize="14" TextAlignment="Center" TextWrapping="Wrap"/>
             <TextBlock Text="{Binding StreetLine}" Foreground="#FF97EAD2" FontSize="26"
                        FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"
                        Margin="0,2,0,10"/>

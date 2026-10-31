@@ -11,8 +11,13 @@ namespace AceDrive.Overlay.ViewModels;
 /// summary block only when this was the garage's second car (grandma's starter plus
 /// the first purchase); the same gate repeats here. Both buttons belong to the host,
 /// which banks the outcome — the screen writes nothing.
+///
+/// Both buttons answer the mic as well as a click: this page is the only way out of
+/// a purchase, and a player who just bought a car has no reason to reach for the
+/// mouse. The taps act at once like the settings page's continue — one choice ends
+/// the page, so there is no second tap for the beat's glow to protect.
 /// </summary>
-public sealed class BoughtFirstCarScreenViewModel : ViewModelBase
+public sealed class BoughtFirstCarScreenViewModel : ViewModelBase, IVoiceScreen
 {
     public BoughtFirstCarScreenViewModel(
         CarSpec car, bool secondCar, ICommand driveCommand, ICommand keepCommand)
@@ -21,6 +26,11 @@ public sealed class BoughtFirstCarScreenViewModel : ViewModelBase
         SummaryLine = secondCar ? Strings.Get("BoughtSecondCar") : string.Empty;
         DriveCommand = driveCommand;
         KeepCommand = keepCommand;
+        VoiceActions = new Dictionary<string, Action>
+        {
+            [Strings.Get("BoughtDrive")] = () => DriveCommand.Execute(null),
+            [Strings.Get("BoughtKeep")] = () => KeepCommand.Execute(null),
+        };
     }
 
     public string Title { get; } = Strings.Get("BoughtTitle");
@@ -38,4 +48,7 @@ public sealed class BoughtFirstCarScreenViewModel : ViewModelBase
     public ICommand DriveCommand { get; }
 
     public ICommand KeepCommand { get; }
+
+    /// <summary>Both buttons answer their printed labels.</summary>
+    public IReadOnlyDictionary<string, Action> VoiceActions { get; }
 }

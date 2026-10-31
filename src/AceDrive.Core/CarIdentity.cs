@@ -52,33 +52,50 @@ public sealed record CarIdentity(string KsId, string? MechPreset)
         next.KsId != KsId || next.MechPreset is not null ? next : this;
 
     /// <summary>
-    /// True when this announced car is the catalogue row at
-    /// <paramref name="carKey"/> (the id, or id#preset for a variant). A base
-    /// row matches every announcement of its folder: onboarding and the
-    /// dealer can own the folder row while the game spawns one of its
-    /// showroom variants. A variant row requires the announced preset to
-    /// match it; a preset-less announcement matches the whole folder because
-    /// the log only knew the folder.
+    /// True when this announced car is the catalogue <paramref name="row"/>.
+    /// A variant row requires the announced preset to match it. A base row is
+    /// the folder's standard car: it stands in for a preset the catalogue does
+    /// not model, but a sibling variant the pool knows is a different car (the
+    /// 992 GT3 RS and its Weissach package), not this one. A preset-less
+    /// announcement matches the whole folder because the log only knew the
+    /// folder.
     /// </summary>
-    public bool Matches(string carKey)
+    public bool Matches(CarSpec row, IReadOnlyList<CarSpec> pool)
     {
-        if (KsId.Length == 0 || !carKey.StartsWith(KsId, StringComparison.Ordinal))
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(pool);
+
+        if (KsId.Length == 0 || !string.Equals(row.Id, KsId, StringComparison.Ordinal))
         {
             return false;
         }
 
-        int boundary = KsId.Length;
-        if (carKey.Length == boundary)
+        if (MechPreset is null)
         {
             return true;
         }
 
-        if (carKey[boundary] != '#')
+        if (row.Preset is not null)
         {
-            return false;
+            return string.Equals(row.Preset, MechPreset, StringComparison.Ordinal);
         }
 
-        return MechPreset is null
-            || string.Equals(carKey[(boundary + 1)..], MechPreset, StringComparison.Ordinal);
+        return !HasVariantRow(pool, row.Id, MechPreset);
+    }
+
+    // A variant row for the announced preset means the pool models that
+    // variant separately, so the folder row must not claim it too.
+    private static bool HasVariantRow(
+        IReadOnlyList<CarSpec> pool, string ksId, string preset)
+    {
+        foreach (CarSpec car in pool)
+        {
+            if (string.Equals(car.Id, ksId, StringComparison.Ordinal)
+                && string.Equals(car.Preset, preset, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }

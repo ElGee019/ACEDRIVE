@@ -155,7 +155,8 @@ the shop count), so a one-shop town always multiplies by 1.0. `year` and
   stays hidden for the whole leg.
 - Arrival at the **home address**: `NotifyHomeArrived` — leg-2 flag off,
   markers released, `homeArrived = true`, handler inactive, street markers
-  off, **friendship +1**, button `DROP OFF`, task `Welcome home {firstName}!`.
+  off, **friendship +1**, button `DROP OFF`, no arrival sentence (the button
+  is the whole arrival).
 - Arrival at **any other address** while the elder is on board:
   `NotifyWrongAddress` — `wrongAddress = true`, handler inactive, markers off,
   **friendship −1**, button `CONTINUE`, task
@@ -181,7 +182,8 @@ on CONTINUE:**
 - `lastWillyGameDay = clock.gameDay`, `lastWillyYear = year`, then
   `SaveManager.Save()`.
 
-Copy (Unity's exact lines):
+Copy (Unity's exact lines; `{person}` is the plain `BaseName`, never the ride's
+companion suffix — the receipt returns one elder):
 
 ```
 Returned: {person}
@@ -200,7 +202,8 @@ Friendship level: {friendshipLevel}
 ```
 
 Unity's old distance-payment block is gone, so the finder's fee is the whole
-reward. CONTINUE closes the receipt and returns to the map; the quest is over
+reward. CONTINUE closes the receipt and returns to the map (the port lands on
+the main page; see §7 A9); the quest is over
 and the row reads `(Completed)`.
 
 ### 2.8 Friendship
@@ -235,7 +238,8 @@ New files, one type per file:
   Unity's `Mathf.RoundToInt` is `Math.Round`, not away-from-zero.
 - `WhereIsWillyShopBand` — `int? MaxShops` (JSON `null` marks the open-ended
   last band) + `double Multiplier`.
-- `WhereIsWillyReceipt` — the receipt's data: `PersonName`, `FirstName`,
+- `WhereIsWillyReceipt` — the receipt's data: `PersonName` (the plain
+  `BaseName`; a resident's ride suffix stays off the receipt), `FirstName`,
   `ShopName`, `FinderFee`, `AverageCarValue`, `BaseReward`, `ShopCount`,
   `ShopMultiplier`, `Attempts`, `AttemptMultiplier`, `Week`, `Year`,
   `FriendshipLevel`.
@@ -324,8 +328,9 @@ player drives off, and a re-awarded friendship (or fee) must be impossible.
 - `Begin()` — the calendar tap:
   - refusals (log, return): not Wednesday 08–20; `_ledger.CompletedOn(game
     date)`; no coffee shop at all.
-  - already running (`_phase` Searching/Found) → reopen the quest page instead
-    of drawing a second search (Unity's blocked job centre).
+  - already running: `Searching` → reopen the quest page instead of drawing a
+    second search (Unity's blocked job centre); `Found` → put the companion's
+    found prompt back up, never a page.
   - `Draw()`: hiding shop = random coffee shop; town = `_map.City`; candidates
     = resident book minus every directory `OwnerName`; if empty, draw a free
     house (not on any known POI/resident address) and `ResidentBook
@@ -338,10 +343,11 @@ player drives off, and a re-awarded friendship (or fee) must be impossible.
   `hud.Update`:
   - `Searching && ParkedAtTarget && CurrentDestination is a coffee shop`:
     the hiding shop → `Find()` (reward computed now; the pinned shop is
-    cleared, so a stray ENTER cannot open the shop, and the street markers have
-    no port equivalent — the home row carries the address) → `_phase = Found`
-    → present the found page; any other shop → `attempts++`, clear the pinned
-    shop, present the page with the "They aren't here" line and GIVE UP.
+    cleared, so a stray ENTER cannot open the shop; the street markers have no
+    port equivalent — the companion carries the found news) → `_phase = Found`
+    → the companion shows `HudWillyFound` with its `DRIVE` button (`HudDrive`),
+    no page; any other shop → `attempts++`, clear the pinned shop, present the
+    page with the "They aren't here" line and GIVE UP.
   - `Found && ParkedAtTarget && CurrentDestination is not null`: compare its
     address with the elder's home; equal → `HomeArrived()` (friendship +1,
     `_phase = AtHome`, re-pin the home marker with the DROP OFF action); else
@@ -350,9 +356,11 @@ player drives off, and a re-awarded friendship (or fee) must be impossible.
   - `AtHome` and `WrongAddress` resolve their last step through the router
     handler (ENTER), never on the poll, so the fee is paid once and the
     penalty applies once.
-- `ChooseHome()` — the found page's DRIVE HOME row: pins the elder's home
-  marker (`HudDestinationCopy("HudWillyHomeDrive", "HudWillyHomeArrived",
-  "HudWillyDropOff")`), hides the panel.
+- `DriveHome()` — the companion's `DRIVE` button on the found prompt (the
+  `DRIVE` news step, A10): clears the prompt and pins the elder's home marker
+  (`HudDestinationCopy("HudWillyHomeDrive", "", "HudWillyDropOff")` — an empty
+  arrival key keeps the sentence down, the button is the arrival), so the
+  banner reads the address the task now needs.
 - `Enter()` — the flow's `IPoiArrivalHandler` for `PoiTypes.Willy`:
   - home marker → pay, certificate, stamp, save, clear the destination, build
     the receipt page and return it (the router presents it);
@@ -361,15 +369,19 @@ player drives off, and a re-awarded friendship (or fee) must be impossible.
   - anything else → null.
 - `Abandon()` — GIVE UP SEARCH (only offered when `attempts > 0`): reset, HUD
   notice with Unity's "Search abandoned…" sentence, hide the panel.
-- `Continue()` — the receipt's CONTINUE: clear everything, `ShowControl()`.
-- `Back()` — the quest page's BACK: hide the panel, keep the quest alive (the
-  calendar row reopens it). Unity has no such verb because its map is always
-  on screen; this is the port's one page affordance.
+- `Continue()` — the receipt's CONTINUE: clear everything, `ShowMenu()` (the
+  main page; a completed run is an event, not a job).
+- `Back()` — the quest page's BACK. Before the first shop tap it declines the
+  run: reset (no draw, no fee, no stamp, no in-flight lock) and `ShowCalendar()`,
+  so an accidental calendar tap lands back on the calendar instead of holding
+  the job centre hostage. Once a shop is pinned the run is live and BACK only
+  hides the panel, so the calendar row reopens it. Unity has no such verb
+  because its map is always on screen; this is the port's one page affordance.
 
 `IWhereIsWillyHost` (small, one job per member):
-`HidePanel()`, `PresentQuest(object page)`, `ShowControl()`.
+`HidePanel()`, `PresentQuest(object page)`, `ShowMenu()`, `ShowCalendar()`.
 `MainViewModel` implements it with `PanelPresenter.Hide`,
-`PanelPresenter.PresentJob` and `Navigation.ShowControl`.
+`PanelPresenter.PresentJob` and `Navigation.ShowMenuPage`.
 
 `WhereIsWillyPoiHandler` (Views/VM layer, one type per file) adapts the router
 to the flow: `Owns` = `PoiTypes.Willy`; `Open` = `flow.Enter()`. Registered in
@@ -378,16 +390,23 @@ to the flow: `Owns` = `PoiTypes.Willy`; `Open` = `flow.Enter()`. Registered in
 ### 3.4 Pages
 
 **`WhereIsWillyScreenViewModel`** (+ `WhereIsWillyScreenView.xaml`), the
-overlay's stand-in for Unity's map during the quest. Its `Phase` (Searching /
-Found) decides the layout; BACK is the same page affordance in both:
+overlay's stand-in for Unity's map during the search. It paints the search only
+— the found step is the companion's (A10) — and BACK is still its one page
+affordance (decline the untouched run, or hide the page mid-drive):
 
-- *Searching*: title `WHERE IS WILLY`, Unity's intro task text, the town's
-  coffee shops as rows (name + `AddressFormatter`), the "They aren't here"
-  line after a failed visit, `GIVE UP SEARCH` only when `attempts > 0`, BACK.
-  A row taps → `ChooseCoffeeShop`; the page hides.
-- *Found*: Unity's found sentence naming the short home address, one
-  `DRIVE {firstName} HOME` row (the elder's door), BACK. A row taps →
-  `ChooseHome`; the page hides.
+- title `WHERE IS WILLY`, Unity's intro task text, the town's coffee shops as
+  rows (name + `AddressFormatter`), the "They aren't here" line after a failed
+  visit, `GIVE UP SEARCH` only when `attempts > 0`, BACK. A row taps →
+  `ChooseCoffeeShop`; the page hides.
+- The found step is a `HudTaskPrompt` (text key + values + action key) the flow
+  hands to the companion: `HudWillyFound` ("Well that's a relief… Now bring
+  {firstName} back home.") with the `DRIVE` button. `TaskActionRequested` comes
+  back to the flow as `DriveHome()`, which pins the home leg and swaps the
+  banner to its address sentence. The button is spoken too: `HudDrive`'s
+  keywords are "drive" and the shared "enter", tapped through the same HUD path
+  as ENTER (`RequestTaskAction` glows, then acts on the shared beat).
+- Arriving at that home leg shows the `DROP OFF` button (the re-pin of the same
+  door keeps the arrival, so the button never flickers out from under the tap).
 
 Voice: every row answers to its label, GIVE UP and BACK answer theirs, all
 through `IVoiceScreen` + `VoiceBeat` (the addresses-page shape).
@@ -428,7 +447,7 @@ timer. The view adds two `DataTrigger`s for the grey/italic state.
 | `Data/` + `JsonWhereIsWillyRules` | the new balance file and its loader |
 | `ARCHITECTURE.md` | §7a: no new cache — say so; the flow's phase/draw/attempts are session state, not a cache |
 | `PORTPLAN.md` | item 27 note: Willy landed; item 52 note: the Wednesday gate is wired |
-| `HudVoiceKeywords` | `HudWillyDropOff` → the `DropOff` words, `HudWillyContinue` → the `Enter` words |
+| `HudVoiceKeywords` | `HudDrive` → the `Drive` words ("enter", "drive"), `HudWillyDropOff` → the `DropOff` words, `HudWillyContinue` → the `Enter` words |
 | `FIREBASE.md` | no change (local quest) |
 
 ### 3.7 resx (en + nl, no sentences in code)
@@ -440,15 +459,14 @@ ControlGateWillyDone         SEE YOU NEXT WEDNESDAY
 ControlGateWillyLocked       UNLOCK COFFEE BEANS CAREER FIRST
 
 WillyTitle                   WHERE IS WILLY
-WillyIntro                   Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Select a coffee shop in {2} to find out whether {1} is there.
+WillyIntro                   Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops inside your operating zone and bring {1} home?&#10;&#10;Select a coffee shop in {2} to find out whether {1} is there.
 WillyNotHere                 They aren't here. Navigate to another coffee shop on the map, or give up.
 WillyGiveUp                  GIVE UP SEARCH
-WillyFound                   Well that's a relief. All well and good! Missing person found! Select {0} to drive {1} back home.
-WillyDriveHome               DRIVE {0} HOME
 
+HudWillyFound                Well that's a relief. All well and good! Missing person found. Now bring {0} back home.
+HudDrive                     DRIVE
 HudWillySearchDrive          Drive to {0}, {1} No. {2} in {3} and look for the missing elder.
 HudWillyHomeDrive            Drive {0} home to {1} No. {2} in {3}
-HudWillyHomeArrived          Welcome home {0}!
 HudWillyDropOff              DROP OFF
 HudWillyWrongAddress         This is not {0}'s home address. {0} is still out there somewhere...
 HudWillyContinue             CONTINUE
@@ -480,18 +498,22 @@ values the flow already resolved.
    and this Wednesday has no stamp. The row reads `Where is Willy`.
 2. Tap → teal flash, panel swaps to `WHERE IS WILLY` with the Unity intro
    sentence and the town's coffee-shop rows; the panel hides only when a row
-   is tapped.
+   is tapped. BACK here (no shop tapped yet) is "not accepting": the draw is
+   dropped and the panel lands back on the calendar, and the row reads
+   `Where is Willy` again.
 3. Tap a shop → the HUD pins it (`Drive to … and look for the missing elder`),
    the panel closes, the distance line counts down.
 4. Park at the wrong shop → `attempts = 1`, the panel reopens with
    `They aren't here…` and `GIVE UP SEARCH`.
-5. Tap the hiding shop, drive, park → `found`, reward computed, panel reopens
-   with `Well that's a relief…` and `DRIVE {first} HOME`.
-6. Tap that row → the elder's home is pinned (`Drive {first} home to …`).
-7. Park at the home → friendship +1, `Welcome home {first}!`, button
-   `DROP OFF`.
+5. Tap the hiding shop, drive, park → `found`, reward computed, the companion
+   (no panel) shows `Well that's a relief. All well and good! Missing person
+   found. Now bring {first} back home.` with a `DRIVE` button.
+6. Tap `DRIVE` (or say "drive") → the prompt clears and the elder's home is
+   pinned (`Drive {first} home to … No. … in …`), distance line counting.
+7. Park at the home → friendship +1, the arrival sentence stays down, button
+   `DROP OFF` alone.
 8. `DROP OFF` → paid, certificate in the trunk, stamp saved, receipt opens.
-9. `CONTINUE` → panel back on the control page; the HUD is clear.
+9. `CONTINUE` → panel back on the main page; the HUD is clear.
 10. Reopen the calendar: the row reads `Where is Willy (Completed)`, grey; a
     tap answers `SEE YOU NEXT WEDNESDAY` and does nothing else.
 
@@ -532,9 +554,11 @@ Flow (`TestSession`, the `ValuationFlowTests` shape — Wednesday pinned via
 - Wednesday tap opens `WhereIsWillyScreenViewModel`, draws one shop + one
   elder, pins nothing; the shop list is the town's coffee shops.
 - Row tap pins `PoiTypes.CoffeeShop` on the HUD and hides the panel.
-- Park at the hiding shop → found page; park at another shop → attempts,
-  not-here line, GIVE UP visible only from then on.
-- Found page → home row pins `PoiTypes.Willy`; park at home → DROP OFF action
+- Park at the hiding shop → no panel; the companion holds `HudWillyFound` and
+  its `HudDrive` button; park at another shop → attempts, not-here line,
+  GIVE UP visible only from then on.
+- Found prompt's button (`hud.RaiseTaskAction()`) → home leg pins
+  `PoiTypes.Willy` and clears the prompt; park at home → DROP OFF action
   on the HUD; `hud.RaiseEnter()` → receipt page; the fee, the certificate and
   the stamp land in one banked call; friendship +1.
 - Wrong address: found, pin a non-home door, park → friendship −1, CONTINUE
@@ -589,10 +613,10 @@ receipt line reuses, so the page and the certificate can never drift).
    icons have no port equivalent until PORTPLAN 59 lands. The quest page lists
    the town's coffee shops and the elder's home; the HUD carries the pinned
    door. Data still flows separately (directory → flow → page/HUD).
-2. **A2 — no street markers.** The found sentence names the home address in
-   the port's one shape (`HudAddress` → `Street 1 · No. 12`, city appended via
-   `HudAddressWithCity`) and the home row pins the exact door. Unity's
-   street-name reveal is a map affordance, not a rule.
+2. **A2 — no street markers.** The found step names the home address in the
+   port's one shape (`HudAddress` → `Street 1 · No. 12`, city appended via
+   `HudAddressWithCity`) once the prompt's DRIVE button pins the exact door.
+   Unity's street-name reveal is a map affordance, not a rule.
 3. **A3 — elder candidates.** Unity draws from its resident POIs (the taxi
    resident service fills them). The port's `ResidentBook` is that same table;
    when it is empty the flow draws one free house and banks a resident, so the
@@ -614,14 +638,29 @@ receipt line reuses, so the page and the certificate can never drift).
 7. **A7 — the job-centre lock.** Unity disables the whole job centre, YOU and
    employees. The port blocks the only conflicting actions (another event via
    the calendar, the taxi shift, the delivery career) and keeps the panel
-   callable, because the panel is also the quest's page host.
+   callable, because the panel is also the quest's page host. The lock starts
+   with the first shop tap, not with the calendar tap: BACK on the untouched
+   quest page declines the run and lands back on the calendar (§3.3), so a
+   mis-click can never lock a career behind a search nobody accepted.
 8. **A8 — wrong address reachability.** The rule and the penalty are ported in
    full; the branch is reachable by pinning any non-home door from the
    addresses page while the elder is on board. Once the marker network lands
    it becomes reachable the Unity way (tap any house).
-9. **Open — audio.** Unity plays the money sound on the receipt. The overlay
-   has no audio seam; the receipt page is the equivalent.
-10. **Open — year.** The port does not persist a game year (PORTPLAN 51), so
+9. **A9 — the receipt's CONTINUE lands on the main page.** Unity returns to
+   its map; the port's map stand-in is the quest page, and the control page is
+   the jobs page the search was started from. A completed run is an event, not
+   a job, so the receipt hands the panel to the menu (the same rule the Cento
+   receipt and the road-test receipt already follow).
+10. **A10 — the found step is the companion's, not a page.** Unity replaces the
+    map's task line with the found sentence and the player drives on. The port
+    does the same on the mini window: the flow hands the HUD a
+    `HudTaskPrompt` (`HudWillyFound` + the `DRIVE` action key), so finding the
+    elder never opens the main panel mid-search, and the `DRIVE` tap is what
+    puts the address sentence up. The quest page therefore paints the search
+    only; BACK there is unchanged (§3.3).
+11. **Open — audio.** Unity plays the money sound on the receipt. The overlay
+    has no audio seam; the receipt page is the equivalent.
+12. **Open — year.** The port does not persist a game year (PORTPLAN 51), so
     the certificate prints `CalendarStamp.Default.Year` (1924), the same fixed
     year every other page stamps.
 

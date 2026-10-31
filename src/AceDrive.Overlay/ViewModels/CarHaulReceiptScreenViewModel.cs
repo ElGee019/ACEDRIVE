@@ -37,8 +37,11 @@ public sealed class CarHaulReceiptScreenViewModel : ViewModelBase, IVoiceScreen,
         RebuildVoice();
     }
 
-    public string CarLine => Strings.Format("HaulReceiptCar", _receipt.CarName);
+    /// <summary>The settled data this page renders (tests read it instead of
+    /// re-parsing the formatted lines).</summary>
+    public CarHaulReceipt Receipt => _receipt;
 
+    public string CarLine => Strings.Format("HaulReceiptCar", _receipt.CarName);
     public string TimeLine => ReceiptText.DriveDuration(
         _receipt.DriveHours, _receipt.DriveMinutesRemainder);
 

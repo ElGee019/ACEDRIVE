@@ -14,6 +14,8 @@ public sealed class CarIdentityTests
     private static readonly CarSpec Perf =
         new("ks_bmw_m2_coupe", 2023, "BMW", "m2 g87 coupe m performance", Passengers: 2) { Preset = "preset_m2_mperf_1" };
 
+    private static readonly List<CarSpec> Folder = [Base, Mech, Perf];
+
     [Fact]
     public void FindIn_ExactPreset_WinsOverFolderRow()
     {
@@ -70,13 +72,40 @@ public sealed class CarIdentityTests
     }
 
     [Fact]
-    public void Matches_BaseRow_AcceptsAnyPresetOfTheFolder()
+    public void Matches_BaseRow_AcceptsAnUnmodelledPresetOfTheFolder()
     {
+        // The dealer can own the folder row while the game spawns a showroom
+        // variant the catalogue has not modelled yet.
+        var announced = new CarIdentity("ks_bmw_m2_coupe", "preset_from_the_future");
+
+        Assert.True(announced.Matches(Base, Folder));
+    }
+
+    [Fact]
+    public void Matches_BaseRow_RejectsAKnownSiblingVariant()
+    {
+        // A variant row in the pool makes the folder row a distinct car:
+        // driving the sibling must not count as the base car.
         var announced = new CarIdentity("ks_bmw_m2_coupe", "preset_m2_mech_1");
 
-        // Grandma's pick and the dealer can own the folder row while the game
-        // spawns a showroom variant of it.
-        Assert.True(announced.Matches(Base.Key));
+        Assert.False(announced.Matches(Base, Folder));
+    }
+
+    [Fact]
+    public void Matches_StandardAndWeissachPackage_AreDifferentCars()
+    {
+        var standard = new CarSpec("ks_porsche_992_gt3_rs", 2021, "Porsche", "992 gt3 rs");
+        var weissach = standard with
+        {
+            Model = "992 gt3 rs weissach",
+            Preset = "preset_gt3rs_mech_2",
+        };
+        var pool = new List<CarSpec> { standard, weissach };
+        var announced = new CarIdentity(
+            "ks_porsche_992_gt3_rs", "preset_gt3rs_mech_2");
+
+        Assert.True(announced.Matches(weissach, pool));
+        Assert.False(announced.Matches(standard, pool));
     }
 
     [Fact]
@@ -84,8 +113,8 @@ public sealed class CarIdentityTests
     {
         var announced = new CarIdentity("ks_bmw_m2_coupe", "preset_m2_mech_1");
 
-        Assert.True(announced.Matches(Mech.Key));
-        Assert.False(announced.Matches(Perf.Key));
+        Assert.True(announced.Matches(Mech, Folder));
+        Assert.False(announced.Matches(Perf, Folder));
     }
 
     [Fact]
@@ -93,18 +122,19 @@ public sealed class CarIdentityTests
     {
         var announced = new CarIdentity("ks_bmw_m2_coupe", null);
 
-        Assert.True(announced.Matches(Base.Key));
-        Assert.True(announced.Matches(Mech.Key));
-        Assert.True(announced.Matches(Perf.Key));
+        Assert.True(announced.Matches(Base, Folder));
+        Assert.True(announced.Matches(Mech, Folder));
+        Assert.True(announced.Matches(Perf, Folder));
     }
 
     [Fact]
-    public void Matches_OtherFolderOrMalformedKey_IsFalse()
+    public void Matches_OtherFolderOrMalformedId_IsFalse()
     {
         var announced = new CarIdentity("ks_bmw_m2_coupe", null);
+        var other = new CarSpec("ks_mazda_mx5_na", 1990, "Mazda", "mx5 na");
 
-        Assert.False(announced.Matches("ks_mazda_mx5_na"));
-        Assert.False(announced.Matches("ks_bmw_m2_coupe_extra"));
-        Assert.False(announced.Matches(""));
+        Assert.False(announced.Matches(other, Folder));
+        Assert.False(announced.Matches(Base with { Id = "ks_bmw_m2_coupe_extra" }, Folder));
+        Assert.False(announced.Matches(Base with { Id = "" }, Folder));
     }
 }

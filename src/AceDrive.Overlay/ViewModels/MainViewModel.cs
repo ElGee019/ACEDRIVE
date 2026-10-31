@@ -17,6 +17,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class MainViewModel
     : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
+      ICarHaulHost,
       ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost,
       IValuationHost, IWhereIsWillyHost, IRoadTestHost, ITouristenfahrtenHost,
       IDisposable
@@ -45,6 +46,10 @@ public sealed class MainViewModel
     // The delivery run from DELIVER to receipt: owns the live run and the board
     // page; the panel, the HUD line and the settle arrive through IDeliveryHost.
     private readonly DeliveryFlow _delivery;
+    // The car-haul offer and run: owns the draw, the phases and the receipt;
+    // the panel, the HUD leg and the control page return arrive through
+    // ICarHaulHost.
+    private readonly CarHaulFlow _haul;
     // The Cento Miglia entry from the built event to the receipt: owns the
     // phases, the registration check and the reputation ticker; the panel, the
     // companion's line and the settle arrive through ICentoRaceHost.
@@ -161,6 +166,10 @@ public sealed class MainViewModel
     // the car actually driven.
     private const string DefaultBrand = "mazda";
 
+    // Car-haul notice line (an unavailable offer): the same short beat the
+    // taxi refusals use, long enough to read one sentence.
+    private const double HaulNoticeSec = 4.0;
+
     private bool _resizing;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
@@ -185,7 +194,7 @@ public sealed class MainViewModel
         GameStateSaver saver, FleetService fleet, JobSettlement settlement,
         OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
         VoiceRouter voiceRouter,
-        TaxiJobFlow taxi, DeliveryFlow delivery, PoiWorld poiWorld,
+        TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld poiWorld,
         CentoRaceFlow cento, CentoRaceSettlement centoSettlement,
         ValuationFlow valuation, WhereIsWillyFlow willy, RoadTestFlow roadTest,
         TouristenfahrtenFlow touristen,
@@ -232,10 +241,17 @@ public sealed class MainViewModel
         _panel = panel;
         _taxi = taxi;
         _delivery = delivery;
+        _haul = haul;
         _cento = cento;
         _centoSettlement = centoSettlement;
         _valuation = valuation;
         _willy = willy;
+        if (_hud is not null)
+        {
+            // The found step's DRIVE button lives on the companion (the run
+            // keeps the panel down); the HUD only knows it was pressed.
+            _hud.TaskActionRequested += (_, _) => _willy.DriveHome();
+        }
         _roadTest = roadTest;
         if (_hud is not null)
         {
@@ -265,6 +281,7 @@ public sealed class MainViewModel
         // fire a command or enter a door.
         _taxi.Attach(this);
         _delivery.Attach(this);
+        _haul.Attach(this);
         _cento.Attach(this);
         _valuation.Attach(this);
         _willy.Attach(this);
@@ -299,6 +316,9 @@ public sealed class MainViewModel
         _ = _todos.Sync();
         _shell.RecordActivity(_clock.UtcNow);
         _voice.Heard += (_, e) => OnVoiceHeard(e.Text, e.IsFinal);
+        // The constrained decoder's hits are wake candidates only: its
+        // vocabulary is the wake phrases, so it has no button labels to tap.
+        _voice.WakeHeard += (_, e) => _voiceRouter.HandleWake(e.Text, e.IsFinal);
         _timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
         _timer.Tick += (_, _) => Poll();
         _lastTick = _clock.UtcNow;
@@ -473,6 +493,16 @@ public sealed class MainViewModel
     void IDeliveryHost.Settle(DeliveryRun run) =>
         _settlement.SettleDeliveryRun(run, HomeCountry, this);
 
+    // The host slice the car haul sees: the flow owns the offer, the run and
+    // the settle; the shell owns the panel, the companion's leg and the notice.
+    void ICarHaulHost.ShowPage(object page) => _nav.ShowScreen(page);
+    void ICarHaulHost.ShowReceipt(object page) => _nav.ShowScreen(page);
+    void ICarHaulHost.RefreshControl() => _nav.RefreshControl();
+    void ICarHaulHost.PinTarget(HudJobGuidance? guidance) =>
+        _hud?.SetJobGuidance(guidance);
+    void ICarHaulHost.ShowNotice(string text) =>
+        _hud?.ShowNotice(text, TimeSpan.FromSeconds(HaulNoticeSec));
+
     // The host slice the Cento Miglia entry sees: the flow owns the phases, the
     // registration check and the reputation ticker; the shell owns the panel,
     // the companion's line and the settle that prices the receipt.
@@ -491,18 +521,22 @@ public sealed class MainViewModel
         _centoSettlement.Settle(race, start, end, this);
 
     // The host slice the weekly valuation sees: the flow owns the week, the
-    // venue leg and the comparison; the shell owns the panel and the return to
-    // the control page. The showcase page itself reaches the panel through the
-    // venue's POI handler, like every other door.
+    // venue leg and the comparison; the shell owns the panel, the briefing page
+    // and the return to the control page or the calendar the row came from. The
+    // showcase page itself reaches the panel through the venue's POI handler,
+    // like every other door.
+    void IValuationHost.PresentBriefing(object page) => _panel.PresentJob(page);
     void IValuationHost.HidePanel() => _panel.Hide();
     void IValuationHost.ShowControl() => _nav.ShowControl();
+    void IValuationHost.ShowCalendar() => _nav.ShowCalendarPage();
 
     // The host slice the missing-person run sees: the flow owns the quest, the
     // search, the drive home and the receipt; the shell owns the panel and the
     // page swap it reaches through the presenter.
     void IWhereIsWillyHost.PresentQuest(object page) => _panel.PresentJob(page);
     void IWhereIsWillyHost.HidePanel() => _panel.Hide();
-    void IWhereIsWillyHost.ShowControl() => _nav.ShowControl();
+    void IWhereIsWillyHost.ShowMenu() => _nav.ShowMenuPage();
+    void IWhereIsWillyHost.ShowCalendar() => _nav.ShowCalendarPage();
 
     // The host slice the road test sees: the flow owns the drive, the 0-60
     // clock, the photo mission and the board; the shell owns the panel, the
@@ -511,12 +545,15 @@ public sealed class MainViewModel
     void IRoadTestHost.ShowReceipt(object screen) => _panel.PresentJob(screen);
     void IRoadTestHost.HidePanel() => _panel.Hide();
     void IRoadTestHost.ShowControl() => _nav.ShowControl();
+    void IRoadTestHost.ShowCalendar() => _nav.ShowCalendarPage();
     void IRoadTestHost.ShowMenu() => _nav.ShowMenuPage();
 
     // The host slice the Saturday Touristenfahrten run sees: the flow owns the
-    // run and its doors; the shell owns the panel, the receipt page, the
-    // calendar it returns to and the standings tail the receipt reads.
+    // run and its doors; the shell owns the panel, the briefing page, the
+    // receipt page, the calendar it returns to and the standings tail the
+    // receipt reads.
     void ITouristenfahrtenHost.HidePanel() => _panel.Hide();
+    void ITouristenfahrtenHost.ShowBriefing(object screen) => _panel.PresentJob(screen);
     void ITouristenfahrtenHost.ShowReceipt(object screen) => _panel.PresentJob(screen);
     void ITouristenfahrtenHost.GoToCalendar() => _nav.ShowCalendarPage();
     void ITouristenfahrtenHost.RefreshStandings() => _ = RefreshStandings();
@@ -900,6 +937,15 @@ public sealed class MainViewModel
 
     private void OnJobEntered()
     {
+        // The haul owns ENTER while it is running: its page is the last one
+        // that pinned a leg, so a parked car confirms whichever phase it is in
+        // (PICK UP at the dealer, DELIVER THE CAR at the customer).
+        if (_haul.Active)
+        {
+            _haul.ConfirmArrival();
+            return;
+        }
+
         if (_delivery.InProgress)
         {
             _delivery.Deliver();

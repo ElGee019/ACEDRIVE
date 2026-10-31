@@ -80,15 +80,44 @@ public sealed class RoadTestRulesTests
     {
         // The pick is the variant row; a preset-less announcement is the folder
         // the log reports when it could not read the spawn line's preset.
-        var pick = new CarSpec("ks_bmw_m2", 2023, "BMW", "M2", 2)
+        var baseCar = new CarSpec("ks_bmw_m2", 2023, "BMW", "M2", 2);
+        var pick = baseCar with
         {
+            Model = "M2 Competition",
             Preset = "preset_m2_mperf_1",
         };
+        var pool = new List<CarSpec> { baseCar, pick };
 
         Assert.True(RoadTestRules.DrivesThePick(
-            new CarIdentity("ks_bmw_m2", "preset_m2_mperf_1"), pick));
+            new CarIdentity("ks_bmw_m2", "preset_m2_mperf_1"), pick, pool));
         Assert.True(RoadTestRules.DrivesThePick(
-            new CarIdentity("ks_bmw_m2", null), pick));
+            new CarIdentity("ks_bmw_m2", null), pick, pool));
+    }
+
+    [Fact]
+    public void DrivesThePick_StandardAndWeissach_AreDifferentCars()
+    {
+        // The standard 992 GT3 RS spawns as preset_gt3rs_mech_1, which the
+        // catalogue leaves on the base row; the Weissach package has its own
+        // row, so the two may not stand in for each other.
+        var standard = new CarSpec(
+            "ks_porsche_992_gt3_rs", 2021, "Porsche", "992 gt3 rs");
+        var weissach = standard with
+        {
+            Model = "992 gt3 rs weissach",
+            Preset = "preset_gt3rs_mech_2",
+        };
+        var pool = new List<CarSpec> { standard, weissach };
+
+        Assert.True(RoadTestRules.DrivesThePick(
+            new CarIdentity("ks_porsche_992_gt3_rs", "preset_gt3rs_mech_1"),
+            standard, pool));
+        Assert.False(RoadTestRules.DrivesThePick(
+            new CarIdentity("ks_porsche_992_gt3_rs", "preset_gt3rs_mech_2"),
+            standard, pool));
+        Assert.True(RoadTestRules.DrivesThePick(
+            new CarIdentity("ks_porsche_992_gt3_rs", "preset_gt3rs_mech_2"),
+            weissach, pool));
     }
 
     [Fact]
@@ -97,7 +126,7 @@ public sealed class RoadTestRulesTests
         var pick = new CarSpec("ks_abarth_695_biposto", 2014, "Abarth", "695 Biposto", 1);
 
         Assert.False(RoadTestRules.DrivesThePick(
-            new CarIdentity("ks_mazda_mx5_na", null), pick));
+            new CarIdentity("ks_mazda_mx5_na", null), pick, [pick]));
     }
 
     [Fact]
@@ -107,6 +136,6 @@ public sealed class RoadTestRulesTests
         // on silence would lock the road test out of every fresh session.
         var pick = new CarSpec("ks_abarth_695_biposto", 2014, "Abarth", "695 Biposto", 1);
 
-        Assert.True(RoadTestRules.DrivesThePick(null, pick));
+        Assert.True(RoadTestRules.DrivesThePick(null, pick, [pick]));
     }
 }

@@ -63,12 +63,19 @@
   <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Deliver to {0} at {1} No. {2} in {3}</value></data>
   <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>You have arrived at {0}. Press DELIVER ITEMS to unload.</value></data>
   <data name="HudDeliveryStoreAction" xml:space="preserve"><value>DELIVER ITEMS</value></data>
-  <!-- Touristenfahrten's two legs: the shop leg names the dropoff list, the
-       corner leg names the loaded order and where it goes. The placeholders
-       follow the flow's own argument list (see HudJobGuidance.DriveArgs). -->
-  <data name="HudTouristenPickupDrive" xml:space="preserve"><value>Drive to {0} to pick up goods to deliver to {1}.</value></data>
+  <!-- Touristenfahrten's two legs: the shop leg names the address to reach and
+       the dropoff list, the corner leg names the loaded order over the corner's
+       address. The shared four placeholders come first ({0} name, {1} street,
+       {2} number, {3} city), then the leg's own values (see
+       HudJobGuidance.DriveArgs). -->
+  <data name="HudTouristenPickupDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3} to pick up goods to deliver to {4}.</value></data>
   <data name="HudTouristenPickupArrived" xml:space="preserve"><value>You are at {0}. Press PICK UP to load the goods.</value></data>
-  <data name="HudTouristenDropoffDrive" xml:space="preserve"><value>Drop off {0} at {1}.</value></data>
+  <data name="HudTouristenDropoffDrive" xml:space="preserve"><value>Drop off {4} at {0}, {1} No. {2} in {3}.</value></data>
+  <!-- The corner's own arrival line and button: this stop unloads a customer's
+       takeaway with one press, so it reads DELIVER, not the delivery career's
+       freight wording. -->
+  <data name="HudTouristenDropoffArrived" xml:space="preserve"><value>You have arrived at {0}. Press DELIVER to unload.</value></data>
+  <data name="HudTouristenDeliverAction" xml:space="preserve"><value>DELIVER</value></data>
   <!-- Speed-challenge police (PORTPLAN 11, Phase C): a warning on approach and
        the fine notice when a patrol catches the car over its limit. -->
   <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>
@@ -196,6 +203,10 @@ For instance "{0}".</value></data>
   <data name="CentoTitle" xml:space="preserve"><value>CENTO MIGLIA EVENTS</value></data>
   <data name="CentoWeek" xml:space="preserve"><value>Week {0}</value></data>
   <data name="CentoReputation" xml:space="preserve"><value>YOUR CLUB REPUTATION: {0:0.00000}</value></data>
+  <!-- The page's intro: the elements that grow the club reputation are the
+       driven distance, the car class and the garage size (CentoReputation's
+       GrowthFactor), so the line names exactly those three. -->
+  <data name="CentoWelcome" xml:space="preserve"><value>Welcome to Cento Miglia. Where you build reputation based on the kilometres you race, the class of the car you drive and how many cars you own.</value></data>
   <data name="CentoTierRequirement" xml:space="preserve"><value>Requires Reputation Level {0}</value></data>
   <data name="CentoFreeEntry" xml:space="preserve"><value>Club Reputation: Free entry</value></data>
   <data name="CentoEligibilityReputation" xml:space="preserve"><value>Club Reputation: {0:0} / {1}</value></data>
@@ -229,6 +240,16 @@ For instance "{0}".</value></data>
   <data name="TouristenItemEspresso" xml:space="preserve"><value>espresso</value></data>
   <data name="TouristenItemTiramisu" xml:space="preserve"><value>tiramisu</value></data>
   <data name="TouristenItemSoup" xml:space="preserve"><value>soup</value></data>
+  <!-- The Touristenfahrten briefing page: the calendar's Saturday row opens it
+       before the run draws its shop and corners. The title is the fallback for
+       an ordinary day — while a real-world Nürburgring event runs, the page
+       wears that event's own name from Data/touristenweekends.json instead.
+       Two paragraphs in one value; the blank line belongs to the copy, so a
+       translator keeps it. -->
+  <data name="TouristenTitle" xml:space="preserve"><value>TOURISTENFAHRTEN WEEKEND</value></data>
+  <data name="TouristenBriefIntro" xml:space="preserve"><value>Spectators around the Nordschleife are in urgent need of their favorite snacks. Healthy profit margins here with extra bonuses on actual race weekends!&#10;&#10;Sure you know where the famous Brünnchen, Einfahrt, Pflanzgarten, Adenauer Forst and Breidscheid Bridge spectator spots are. If not, you will have to find them... Do your research!</value></data>
+  <data name="TouristenBriefStart" xml:space="preserve"><value>START DRIVE</value></data>
+  <data name="TouristenBack" xml:space="preserve"><value>BACK</value></data>
   <data name="NoEvent" xml:space="preserve"><value>No event</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Click Max's Grocery Store, drive there and enter the store.</value></data>
   <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Go to the JOBS page, select DELIVERY JOB and open a career of choice.</value></data>
@@ -443,7 +464,7 @@ Accept this job?</value></data>
        Placeholders survive translation; translators may reorder, never
        remove. -->
   <data name="ZoneExpansionTitle" xml:space="preserve"><value>OPERATING ZONE EXPANDED</value></data>
-  <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>New street discovered</value></data>
+  <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>New street added to your operating zone</value></data>
   <data name="ZoneExpansionZoneLine" xml:space="preserve"><value>Operating Zone: {0} streets</value></data>
   <data name="ZoneExpansionPreviousArea" xml:space="preserve"><value>Previous Area: {0:0.0} km</value></data>
   <data name="ZoneExpansionNewArea" xml:space="preserve"><value>New Total Area: {0:0.0} km</value></data>
@@ -566,7 +587,24 @@ Accept this job?</value></data>
   <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points earned: {0}</value></data>
   <data name="DelReceiptCredPTotal" xml:space="preserve"><value>Total Credibility Points: {0}</value></data>
   <data name="DelReceiptXpCalc" xml:space="preserve"><value>XP: ({0:0.0} km × class {1} × rarity {2}) / 500 × street knowledge {3}%</value></data>
-  <!-- Car-haul receipt page (PORTPLAN 20, Unity CarHaulingScreen). Pay is
+  <!-- Car-haul offer / active-leg page (PORTPLAN 20). BACK reuses
+       DeliveryBack; the HUD's PICK UP reuses HudPickUp. {0}/{1}/{2}/{3} are
+       the shared name/street/number/city shape the HUD drive keys use, {4}
+       is the hauled car. -->
+  <data name="HaulOfferTitle" xml:space="preserve"><value>CAR HAULING JOB</value></data>
+  <data name="HaulOfferCar" xml:space="preserve"><value>New car: {0}</value></data>
+  <data name="HaulOfferDealer" xml:space="preserve"><value>Pick it up at {0} — {1} {2}, {3}</value></data>
+  <data name="HaulOfferCustomer" xml:space="preserve"><value>Deliver it to {0} — {1} {2}, {3}</value></data>
+  <data name="HaulOfferTier" xml:space="preserve"><value>Class tier {0}</value></data>
+  <data name="HaulAccept" xml:space="preserve"><value>ACCEPT</value></data>
+  <data name="HaulJobPickUpTask" xml:space="preserve"><value>Pick up the {0} at {1}.</value></data>
+  <data name="HaulJobDeliverTask" xml:space="preserve"><value>Deliver the car to {0}.</value></data>
+  <data name="HaulUnavailable" xml:space="preserve"><value>No car hauling job available yet.</value></data>
+  <data name="HudHaulToDealer" xml:space="preserve"><value>Drive to {0} to pick up the {4}.</value></data>
+  <data name="HudHaulArrivedDealer" xml:space="preserve"><value>You have arrived at {0}.</value></data>
+  <data name="HudHaulToCustomer" xml:space="preserve"><value>Drive to {0} to deliver the car.</value></data>
+  <data name="HudHaulArrivedCustomer" xml:space="preserve"><value>You have arrived at {0}.</value></data>
+  <data name="HudHaulDeliverCar" xml:space="preserve"><value>DELIVER THE CAR</value></data>  <!-- Car-haul receipt page (PORTPLAN 20, Unity CarHaulingScreen). Pay is
        time-based: class band scales the driver rating into a per-minute
        rate, the drive minutes price the total. No XP or standings block —
        Unity settles the haul's cash alone. {0} in the car line is Unity's
@@ -751,6 +789,12 @@ Accept this job?</value></data>
        so a translator may reorder and never remove. -->
   <data name="ValuationTitle" xml:space="preserve"><value>MARKET VALUATION</value></data>
   <data name="ValuationVenueLine" xml:space="preserve"><value>This week's venue: {0}</value></data>
+  <!-- The briefing page the calendar's Monday row opens before the drive: what
+       the jury compares, the terms it scores and how long an entry stands. Three
+       paragraphs in one value; the blank lines are part of the copy, so a
+       translator keeps them rather than the view inventing the breaks. -->
+  <data name="ValuationBriefIntro" xml:space="preserve"><value>You can enter a vehicle of your choice that you own, to be judged against a car another player has already entered.&#10;&#10;The jury scores the price of your car, its top speed, power, how many jobs you have completed with it, its engine health and all your time trial standings with this car.&#10;&#10;Your entry stays up until you enter another car, or until two real-world days have passed. While it stands, it is matched against other players' entries.</value></data>
+  <data name="ValuationBriefStart" xml:space="preserve"><value>START DRIVE</value></data>
   <!-- Two paragraphs in one value: the page's ask (Unity's line) and the terms
        the jury scores. The blank line is part of the copy, so a translator
        keeps it rather than the view inventing the break. -->
@@ -804,21 +848,23 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="ControlGateWillyLocked" xml:space="preserve"><value>UNLOCK COFFEE BEANS CAREER FIRST</value></data>
 
   <!-- The quest page (Unity's map stand-in): the title, the two Unity task
-       sentences, the failed-visit hint, the found sentence and the two verbs. -->
+       sentences, the failed-visit hint and the one verb. -->
   <data name="WillyTitle" xml:space="preserve"><value>WHERE IS WILLY</value></data>
-  <data name="WillyIntro" xml:space="preserve"><value>Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops and bring {1} home? Select a coffee shop in {2} to find out whether {1} is there.</value></data>
+  <!-- The quest sentence and its hint sit in one paragraph with a blank line
+       between them (&#10;&#10;): the hint is a second thought, not a
+       continuation of the ask. -->
+  <data name="WillyIntro" xml:space="preserve"><value>Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops inside your operating zone and bring {1} home?&#10;&#10;Select a coffee shop in {2} to find out whether {1} is there.</value></data>
   <data name="WillyNotHere" xml:space="preserve"><value>They aren't here. Navigate to another coffee shop on the map, or give up.</value></data>
   <data name="WillyGiveUp" xml:space="preserve"><value>GIVE UP SEARCH</value></data>
-  <data name="WillyFound" xml:space="preserve"><value>Well that's a relief. All well and good! Missing person found! Select {0} to drive {1} back home.</value></data>
-  <data name="WillyDriveHome" xml:space="preserve"><value>DRIVE {0} HOME</value></data>
   <data name="WillyBack" xml:space="preserve"><value>BACK</value></data>
   <data name="WillyCertificateName" xml:space="preserve"><value>Bring-Them-Home Certificate Week {0} {1}</value></data>
 
   <!-- The companion's quest legs. The generic placeholders stay ({0} name,
        {1} street, {2} number, {3} city) so a translation can reorder them. -->
   <data name="HudWillySearchDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3} and look for the missing elder.</value></data>
+  <data name="HudWillyFound" xml:space="preserve"><value>Well that's a relief. All well and good! Missing person found. Now bring {0} back home.</value></data>
+  <data name="HudDrive" xml:space="preserve"><value>DRIVE</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Drive {0} home to {1} No. {2} in {3}</value></data>
-  <data name="HudWillyHomeArrived" xml:space="preserve"><value>Welcome home {0}!</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>DROP OFF</value></data>
   <data name="HudWillyWrongAddress" xml:space="preserve"><value>This is not {0}'s home address. {0} is still out there somewhere...</value></data>
   <data name="HudWillyContinue" xml:space="preserve"><value>CONTINUE</value></data>
@@ -855,6 +901,12 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="RoadTestPhotoIntro" xml:space="preserve"><value>Drive anywhere across the map so the photographer can get his shots. Switching up the location from our last shoot will keep things interesting for our readers.</value></data>
   <data name="RoadTestPhotoNoPosition" xml:space="preserve"><value>No address here — drive on a little and take the shot again.</value></data>
   <data name="RoadTestBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- The briefing page (PORTPLAN 49): the calendar row's first page, read
+       before the drive. Unity starts the job at the tap; the port spells the
+       week out first, like the market valuation's briefing. -->
+  <data name="RoadTestBriefVenue" xml:space="preserve"><value>Test centre: La Strada, {0}</value></data>
+  <data name="RoadTestBriefIntro" xml:space="preserve"><value>La Strada will feature the {0} on the cover this week.&#10;&#10;Set a 0-60 time and do a braking test to provide the technical specs.&#10;&#10;Your time will be compared to other testers' times to define your car journalist reputation.&#10;Reputation, the amount of friends you have, the amount of citizens impact how many copies of the magazine are sold and at what price.</value></data>
+  <data name="RoadTestBriefStart" xml:space="preserve"><value>START DRIVE</value></data>
   <data name="RoadTestContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="RoadTestPickRequired" xml:space="preserve"><value>This week's test is for the {0}. Change into that car.</value></data>
   <data name="RoadTestBoard" xml:space="preserve"><value>GLOBAL LEADERBOARD</value></data>

@@ -22,7 +22,7 @@ public sealed class ValuationFlowTests
         Price: 20000.0, Horsepower: 150, EngineCc: 1600, TopSpeedKmh: 200);
 
     [Fact]
-    public void MondayPoll_DrawsTheVenue_AndTheCalendarTapStartsTheDrive()
+    public void MondayPoll_DrawsTheVenue_AndTheCalendarTapOpensTheBriefing()
     {
         var board = new FakeValuationBoard();
         var hud = new FakeTelemetryHud();
@@ -35,10 +35,84 @@ public sealed class ValuationFlowTests
 
         OpenCalendar(session).DayCommand.Execute(2);
 
+        // The row explains the week first: the player reads the venue and the
+        // jury's terms before a drive that cannot be cancelled starts.
+        var briefing = Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
+        Assert.False(session.Ledger.Driving);
+        Assert.Null(hud.Destination);
+        Assert.True(session.Vm.IsShown);
+        Assert.False(string.IsNullOrWhiteSpace(briefing.VenueLine));
+    }
+
+    [Fact]
+    public void BriefingStart_PinsTheVenue_AndHidesThePanel()
+    {
+        var board = new FakeValuationBoard();
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(board: board, hud: hud);
+        session.Story.FinishDialogue();
+        session.Vm.Poll();
+        OpenCalendar(session).DayCommand.Execute(2);
+        var briefing = Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
+
+        briefing.StartCommand.Execute(null);
+
         Assert.True(session.Ledger.Driving);
         Assert.False(session.Vm.IsShown);
         Assert.Equal("HudValuationDrive", hud.Copy?.DriveKey);
         Assert.Equal(PoiTypes.Valuation, hud.Destination?.Type);
+    }
+
+    [Fact]
+    public void Briefing_AnswersByVoice_StartDriveAndBack()
+    {
+        // Both buttons answer the mic the way they answer a click, through the
+        // real router: the calendar row's spoken label opens the page, "start
+        // drive" begins the leg, and a second session's "back" returns to the
+        // calendar instead.
+        var mic = new FakeVoiceListener();
+        TestSessionResult session = TestSession.Create(new TestSessionOptions
+        {
+            SpeedKmh = 0f,
+            ValuationBoard = new FakeValuationBoard(),
+            ValuationRng = new Random(0),
+            Hud = new FakeTelemetryHud(),
+            Cars = [TestCar],
+            Voice = mic,
+        });
+        session.Story.FinishDialogue();
+        session.Vm.Poll();
+        session.Vm.Show();
+        Assert.IsType<MenuScreenViewModel>(session.Vm.CurrentScreen)
+            .CalendarCommand.Execute(null);
+
+        mic.Fire("market valuation");
+        DrainBeat(session);
+        Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
+
+        mic.Fire("start drive");
+        DrainBeat(session);
+
+        Assert.True(session.Ledger.Driving);
+        Assert.False(session.Vm.IsShown);
+    }
+
+    [Fact]
+    public void BriefingBack_ReturnsToTheCalendar_WithoutStartingTheDrive()
+    {
+        var board = new FakeValuationBoard();
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(board: board, hud: hud);
+        session.Story.FinishDialogue();
+        session.Vm.Poll();
+        OpenCalendar(session).DayCommand.Execute(2);
+        var briefing = Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
+
+        briefing.BackCommand.Execute(null);
+
+        Assert.IsType<CalendarScreenViewModel>(session.Vm.CurrentScreen);
+        Assert.False(session.Ledger.Driving);
+        Assert.Null(hud.Destination);
     }
 
     [Fact]
@@ -82,6 +156,8 @@ public sealed class ValuationFlowTests
         session.Story.FinishDialogue();
         session.Vm.Poll();
         OpenCalendar(session).DayCommand.Execute(2);
+        var briefing = Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
+        briefing.StartCommand.Execute(null);
         Assert.Equal("HudEnter", hud.Copy?.ActionKey);
         Assert.Equal(string.Empty, hud.Copy?.ArrivedKey);
 
@@ -479,12 +555,24 @@ public sealed class ValuationFlowTests
         return Assert.IsType<CalendarScreenViewModel>(session.Vm.CurrentScreen);
     }
 
+    // What the 10 Hz DispatcherTimer does in the app: the beat's deferred tap
+    // lands on the next poll.
+    private static void DrainBeat(TestSessionResult session)
+    {
+        session.Clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
+        session.Vm.Poll();
+    }
+
     private static ValuationScreenViewModel OpenShowcase(
         TestSessionResult session, FakeTelemetryHud hud)
     {
         session.Story.FinishDialogue();
         session.Vm.Poll();
         OpenCalendar(session).DayCommand.Execute(2);
+        // The row opens the briefing; its START is what pins the venue and puts
+        // the panel down for the drive.
+        var briefing = Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
+        briefing.StartCommand.Execute(null);
         hud.AtDestination = true;
         // Parking raises the companion's button (and its "enter" keyword); the
         // tap is what opens the showcase.

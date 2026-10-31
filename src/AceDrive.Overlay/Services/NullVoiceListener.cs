@@ -4,7 +4,17 @@ namespace AceDrive.Overlay.Services;
 public sealed class NullVoiceListener : IVoiceListener
 {
     public bool IsAvailable => false;
+
+    /// <summary>No constrained decoder without a model, so this never feeds.</summary>
+    public bool WakeListening { get; set; }
+
     public event EventHandler<VoiceTextEventArgs>? Heard
+    {
+        add { }
+        remove { }
+    }
+
+    public event EventHandler<VoiceTextEventArgs>? WakeHeard
     {
         add { }
         remove { }

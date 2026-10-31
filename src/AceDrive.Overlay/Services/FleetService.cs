@@ -113,7 +113,8 @@ public sealed class FleetService
     public bool IsDrivingWrongCar() =>
         _driven.CurrentIdentity is { } identity
         && _garage.Current is { } current
-        && !identity.Matches(current.Key);
+        && _garage.SpecOf(current) is { } spec
+        && !identity.Matches(spec, _cars);
 
     /// <summary>
     /// The odometer feed (PORTPLAN items 31/32, Unity DrivingManager's speed
@@ -253,7 +254,7 @@ public sealed class FleetService
     {
         foreach (OwnedCar owned in _garage.Cars)
         {
-            if (live.Matches(owned.Key))
+            if (_garage.SpecOf(owned) is { } spec && live.Matches(spec, _cars))
             {
                 return owned;
             }

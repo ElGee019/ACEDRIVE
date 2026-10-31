@@ -75,6 +75,13 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         {
             voice[voiceDoneLabel] = () => _done();
         }
+        if (quit is not null)
+        {
+            // QUIT answers the English word whatever the page prints (the model
+            // is English, HudVoiceKeywords' rule). RESET GAME stays mouse-only:
+            // a misheard word must not wipe a career, even behind its confirm.
+            voice["quit"] = Quit;
+        }
         VoiceActions = voice;
         UnitOptions =
         [
@@ -158,7 +165,11 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     /// <summary>RESET GAME; inert on the first-run page, where it is hidden.</summary>
     public ICommand ResetCommand { get; }
 
-    /// <summary>Spoken label -&gt; action; only the settings reuse registers BACK.</summary>
+    /// <summary>
+    /// Spoken label -&gt; action: only the settings reuse registers anything (the
+    /// BACK passed in, and the English "quit"); the first-run page is mouse-only,
+    /// and RESET GAME never answers the mic.
+    /// </summary>
     public IReadOnlyDictionary<string, Action> VoiceActions { get; }
 
     private void OnSelectionChanged()

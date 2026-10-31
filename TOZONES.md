@@ -217,7 +217,7 @@ Layout (Unity parity, top to bottom):
 | Row | Copy key | Value |
 |---|---|---|
 | Title | `ZoneExpansionTitle` | OPERATING ZONE EXPANDED |
-| Label | `ZoneExpansionNewStreet` | New street discovered |
+| Label | `ZoneExpansionNewStreet` | New street added to your operating zone |
 | Street | — | `streetName.ToUpper()` |
 | Zone | `ZoneExpansionZoneLine` | Operating Zone: {0} streets |
 | Previous area | `ZoneExpansionPreviousArea` | Previous Area: {0:0.0} km |

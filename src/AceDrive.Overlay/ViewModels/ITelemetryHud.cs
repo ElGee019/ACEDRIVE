@@ -91,6 +91,41 @@ public interface ITelemetryHud
     bool ParkedAtTarget { get; }
 
     /// <summary>
+    /// Shows a one-off task in the task-text slot: its sentence and one action
+    /// button (the missing-person run's found news and DRIVE). Not a
+    /// destination — no distance line, no arrival — and a destination or a job
+    /// leg handed over later takes the slot back. Null clears it.
+    /// </summary>
+    void SetTaskPrompt(HudTaskPrompt? prompt);
+
+    /// <summary>
+    /// Raised when the player taps the task prompt's action button. The host
+    /// owns what it means; the HUD only knows the button was offered and pressed.
+    /// </summary>
+    event EventHandler? TaskActionRequested;
+
+    /// <summary>
+    /// True while the task prompt's action button is up. Voice taps it only
+    /// while it is: a prompt with nothing left to do must not answer a stray
+    /// "drive" the way a pinned door answers "enter".
+    /// </summary>
+    bool ShowTaskAction { get; }
+
+    /// <summary>
+    /// Spoken words that fire the task prompt's button while it is up ("drive"
+    /// for the found-elder prompt). English like every other keyword: the
+    /// recognizer is.
+    /// </summary>
+    IReadOnlyList<string> TaskKeywords { get; }
+
+    /// <summary>
+    /// Voice activation of the task prompt: glows the button teal for the
+    /// shared beat, then raises <see cref="TaskActionRequested"/>. A mouse
+    /// click acts immediately.
+    /// </summary>
+    void RequestTaskAction();
+
+    /// <summary>
     /// Shows a transient line under the banner (a police fine, a refusal
     /// hint). The host formats the text; the HUD expires it on the clock, so
     /// a stalled poll cannot leave it up forever.

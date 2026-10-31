@@ -250,17 +250,16 @@ public sealed class Navigation
 
     // Built once and reused. The taxi entry opens the job proposal page (port
     // of Unity TaxiJobProposalScreen); delivery opens the career page (port
-    // of Unity DeliveryJobScreen); the haul settles its placeholder run and
-    // shows the flow's receipt; the police entry is the page's own
-    // placeholder, so it takes no command from here. The weekly strip lives on
-    // its own page (see CalendarPage).
+    // of Unity DeliveryJobScreen); the haul opens its offer/active-leg page;
+    // the police entry is the page's own placeholder, so it takes no command
+    // from here. The weekly strip lives on its own page (see CalendarPage).
     public MainControlScreenViewModel ControlPage()
     {
         _control ??= new MainControlScreenViewModel(
             _beat, _clock, _todos, _shift,
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
-                new RelayCommand(SettleHaul), _todos.AcknowledgeCommand),
+                new RelayCommand(OpenHaul), _todos.AcknowledgeCommand),
             MenuCommand);
         return _control;
     }
@@ -331,10 +330,10 @@ public sealed class Navigation
         ShowScreen(_delivery.OpenBoard());
     }
 
-    // The haul tap settles the placeholder run and puts the flow's own receipt
-    // up; CONTINUE is the control page it was opened from. Nothing banks here:
-    // the flow owns its wallet, calendar checkpoint and receipt.
-    private void SettleHaul() => ShowScreen(_haul.Settle(ControlCommand));
+    // The haul tap opens the flow's page (offer or active leg); CONTINUE/BACK
+    // is the control page it was opened from. The flow owns the run, the HUD
+    // leg and the receipt.
+    private void OpenHaul() => ShowScreen(_haul.Open(ControlCommand, ControlPage()));
 
     /// <summary>Opens the hub page (Unity's OPEN NEW CAREER, PORTPLAN 18).</summary>
     public void ShowHub() =>
@@ -483,12 +482,12 @@ public sealed class Navigation
         }
 
         // The weekly market valuation (PORTPLAN 49): the Monday row is the
-        // show's job-centre button. The tap pins the venue and sends the
-        // player off; the flow owns the window gate as well, so a caller can
-        // never jump it.
+        // show's job-centre button. The tap opens the week's briefing; its
+        // START pins the venue and sends the player off. The flow owns the
+        // window gate as well, so a caller can never jump it.
         if (day == _valuationDay)
         {
-            _valuation.BeginDrive();
+            _valuation.Begin();
             return;
         }
 

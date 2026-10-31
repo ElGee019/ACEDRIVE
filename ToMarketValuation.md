@@ -81,6 +81,10 @@ uniformly over every house on both streets. Mark the real discovery with a
 2. Tap = locate phase: inject a temporary POI/marker at the venue
    (`ValuationHandler.BeginDriveToValuation`). The overlay's equivalent is the
    companion HUD destination (the addresses page already pins destinations).
+   **ACEDRIVE deviation:** the overlay opens a brief page first — the week's
+   venue, what the jury compares and scores, and how long an entry stands — and
+   its **START DRIVE** is what pins the marker; **BACK** returns to the
+   calendar with nothing started.
 3. Tapping the marker arms **DRIVE**; DRIVE routes to the venue and sets
    `player.valuationDriving = true` so an app kill resumes the leg.
 4. Arrival (`OnDestinationReached`):
@@ -240,8 +244,15 @@ retroactively for new weeks only (old entries keep their stored score).
 Owns all timing/state transitions; no UI copy, no direct `new` of services.
 
 - `Attach(IValuationHost)` — re-pins a saved in-flight drive (offline arrival).
-- `BeginDrive()` — gate on Monday 8–20, draw/pin venue, set
+- `Begin()` — the calendar row's tap: gate on Monday 8–20, draw/resolve the
+  venue and reveal the week's brief page. It never starts the drive, so the
+  player reads the terms before a leg that cannot be cancelled.
+- `BeginDrive()` — the brief's START: the same gate, pin the venue, set
   `valuationDriving`, save, hide panel, log.
+- `Back()` — the brief's BACK: hand the panel back to the calendar. The venue
+  draw stays banked (it is this week's venue either way), nothing else changes.
+- `TryStart(out venue)` (private) — the shared gate of `Begin`/`BeginDrive`:
+  window, one entry a week, venue that resolves inside the zone.
 - `Tick(now)` — Monday reset, 6 am venue draw, offline catch-up, drain board
   snapshots, drain draw/catch-up tasks, show queued 4 s notices.
 - `EnterVenue(poi)` — the venue's POI handler (`ValuationPoiHandler`): when
@@ -265,6 +276,17 @@ Owns all timing/state transitions; no UI copy, no direct `new` of services.
 
 ### 3.4 Screen
 
+- `ValuationBriefingScreenViewModel` (the calendar row's page, before the
+  drive): the title, the week's venue line and one copy block naming the pick,
+  the compared car, the six terms of the score and the two-real-day stand; START
+  DRIVE (`BeginDrive`) above BACK (the flow shows the calendar). `IVoiceScreen`
+  with START DRIVE / BACK on the shared beat. It paints copy and reports the two
+  verbs; the flow owns the gate, the draw and the drive.
+- `ValuationBriefingScreenView.xaml` + empty code-behind: same skeleton as the
+  missing-person page (title band, centred body, verbs flush at the bottom) and
+  the same body size as its intro; add
+  `<DataTemplate DataType="{x:Type vm:ValuationBriefingScreenViewModel}">` in
+  `MainWindow.xaml`.
 - `ValuationScreenViewModel` (entry + comparison phases):
   - picker of owned cars (`GarageRow`), stats (`GarageStatRow`), current car
     selected, `ENTER WITH {car}`.
@@ -275,16 +297,17 @@ Owns all timing/state transitions; no UI copy, no direct `new` of services.
 - `ValuationScreenView.xaml` + empty code-behind, same page skeleton as
   Garage/Cento; add `<DataTemplate DataType="{x:Type vm:ValuationScreenViewModel}">`
   in `MainWindow.xaml`.
-- `IValuationHost`: `HidePanel()`, `ShowControl()`. The showcase page reaches
-  the panel through the venue's POI handler, so the host has no page verb.
-  `MainViewModel` implements it with `PanelPresenter.Hide`,
-  `Navigation.ShowControl`.
+- `IValuationHost`: `PresentBriefing()`, `HidePanel()`, `ShowControl()`,
+  `ShowCalendar()`. The showcase page reaches the panel through the venue's POI
+  handler, so the host has no showcase verb. `MainViewModel` implements it with
+  `PanelPresenter.PresentJob`, `PanelPresenter.Hide`, `Navigation.ShowControl`
+  and `Navigation.ShowCalendarPage`.
 
 ### 3.5 Wiring
 
 | Point | Change |
 |---|---|
-| `Navigation` | ctor takes `ValuationFlow`; `_valuationDay` read from `ControlCalendar.Week`; `OnDay(valuationDay)` → `_valuation.BeginDrive()` (calendar gate already checks day + 8–20) |
+| `Navigation` | ctor takes `ValuationFlow`; `_valuationDay` read from `ControlCalendar.Week`; `OnDay(valuationDay)` → `_valuation.Begin()` (the brief page; its START runs `BeginDrive`; calendar gate already checks day + 8–20) |
 | `MainViewModel` | ctor takes `ValuationFlow`; `Attach(this)`; `Poll` calls `_valuation.Tick(now)` after `_day.Tick`; implements `IValuationHost` |
 | `GameStateSaver` | ctor takes `ValuationLedger`; `SaveDriver` writes the nine valuation fields with `with { … }` |
 | `App.OnStartup` | build `ValuationLedger`; choose `FirestoreValuationBoard` (online branch, after `_firebase`) or `OfflineValuationBoard`; build `ValuationFlow` before `Navigation`; register `ValuationPoiHandler` on the arrival router; pass ledger to saver and flow to nav/VM |
@@ -300,6 +323,14 @@ Add to `Strings.resx` and `Strings.nl.resx`; no sentences in code.
 ```
 ValuationTitle             MARKET VALUATION
 ValuationVenueLine         This week's venue: {0}
+ValuationBriefIntro        You can enter a vehicle of your choice that you own, to be judged against a car
+                           another player has already entered.
+                           (blank line) The jury scores the price of your car, its top speed, power, how many
+                           jobs you have completed with it, its engine health and all your time trial standings
+                           with this car.
+                           (blank line) Your entry stays up until you enter another car, or until two real-world
+                           days have passed. While it stands, it is matched against other players' entries.
+ValuationBriefStart        START DRIVE
 ValuationIntro             Choose the car you want the jury to value this week.
 ValuationSelect            Select car
 ValuationNoCars            There is no car in the garage to enter.
@@ -359,11 +390,17 @@ Services:
   caller's path (keep the existing full-reset test for `ResetAsync`).
 
 Flow/integration (`TestSession`):
-- Monday 08:00 start → `vm.Poll()` draws a venue; `BeginDrive` pins the HUD
-  and hides the panel; the pin carries the `HudEnter` action and no arrival
-  copy. Fake HUD parked → the button is up and the showcase is **not** open;
+- Monday 08:00 start → `vm.Poll()` draws a venue; the calendar row opens
+  `ValuationBriefingScreenViewModel` (nothing pinned, panel up); its START pins
+  the HUD and hides the panel; the pin carries the `HudEnter` action and no
+  arrival copy; its BACK lands on the calendar with no drive started. Fake HUD
+  parked → the button is up and the showcase is **not** open;
   the fake HUD's `RaiseEnter` (the same event the button and the mic raise)
   opens `ValuationScreenViewModel` and consumes the venue.
+- `ValuationBriefingScreenTests`: the copy names the pick, the compared car,
+  the six score terms, the two-real-day stand and the other players' entries;
+  START/BACK reach the injected verbs and answer their labels; a voice START
+  glows for the shared beat before acting.
 - ENTER with an owned car pushes one entry, computes the Unity score
   (including per-car jobs + engine), draws the fake board's rival, paints
   win/loss and pays XP only on CONTINUE.
@@ -386,7 +423,8 @@ Flow/integration (`TestSession`):
       `FirestoreValuationEntries.WipeOwnAsync`.
 - [x] Flow: `ValuationFlow` + `IValuationHost`.
 - [x] UI: `ValuationScreenViewModel`, `ValuationScreenView.xaml(.cs)`,
-      `MainWindow.xaml` template, resx en/nl.
+      `ValuationBriefingScreenViewModel`, `ValuationBriefingScreenView.xaml(.cs)`,
+      `MainWindow.xaml` templates, resx en/nl.
 - [x] Wiring: `Navigation`, `MainViewModel`, `App.OnStartup`, `TestSession`.
 - [x] Docs: `FIREBASE.md`, `PORTPLAN.md` item 49 note, `ARCHITECTURE.md`
       cache/anomaly rows if the watcher stays.
