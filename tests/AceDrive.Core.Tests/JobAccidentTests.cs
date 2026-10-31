@@ -54,11 +54,11 @@ public sealed class JobAccidentTests
         Assert.Equal("HudAccidentRepair", hud.TaskPrompt.ActionKey);
         // The prompt carries the impact speed, the customer who lost the
         // friendship and the bill the button takes (120 of 240 km/h on a
-        // 40 000 CR car: half its value).
+        // 40 000 CR car: a twentieth of its value).
         Assert.Equal("120", hud.TaskPrompt.Args![0]);
         var (customer, delta) = Assert.Single(friends.Deltas);
         Assert.Equal(customer, hud.TaskPrompt.Args[1]);
-        Assert.Equal("20000.00", hud.TaskPrompt.Args[2]);
+        Assert.Equal("2000.00", hud.TaskPrompt.Args[2]);
         Assert.Equal(-1, delta);
         // The ride cannot be resumed: both job commands guard on the phase, and
         // the crash dropped it to None.
@@ -75,12 +75,12 @@ public sealed class JobAccidentTests
         TestSessionResult rig = New(garage, hud, new FakeFriendshipStore(), wallet);
         TaxiFlow.Propose(rig.Vm);
         TaxiFlow.Pickup(rig.Vm, rig.Clock);
-        Crash(rig.Vm, rig.Clock, rig.Tel); // 120 of 240 km/h: half the car's value
+        Crash(rig.Vm, rig.Clock, rig.Tel); // 120 of 240 km/h: a twentieth of the car's value
 
         hud.RaiseTaskAction();
 
-        Assert.Equal(30000.0, wallet.Cash, 6);              // 40000 × 0.5 paid
-        Assert.Equal(18000.0, wallet.PendingInsurance, 6);  // 90 % of the bill
+        Assert.Equal(48000.0, wallet.Cash, 6);              // 40000 × 0.05 paid
+        Assert.Equal(1800.0, wallet.PendingInsurance, 6);   // 90 % of the bill
         Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
         Assert.Null(hud.TaskPrompt);
         Assert.IsType<MenuScreenViewModel>(rig.Vm.CurrentScreen);
@@ -99,7 +99,7 @@ public sealed class JobAccidentTests
 
         hud.RaiseTaskAction();
 
-        Assert.Equal(30000.0, wallet.Cash, 6);
+        Assert.Equal(48000.0, wallet.Cash, 6);
         Assert.Equal(0.0, wallet.PendingInsurance, 6);
         Assert.IsType<MenuScreenViewModel>(rig.Vm.CurrentScreen);
     }
@@ -117,11 +117,11 @@ public sealed class JobAccidentTests
 
         hud.RaiseTaskAction();
 
-        // The repair is not optional: the 20 000 CR bill leaves a 19 000 CR debt
+        // The repair is not optional: the 2 000 CR bill leaves a 1 000 CR debt
         // (Unity's RepairScreen subtracts regardless) and the claim is 90 % of
         // the bill, not of what the cash happened to hold.
-        Assert.Equal(-19000.0, wallet.Cash, 6);
-        Assert.Equal(18000.0, wallet.PendingInsurance, 6);
+        Assert.Equal(-1000.0, wallet.Cash, 6);
+        Assert.Equal(1800.0, wallet.PendingInsurance, 6);
         Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
     }
 

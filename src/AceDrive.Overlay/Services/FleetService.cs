@@ -164,7 +164,8 @@ public sealed class FleetService
     /// a hit. The pre-impact speed comes from the detector's previous sample,
     /// because by the time the poll reads the damage the car has usually
     /// stopped. The repair share of the car's value is
-    /// <see cref="AccidentRules.RepairFraction"/> (top speed impact = 100%),
+    /// <see cref="AccidentRules.RepairFraction"/> (a top speed impact costs a
+    /// tenth of the car's value),
     /// banked on the driven car as outstanding body damage. Every crash of a
     /// ride adds its share, but only the share the car could still take is
     /// billed, so the accumulated repair stops at the car's own price.

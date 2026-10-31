@@ -94,7 +94,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 - [-] 37 Fuel simulation (burn/prices/refuel) — DECLINED (use Kunos fuel sim)
 - [ ] 38 Fuel-out stranding + roadside refuel — PENDING/CONDITIONAL (implement depending on Kunos)
 - [x] 39 Mechanical breakdown session — CONFIRMED
-- [-] 40 Accidents (damage roll / payout cut) — DECLINED as a random roll (ACE owns collisions); the ACE collision damage itself now prices a body repair: the mechanic bills impact speed ÷ car top speed × car value (top speed hit = a total write-off), banked per car and covered 90% by insurance. A crash during a taxi ride or a delivery run ends that job on the spot (no fare, no receipt) and costs the customer one friendship; the companion then offers REPAIR THE CAR, which takes the bill, banks the insured share for the broker and returns the main page
+- [-] 40 Accidents (damage roll / payout cut) — DECLINED as a random roll (ACE owns collisions); the ACE collision damage itself now prices a body repair: a hit banks a tenth of impact speed ÷ car top speed × car value (a top-speed impact costs 10% of the car, ten unrepaired ones total it), banked per car and covered 90% by insurance. A crash during a taxi ride or a delivery run ends that job on the spot (no fare, no receipt) and costs the customer one friendship; the companion then offers REPAIR THE CAR, which takes the bill, banks the insured share for the broker and returns the main page
 - [x] 41 Police patrols + fines — CONFIRMED
 - [x] 42 Protective consumables (Heat-Free / Fine Waived / Invincible / Half-Damage / DR Protection) — CONFIRMED
 

@@ -44,8 +44,18 @@ public sealed class FleetAccidentTests
         Assert.Equal(0.0, rig.Garage.Current!.BodyDamage, 6);
     }
 
+    // One crash through the feed: a prime sample at the pre-hit speed, then the
+    // damaged sample. Advances the running EVO counter by ten units.
+    private static AccidentDamage? Crash(
+        Rig rig, ref double damage, double speedKmh, DateTime at)
+    {
+        rig.Fleet.ObserveAccident(Sample(speedKmh, damage), at);
+        damage += 10.0;
+        return rig.Fleet.ObserveAccident(Sample(0.0, damage), at.AddMilliseconds(100));
+    }
+
     [Fact]
-    public void AHalfTopSpeedHit_BanksHalfTheCarValue()
+    public void AHalfTopSpeedHit_BanksATwentiethOfTheCarValue()
     {
         Rig rig = New();
         rig.Fleet.ObserveAccident(Sample(120.0, 0.0), T0);
@@ -54,52 +64,51 @@ public sealed class FleetAccidentTests
 
         Assert.NotNull(hit);
         Assert.Equal(120.0, hit.ImpactSpeedKmh, 6);
-        Assert.Equal(0.5, hit.RepairFraction, 6);
-        Assert.Equal(20000.0, hit.RepairCost, 6);
-        Assert.Equal(0.5, hit.TotalDamageFraction, 6);
-        Assert.Equal(0.5, rig.Garage.Current!.BodyDamage, 6);
+        Assert.Equal(0.05, hit.RepairFraction, 6);
+        Assert.Equal(2000.0, hit.RepairCost, 6);
+        Assert.Equal(0.05, hit.TotalDamageFraction, 6);
+        Assert.Equal(0.05, rig.Garage.Current!.BodyDamage, 6);
     }
 
     [Fact]
-    public void ASecondUnrepairedHit_AccumulatesButNeverPassesAWriteOff()
+    public void TenTopSpeedHits_TotalTheCar_AndTheEleventhBillsNothing()
     {
         Rig rig = New();
-        rig.Fleet.ObserveAccident(Sample(240.0, 0.0), T0);
-        rig.Fleet.ObserveAccident(Sample(0.0, 100.0), T0.AddMilliseconds(100));
-        rig.Fleet.ObserveAccident(Sample(240.0, 100.0), T0.AddSeconds(2));
+        double damage = 0.0;
+        DateTime at = T0;
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.NotNull(Crash(rig, ref damage, 240.0, at));
+            at = at.AddSeconds(2);
+        }
 
-        AccidentDamage? second = rig.Fleet.ObserveAccident(Sample(0.0, 200.0), T0.AddSeconds(2.1));
+        AccidentDamage? eleventh = Crash(rig, ref damage, 240.0, at);
 
-        Assert.NotNull(second);
-        Assert.Equal(1.0, second.RepairFraction, 6);
-        Assert.Equal(1.0, second.TotalDamageFraction, 6);
+        Assert.NotNull(eleventh);
         Assert.Equal(1.0, rig.Garage.Current!.BodyDamage, 6);
-        // The car was already written off by the first crash, so this one adds
-        // nothing to the bill: the total can never pass the car's own price.
-        Assert.Equal(0.0, second.RepairCost, 6);
+        // The car is already written off, so this crash adds nothing to the
+        // bill: the total can never pass the car's own price.
+        Assert.Equal(0.0, eleventh.RepairCost, 6);
+        Assert.Equal(40000.0, Car.Price * rig.Garage.Current!.BodyDamage, 6);
     }
 
     [Fact]
-    public void SeveralHitsInOneRide_AccumulateUntilTheBillEqualsTheCarPrice()
+    public void SeveralHalfSpeedHits_AccumulateAndTheBillFollowsTheDamage()
     {
         Rig rig = New();
-        rig.Fleet.ObserveAccident(Sample(120.0, 0.0), T0);
+        double damage = 0.0;
+        DateTime at = T0;
+        AccidentDamage first = Crash(rig, ref damage, 120.0, at)!;
+        at = at.AddSeconds(2);
+        AccidentDamage second = Crash(rig, ref damage, 120.0, at)!;
+        at = at.AddSeconds(2);
+        AccidentDamage third = Crash(rig, ref damage, 120.0, at)!;
 
-        AccidentDamage first = rig.Fleet.ObserveAccident(
-            Sample(0.0, 10.0), T0.AddMilliseconds(100))!;
-        rig.Fleet.ObserveAccident(Sample(120.0, 10.0), T0.AddSeconds(2));
-        AccidentDamage second = rig.Fleet.ObserveAccident(
-            Sample(0.0, 20.0), T0.AddSeconds(2.1))!;
-        rig.Fleet.ObserveAccident(Sample(120.0, 20.0), T0.AddSeconds(4));
-        AccidentDamage third = rig.Fleet.ObserveAccident(
-            Sample(0.0, 30.0), T0.AddSeconds(4.1))!;
-
-        Assert.Equal(20000.0, first.RepairCost, 6);
-        Assert.Equal(20000.0, second.RepairCost, 6);
-        Assert.Equal(1.0, third.TotalDamageFraction, 6);
-        Assert.Equal(0.0, third.RepairCost, 6); // nothing left to bill
-        Assert.Equal(Car.Price, first.RepairCost + second.RepairCost + third.RepairCost, 6);
-        Assert.Equal(40000.0, Car.Price * rig.Garage.Current!.BodyDamage, 6);
+        Assert.Equal(2000.0, first.RepairCost, 6);
+        Assert.Equal(2000.0, second.RepairCost, 6);
+        Assert.Equal(0.15, third.TotalDamageFraction, 6);
+        Assert.Equal(6000.0, first.RepairCost + second.RepairCost + third.RepairCost, 6);
+        Assert.Equal(6000.0, Car.Price * rig.Garage.Current!.BodyDamage, 6);
     }
 
     [Fact]
