@@ -52,8 +52,13 @@ public sealed class JobAccidentTests
         Assert.Null(hud.JobGuidance); // the drive line went away
         Assert.Equal("HudAccidentRideLost", hud.TaskPrompt!.TextKey);
         Assert.Equal("HudAccidentRepair", hud.TaskPrompt.ActionKey);
-        Assert.Contains("120", hud.TaskPrompt.Args![0], StringComparison.Ordinal);
-        var (_, delta) = Assert.Single(friends.Deltas);
+        // The prompt carries the impact speed, the customer who lost the
+        // friendship and the bill the button takes (120 of 240 km/h on a
+        // 40 000 CR car: half its value).
+        Assert.Equal("120", hud.TaskPrompt.Args![0]);
+        var (customer, delta) = Assert.Single(friends.Deltas);
+        Assert.Equal(customer, hud.TaskPrompt.Args[1]);
+        Assert.Equal("20000.00", hud.TaskPrompt.Args[2]);
         Assert.Equal(-1, delta);
         // The ride cannot be resumed: both job commands guard on the phase, and
         // the crash dropped it to None.

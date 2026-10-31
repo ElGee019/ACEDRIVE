@@ -866,9 +866,10 @@ public sealed class MainViewModel
             TimeSpan.FromSeconds(AccidentNoticeSec));
     }
 
-    // The repair prompt: the crash sentence plus the one button that pays the
-    // bill. The prompt is kept, not just handed over, so the button's tap is
-    // answered only while this prompt is still the one on the slot.
+    // The repair prompt: the crash sentence, who lost the friendship and the
+    // bill the button will take, plus the one button that pays it. The prompt is
+    // kept, not just handed over, so the button's tap is answered only while
+    // this prompt is still the one on the slot.
     private void ShowAccidentRepair(
         string textKey, AccidentDamage accident, string? customer)
     {
@@ -877,11 +878,20 @@ public sealed class MainViewModel
             [
                 accident.ImpactSpeedKmh.ToString("0", CultureInfo.CurrentCulture),
                 customer ?? string.Empty,
+                AccidentBill().ToString("0.00", CultureInfo.CurrentCulture),
             ],
             "HudAccidentRepair");
         _accidentPrompt = prompt;
         _hud?.SetTaskPrompt(prompt);
     }
+
+    // The bill the mechanic would quote for the dents on the car driven now:
+    // the car's value times its outstanding body damage. The prompt shows it and
+    // the repair charges it, so the number the player reads is the one taken.
+    private double AccidentBill() =>
+        _garage.Current is { BodyDamage: > 0.0 } car && _garage.SpecOf(car) is { } spec
+            ? AccidentRules.RepairCost(spec.Price, car.BodyDamage)
+            : 0.0;
 
     // The companion's one action button: the crash repair while its prompt is
     // up, the missing-person run's DRIVE home otherwise.
@@ -905,9 +915,9 @@ public sealed class MainViewModel
     {
         _accidentPrompt = null;
         _hud?.SetTaskPrompt(null);
-        if (_garage.Current is { BodyDamage: > 0.0 } car && _garage.SpecOf(car) is { } spec)
+        if (_garage.Current is { BodyDamage: > 0.0 } car)
         {
-            double bill = AccidentRules.RepairCost(spec.Price, car.BodyDamage);
+            double bill = AccidentBill();
             double paid = _wallet.ChargeUnavoidable(bill);
             double claim = car.HasInsurance ? paid * InsuranceRules.RepairPayoutFraction : 0.0;
             _wallet.AddInsurancePayout(claim);
