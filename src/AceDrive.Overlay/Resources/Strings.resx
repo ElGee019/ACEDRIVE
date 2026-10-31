@@ -155,9 +155,12 @@
   <data name="VoiceInfoButtons" xml:space="preserve"><value>Say a button's text to click that button.
 For instance "{0}".</value></data>
   <!-- The first birthday page prints the lesson above its CONTINUE once the
-       consent page has answered. The consent page itself only asks, so the
-       two buttons below this sentence are the answer. -->
+       consent page has answered. The consent page itself only asks (plus the
+       privacy line under it), so the two buttons at the bottom are the answer. -->
   <data name="VoiceConsentIntro" xml:space="preserve"><value>ACEDrive can be voice controlled. If you want to activate that option, confirm here</value></data>
+  <!-- The ask is also the privacy statement: speech runs on the local Vosk
+       model, so the claim is true and the permission is an informed one. -->
+  <data name="VoiceConsentPrivacy" xml:space="preserve"><value>Voice control is completely offline. Audio is never uploaded or transmitted</value></data>
   <data name="VoiceConsentConfirm" xml:space="preserve"><value>CONFIRM</value></data>
   <data name="VoiceConsentDecline" xml:space="preserve"><value>NO THANK YOU</value></data>
   <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Click "{0}" and select "JOBS" to start your first taxi shift.</value></data>
@@ -484,11 +487,27 @@ Accept this job?</value></data>
        business labels. An unknown tag falls back to the title-cased type. -->
   <data name="PoiTypeCarWash" xml:space="preserve"><value>Car Wash</value></data>
   <data name="PoiTypeBank" xml:space="preserve"><value>Bank</value></data>
-  <data name="PoiTypeInsurance" xml:space="preserve"><value>Insurance</value></data>
+  <data name="PoiTypeInsurance" xml:space="preserve"><value>Insurance Broker</value></data>
   <data name="PoiTypeDealer" xml:space="preserve"><value>Car Dealer</value></data>
-  <data name="PoiTypeMechanic" xml:space="preserve"><value>Mechanic</value></data>
+  <data name="PoiTypeMechanic" xml:space="preserve"><value>Car Mechanic</value></data>
   <data name="PoiTypeGrocery" xml:space="preserve"><value>Grocery Store</value></data>
   <data name="PoiTypeCoffee" xml:space="preserve"><value>Coffee Shop</value></data>
+  <!-- New-business explanation pages (TOZONES §4.5): the expansion page's
+       CONTINUE opens one before the receipt's target, every time a door of
+       that family opens. The title is the plural family name; the body keeps
+       the copy's own paragraph breaks (blank line = new paragraph). No
+       placeholders, so translators may reflow the text freely. -->
+  <data name="PoiIntroCarWashTitle" xml:space="preserve"><value>Car Washes</value></data>
+  <data name="PoiIntroCarWashBody" xml:space="preserve"><value>Transporting customers and cargo will leave your vehicle dirty. Keep it clean, as a filthy ride can lead to rejected fares. Certain goods accumulate dirt and grime faster than others.&#10;&#10;Visit any Car Wash to wash away the dirt.</value></data>
+  <data name="PoiIntroInsuranceTitle" xml:space="preserve"><value>Insurance Brokers</value></data>
+  <data name="PoiIntroInsuranceBody" xml:space="preserve"><value>Crashing your car is not cheap. Better protect yourself with insurance. In case of an accident you will pay the full repair cost upfront.&#10;Visit the Insurance Broker to cash in on your reimbursement.</value></data>
+  <data name="PoiIntroBankTitle" xml:space="preserve"><value>Banks</value></data>
+  <data name="PoiIntroBankBody" xml:space="preserve"><value>Grandma Sonja has transferred 1,000 CR into your bank account. Your interest rate will increase based on the number of consecutive days you play ACEDrive and the size of your operating zone.&#10;&#10;You can withdraw your funds anytime by visiting the Bank.</value></data>
+  <data name="PoiIntroDealerTitle" xml:space="preserve"><value>Car Dealers</value></data>
+  <data name="PoiIntroDealerBody" xml:space="preserve"><value>Need a new ride or looking to unload your current vehicle? Visit any Car Dealer marked on the map.&#10;&#10;If you're selling, keep in mind that your car's resale value is directly affected by its engine condition and its Leaderboard Ranking. Any time trial records linked to the vehicle will stay with it, even after it's sold.</value></data>
+  <data name="PoiIntroMechanicTitle" xml:space="preserve"><value>Car Mechanics</value></data>
+  <data name="PoiIntroMechanicBody" xml:space="preserve"><value>Keep your car in top condition to avoid sudden breakdowns—visit a Car Mechanic to swap out worn-out parts.&#10;&#10;Engine Health drops naturally over time as your odometer goes up, with the exact wear rate depending on the engine model. Once it reaches critical condition, the engine will break completely, and your only option will be to buy a full replacement.</value></data>
+  <data name="PoiIntroContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <!-- Home page (Unity YouScreen): the player's own doors, starting with the
        garage and the addresses page. -->
   <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
@@ -649,6 +668,9 @@ Accept this job?</value></data>
   <data name="MechanicRepairParts" xml:space="preserve"><value>REPAIR PARTS</value></data>
   <data name="MechanicRepairEngine" xml:space="preserve"><value>REPAIR ENGINE</value></data>
   <data name="MechanicNewEngine" xml:space="preserve"><value>BUY NEW ENGINE</value></data>
+  <data name="MechanicBodyDamage" xml:space="preserve"><value>Body damage: {0:0.0}% — repair CR{1:0.00}</value></data>
+  <data name="MechanicRepairBody" xml:space="preserve"><value>REPAIR BODY</value></data>
+  <data name="AccidentNotice" xml:space="preserve"><value>Accident! {0:0} km/h impact — repair estimate CR{1:0.00}.</value></data>
   <data name="MechanicPartOilChange" xml:space="preserve"><value>Oil efficiency</value></data>
   <data name="MechanicPartWipers" xml:space="preserve"><value>Wipers</value></data>
   <data name="MechanicPartAirFilter" xml:space="preserve"><value>Air filter</value></data>

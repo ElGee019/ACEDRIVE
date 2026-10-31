@@ -72,10 +72,13 @@ public sealed class PoiWorld
     /// moves. A fresh career is still in the introduction, and Unity's
     /// firstSceneComplete gate keeps the list empty until it ends.
     /// <paramref name="expansion"/> is the settle hook's growth report: its
-    /// street receives the first new door (Unity's FinishExpandCoroutine), and
-    /// the returned doors are the ones this call banked, so the expansion page
-    /// can list the businesses that just opened. Stores are adopted into the
-    /// board and the town before returning.
+    /// street receives the one business door this growth opens (Unity's
+    /// FinishExpandCoroutine), and the returned door is the one this call
+    /// banked, so the expansion page can announce it and its info page can
+    /// follow. Without an expansion only the store families catch up (an owned
+    /// hub backfills its first stores), never a business: a business door is
+    /// only ever added on a street that just joined, so it is always announced.
+    /// Stores are adopted into the board and the town before returning.
     /// </summary>
     public IReadOnlyList<PointOfInterest> Grow(ZoneExpansion? expansion = null)
     {
@@ -84,9 +87,14 @@ public sealed class PoiWorld
             return [];
         }
 
+        // One business per street: two families crossing a threshold on the
+        // same expansion would share one street and only the first could be
+        // announced. The rest stay due and open on the following expansions.
+        bool streetJoined = expansion is not null;
         IReadOnlyList<PointOfInterest> grown = _growth.Spawn(
             _zone.StreetIds.Count, _jobs.Completed, _directory, _zone.ZoneMap,
-            expansion?.StreetName, _career.OwnsCategory);
+            expansion?.StreetName, _career.OwnsCategory,
+            maxDoors: streetJoined ? 1 : int.MaxValue, streetJoined: streetJoined);
         var banked = new List<PointOfInterest>(grown.Count);
         foreach (PointOfInterest poi in grown)
         {

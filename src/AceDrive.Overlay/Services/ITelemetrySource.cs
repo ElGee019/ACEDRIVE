@@ -14,12 +14,15 @@ public sealed record TrackInfo(
 /// <summary>One physics tick. Plain data, no Win32 types. Co-located with
 /// <see cref="ITelemetrySource"/> per the small-DTO-on-its-interface rule.
 /// The optional fields stay null when EVO's graphics/static block is missing,
-/// so the core speed/gear read keeps working on its own.</summary>
+/// so the core speed/gear read keeps working on its own. <c>CarDamage</c> is
+/// the sum of EVO's five collision-damage zones in the game's absolute units;
+/// it only ever jumps on a hit (or drops on a repair/session reload).</summary>
 public sealed record TelemetrySample(
     int PacketId, float Gas, float Brake, int Gear,
     int Rpm, float SteerRad, float SpeedKmh,
     float? NormalizedPosition = null,
-    TrackInfo? Track = null);
+    TrackInfo? Track = null,
+    float CarDamage = 0f);
 
 /// <summary>
 /// Abstraction over EVO shared memory. Lets ViewModels run against

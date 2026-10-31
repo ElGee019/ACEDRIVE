@@ -113,36 +113,73 @@ public sealed class PoiWorldTests
     }
 
     [Fact]
-    public void Grow_AfterTheIntroduction_OpensTheUnlockedBusinesses()
+    public void Grow_WithoutAnExpansion_OpensNoBusiness()
     {
+        // Pacing is street-driven: a resumed save whose counters already
+        // crossed a threshold opens no business until a street joins, so no
+        // door is ever added behind a page that could not announce it.
         var saved = new DriverState(
             0, 0, StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"], JobsCompleted: 10);
-        var fixture = Build(progress: Done, saved: saved);
+        var fixture = Build(progress: Done, saved: saved, map: SixStreets);
 
-        IReadOnlyList<PointOfInterest> grown = fixture.World.Grow();
+        Assert.Empty(fixture.World.Grow());
 
-        Assert.Contains(fixture.Directory.All, poi => poi.Type == PoiTypes.CarWash);
-        Assert.Contains(fixture.Directory.All, poi => poi.Type == PoiTypes.Dealer);
-        // Every door the report lists was actually banked.
-        Assert.Equal(grown.Count, fixture.Directory.All.Count);
-        Assert.NotEmpty(fixture.Store.Saved);
-        // The board page is refreshed once even with no shop door: a new
-        // business door is still news for the cached addresses/board reads.
-        Assert.Equal(1, fixture.Host.Refreshes);
+        Assert.Empty(fixture.Directory.All);
+        Assert.Equal(0, fixture.Store.Saves);
     }
 
     [Fact]
-    public void Grow_IsIdempotent_WhenTheDoorsAreBanked()
+    public void Grow_WithAnExpansion_OpensOneFamilyPerStreet()
     {
+        // Car wash (6 streets) and dealer (10 jobs) are both due; only the
+        // first family opens on this street. The dealer stays due and opens on
+        // the next expansion, so no two businesses share one announcement.
         var saved = new DriverState(
             0, 0, StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"], JobsCompleted: 10);
-        var fixture = Build(progress: Done, saved: saved);
+        var fixture = Build(progress: Done, saved: saved, map: SixStreets);
 
-        fixture.World.Grow();
-        int count = fixture.Directory.All.Count;
-        Assert.Empty(fixture.World.Grow());
+        PointOfInterest carwash = Assert.Single(fixture.World.Grow(
+            new ZoneExpansion("Street 6", 6, 1.929, 2.8935, 3)));
+        Assert.Equal(PoiTypes.CarWash, carwash.Type);
 
-        Assert.Equal(count, fixture.Directory.All.Count);
+        PointOfInterest dealer = Assert.Single(fixture.World.Grow(
+            new ZoneExpansion("Street 6", 6, 1.929, 2.8935, 3)));
+        Assert.Equal(PoiTypes.Dealer, dealer.Type);
+    }
+
+    [Fact]
+    public void Grow_WithoutAnExpansion_StillBackfillsAnOwnedHubStore()
+    {
+        // The store families follow the hub purchase, not the streets: the
+        // career's first store must exist when the board is shown again.
+        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        Assert.True(career.TryOpenCareer(1, 0, 0));
+        var fixture = Build(progress: Done, career: career);
+
+        Assert.Contains(
+            fixture.World.Grow(), poi => poi.Type == PoiTypes.GroceryStore);
+    }
+
+    [Fact]
+    public void Grow_OpensTheMechanicOnItsOwnStreet_AfterTheOlderFamilies()
+    {
+        // 36 settled jobs unlock the mechanic, but it never shares a street
+        // with another family: the car wash and the dealer take the first two
+        // expansions, the mechanic the third — and its door lands on the
+        // street that expansion just added.
+        var saved = new DriverState(
+            0, 0, StreetIds: ["home", "s1", "s2", "s3", "s4", "s5"], JobsCompleted: 36);
+        var fixture = Build(progress: Done, saved: saved, map: SixStreets);
+        var expansion = new ZoneExpansion("Street 6", 6, 1.929, 2.8935, 3);
+
+        Assert.Equal(
+            PoiTypes.CarWash, Assert.Single(fixture.World.Grow(expansion)).Type);
+        Assert.Equal(
+            PoiTypes.Dealer, Assert.Single(fixture.World.Grow(expansion)).Type);
+
+        PointOfInterest mechanic = Assert.Single(fixture.World.Grow(expansion));
+        Assert.Equal(PoiTypes.Mechanic, mechanic.Type);
+        Assert.Equal("Street 6", mechanic.Address.StreetName);
     }
 
     [Fact]

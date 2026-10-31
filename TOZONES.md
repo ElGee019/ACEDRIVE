@@ -249,6 +249,26 @@ Routing (no screen opens another screen — AGENTS.md):
 * `Navigation` gains `IZoneStandings` (constructor) and the `VoiceBeat` it
   already has.
 
+New-business explanation pages (the expansion's follow-up):
+
+* One door per expansion: `PoiWorld.Grow` asks `PoiSpawner` for
+  `maxDoors: 1`, and asks with `streetJoined: false` when the growth added no
+  street. Business families therefore only open on a street that just joined
+  (the mechanic, previously job-only, included) and two families never share
+  one announcement; the store families keep following an owned hub category,
+  so a hub purchase still backfills its first store.
+* `ViewModels/PoiIntroCopy` maps a type tag to a resx pair: the title is the
+  plural family name (`PoiIntro<Family>Title`), the body the explanation
+  (`PoiIntro<Family>Body`). Five families are authored (car wash, insurance,
+  bank, dealer, mechanic); the store doors and the pizzeria answer null and get
+  no page.
+* `ViewModels/PoiIntroScreenViewModel` + `Views/PoiIntroScreenView`: title band,
+  body (the copy's own paragraph breaks), one CONTINUE.
+  `Navigation.ShowZoneExpansion` wraps the continuation, so both CONTINUE and
+  FIND STREET → BACK pass the page for every added family and then run the
+  target the receipt would have shown — every time a door opens, not only the
+  first.
+
 Pending hand-off (the coordinator, one field):
 
 * `MainViewModel` implements `IJobSettlementHost.GoToControlPage` /
@@ -372,11 +392,19 @@ Core (`tests/AceDrive.Core.Tests`):
   returns null and consumes nothing.
 * `PoiSpawnerTests` — a draw with `addressable` never leaves the discovered
   streets; the first door of an expansion sits on `openedStreet`; a full
-  opened street falls back; ids stay unique; naming still `{0}` + name pool.
+  opened street falls back; ids stay unique; naming still `{0}` + name pool;
+  `maxDoors: 1` opens one family per expansion; `streetJoined: false` opens no
+  business but still backfills an owned hub's store.
 * `TaxiAddressPlanTests` — one-street map draws a same-street second address;
   two streets keep the different-street rule.
-* `PoiWorldTests` — `Grow(expansion)` returns the banked doors, adopts stores
-  before returning, and still places nothing before the introduction.
+* `PoiWorldTests` — `Grow(expansion)` returns the banked door, adopts stores
+  before returning, places nothing before the introduction and nothing without
+  an expansion, opens one family per street, and lands the mechanic on its own
+  expansion's street.
+* `PoiIntroScreenViewModelTests` — the five authored families' title/body come
+  from resx (plural title, the copy's paragraph breaks), one page per family
+  in bank order, no page for a family without copy, CONTINUE and the voice beat
+  run the continuation once.
 * `ZoneStandings` already covered; add a page-level test for `IsAvailable`
   false → block hidden.
 * `JsonAddressMapStore`-style content test: street ids/names unique, spans
@@ -391,7 +419,9 @@ ViewModels:
   page on the receipt CONTINUE, and its CONTINUE lands on the control page /
   delivery board; a settle below the curve goes straight through.
 * `NavigationTests` — FIND STREET opens the addresses page whose BACK runs
-  the same continuation.
+  the same continuation; both that BACK and the page's CONTINUE pass the new
+  business's explanation page first, and a family without copy continues
+  straight through.
 * `TestSession` gains `ZoneStandings` (fake) and builds `OperatingZone` with
   the map + profile street id, mirroring the root.
 

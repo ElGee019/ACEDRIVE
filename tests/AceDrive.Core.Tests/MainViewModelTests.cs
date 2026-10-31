@@ -4052,7 +4052,12 @@ public sealed class MainViewModelTests
         Assert.All(page.BusinessLines, line => Assert.Contains(
             stand.Rows, row => line.EndsWith(row.Name, StringComparison.Ordinal)));
 
+        // The way off the page explains the business it just opened before the
+        // receipt's target (the car wash's page, then the control page).
         page.ContinueCommand.Execute(null);
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(Strings.Get("PoiIntroCarWashTitle"), intro.Title);
+        intro.ContinueCommand.Execute(null);
         var control = Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         control.BackCommand.Execute(null);
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
@@ -4257,8 +4262,11 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void SavedProgress_OpensTheBusinessesTheThresholdsUnlocked()
+    public void SavedProgress_OpensNoBusinessUntilTheNextStreetJoins()
     {
+        // Pacing is street-driven: a resumed save does not dump the doors its
+        // thresholds already crossed at boot. Each one opens with the next
+        // expansion, so the page (and its explanation) precedes the door.
         var directory = new PoiDirectory();
         var saved = new DriverState(
             500.0, 0.0,
@@ -4269,8 +4277,11 @@ public sealed class MainViewModelTests
             progress: OnboardingState.Fresh with { BirthdayDone = true },
             savedDriver: saved, poiDirectory: directory);
 
-        Assert.Contains(directory.All, poi => poi.Type == PoiTypes.CarWash);
-        Assert.Contains(directory.All, poi => poi.Type == PoiTypes.Dealer);
+        // The story door (Max's grocery) is still there; no generated business
+        // is, even though the saved counters already crossed two thresholds.
+        Assert.DoesNotContain(directory.All, poi =>
+            poi.Type is PoiTypes.CarWash or PoiTypes.Insurance or PoiTypes.Bank
+                or PoiTypes.Dealer or PoiTypes.Mechanic);
     }
 
     [Fact]

@@ -1,5 +1,6 @@
 using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
@@ -275,6 +276,78 @@ public sealed class NavigationTests
         // zone the navigator holds rather than a snapshot of its own.
         Assert.Equal(["Street 1"], addresses.StreetNames);
         addresses.BackCommand.Execute(null);
+
+        Assert.Equal(1, continued);
+    }
+
+    [Fact]
+    public void ZoneExpansion_ExplainsTheNewBusinessBeforeTheContinuation()
+    {
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
+        int continued = 0;
+        var carwash = new PointOfInterest(
+            "carwash_0", "Ace's Carwash",
+            new AddressLocation("Street 2", 4, HouseSide.Right), PoiTypes.CarWash);
+
+        nav.ShowZoneExpansion(
+            new ZoneExpansion("Street 2", 2, 1.929, 2.8935, 3), [carwash],
+            () => continued++);
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(shell.CurrentScreen);
+        page.ContinueCommand.Execute(null);
+
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(shell.CurrentScreen);
+        Assert.Equal(Strings.Get("PoiIntroCarWashTitle"), intro.Title);
+        Assert.Equal(Strings.Get("PoiIntroCarWashBody"), intro.Body);
+        Assert.Equal(0, continued);
+
+        intro.ContinueCommand.Execute(null);
+        Assert.Equal(1, continued);
+    }
+
+    [Fact]
+    public void ZoneExpansion_FindStreetBack_AlsoExplainsTheNewBusiness()
+    {
+        // FIND STREET's BACK runs the same continuation, so it passes the
+        // explanation page too: the way back from the map stand-in and the
+        // way forward from the receipt land on the same sequence.
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
+        int continued = 0;
+        var bank = new PointOfInterest(
+            "bank_0", "Rae's Bank",
+            new AddressLocation("Street 2", 4, HouseSide.Right), PoiTypes.Bank);
+
+        nav.ShowZoneExpansion(
+            new ZoneExpansion("Street 2", 2, 1.929, 2.8935, 3), [bank],
+            () => continued++);
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(shell.CurrentScreen);
+        page.FindStreetCommand.Execute(null);
+
+        var addresses = Assert.IsType<AddressesScreenViewModel>(shell.CurrentScreen);
+        addresses.BackCommand.Execute(null);
+
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(shell.CurrentScreen);
+        Assert.Equal(Strings.Get("PoiIntroBankTitle"), intro.Title);
+        intro.ContinueCommand.Execute(null);
+
+        Assert.Equal(1, continued);
+    }
+
+    [Fact]
+    public void ZoneExpansion_WithoutAuthoredCopy_ContinuesStraightThrough()
+    {
+        // A family with no explanation page (a store door) must not hold the
+        // continuation behind an empty screen.
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
+        int continued = 0;
+        var store = new PointOfInterest(
+            "grocery_store_0", "Noor's Grocery",
+            new AddressLocation("Street 2", 4, HouseSide.Right), PoiTypes.GroceryStore);
+
+        nav.ShowZoneExpansion(
+            new ZoneExpansion("Street 2", 2, 1.929, 2.8935, 3), [store],
+            () => continued++);
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(shell.CurrentScreen);
+        page.ContinueCommand.Execute(null);
 
         Assert.Equal(1, continued);
     }

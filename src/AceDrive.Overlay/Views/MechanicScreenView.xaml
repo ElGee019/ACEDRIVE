@@ -42,6 +42,11 @@
                            TextAlignment="Center" Style="{StaticResource WhenCar}"/>
                 <TextBlock Text="{Binding EngineConditionLine}" Foreground="#FFBFC4C9" FontSize="12"
                            TextAlignment="Center" Style="{StaticResource WhenCar}"/>
+                <!-- Accident damage: the telemetry-banked dents and their bill,
+                     shown only while the car carries any. -->
+                <TextBlock Text="{Binding BodyDamageLine}" Foreground="#FFFFB74D" FontSize="12"
+                           TextAlignment="Center" TextWrapping="Wrap"
+                           Visibility="{Binding BodyRepairVisible, Converter={StaticResource BoolToVis}}"/>
                 <!-- Stranded engine: the failure note and the two economics lines
                      (Unity's _textEngineFailure block). -->
                 <StackPanel Margin="0,6,0,0"
@@ -87,6 +92,9 @@
             </StackPanel>
         </ScrollViewer>
         <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=MechanicRepairBody}" Command="{Binding RepairBodyCommand}"
+                    Margin="0,0,0,6"
+                    Visibility="{Binding BodyRepairVisible, Converter={StaticResource BoolToVis}}"/>
             <Button Content="{loc:Loc Key=MechanicRepairParts}" Command="{Binding RepairPartsCommand}"
                     Margin="0,0,0,6"
                     Visibility="{Binding RepairPartsVisible, Converter={StaticResource BoolToVis}}"/>

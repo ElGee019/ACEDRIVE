@@ -957,8 +957,8 @@ public sealed class HudViewModelTests
 
     // The car's microphone turns a clean "pick up" into one of these two-word
     // fragments far more often than it lands the phrase, and each miss used to
-    // be dead air the player had to repeat (2026-10-21..25 logs). They stay
-    // pickup words, never drop-off words: the leg still owns its own table.
+    // be dead air the player had to repeat (2026-10-21..25 and 10-31 logs). They
+    // stay pickup words, never drop-off words: the leg still owns its own table.
     [Theory]
     [InlineData("the gop")]  // 2026-10-25 09:54:27, 10-24 13:04:30
     [InlineData("it up")]    // 2026-10-24 14:40:01, 10-25 19:52:09
@@ -969,6 +969,7 @@ public sealed class HudViewModelTests
     [InlineData("the cup")]  // 2026-10-22 21:57:19
     [InlineData("the good")] // 2026-10-23 21:47:21
     [InlineData("the poop")] // 2026-10-22 22:26:42
+    [InlineData("picked up")] // 2026-10-31 17:27:42
     public void JobGuidance_PickUpAnswersTheLoggedMishearings(string spoken)
     {
         var vm = Create();

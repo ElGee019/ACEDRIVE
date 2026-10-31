@@ -237,6 +237,44 @@ public sealed class PoiSpawnerTests
     }
 
     [Fact]
+    public void NoStreetJoined_OpensNoStreetPacedBusiness()
+    {
+        // Boot, board open and hub close ask with streetJoined: false so no
+        // business is ever added off the expansion page. Both the car wash
+        // (6 streets) and the dealer (10 jobs) are due here and both wait.
+        Assert.Empty(Spawner().Spawn(
+            6, 10, new PoiDirectory(), AddressMap.Default, streetJoined: false));
+    }
+
+    [Fact]
+    public void NoStreetJoined_StillOpensAnOwnedHubStore()
+    {
+        // Stores follow the hub purchase, not the streets: a career's first
+        // store must exist when the board is shown again after the purchase.
+        Predicate<string> groceries =
+            category => string.Equals(category, "groceries", StringComparison.Ordinal);
+
+        PointOfInterest store = Assert.Single(Spawner().Spawn(
+            1, 0, new PoiDirectory(), AddressMap.Default,
+            ownsCategory: groceries, streetJoined: false));
+
+        Assert.Equal(PoiTypes.GroceryStore, store.Type);
+    }
+
+    [Fact]
+    public void MaxDoors_OpensOneFamilyPerExpansion()
+    {
+        // One street carries one announcement: the car wash takes this
+        // expansion's door, the dealer stays due for the next one.
+        PointOfInterest door = Assert.Single(Spawner().Spawn(
+            6, 10, new PoiDirectory(), AddressMap.Default,
+            openedStreet: "Street 2", maxDoors: 1));
+
+        Assert.Equal(PoiTypes.CarWash, door.Type);
+        Assert.Equal("Street 2", door.Address.StreetName);
+    }
+
+    [Fact]
     public void Spawn_StopsAtTheMapCapacity_WithoutThrowing()
     {
         var map = new AddressMap(

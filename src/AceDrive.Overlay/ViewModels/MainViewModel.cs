@@ -170,6 +170,10 @@ public sealed class MainViewModel
     // taxi refusals use, long enough to read one sentence.
     private const double HaulNoticeSec = 4.0;
 
+    // Accident notice: the impact speed plus the repair estimate, long enough
+    // to read while the car is still rolling to a stop.
+    private const double AccidentNoticeSec = 6.0;
+
     private bool _resizing;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
@@ -300,10 +304,10 @@ public sealed class MainViewModel
         // router read it there); what is left here is the transition line.
         _carBrands.BrandChanged += (_, e) =>
             _log.LogInfo($"now following: {e.Brand} (say 'hey {e.Brand}')");
-        // Business catch-up at boot (Unity MapScreen.Show's generator checks):
-        // a save whose street/job counters already crossed a threshold opens
-        // the missing doors now. A fresh career is still in onboarding, so the
-        // gate keeps the business list empty until the introduction ends.
+        // Door adoption at boot: a resumed save's known stores join the
+        // delivery board and the town before the first paint. Business doors
+        // are not catch-up here any more: they only open with a street
+        // expansion, so every one of them is announced on its page.
         _poiWorld.Grow();
         // Driver catch-up (PORTPLAN items 30/47, Unity MapScreen.Show): grandma's
         // car is seeded into a garage that predates the garage file, and the
@@ -311,7 +315,7 @@ public sealed class MainViewModel
         // introduction. Both rules and their saves live in the collaborator.
         _catchUp.Run(_day.DisplayWeek);
         // The catch-up's streak bonus is a lifetime-earned credit, and the
-        // business growth above may have placed a visit door: one boot sync
+        // store adoption above may have placed a visit door: one boot sync
         // lets both land in the ToDo list before the first paint.
         _ = _todos.Sync();
         _shell.RecordActivity(_clock.UtcNow);
@@ -776,6 +780,17 @@ public sealed class MainViewModel
         // the drive. The garage file is banked on the same wall-time throttle
         // as the clock, so a kill costs at most the window.
         _fleet.IntegrateOdometer(s, dt, _story.Done);
+        // The accident feed rides the same tick: a jump in EVO's collision
+        // damage is one crash, priced off the speed the car carried into it.
+        // Banking the garage immediately means a kill right after the hit
+        // keeps the dent (the odometer's own save stays on its throttle).
+        if (_fleet.ObserveAccident(s, now) is { } accident)
+        {
+            SaveGarage();
+            _hud?.ShowNotice(
+                Strings.Format("AccidentNotice", accident.ImpactSpeedKmh, accident.RepairCost),
+                TimeSpan.FromSeconds(AccidentNoticeSec));
+        }
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());
         // The missing-person run's arrival rides the same poll: parked at a

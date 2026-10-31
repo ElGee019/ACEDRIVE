@@ -40,11 +40,21 @@ public sealed class PoiSpawner
     /// (Unity's FinishExpandCoroutine), while the rest draw over the whole
     /// discovered map. <paramref name="ownsCategory"/> gates the store
     /// families: no owned grocery/coffee hub means no store door.
+    /// <paramref name="maxDoors"/> caps the call: a zone expansion opens one
+    /// business at a time, so no two families ever cross a threshold on the
+    /// same street and every new door can be announced on its own page. The
+    /// cap only decides how many of the due doors are banked now; the rest stay
+    /// due and open on the next expansion. <paramref name="streetJoined"/> is
+    /// false for a growth that added no street (boot, board open, hub
+    /// purchase): the street/job-paced business families then stay closed so
+    /// no business is ever added off-screen, while the store families still
+    /// follow their owned hub category.
     /// </summary>
     public IReadOnlyList<PointOfInterest> Spawn(
         int discoveredStreets, int settledJobs, PoiDirectory known,
         AddressMap addressable, string? openedStreet = null,
-        Predicate<string>? ownsCategory = null)
+        Predicate<string>? ownsCategory = null, int maxDoors = int.MaxValue,
+        bool streetJoined = true)
     {
         ArgumentNullException.ThrowIfNull(addressable);
         var added = new List<PointOfInterest>();
@@ -55,9 +65,15 @@ public sealed class PoiSpawner
 
         foreach (PoiDefinition definition in _definitions)
         {
+            if (added.Count >= maxDoors)
+            {
+                break;
+            }
+
             if (definition.Spawn is not { } rule
                 || rule.Pacing == PoiPacing.None
-                || string.IsNullOrWhiteSpace(definition.NamePattern))
+                || string.IsNullOrWhiteSpace(definition.NamePattern)
+                || (!streetJoined && rule.Pacing != PoiPacing.OwnedCategory))
             {
                 continue;
             }
@@ -69,7 +85,7 @@ public sealed class PoiSpawner
                 && ownsCategory(definition.Category);
             int expected = rule.ExpectedCount(
                 discoveredStreets, settledJobs, categoryOwned);
-            while (existing < expected)
+            while (existing < expected && added.Count < maxDoors)
             {
                 // The first missing door of the whole call is the expansion's
                 // new door; only that one is forced onto the opened street.

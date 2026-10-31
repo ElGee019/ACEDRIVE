@@ -28,6 +28,10 @@ public sealed class FleetService
     private readonly ILog _log;
     private readonly ICarBrandSource _driven;
     private readonly IContentSource _content;
+    // The collision latch (PORTPLAN 40's ACE signal): EVO publishes cumulative
+    // damage per zone, not a crash event, so the detector turns a jump in it
+    // into one impact with the pre-hit speed attached.
+    private readonly AccidentDetector _accidents = new();
 
     public FleetService(
         Garage garage, IReadOnlyList<CarSpec> cars, GameClock game,
@@ -153,6 +157,61 @@ public sealed class FleetService
             RunEngineChecks(car);
         }
     }
+
+    /// <summary>
+    /// The accident feed (the ACE signal PORTPLAN item 40 deferred to): the
+    /// physics block carries cumulative collision damage, so a positive jump is
+    /// a hit. The pre-impact speed comes from the detector's previous sample,
+    /// because by the time the poll reads the damage the car has usually
+    /// stopped. The repair share of the car's value is
+    /// <see cref="AccidentRules.RepairFraction"/> (top speed impact = 100%),
+    /// banked on the driven car as outstanding body damage. Returns null when
+    /// nothing happened, on the second sample of a settling crash, and when
+    /// there is no owned car to bill (a borrowed free-roam car has no row).
+    /// </summary>
+    public AccidentDamage? ObserveAccident(TelemetrySample sample, DateTime now)
+    {
+        double speed = double.IsFinite(sample.SpeedKmh)
+            ? Math.Clamp(sample.SpeedKmh, 0.0, MaxTelemetrySpeedKmh)
+            : 0.0;
+        double damage = double.IsFinite(sample.CarDamage)
+            ? Math.Max(0.0, sample.CarDamage)
+            : 0.0;
+
+        AccidentImpact? impact = _accidents.Observe(damage, speed, now);
+        if (impact is null)
+        {
+            return null;
+        }
+
+        if (DrivenCar() is not { } car || _garage.SpecOf(car) is not { TopSpeedKmh: > 0 } spec)
+        {
+            _log.LogWarning(
+                $"[Accident] {impact.ImpactSpeedKmh:0} km/h hit with no priced car to bill");
+            return null;
+        }
+
+        double fraction = AccidentRules.RepairFraction(impact.ImpactSpeedKmh, spec.TopSpeedKmh);
+        if (fraction <= 0.0)
+        {
+            return null;
+        }
+
+        car.AddBodyDamage(fraction);
+        double cost = AccidentRules.RepairCost(spec.Price, impact.ImpactSpeedKmh, spec.TopSpeedKmh);
+        _log.LogInfo(
+            $"[Accident] {car.Key} hit at {impact.ImpactSpeedKmh:0} km/h " +
+            $"({fraction * 100.0:0.0}% of {spec.TopSpeedKmh} km/h) — " +
+            $"body damage {car.BodyDamage * 100.0:0.0}% of value, repair {cost:0.00} CR");
+        return new AccidentDamage(impact.ImpactSpeedKmh, fraction, cost, car.BodyDamage);
+    }
+
+    // The car an accident bills: the driven car when the watcher knows it and
+    // the garage owns it, else the garage's current car while the watcher is
+    // still quiet. A live car with no garage row (free-roam loaner) is null, so
+    // its crashes never touch the career ledger.
+    private OwnedCar? DrivenCar() =>
+        _driven.CurrentIdentity is { } live ? FindOwned(live) : _garage.Current;
 
     /// <summary>
     /// One completed job's dirt (PORTPLAN 33, Unity IncrementFilth): +1 on the

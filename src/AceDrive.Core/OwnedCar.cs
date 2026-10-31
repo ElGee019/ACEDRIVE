@@ -43,6 +43,7 @@ public sealed class OwnedCar
         _askedCategories = CleanAsked(saved?.AskedCategories);
         JobsCompleted = Math.Max(0, saved?.JobsCompleted ?? 0);
         LeaderboardRanking = CleanRanking(saved?.LeaderboardRanking ?? DefaultLeaderboardRanking);
+        BodyDamage = CleanFraction(saved?.BodyDamage ?? 0.0);
     }
 
     /// <summary>Catalogue key of the bought car (<see cref="CarSpec.Key"/>).</summary>
@@ -84,6 +85,33 @@ public sealed class OwnedCar
 
     /// <summary>The engine health (PORTPLAN item 32, Unity EngineHealthService).</summary>
     public EngineHealth Engine { get; }
+
+    /// <summary>
+    /// Outstanding body damage as a fraction of the car's value (0..1), the
+    /// sum of every unrepaired collision. The repair bill the mechanic quotes
+    /// is <c>CarSpec.Price × BodyDamage</c>; the fraction (not a CR amount) is
+    /// what persists, so a re-priced car re-prices its old dents too. 0 = sound,
+    /// 1 = written off, capped because a car cannot owe more than its value.
+    /// </summary>
+    public double BodyDamage { get; private set; }
+
+    /// <summary>
+    /// Banks one collision's share of the car's value. Non-finite and
+    /// non-positive input is ignored so a torn telemetry read cannot dent the
+    /// car; the total saturates at a write-off instead of growing past it.
+    /// </summary>
+    public void AddBodyDamage(double fraction)
+    {
+        if (!double.IsFinite(fraction) || fraction <= 0.0)
+        {
+            return;
+        }
+        BodyDamage = Math.Clamp(BodyDamage + fraction, 0.0, 1.0);
+    }
+
+    /// <summary>The mechanic's body repair: the dents are gone, the car is
+    /// sound again. The caller banks the garage after the charge.</summary>
+    public void RepairBody() => BodyDamage = 0.0;
 
     // The quiz history: category keys already asked on this car. Reset once
     // every category has been asked (CarStatQuiz.MarkAsked owns that rule).
@@ -137,7 +165,7 @@ public sealed class OwnedCar
     public OwnedCarState Snapshot() => new(
         Key, PurchaseWeek, Odometer, HasInsurance, Filth.Value,
         Condition.Snapshot(), Engine.Snapshot(), _askedCategories, JobsCompleted,
-        LeaderboardRanking);
+        LeaderboardRanking, BodyDamage);
 
     // A hand-edited or NaN ranking would make the valuation score unusable, so
     // the reading clamps into the 0..1 band the curve expects; a non-finite one
@@ -146,6 +174,9 @@ public sealed class OwnedCar
         double.IsFinite(ranking)
             ? Math.Clamp(ranking, 0.0, 1.0)
             : DefaultLeaderboardRanking;
+
+    private static double CleanFraction(double value) =>
+        double.IsFinite(value) ? Math.Clamp(value, 0.0, 1.0) : 0.0;
 
     private static List<string> CleanAsked(IReadOnlyList<string>? saved)
     {

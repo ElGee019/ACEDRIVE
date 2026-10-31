@@ -88,6 +88,11 @@ public sealed class JsonGarageStore : IGarageStore
                 PurchaseWeek = Math.Max(0, row.PurchaseWeek),
                 Parts = CleanParts(row.Parts),
                 Engine = CleanEngine(row.Engine),
+                // A hand-edited or NaN dent would price a repair with garbage;
+                // clamp into the 0..1 write-off band the rule expects.
+                BodyDamage = double.IsFinite(row.BodyDamage)
+                    ? Math.Clamp(row.BodyDamage, 0.0, 1.0)
+                    : 0.0,
             });
         }
         if (dropped > 0)

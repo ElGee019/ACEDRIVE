@@ -42,12 +42,12 @@
             <StackPanel Visibility="{Binding HasBusinesses, Converter={StaticResource BoolToVis}}">
                 <Border Style="{StaticResource SectionDivider}"/>
                 <TextBlock Text="{loc:Loc Key=ZoneExpansionNewBusinesses}" Foreground="#FFF"
-                           FontSize="14" FontWeight="Bold" TextAlignment="Center"
+                           FontSize="16" FontWeight="Bold" TextAlignment="Center"
                            Margin="0,0,0,6"/>
                 <ItemsControl ItemsSource="{Binding BusinessLines}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding}" Foreground="#FFBFC4C9" FontSize="14"
+                            <TextBlock Text="{Binding}" Foreground="#FFBFC4C9" FontSize="16"
                                        TextAlignment="Center" TextWrapping="Wrap"
                                        Margin="0,0,0,2"/>
                         </DataTemplate>

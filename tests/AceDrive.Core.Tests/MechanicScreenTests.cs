@@ -19,7 +19,8 @@ public sealed class MechanicScreenTests
 
     private static Rig New(
         double cash = 100000.0, double driveKm = 0.0, bool broken = false,
-        CarSpec? car = null, bool withCar = true, Action? onBack = null)
+        CarSpec? car = null, bool withCar = true, Action? onBack = null,
+        double bodyDamage = 0.0)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         CarSpec spec = car ?? Car;
@@ -27,7 +28,8 @@ public sealed class MechanicScreenTests
         // are exercised; without one: an empty garage.
         GarageState? saved = withCar
             ? new GarageState(spec.Key, [
-                new OwnedCarState(spec.Key, 1, 0.0, false, 0, null, new EngineConditionState(0.0, broken)),
+                new OwnedCarState(spec.Key, 1, 0.0, false, 0, null, new EngineConditionState(0.0, broken),
+                    BodyDamage: bodyDamage),
             ])
             : null;
         var garage = new Garage([spec], saved);
@@ -169,6 +171,46 @@ public sealed class MechanicScreenTests
         Assert.Equal(0.0, car.Condition.PartFraction("oil_change", 0.0));
         Assert.Equal(100000.0 - 12000.0, rig.Wallet.Cash, 6); // 40000 × 0.30
         Assert.True(Assert.Single(rig.Repairs).EngineReplaced);
+    }
+
+    [Fact]
+    public void BodyDamage_ShowsTheBill_AndTheRepairClearsIt()
+    {
+        var rig = New(cash: 100000.0, bodyDamage: 0.5);
+
+        Assert.True(rig.Vm.BodyRepairVisible);
+        Assert.Contains("50.0%", rig.Vm.BodyDamageLine);
+        Assert.Contains("CR20000.00", rig.Vm.BodyDamageLine); // 40000 × 0.5
+
+        rig.Vm.RepairBodyCommand.Execute(null);
+
+        Assert.Equal(0.0, rig.Garage.Current!.BodyDamage, 6);
+        Assert.Equal(80000.0, rig.Wallet.Cash, 6);
+        Assert.False(rig.Vm.BodyRepairVisible);
+        MechanicRepair repair = Assert.Single(rig.Repairs);
+        Assert.Equal("body-repair", repair.Kind);
+        Assert.Equal(20000.0, repair.Cost, 6);
+    }
+
+    [Fact]
+    public void ACleanCar_HidesTheBodyRepair()
+    {
+        var rig = New();
+
+        Assert.False(rig.Vm.BodyRepairVisible);
+        Assert.Equal(string.Empty, rig.Vm.BodyDamageLine);
+        Assert.False(rig.Vm.RepairBodyCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void BodyRepair_WithoutCash_IsANoOp()
+    {
+        var rig = New(cash: 100.0, bodyDamage: 0.5);
+
+        rig.Vm.RepairBodyCommand.Execute(null);
+
+        Assert.Equal(0.5, rig.Garage.Current!.BodyDamage, 6);
+        Assert.Empty(rig.Repairs);
     }
 
     [Fact]

@@ -34,6 +34,7 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     private readonly RelayCommand _repairParts;
     private readonly RelayCommand _repairEngine;
     private readonly RelayCommand _newEngine;
+    private readonly RelayCommand _repairBody;
 
     public MechanicScreenViewModel(
         Garage garage, DriverWallet wallet, GameClock game, VoiceBeat beat,
@@ -53,9 +54,11 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         _repairParts = new RelayCommand(RepairParts, CanRepairParts);
         _repairEngine = new RelayCommand(RepairEngine, CanFixEngine);
         _newEngine = new RelayCommand(NewEngine, CanFixEngine);
+        _repairBody = new RelayCommand(RepairBody, CanRepairBody);
         RepairPartsCommand = _repairParts;
         RepairEngineCommand = _repairEngine;
         NewEngineCommand = _newEngine;
+        RepairBodyCommand = _repairBody;
         Reload();
     }
 
@@ -67,6 +70,10 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     public ICommand RepairEngineCommand { get; }
 
     public ICommand NewEngineCommand { get; }
+
+    /// <summary>The body repair: the accident ledger's outstanding dents, at
+    /// the car's value times their accumulated fraction (through 100%).</summary>
+    public ICommand RepairBodyCommand { get; }
 
     public ICommand BackCommand { get; }
 
@@ -100,6 +107,15 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
 
     public string NewEngineCostLine { get => _newEngineCostLine; private set => SetField(ref _newEngineCostLine, value); }
     private string _newEngineCostLine = "";
+
+    /// <summary>The accident bill: how much of the car's value the unrepaired
+    /// dents are worth, or empty on a sound car.</summary>
+    public string BodyDamageLine { get => _bodyDamageLine; private set => SetField(ref _bodyDamageLine, value); }
+    private string _bodyDamageLine = "";
+
+    /// <summary>The body repair block, shown only while the car carries dents.</summary>
+    public bool BodyRepairVisible { get => _bodyRepairVisible; private set => SetField(ref _bodyRepairVisible, value); }
+    private bool _bodyRepairVisible;
 
     /// <summary>Unity's "_textPrice": the queued total and the cash left after.</summary>
     public string TotalLine { get => _totalLine; private set => SetField(ref _totalLine, value); }
@@ -205,6 +221,26 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         _onRepaired(new MechanicRepair("new-engine", price, 0, EngineReplaced: true));
     }
 
+    // The accident repair: the dents banked by the telemetry feed are paid in
+    // one bill and cleared. The cost is the car's catalogue value times the
+    // accumulated damage fraction, so a re-priced car re-prices old dents too.
+    private void RepairBody()
+    {
+        ClearBackFlash();
+        if (_garage.Current is not { } car || !CanRepairBody())
+        {
+            return;
+        }
+        double price = BodyRepairPrice(car);
+        if (!_wallet.TrySpend(price))
+        {
+            return;
+        }
+        car.RepairBody();
+        Reload();
+        _onRepaired(new MechanicRepair("body-repair", price, 0, EngineReplaced: false));
+    }
+
     // The one path back: a click and the voice tap's deferred end both land
     // here, so the glow clears on the way out (bank-page precedent).
     private void Back()
@@ -218,6 +254,9 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
 
     private bool CanFixEngine() => _garage.Current is { } car && car.Engine.Broken;
 
+    private bool CanRepairBody() =>
+        _garage.Current is { } car && car.BodyDamage > 0.0 && _wallet.Cash >= BodyRepairPrice(car);
+
     private void Reload()
     {
         if (_garage.Current is not { } car)
@@ -229,6 +268,8 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
             EngineConditionLine = string.Empty;
             RepairEngineCostLine = string.Empty;
             NewEngineCostLine = string.Empty;
+            BodyDamageLine = string.Empty;
+            BodyRepairVisible = false;
             TotalLine = string.Empty;
             TotalVisible = false;
             RepairPartsVisible = false;
@@ -254,6 +295,10 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         EngineFailureVisible = car.Engine.Broken;
         RepairEngineCostLine = Strings.Format("MechanicRepairEngineCost", EngineRepairPrice(car, carClass));
         NewEngineCostLine = Strings.Format("MechanicNewEngineCost", NewEnginePrice(car, carClass));
+        BodyRepairVisible = car.BodyDamage > 0.0;
+        BodyDamageLine = BodyRepairVisible
+            ? Strings.Format("MechanicBodyDamage", car.BodyDamage * 100.0, BodyRepairPrice(car))
+            : string.Empty;
         Rows = Paint(car, carClass);
         double total = QueuedTotal(carClass);
         TotalVisible = total > 0.0;
@@ -269,6 +314,7 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         _repairParts.RaiseCanExecuteChanged();
         _repairEngine.RaiseCanExecuteChanged();
         _newEngine.RaiseCanExecuteChanged();
+        _repairBody.RaiseCanExecuteChanged();
     }
 
     // Unity RefreshPartRowStates: efficiency counts down from 100, the price is
@@ -319,6 +365,12 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     private double NewEnginePrice(OwnedCar car, int carClass) =>
         (_garage.SpecOf(car)?.Price ?? 0.0) * _rules.NewEngineFraction * _rules.MultiplierFor(carClass);
 
+    // The accident bill is the car's value times the banked damage fraction;
+    // the class multiplier stays on parts/engine, as it does in the Unity
+    // repair screen, so a write-off is exactly the car's price.
+    private double BodyRepairPrice(OwnedCar car) =>
+        (_garage.SpecOf(car)?.Price ?? 0.0) * car.BodyDamage;
+
     private int ClassOf(OwnedCar car) => _garage.SpecOf(car)?.Class ?? 0;
 
     // Part names are the voice keys for their rows; the repair labels act at
@@ -335,6 +387,7 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         actions[Strings.Get("MechanicRepairParts")] = RepairParts;
         actions[Strings.Get("MechanicRepairEngine")] = RepairEngine;
         actions[Strings.Get("MechanicNewEngine")] = NewEngine;
+        actions[Strings.Get("MechanicRepairBody")] = RepairBody;
         // Back navigates: glow first, act at the end of the shared beat.
         actions[Strings.Get("DeliveryBack")] = () =>
         {

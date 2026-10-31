@@ -128,8 +128,10 @@
 Bijvoorbeeld "{0}".</value></data>
   <!-- De eerste verjaardagspagina toont de uitleg boven zijn DOORGAAN zodra de
        toestemmingspagina is beantwoord. De toestemmingspagina zelf vraagt het
-       alleen, dus de twee knoppen onder deze zin zijn het antwoord. -->
+       alleen (met de privacyregel eronder), dus de twee knoppen onderaan zijn
+       het antwoord. -->
   <data name="VoiceConsentIntro" xml:space="preserve"><value>ACEDrive kan met spraak bediend worden. Wil je die optie activeren, bevestig dan hier</value></data>
+  <data name="VoiceConsentPrivacy" xml:space="preserve"><value>Spraakbediening werkt volledig offline. Audio wordt nooit geüpload of verzonden</value></data>
   <data name="VoiceConsentConfirm" xml:space="preserve"><value>BEVESTIGEN</value></data>
   <data name="VoiceConsentDecline" xml:space="preserve"><value>NEE, BEDANKT</value></data>
   <data name="VoiceInfoFirstJob" xml:space="preserve"><value>Klik op "{0}" en kies "JOBS" om je eerste taxidienst te starten.</value></data>
@@ -366,11 +368,22 @@ Deze klus aannemen?</value></data>
   <data name="ZoneStandingsUnknown" xml:space="preserve"><value>—/—</value></data>
   <data name="PoiTypeCarWash" xml:space="preserve"><value>Carwash</value></data>
   <data name="PoiTypeBank" xml:space="preserve"><value>Bank</value></data>
-  <data name="PoiTypeInsurance" xml:space="preserve"><value>Verzekering</value></data>
+  <data name="PoiTypeInsurance" xml:space="preserve"><value>Verzekeringsmakelaar</value></data>
   <data name="PoiTypeDealer" xml:space="preserve"><value>Autodealer</value></data>
-  <data name="PoiTypeMechanic" xml:space="preserve"><value>Monteur</value></data>
+  <data name="PoiTypeMechanic" xml:space="preserve"><value>Automonteur</value></data>
   <data name="PoiTypeGrocery" xml:space="preserve"><value>Supermarkt</value></data>
   <data name="PoiTypeCoffee" xml:space="preserve"><value>Koffiebar</value></data>
+  <data name="PoiIntroCarWashTitle" xml:space="preserve"><value>Carwashes</value></data>
+  <data name="PoiIntroCarWashBody" xml:space="preserve"><value>Klanten en vracht vervoeren maakt je auto vies. Houd hem schoon, want een vuile auto kan tot geweigerde ritten leiden. Sommige goederen verzamelen sneller vuil dan andere.&#10;&#10;Bezoek een Carwash om het vuil weg te spoelen.</value></data>
+  <data name="PoiIntroInsuranceTitle" xml:space="preserve"><value>Verzekeringsmakelaars</value></data>
+  <data name="PoiIntroInsuranceBody" xml:space="preserve"><value>Een crash is duur. Bescherm jezelf met een verzekering. Bij een ongeluk betaal je de volledige reparatiekosten vooraf.&#10;Bezoek de Verzekeringsmakelaar om je vergoeding te innen.</value></data>
+  <data name="PoiIntroBankTitle" xml:space="preserve"><value>Banken</value></data>
+  <data name="PoiIntroBankBody" xml:space="preserve"><value>Oma Sonja heeft 1.000 CR naar je bankrekening overgemaakt. Je rente stijgt op basis van het aantal opeenvolgende dagen dat je ACEDrive speelt en de grootte van je werkgebied.&#10;&#10;Je kunt je geld op elk moment opnemen door de Bank te bezoeken.</value></data>
+  <data name="PoiIntroDealerTitle" xml:space="preserve"><value>Autodealers</value></data>
+  <data name="PoiIntroDealerBody" xml:space="preserve"><value>Een nieuwe auto nodig of wil je je huidige verkopen? Bezoek een Autodealer op de kaart.&#10;&#10;Bij verkoop: de restwaarde van je auto hangt direct af van de staat van de motor en je klassering op het leaderboard. Eventuele tijdritrecords die aan de auto gekoppeld zijn, blijven bij de auto, ook nadat hij verkocht is.</value></data>
+  <data name="PoiIntroMechanicTitle" xml:space="preserve"><value>Automonteurs</value></data>
+  <data name="PoiIntroMechanicBody" xml:space="preserve"><value>Houd je auto in topconditie om plotselinge pech te voorkomen—bezoek een Automonteur om versleten onderdelen te vervangen.&#10;&#10;De motorconditie daalt van nature naarmate je kilometerstand stijgt; de exacte slijtagesnelheid hangt af van het motormodel. Zodra de motor in kritieke staat verkeert, begeeft hij het volledig en is een complete vervanging je enige optie.</value></data>
+  <data name="PoiIntroContinue" xml:space="preserve"><value>VERDER</value></data>
   <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
   <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
   <data name="HomeAddresses" xml:space="preserve"><value>ADRESSEN</value></data>
@@ -512,6 +525,9 @@ Deze klus aannemen?</value></data>
   <data name="MechanicRepairParts" xml:space="preserve"><value>ONDERDELEN VERVANGEN</value></data>
   <data name="MechanicRepairEngine" xml:space="preserve"><value>MOTOR REPAREREN</value></data>
   <data name="MechanicNewEngine" xml:space="preserve"><value>NIEUWE MOTOR KOPEN</value></data>
+  <data name="MechanicBodyDamage" xml:space="preserve"><value>Carrosserieschade: {0:0.0}% — reparatie CR{1:0.00}</value></data>
+  <data name="MechanicRepairBody" xml:space="preserve"><value>CARROSSERIE REPAREREN</value></data>
+  <data name="AccidentNotice" xml:space="preserve"><value>Ongeluk! Impact bij {0:0} km/u — geschatte reparatie CR{1:0.00}.</value></data>
   <data name="MechanicPartOilChange" xml:space="preserve"><value>Olie-efficiëntie</value></data>
   <data name="MechanicPartWipers" xml:space="preserve"><value>Ruitenwissers</value></data>
   <data name="MechanicPartAirFilter" xml:space="preserve"><value>Luchtfilter</value></data>

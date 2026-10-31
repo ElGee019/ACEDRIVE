@@ -4,9 +4,9 @@
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Same page skeleton as VoiceInfoScreenView: viewport-pinned MinHeight,
          title row at a fixed height, body centered below it, the action row at
-         the bottom. The body is the permission ask; the two buttons are the
-         only way off the page. The voice lesson lives on the first birthday
-         page, where the mic is already on. -->
+         the bottom. The body is the permission ask plus the offline promise
+         under it; the two buttons are the only way off the page. The voice
+         lesson lives on the first birthday page, where the mic is already on. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -14,8 +14,13 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=VoiceInfoTitle}"/>
-        <TextBlock Grid.Row="1" Style="{StaticResource PageBody}" Text="{loc:Loc Key=VoiceConsentIntro}"
-                   VerticalAlignment="Center"/>
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Style="{StaticResource PageBody}" Text="{loc:Loc Key=VoiceConsentIntro}"/>
+            <!-- The privacy line sits under the ask, dimmer than it: it
+                 informs the answer without competing with the question. -->
+            <TextBlock Style="{StaticResource PageBody}" Foreground="#FFBFC4C9"
+                       Text="{loc:Loc Key=VoiceConsentPrivacy}"/>
+        </StackPanel>
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center"
                     Margin="0,4,0,6">
             <Button Content="{loc:Loc Key=VoiceConsentConfirm}" Command="{Binding ConfirmCommand}"

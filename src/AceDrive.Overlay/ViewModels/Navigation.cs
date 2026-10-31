@@ -667,20 +667,49 @@ public sealed class Navigation
     /// would have shown, and its CONTINUE runs <paramref name="next"/>.
     /// FIND STREET opens the addresses page (the port's map stand-in) with its
     /// BACK running that same continuation, so the button keeps Unity's map
-    /// contract without a map. The board is ranked against the new area first,
-    /// so the page's standings block renders a fresh result instead of polling.
+    /// contract without a map. The newly opened business's explanation page sits
+    /// in front of that continuation, so every way off the page passes through
+    /// it. The board is ranked against the new area first, so the page's
+    /// standings block renders a fresh result instead of polling.
     /// </summary>
     public void ShowZoneExpansion(
         ZoneExpansion zone, IReadOnlyList<PointOfInterest> added, Action next)
     {
+        ArgumentNullException.ThrowIfNull(zone);
+        ArgumentNullException.ThrowIfNull(added);
         ArgumentNullException.ThrowIfNull(next);
         _zoneStandings.Refresh(zone.NewKm);
+        Action continuation = WithPoiIntros(added, next);
         var page = new ZoneExpansionScreenViewModel(
             zone, added, _zoneStandings, _beat,
-            new RelayCommand(next),
+            new RelayCommand(continuation),
             new RelayCommand(() =>
-                ShowScreen(AddressesPage(new RelayCommand(next)))));
+                ShowScreen(AddressesPage(new RelayCommand(continuation)))));
         ShowScreen(page);
+    }
+
+    // The explanation pages this growth earned, one per family, ahead of the
+    // continuation. A family with no authored copy (a store door) adds none, so
+    // an expansion that opened no explained business leaves the target alone.
+    private Action WithPoiIntros(IReadOnlyList<PointOfInterest> added, Action next)
+    {
+        IReadOnlyList<PoiIntro> intros = PoiIntroCopy.ForAdded(added);
+        return intros.Count == 0 ? next : () => ShowPoiIntro(intros, 0, next);
+    }
+
+    // One page at a time: CONTINUE opens the next family's page, the last one
+    // runs the continuation the expansion page would have run.
+    private void ShowPoiIntro(
+        IReadOnlyList<PoiIntro> intros, int index, Action next)
+    {
+        if (index >= intros.Count)
+        {
+            next();
+            return;
+        }
+
+        ShowScreen(new PoiIntroScreenViewModel(
+            intros[index], () => ShowPoiIntro(intros, index + 1, next), _beat));
     }
 
     // The trunk page (PORTPLAN 26, Unity YouScreen's TrunkScreen) is rebuilt on

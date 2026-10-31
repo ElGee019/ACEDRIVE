@@ -18,7 +18,8 @@ public sealed record GarageState(
 /// score's per-car job term (Unity CarJobsService): a save before the market
 /// slice loads as zero. LeaderboardRanking is the valuation's stretch-board
 /// term: a save before it existed loads on the top-percentile placeholder, and
-/// the future boards overwrite it with the computed 0..1 value.</summary>
+/// the future boards overwrite it with the computed 0..1 value. BodyDamage is
+/// the accident ledger: a save before the accident slice loads undented.</summary>
 public sealed record OwnedCarState(
     string Key,
     int PurchaseWeek = 0,
@@ -29,7 +30,8 @@ public sealed record OwnedCarState(
     EngineConditionState? Engine = null,
     IReadOnlyList<string>? AskedCategories = null,
     int JobsCompleted = 0,
-    double LeaderboardRanking = OwnedCar.DefaultLeaderboardRanking);
+    double LeaderboardRanking = OwnedCar.DefaultLeaderboardRanking,
+    double BodyDamage = 0.0);
 
 /// <summary>One part's baseline (Unity CarMaintenancePart: partKey +
 /// lastServiceOdometer).</summary>

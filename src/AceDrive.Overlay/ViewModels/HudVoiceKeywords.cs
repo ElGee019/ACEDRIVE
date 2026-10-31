@@ -21,12 +21,14 @@ internal static class HudVoiceKeywords
     // transcript — logged 2026-10-21..25 ("the gop" x6, "it up" x5,
     // "the top"/"the up" x2, plus "he got", "you go", "the cup", "the good",
     // "the poop", "the google"), each one dead air the player had to repeat.
+    // The past tense is the same two words: 2026-10-31 17:27:42 heard "picked
+    // up" (dead air), the repeat at :46 landed the clean phrase.
     // They are whole-word runs like every other keyword, so a radio transcript
     // containing one can fire too; that is accepted because the button is only
     // up parked on its own door, where this action is the only thing to do.
     private static readonly string[] PickUp =
     [
-        "enter", "pick up", "pickup",
+        "enter", "pick up", "pickup", "picked up",
         "the gop", "it up", "the up", "the top",
         "he got", "you go", "the cup", "the good", "the poop", "the google",
     ];

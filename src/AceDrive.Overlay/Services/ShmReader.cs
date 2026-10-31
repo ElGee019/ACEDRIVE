@@ -25,6 +25,13 @@ internal sealed class ShmReader : ITelemetrySource
     private const int OffSteer = 24;  // rad, -=left
     private const int OffSpeedKmh = 28;
 
+    // AC1-compatible collision damage, absolute units per zone (not 0..1 in
+    // EVO): front, rear, left, right, centre. The accident detector only needs
+    // the running total, so the reader sums the five slots instead of handing
+    // the zones on.
+    private const int OffCarDamage = 224;
+    private const int CarDamageZones = 5;
+
     // Graphics/static offsets (live-telemetry-evo docs/SHARED_MEMORY.md,
     // layout v1.x). WHY hardcoded here: the repo keeps every byte offset in
     // this one reader so an EVO update only has one blast radius. The attach
@@ -37,6 +44,10 @@ internal sealed class ShmReader : ITelemetrySource
     private const int OffStaticTrackLengthMeters = 204;  // float
     private const int StaticVersionChars = 15;
     private const int StaticNameChars = 33;
+    // The documented physics block is 800 bytes; the damage zones at 224 are
+    // past the AC1 prefix, so the view must cover the whole block (it used to
+    // stop at 64: speed/gear only).
+    private const int PhysicsViewBytes = 800;
     private const int GraphicsViewBytes = 2048;
     private const int StaticViewBytes = 256;
 
@@ -168,7 +179,7 @@ internal sealed class ShmReader : ITelemetrySource
         try
         {
             _mmf ??= MemoryMappedFile.OpenExisting(PhysicsMap, MemoryMappedFileRights.Read);
-            _view ??= _mmf.CreateViewAccessor(0, 64, MemoryMappedFileAccess.Read);
+            _view ??= _mmf.CreateViewAccessor(0, PhysicsViewBytes, MemoryMappedFileAccess.Read);
         }
         // WHY: attach races game shutdown; warn once and retry on the next tick.
         // (Same guarded set as Probe/ReadSample; no bare Exception per CA1031.
@@ -425,6 +436,7 @@ internal sealed class ShmReader : ITelemetrySource
         int rpm = view.ReadInt32(OffRpms);
         float steer = view.ReadSingle(OffSteer);
         float speed = view.ReadSingle(OffSpeedKmh);
+        float damage = ReadCarDamage(view);
 
         if (packet != view.ReadInt32(OffPacketId))
         {
@@ -437,6 +449,7 @@ internal sealed class ShmReader : ITelemetrySource
             rpm = view.ReadInt32(OffRpms);
             steer = view.ReadSingle(OffSteer);
             speed = view.ReadSingle(OffSpeedKmh);
+            damage = ReadCarDamage(view);
 
             if (packet != view.ReadInt32(OffPacketId))
             {
@@ -454,7 +467,19 @@ internal sealed class ShmReader : ITelemetrySource
         }
 
         return new TelemetrySample(
-            packet, gas, brake, gear, rpm, steer, speed, normalizedPosition, track);
+            packet, gas, brake, gear, rpm, steer, speed, normalizedPosition, track, damage);
+    }
+
+    // Sum of the five damage zones: EVO writes absolute units per zone, and the
+    // accident rule only cares that the total moved. Five reads, no allocation.
+    private static float ReadCarDamage(MemoryMappedViewAccessor view)
+    {
+        float total = 0f;
+        for (int i = 0; i < CarDamageZones; i++)
+        {
+            total += view.ReadSingle(OffCarDamage + (i * 4));
+        }
+        return total;
     }
 
     private TelemetrySample? FailRead(Exception ex)

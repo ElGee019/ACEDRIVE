@@ -87,9 +87,9 @@ public sealed class ZoneExpansionScreenViewModelTests
     [Theory]
     [InlineData(PoiTypes.CarWash, "Car Wash")]
     [InlineData(PoiTypes.Bank, "Bank")]
-    [InlineData(PoiTypes.Insurance, "Insurance")]
+    [InlineData(PoiTypes.Insurance, "Insurance Broker")]
     [InlineData(PoiTypes.Dealer, "Car Dealer")]
-    [InlineData(PoiTypes.Mechanic, "Mechanic")]
+    [InlineData(PoiTypes.Mechanic, "Car Mechanic")]
     [InlineData(PoiTypes.GroceryStore, "Grocery Store")]
     [InlineData(PoiTypes.CoffeeShop, "Coffee Shop")]
     public void PoiTypeLabels_MapEveryZoneFamily(string type, string label) =>
