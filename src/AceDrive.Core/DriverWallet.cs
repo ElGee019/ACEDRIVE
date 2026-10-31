@@ -223,13 +223,13 @@ public sealed class DriverWallet
     /// the lifetime-earned reading the ToDo subject shows.</summary>
     public void AddBonus(double bonus)
     {
-        Cash = Math.Round(Cash + bonus, 2, MidpointRounding.AwayFromZero);
+        ApplyCash(bonus);
         Earn(bonus);
     }
 
     public void AddReceipt(TaxiReceipt receipt)
     {
-        Cash = Math.Round(Cash + receipt.Total, 2, MidpointRounding.AwayFromZero);
+        ApplyCash(receipt.Total);
         Xp += receipt.XpEarned;
         Earn(receipt.Total);
     }
@@ -239,7 +239,7 @@ public sealed class DriverWallet
     /// TotalEarned IS the wallet delta, so no separate lines to keep apart.</summary>
     public void AddDelivery(DeliveryReceipt receipt)
     {
-        Cash = Math.Round(Cash + receipt.TotalEarned, 2, MidpointRounding.AwayFromZero);
+        ApplyCash(receipt.TotalEarned);
         Xp += receipt.XpEarned;
         Earn(receipt.TotalEarned);
     }
@@ -250,7 +250,7 @@ public sealed class DriverWallet
     /// the XP total stays untouched here too.</summary>
     public void AddHaul(CarHaulReceipt receipt)
     {
-        Cash = Math.Round(Cash + receipt.TotalEarned, 2, MidpointRounding.AwayFromZero);
+        ApplyCash(receipt.TotalEarned);
         Earn(receipt.TotalEarned);
     }
 
@@ -263,7 +263,7 @@ public sealed class DriverWallet
     public void AddRoadTest(RoadTestReceipt receipt)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        Cash = Math.Round(Cash + receipt.Payment, 2, MidpointRounding.AwayFromZero);
+        ApplyCash(receipt.Payment);
         Earn(receipt.Payment);
     }
 
@@ -277,7 +277,7 @@ public sealed class DriverWallet
     public void AddCentoRace(CentoReceipt receipt)
     {
         ArgumentNullException.ThrowIfNull(receipt);
-        Cash = Math.Round(Cash + receipt.TotalEarned, 2, MidpointRounding.AwayFromZero);
+        ApplyCash(receipt.TotalEarned);
         Earn(receipt.TotalEarned);
         if (double.IsFinite(receipt.EndReputation) && receipt.EndReputation > 0.0)
         {
@@ -299,6 +299,20 @@ public sealed class DriverWallet
         ClubReputation = ClubReputation,
         StarOfTheShowWins = StarOfTheShowWins,
     };
+
+    // Every cash delta lands here: the ledger never goes negative. A fine that
+    // outruns the fare takes what the account holds instead of leaving the
+    // player in debt, the same rule ChargeUnavoidable applies to a tow fee —
+    // Unity's float ledger does go negative, this port keeps the balance every
+    // page shows honest.
+    private void ApplyCash(double delta)
+    {
+        if (!double.IsFinite(delta))
+        {
+            return;
+        }
+        Cash = Math.Max(0.0, Math.Round(Cash + delta, 2, MidpointRounding.AwayFromZero));
+    }
 
     private void Earn(double amount)
     {

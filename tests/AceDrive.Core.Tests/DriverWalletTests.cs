@@ -39,6 +39,19 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
+    public void AddReceipt_WithAFineBiggerThanTheCash_LeavesTheLedgerAtZero()
+    {
+        // A €50 fine on a fare that cannot cover it settles negative: the cash
+        // takes the loss it can and the balance never dips below zero.
+        var wallet = new DriverWallet(new DriverState(20.0, 0.0));
+
+        wallet.AddReceipt(Receipt(total: -50.0));
+
+        Assert.Equal(0.0, wallet.Cash);
+        Assert.Equal(0.0, wallet.CreditEarned); // a loss is not an earning
+    }
+
+    [Fact]
     public void TrySpend_MovesCashOrRefuses()
     {
         // Unity's buy gate (CarDealerScreen.OnBuyClicked): a short wallet
