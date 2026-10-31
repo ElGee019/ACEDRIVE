@@ -19,11 +19,15 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
-    public void Resume_ClampsNegativeSaves()
+    public void Resume_KeepsADebtButDropsANonFiniteBalance()
     {
-        var wallet = new DriverWallet(new DriverState(-5.0, -1.0));
-        Assert.Equal(0.0, wallet.Cash);
-        Assert.Equal(0.0, wallet.Xp);
+        // A repair can outrun the cash, so a debt is a real state a restart must
+        // keep. Only a non-finite hand-edit falls back to the seed.
+        Assert.Equal(-5.0, new DriverWallet(new DriverState(-5.0, -1.0)).Cash);
+        Assert.Equal(0.0, new DriverWallet(new DriverState(-5.0, -1.0)).Xp);
+        Assert.Equal(
+            DriverWallet.StartingCash,
+            new DriverWallet(new DriverState(double.NaN, 0.0)).Cash);
     }
 
     [Fact]
@@ -39,15 +43,15 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
-    public void AddReceipt_WithAFineBiggerThanTheCash_LeavesTheLedgerAtZero()
+    public void AddReceipt_WithAFineBiggerThanTheCash_LeavesTheDriverInDebt()
     {
-        // A €50 fine on a fare that cannot cover it settles negative: the cash
-        // takes the loss it can and the balance never dips below zero.
+        // A €50 fine on a fare that cannot cover it settles negative: the fine
+        // is not optional, so the balance carries the rest as a debt.
         var wallet = new DriverWallet(new DriverState(20.0, 0.0));
 
         wallet.AddReceipt(Receipt(total: -50.0));
 
-        Assert.Equal(0.0, wallet.Cash);
+        Assert.Equal(-30.0, wallet.Cash);
         Assert.Equal(0.0, wallet.CreditEarned); // a loss is not an earning
     }
 
@@ -254,6 +258,31 @@ public sealed class DriverWalletTests
         Assert.Equal(0.0, wallet.Cash);
         Assert.Equal(0.0, wallet.ChargeUnavoidable(5.0));   // nothing left to take
         Assert.Equal(0.0, wallet.ChargeUnavoidable(0.0));   // a free charge is a no-op
+    }
+
+    [Fact]
+    public void ChargeUnavoidable_OnADebt_TakesNothingAndKeepsTheDebt()
+    {
+        // The fee must not "pay itself" out of a negative balance: a tow on a
+        // driver already in debt leaves the debt exactly where it was.
+        var wallet = new DriverWallet(new DriverState(-20.0, 0.0));
+
+        Assert.Equal(0.0, wallet.ChargeUnavoidable(5.0));
+        Assert.Equal(-20.0, wallet.Cash);
+    }
+
+    [Fact]
+    public void ChargeInFull_MayLeaveTheLedgerInDebt()
+    {
+        // Unity's RepairScreen: cash -= cost with no floor, the accident repair
+        // a player cannot refuse.
+        var wallet = new DriverWallet(new DriverState(10.0, 0.0));
+
+        wallet.ChargeInFull(25.0);
+
+        Assert.Equal(-15.0, wallet.Cash);
+        wallet.ChargeInFull(0.0); // a free charge is a no-op
+        Assert.Equal(-15.0, wallet.Cash);
     }
 
     [Fact]

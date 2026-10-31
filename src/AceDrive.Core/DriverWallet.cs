@@ -24,7 +24,10 @@ public sealed class DriverWallet
 
     public DriverWallet(DriverState? saved = null)
     {
-        Cash = Math.Max(0.0, saved?.Cash ?? StartingCash);
+        // A debt is a real state: an accident repair the player cannot refuse
+        // can outrun the cash, and restarting must not forgive it. Only a
+        // non-finite hand-edit falls back to the seed.
+        Cash = saved is { Cash: var cash } && double.IsFinite(cash) ? cash : StartingCash;
         Xp = Math.Max(0.0, saved?.Xp ?? 0.0);
         // The 1000.0 record default IS Unity's seed (PlayerDefaults + the map
         // boot 0→1000 migration): a pre-bank save deserializes straight to the
@@ -155,10 +158,10 @@ public sealed class DriverWallet
         BankBalance = Math.Round(BankBalance + interest, 2, MidpointRounding.AwayFromZero);
 
     /// <summary>
-    /// An unavoidable charge the player cannot refuse (the nightly insurance
-    /// premium, the breakdown tow fee): it takes what the cash can cover and no
-    /// more (the ledger never goes negative). Returns the CR actually charged;
-    /// the caller logs a short wallet. Rounded like every other money move.
+    /// An unavoidable charge the player cannot refuse and Unity floors (the
+    /// nightly insurance premium, the breakdown tow fee): it takes what the cash
+    /// can cover and no more. Returns the CR actually charged; the caller logs a
+    /// short wallet. Rounded like every other money move.
     /// </summary>
     public double ChargeUnavoidable(double amount)
     {
@@ -166,9 +169,25 @@ public sealed class DriverWallet
         {
             return 0.0;
         }
-        double moved = Math.Round(Math.Min(amount, Cash), 2, MidpointRounding.AwayFromZero);
-        Cash = Math.Round(Cash - moved, 2, MidpointRounding.AwayFromZero);
+        // WHY the outer floor: a balance already in debt covers nothing, so the
+        // charge must not "pay itself" out of the negative and erase the debt.
+        double moved = Math.Round(Math.Max(0.0, Math.Min(amount, Cash)), 2, MidpointRounding.AwayFromZero);
+        ApplyCash(-moved);
         return moved;
+    }
+
+    /// <summary>
+    /// A charge the player cannot refuse even when the cash is short, the way
+    /// Unity's RepairScreen settles an accident: <c>cash -= cost</c> with no
+    /// floor, so the balance may go into debt. The repair is the only caller —
+    /// a voluntary purchase still goes through <see cref="TrySpend"/>.
+    /// </summary>
+    public void ChargeInFull(double amount)
+    {
+        if (amount > 0.0 && double.IsFinite(amount))
+        {
+            ApplyCash(-amount);
+        }
     }
 
     /// <summary>Unity RepairScreen's insurance payout: 90% of the repair cost
@@ -300,18 +319,16 @@ public sealed class DriverWallet
         StarOfTheShowWins = StarOfTheShowWins,
     };
 
-    // Every cash delta lands here: the ledger never goes negative. A fine that
-    // outruns the fare takes what the account holds instead of leaving the
-    // player in debt, the same rule ChargeUnavoidable applies to a tow fee —
-    // Unity's float ledger does go negative, this port keeps the balance every
-    // page shows honest.
+    // Every cash delta lands here: rounded to the cent, sign preserved. A debt
+    // is a real state (Unity's cash can sit below zero after an accident
+    // repair); only a voluntary purchase is gated, by TrySpend.
     private void ApplyCash(double delta)
     {
         if (!double.IsFinite(delta))
         {
             return;
         }
-        Cash = Math.Max(0.0, Math.Round(Cash + delta, 2, MidpointRounding.AwayFromZero));
+        Cash = Math.Round(Cash + delta, 2, MidpointRounding.AwayFromZero);
     }
 
     private void Earn(double amount)

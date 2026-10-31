@@ -907,24 +907,27 @@ public sealed class MainViewModel
     }
 
     // REPAIR THE CAR: the bill the mechanic would quote for the dents (the
-    // car's value times its outstanding body damage) is taken in full — cash
-    // never goes negative, like the tow fee — and an insured car claims the
-    // Unity share into the broker's escrow. The repair clears the dents and the
-    // main page comes back up.
+    // car's value times its outstanding body damage) is taken in full — the
+    // repair is not optional, so the cash may go into debt — and an insured car
+    // claims the Unity share into the broker's escrow. The repair clears the
+    // dents and the main page comes back up.
     private void RepairAfterAccident()
     {
         _accidentPrompt = null;
         _hud?.SetTaskPrompt(null);
         if (_garage.Current is { BodyDamage: > 0.0 } car)
         {
+            // The crash repair is unavoidable, so it may overdraw the cash
+            // (Unity's RepairScreen settles the same way); the insured share is
+            // Unity's 90 % of the bill, not of what the cash happened to hold.
             double bill = AccidentBill();
-            double paid = _wallet.ChargeUnavoidable(bill);
-            double claim = car.HasInsurance ? paid * InsuranceRules.RepairPayoutFraction : 0.0;
+            _wallet.ChargeInFull(bill);
+            double claim = car.HasInsurance ? bill * InsuranceRules.RepairPayoutFraction : 0.0;
             _wallet.AddInsurancePayout(claim);
             car.RepairBody();
             SaveGarage();
             SaveDriver(_rivals.LastResult);
-            _log.LogInfo($"[Accident] body repaired: bill {bill:0.00} CR, paid {paid:0.00} CR, " +
+            _log.LogInfo($"[Accident] body repaired: bill {bill:0.00} CR, " +
                 $"insurance {claim:0.00} CR, cash {_wallet.Cash:0.00}");
         }
 

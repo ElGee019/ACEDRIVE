@@ -105,7 +105,7 @@ public sealed class JobAccidentTests
     }
 
     [Fact]
-    public void RepairWithShortCash_TakesWhatThereIsAndStillRepairs()
+    public void RepairWithShortCash_LeavesTheDebtAndClaimsTheWholeBill()
     {
         var hud = new FakeTelemetryHud();
         var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
@@ -117,8 +117,11 @@ public sealed class JobAccidentTests
 
         hud.RaiseTaskAction();
 
-        Assert.Equal(0.0, wallet.Cash, 6);                 // the ledger never goes negative
-        Assert.Equal(900.0, wallet.PendingInsurance, 6);   // 90 % of what was paid
+        // The repair is not optional: the 20 000 CR bill leaves a 19 000 CR debt
+        // (Unity's RepairScreen subtracts regardless) and the claim is 90 % of
+        // the bill, not of what the cash happened to hold.
+        Assert.Equal(-19000.0, wallet.Cash, 6);
+        Assert.Equal(18000.0, wallet.PendingInsurance, 6);
         Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
     }
 
