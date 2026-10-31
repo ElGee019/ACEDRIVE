@@ -165,9 +165,12 @@ public sealed class FleetService
     /// because by the time the poll reads the damage the car has usually
     /// stopped. The repair share of the car's value is
     /// <see cref="AccidentRules.RepairFraction"/> (top speed impact = 100%),
-    /// banked on the driven car as outstanding body damage. Returns null when
-    /// nothing happened, on the second sample of a settling crash, and when
-    /// there is no owned car to bill (a borrowed free-roam car has no row).
+    /// banked on the driven car as outstanding body damage. Every crash of a
+    /// ride adds its share, but only the share the car could still take is
+    /// billed, so the accumulated repair stops at the car's own price.
+    /// Returns null when nothing happened, on the second sample of a settling
+    /// crash, and when there is no owned car to bill (a borrowed free-roam car
+    /// has no row).
     /// </summary>
     public AccidentDamage? ObserveAccident(TelemetrySample sample, DateTime now)
     {
@@ -197,8 +200,8 @@ public sealed class FleetService
             return null;
         }
 
-        car.AddBodyDamage(fraction);
-        double cost = AccidentRules.RepairCost(spec.Price, impact.ImpactSpeedKmh, spec.TopSpeedKmh);
+        double charged = car.AddBodyDamage(fraction);
+        double cost = AccidentRules.RepairCost(spec.Price, charged);
         _log.LogInfo(
             $"[Accident] {car.Key} hit at {impact.ImpactSpeedKmh:0} km/h " +
             $"({fraction * 100.0:0.0}% of {spec.TopSpeedKmh} km/h) — " +

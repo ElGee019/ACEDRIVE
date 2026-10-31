@@ -193,6 +193,20 @@ public sealed class MechanicScreenTests
     }
 
     [Fact]
+    public void AWrittenOffCar_BillsNoMoreThanItsOwnPrice()
+    {
+        var rig = New(cash: 100000.0, bodyDamage: 1.0);
+
+        Assert.Contains("100.0%", rig.Vm.BodyDamageLine);
+        Assert.Contains("CR40000.00", rig.Vm.BodyDamageLine); // the car's price, not more
+
+        rig.Vm.RepairBodyCommand.Execute(null);
+
+        Assert.Equal(60000.0, rig.Wallet.Cash, 6);
+        Assert.Equal(40000.0, Assert.Single(rig.Repairs).Cost, 6);
+    }
+
+    [Fact]
     public void ACleanCar_HidesTheBodyRepair()
     {
         var rig = New();

@@ -5,7 +5,8 @@ namespace AceDrive.Core.Tests;
 
 /// <summary>The poll's accident feed (FleetService.ObserveAccident): a jump in
 /// EVO's collision damage is billed to the driven car at its impact-speed share
-/// of the catalogue value, and a free-roam loaner has no row to bill.</summary>
+/// of the catalogue value, the crashes of one ride accumulate until the car is
+/// written off, and a free-roam loaner has no row to bill.</summary>
 public sealed class FleetAccidentTests
 {
     private static readonly DateTime T0 = new(2026, 10, 31, 12, 0, 0, DateTimeKind.Utc);
@@ -73,6 +74,32 @@ public sealed class FleetAccidentTests
         Assert.Equal(1.0, second.RepairFraction, 6);
         Assert.Equal(1.0, second.TotalDamageFraction, 6);
         Assert.Equal(1.0, rig.Garage.Current!.BodyDamage, 6);
+        // The car was already written off by the first crash, so this one adds
+        // nothing to the bill: the total can never pass the car's own price.
+        Assert.Equal(0.0, second.RepairCost, 6);
+    }
+
+    [Fact]
+    public void SeveralHitsInOneRide_AccumulateUntilTheBillEqualsTheCarPrice()
+    {
+        Rig rig = New();
+        rig.Fleet.ObserveAccident(Sample(120.0, 0.0), T0);
+
+        AccidentDamage first = rig.Fleet.ObserveAccident(
+            Sample(0.0, 10.0), T0.AddMilliseconds(100))!;
+        rig.Fleet.ObserveAccident(Sample(120.0, 10.0), T0.AddSeconds(2));
+        AccidentDamage second = rig.Fleet.ObserveAccident(
+            Sample(0.0, 20.0), T0.AddSeconds(2.1))!;
+        rig.Fleet.ObserveAccident(Sample(120.0, 20.0), T0.AddSeconds(4));
+        AccidentDamage third = rig.Fleet.ObserveAccident(
+            Sample(0.0, 30.0), T0.AddSeconds(4.1))!;
+
+        Assert.Equal(20000.0, first.RepairCost, 6);
+        Assert.Equal(20000.0, second.RepairCost, 6);
+        Assert.Equal(1.0, third.TotalDamageFraction, 6);
+        Assert.Equal(0.0, third.RepairCost, 6); // nothing left to bill
+        Assert.Equal(Car.Price, first.RepairCost + second.RepairCost + third.RepairCost, 6);
+        Assert.Equal(40000.0, Car.Price * rig.Garage.Current!.BodyDamage, 6);
     }
 
     [Fact]

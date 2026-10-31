@@ -96,17 +96,22 @@ public sealed class OwnedCar
     public double BodyDamage { get; private set; }
 
     /// <summary>
-    /// Banks one collision's share of the car's value. Non-finite and
-    /// non-positive input is ignored so a torn telemetry read cannot dent the
-    /// car; the total saturates at a write-off instead of growing past it.
+    /// Banks one collision's share of the car's value and returns the share it
+    /// actually added. Non-finite and non-positive input is ignored so a torn
+    /// telemetry read cannot dent the car. The total saturates at a write-off,
+    /// and that is also where the bill stops growing: the caller prices the
+    /// returned share, so the crashes of one ride accumulate while their repair
+    /// can never cost more than the car itself.
     /// </summary>
-    public void AddBodyDamage(double fraction)
+    public double AddBodyDamage(double fraction)
     {
         if (!double.IsFinite(fraction) || fraction <= 0.0)
         {
-            return;
+            return 0.0;
         }
-        BodyDamage = Math.Clamp(BodyDamage + fraction, 0.0, 1.0);
+        double before = BodyDamage;
+        BodyDamage = Math.Clamp(before + fraction, 0.0, 1.0);
+        return BodyDamage - before;
     }
 
     /// <summary>The mechanic's body repair: the dents are gone, the car is

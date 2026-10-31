@@ -28,14 +28,19 @@ public static class AccidentRules
         return Math.Clamp(impactSpeedKmh / topSpeedKmh, 0.0, 1.0);
     }
 
-    /// <summary>The CR a repair bills for one impact: the car's value times
-    /// <see cref="RepairFraction"/>.</summary>
-    public static double RepairCost(double carValue, double impactSpeedKmh, double topSpeedKmh)
+    /// <summary>
+    /// The CR a share of the car's value bills. The caller passes the share the
+    /// car actually took (<see cref="OwnedCar.AddBodyDamage"/> returns it, so a
+    /// car already written off is billed nothing more), and the clamp here is
+    /// the last line of defence: several crashes accumulate, but their repair
+    /// can never cost more than the car itself.
+    /// </summary>
+    public static double RepairCost(double carValue, double fraction)
     {
-        if (!double.IsFinite(carValue) || carValue <= 0.0)
+        if (!double.IsFinite(carValue) || carValue <= 0.0 || !double.IsFinite(fraction))
         {
             return 0.0;
         }
-        return carValue * RepairFraction(impactSpeedKmh, topSpeedKmh);
+        return carValue * Math.Clamp(fraction, 0.0, 1.0);
     }
 }
