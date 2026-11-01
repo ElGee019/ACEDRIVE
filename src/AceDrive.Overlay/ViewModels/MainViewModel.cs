@@ -171,10 +171,6 @@ public sealed class MainViewModel
     // taxi refusals use, long enough to read one sentence.
     private const double HaulNoticeSec = 4.0;
 
-    // Accident notice: the impact speed plus the repair estimate, long enough
-    // to read while the car is still rolling to a stop.
-    private const double AccidentNoticeSec = 6.0;
-
     private bool _resizing;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
@@ -184,6 +180,20 @@ public sealed class MainViewModel
     // action button's slot is shared, so the tap is answered for the flow that
     // put the prompt up instead of for whoever registered last.
     private HudTaskPrompt? _accidentPrompt;
+
+    // Whether the crash prompt on the slot ended a job (and so owes the player
+    // the main page back once repaired), or came from a crash in free roam,
+    // where the panel stays where the player left it.
+    private bool _accidentHandsBackMenu;
+
+    // Whether the garage still holds the car Grandma Sonja handed over: the
+    // broker's page then closes on the line that she insured that one, which is
+    // only true for her car. The garage's current car stands for the car being
+    // driven — the fleet warns on the HUD when it is not the one on the road.
+    private bool DrivesGrandmaCar =>
+        _story.Progress.GrandmaCarId is { Length: > 0 } grandma
+        && _garage.Current is { } car
+        && string.Equals(car.Key, grandma, StringComparison.Ordinal);
 
     // A job is live from ACCEPT (the drive to the pickup) until the drop-off
     // settles, or from DELIVER until the last store is served. The idle-shift
@@ -238,6 +248,10 @@ public sealed class MainViewModel
             // The HUD only knows it is parked at the pinned door; the job
             // phase decides whether that confirms the pickup or the drop-off.
             _hud.JobEnterRequested += (_, _) => OnJobEntered();
+            // The story door's tap lands here as well: the coordinator owns
+            // the job-vs-story split, so a live job's pickup/drop-off can
+            // never open the story door underneath it.
+            _hud.EnterRequested += (_, _) => EnterStoryDoor();
         }
         // The persistence collaborator, the fleet and the boot catch-up are
         // built by the root: the shell may not own a stateful service
@@ -465,7 +479,7 @@ public sealed class MainViewModel
         if (_pendingExpansion is { } report)
         {
             _pendingExpansion = null;
-            _nav.ShowZoneExpansion(report.Zone, report.Added, next);
+            _nav.ShowZoneExpansion(report.Zone, report.Added, next, DrivesGrandmaCar);
             return;
         }
 
@@ -605,7 +619,8 @@ public sealed class MainViewModel
     // this class).
     void IDayCycleHost.DisplayWeekChanged(int week) => _nav.DisplayWeekChanged(week);
     void IDayCycleHost.ReadoutsChanged() => RefreshJob();
-    void IDayCycleHost.ShowShiftEnded(object page) => _panel.PresentInterruption(page);
+    void IDayCycleHost.ShowShiftEnded(object page) =>
+        _panel.PresentInterruption(page, "shift ended");
     void IDayCycleHost.ResumeAfterShiftEnded() => _panel.ResumeInterrupted();
 
     // ---- lifecycle (called by the view) ----------------------------------
@@ -791,7 +806,13 @@ public sealed class MainViewModel
         // damage is one crash, priced off the speed the car carried into it.
         // Banking the garage immediately means a kill right after the hit
         // keeps the dent (the odometer's own save stays on its throttle).
-        if (_fleet.ObserveAccident(s, now) is { } accident)
+        // WHY the introduction gate: the first drives are grandma's errand and
+        // the guided tour, so a bump there must not bill a repair (or open the
+        // broker's page over a walk page). Detection starts once the community
+        // centre has handed the career over; skipping the call also leaves the
+        // detector unprimed, so the intro's own dents never surface as a crash
+        // on the first real tick.
+        if (!_story.IntroInProgress && _fleet.ObserveAccident(s, now) is { } accident)
         {
             SaveGarage();
             EndJobForAccident(accident);
@@ -844,45 +865,49 @@ public sealed class MainViewModel
 
     // A crash that lands while a job is live ends it (Unity's accident
     // arrival): the ride or the run is dropped without a receipt and its
-    // customer loses a friendship, and the companion offers the repair instead
-    // of the drive line. A crash outside a job keeps the plain notice — the
-    // mechanic's body repair is the way back from it.
+    // customer loses a friendship. Either way — and outside a job as well — the
+    // companion offers the repair with the bill the button takes, so a dent can
+    // always be settled from the driver's seat, not only at the mechanic.
     private void EndJobForAccident(AccidentDamage accident)
     {
+        string impact = accident.ImpactSpeedKmh.ToString("0", CultureInfo.CurrentCulture);
+        string bill = AccidentBill().ToString("0.00", CultureInfo.CurrentCulture);
+
         if (_taxi.FailForAccident() is { } customer)
         {
-            ShowAccidentRepair("HudAccidentRideLost", accident, customer);
+            ShowAccidentRepair("HudAccidentRideLost", [impact, customer, bill], handsBackMenu: true);
             return;
         }
 
         if (_delivery.FailForAccident())
         {
-            ShowAccidentRepair("HudAccidentCargoLost", accident, null);
+            ShowAccidentRepair("HudAccidentCargoLost", [impact, bill], handsBackMenu: true);
             return;
         }
 
-        _hud?.ShowNotice(
-            Strings.Format("AccidentNotice", accident.ImpactSpeedKmh, accident.RepairCost),
-            TimeSpan.FromSeconds(AccidentNoticeSec));
+        // No job to end: the crash only dented the car, so the same repair offer
+        // comes up without a lost friendship and without stealing the panel.
+        ShowAccidentRepair("HudAccidentSolo", [impact, bill], handsBackMenu: false);
     }
 
-    // The repair prompt: the crash sentence, who lost the friendship and the
-    // bill the button will take, plus the one button that pays it. The prompt is
-    // kept, not just handed over, so the button's tap is answered only while
-    // this prompt is still the one on the slot.
+    // The repair prompt: the crash sentence with the bill the button will take,
+    // plus the one button that pays it. The prompt is kept, not just handed
+    // over, so the button's tap is answered only while this prompt is still the
+    // one on the slot (a destination or a new leg takes the slot back).
     private void ShowAccidentRepair(
-        string textKey, AccidentDamage accident, string? customer)
+        string textKey, IReadOnlyList<string> args, bool handsBackMenu)
     {
-        var prompt = new HudTaskPrompt(
-            textKey,
-            [
-                accident.ImpactSpeedKmh.ToString("0", CultureInfo.CurrentCulture),
-                customer ?? string.Empty,
-                AccidentBill().ToString("0.00", CultureInfo.CurrentCulture),
-            ],
-            "HudAccidentRepair");
+        _accidentHandsBackMenu = handsBackMenu;
+        var prompt = new HudTaskPrompt(textKey, args, "HudAccidentRepair");
         _accidentPrompt = prompt;
         _hud?.SetTaskPrompt(prompt);
+        // WHY the summon: the companion steps aside while the main panel is up
+        // (its strip would cover page rows), and a free-roam crash can land on a
+        // page the player left open. The offer has to reach them anyway, so the
+        // companion is surfaced over that page like a destination just pinned;
+        // consuming the offer clears the slot and it steps aside again. A crash
+        // inside a job finds the panel down and this call is a no-op.
+        _hud?.ShowTaskText();
     }
 
     // The bill the mechanic would quote for the dents on the car driven now:
@@ -910,7 +935,7 @@ public sealed class MainViewModel
     // car's value times its outstanding body damage) is taken in full — the
     // repair is not optional, so the cash may go into debt — and an insured car
     // claims the Unity share into the broker's escrow. The repair clears the
-    // dents and the main page comes back up.
+    // dents, and a crash that ended a job hands the main page back.
     private void RepairAfterAccident()
     {
         _accidentPrompt = null;
@@ -931,10 +956,52 @@ public sealed class MainViewModel
                 $"insurance {claim:0.00} CR, cash {_wallet.Cash:0.00}");
         }
 
-        // The repair ends the interruption the way Unity's RepairScreen does:
-        // the main page comes back up, with the panel revealed (the HUD owned
-        // the screen while the job ran).
+        // The first repair is the moment the insurance broker opens: the bill
+        // just paid in full is the lesson its page explains, and the door has
+        // to exist before the page can name it (PoiWorld.OpenGrantedFirst). The
+        // page is an interruption, so it hands the player back what the crash
+        // took (the drive, or the page they had up) and a job-ending crash its
+        // menu; a later repair finds the door already there and takes the plain
+        // hand-back below.
+        if (_poiWorld.OpenGrantedFirst(PoiTypes.Insurance) is { } broker
+            && _nav.PoiIntroPage(broker.Type, LeaveBrokerIntro, DrivesGrandmaCar) is { } page)
+        {
+            _panel.PresentInterruption(page, "insurance broker");
+            return;
+        }
+
+        HandBackAfterRepair();
+    }
+
+    // The repair ends the interruption the way Unity's RepairScreen does: a
+    // crash that ended a job hands the panel back to the main page (the HUD
+    // owned the screen while the job ran). A free-roam crash was not an
+    // interruption, so the panel stays wherever the player left it.
+    private void HandBackAfterRepair()
+    {
+        if (!_accidentHandsBackMenu)
+        {
+            return;
+        }
+
+        _accidentHandsBackMenu = false;
         _panel.ShowMenu();
+    }
+
+    // The broker page's way out: a crash that ended a job still owes the main
+    // page back (the panel was down while the HUD owned the screen), while a
+    // free-roam crash resumes what the page took — the drive when the panel was
+    // hidden, or the page the player had up.
+    private void LeaveBrokerIntro()
+    {
+        if (_accidentHandsBackMenu)
+        {
+            _accidentHandsBackMenu = false;
+            _panel.ShowMenu();
+            return;
+        }
+
+        _panel.ResumeInterrupted();
     }
 
     // Copies the paint the readout formatter returned: a null member means the
@@ -1049,6 +1116,23 @@ public sealed class MainViewModel
     }
 
     // ---- job commands ------------------------------------------------------
+
+    // The story door's ENTER. A live job owns its pickup/drop-off door: the
+    // player stops there, they do not walk in, so a story tap is dropped
+    // rather than opening the interior that happens to share the address. The
+    // HUD already routes a parked tap to the job event while a leg is pinned
+    // (HudViewModel.RaiseEnter); this also covers a live job whose leg could
+    // not be pinned, where the old story destination is all the HUD has left.
+    private void EnterStoryDoor()
+    {
+        if (JobInProgress)
+        {
+            _log.LogInfo("enter ignored: a job is in progress");
+            return;
+        }
+
+        _story.EnterPoi();
+    }
 
     private void OnJobEntered()
     {

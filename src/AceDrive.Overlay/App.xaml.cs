@@ -21,12 +21,6 @@ public partial class App : Application, IDisposable
     private FirestoreValuationBoard? _valuationBoard;
     private bool _disposed;
 
-    // TEMPORARY (testing): keeps every calendar event playable on any day and
-    // hour and lets the one-shot events (the missing-person run, the market
-    // valuation) be replayed. Flip to false to restore the shipping gates; the
-    // flag and the three arguments it feeds are deleted once the playtest ends.
-    private const bool IgnoreEventGatesForTesting = true;
-
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -246,6 +240,11 @@ public partial class App : Application, IDisposable
         // game date its receipt last stamped, so a restart closes the row for
         // the rest of that Wednesday.
         var willyLedger = new WhereIsWillyLedger(savedDriver);
+        // The calendar's once-per-week stamps for the events that keep no ledger
+        // of their own (road test, Cento Miglia, Touristenfahrten): the game date
+        // each was last taken, so a restart inside the same week keeps those rows
+        // closed and the day-of-week gate keeps that day the week's only slot.
+        var weeklyEvents = new WeeklyEventLedger(savedDriver);
         var todoStore = new JsonTodoProgressStore(_log);
         // The open taxi shift resumes with its wall-clock stamps (PORTPLAN 12):
         // the 30-minute idle rule keeps running while the app and EVO are
@@ -432,7 +431,7 @@ public partial class App : Application, IDisposable
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
             garage, city, hunger, roadTests, shift, shifts, jobs, pins, visits,
-            valuation, willyLedger, deliveryCareer);
+            valuation, willyLedger, deliveryCareer, weeklyEvents);
         // The panel, its page and the activity stamp: view state with an owner
         // the view binds through the shell, not state the coordinator holds.
         var shell = new OverlayShell();
@@ -452,8 +451,7 @@ public partial class App : Application, IDisposable
         var willyFlow = new WhereIsWillyFlow(
             zone, game, poiGenerator, poiDirectory, residents, garage, cars,
             willyRules, willyLedger, friendships, trunk, driver, hud, saver,
-            rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log,
-            ignoreEventGates: IgnoreEventGatesForTesting);
+            rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log);
         // The road test (PORTPLAN 49): its own flow owns the drive to La Strada,
         // the 0-60 leg, the photo mission and the receipt page, so the
         // coordinator only forwards the calendar tap, the poll and the
@@ -473,8 +471,7 @@ public partial class App : Application, IDisposable
         var roadTestFlow = new RoadTestFlow(
             onboardingStore, game, wall, roadTests, hud, roadTestStandings,
             profileStore, roadTestSettlement, cars, addressMap, beat,
-            () => carBrands.CurrentIdentity, new Random(taxiSeed + 10), _log,
-            ignoreEventGates: IgnoreEventGatesForTesting);
+            () => carBrands.CurrentIdentity, new Random(taxiSeed + 10), _log);
         // The quest's marker handler joins the typed arrival list first, so a
         // Willy marker can never fall through to a business interior.
         IPoiArrivalHandler[] poiHandlers =
@@ -513,7 +510,7 @@ public partial class App : Application, IDisposable
         // attaches to the coordinator as its host inside the VM's constructor;
         // its arrival delegates only read the host when a door is entered.
         var poiWorld = new PoiWorld(
-            poiSpawner, poiDirectory, poiStore, deliveryBoard, deliveryCareer,
+            poiSpawner, poiDirectory, poiStore, addressMap, deliveryBoard, deliveryCareer,
             city, storeCatalog, zone, jobs, onboardingStore, shops, dayCycle, _log);
         // The trip-start breakdown roll (PORTPLAN 39): one seeded instance,
         // never the shared global (AGENTS.md), read by both job flows.
@@ -554,8 +551,7 @@ public partial class App : Application, IDisposable
         // stream, offset from the other launch draws.
         var valuationFlow = new ValuationFlow(
             zone, game, wall, valuation, valuationBoard, garage, cars, driver,
-            profileStore, hud, saver, rivals, beat, new Random(taxiSeed + 8), _log,
-            ignoreEventGates: IgnoreEventGatesForTesting);
+            profileStore, hud, saver, rivals, beat, new Random(taxiSeed + 8), _log);
         // The venue is a temporary door like the quest's markers: it joins the
         // typed list once its flow exists, so ENTER opens the showcase instead
         // of falling through to a business interior.
@@ -597,10 +593,10 @@ public partial class App : Application, IDisposable
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
             valuationFlow, willyFlow, willyLedger, roadTestFlow, touristen,
+            weeklyEvents,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
-            () => carBrands.Brand, new Random(taxiSeed + 6), _log,
-            ignoreEventGates: IgnoreEventGatesForTesting);
+            () => carBrands.Brand, new Random(taxiSeed + 6), _log);
         // The mic is built by the root and handed to both sides that need it:
         // the coordinator owns its session lifecycle, the story flow only gets
         // the two verbs the consent page's answer needs, and the panel hands it

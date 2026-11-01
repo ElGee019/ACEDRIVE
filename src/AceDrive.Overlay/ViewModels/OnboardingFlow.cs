@@ -146,10 +146,6 @@ public sealed class OnboardingFlow : IScreenController
         _introClosed = _progress.CommunityCentreDone;
         _profile = _profiles.Load();
         RestoreSavedPois();
-        if (_hud is not null)
-        {
-            _hud.EnterRequested += (_, _) => EnterPoi();
-        }
     }
 
     /// <summary>The persisted walk state (saved before the flow loaded it).</summary>
@@ -373,16 +369,20 @@ public sealed class OnboardingFlow : IScreenController
         if (!Content.Cars.Any(c => c.Id == carId)) return;
         _progress = _progress with { GrandmaCarId = carId };
         _onboarding.Save(_progress);
-        // Unity GrandmaCarScreen: the pick IS the first OwnedCar (odometer 0,
-        // no insurance) and the car driven from here on. Walking the
-        // introduction again keeps an owned car, but the pick still becomes
-        // current: the player just told us which car they drive.
+        // Unity GrandmaCarScreen: the pick IS the first OwnedCar (odometer 0)
+        // and the car driven from here on. Walking the introduction again keeps
+        // an owned car, but the pick still becomes current: the player just told
+        // us which car they drive.
+        // WHY insured: Grandma Sonja hands her car over covered, which is the
+        // courtesy the insurance broker's page promises ("she has insured this
+        // car for you already"); the first crash then pays the 90 % claim
+        // instead of the full bill. A car the player buys later is not insured.
         bool added = false;
         if (!_garage.Owns(carId))
         {
-            _garage.Add(carId, _displayWeek());
+            _garage.Add(carId, _displayWeek()).SetInsurance(insured: true);
             added = true;
-            _log.LogInfo($"grandma car: {carId} (first OwnedCar)");
+            _log.LogInfo($"grandma car: {carId} (first OwnedCar, insured)");
         }
         else
         {
@@ -619,14 +619,15 @@ public sealed class OnboardingFlow : IScreenController
         _log.LogInfo($"birthday errand: {poi.Name} at {AddressFormatter.Format(poi.Address)}");
     }
 
-    // The HUD's ENTER button fires only once the player is parked on the
-    // destination's house. Friends and grandma's house have no interior: the
-    // story arrivals own those taps (pickup, pancakes). Otherwise the typed
-    // router builds the shop interior (PORTPLAN 24); an unclaimed type keeps
-    // the log-only fallback so no POI is a dead end. A second ENTER while
-    // already inside is ignored. The interior's BACK is bound to this POI, so
-    // leaving it can only ever finish this errand.
-    private void EnterPoi()
+    // The shell's ENTER policy calls this once the player is parked on the
+    // destination's house: the coordinator owns the job-vs-story split, so a
+    // live job's pickup/dropoff is never routed here. Friends and grandma's
+    // house have no interior: the story arrivals own those taps (pickup,
+    // pancakes). Otherwise the typed router builds the shop interior (PORTPLAN
+    // 24); an unclaimed type keeps the log-only fallback so no POI is a dead
+    // end. A second ENTER while already inside is ignored. The interior's BACK
+    // is bound to this POI, so leaving it can only ever finish this errand.
+    public void EnterPoi()
     {
         // The HUD knows which door it is guiding to: a story leg pins one, and
         // the addresses page pins another through the same SetDestination, so

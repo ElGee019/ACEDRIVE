@@ -1,0 +1,44 @@
+<UserControl x:Class="AceDrive.Overlay.Views.SuggestCarModScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Car-mod suggestion page: same page skeleton as the wallet page —
+         centred body with the button band flush at the bottom. SUGGEST sits
+         directly above BACK and both stretch the full panel width; teal is
+         the shared voice-ack highlight. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <TextBlock Grid.Row="0" Text="{Binding Prompt}"
+                   Foreground="#FFF" FontSize="16" TextAlignment="Center"
+                   TextWrapping="Wrap" HorizontalAlignment="Center"
+                   VerticalAlignment="Center" Margin="16,0"/>
+        <StackPanel Grid.Row="1">
+            <Button Content="{loc:Loc Key=SuggestCarModSubmit}"
+                    Command="{Binding SuggestCommand}" Margin="0,0,0,6">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SuggestFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=SuggestCarModBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

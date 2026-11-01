@@ -88,8 +88,8 @@ public sealed class PoiWorldTests
             new PoiSpawner(
                 PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            doors, store, board, deliveryCareer, city, stores ?? StoreCatalog.Default,
-            zone, jobs, onboarding, shops, day, logger);
+            doors, store, map ?? AddressMap.Default, board, deliveryCareer, city,
+            stores ?? StoreCatalog.Default, zone, jobs, onboarding, shops, day, logger);
         var host = new FakePoiWorldHost();
         world.Attach(host);
         return new Fixture(world, host, doors, store, board, city, wallet, garage, cars);
@@ -235,6 +235,51 @@ public sealed class PoiWorldTests
         Assert.True(row.UnitCapacity > 0);
         Assert.Equal(row.UnitCapacity, fixture.City.Live(row).StockedUnits);
         Assert.Equal(1, fixture.Host.Refreshes);
+    }
+
+    [Fact]
+    public void OpenGrantedFirst_OpensOutsideTheZone_WhenTheZonesStreetsAreFull()
+    {
+        // A tiny zone whose houses are all taken can no longer draw inside
+        // itself: the earned broker falls back to the next street of the map, so
+        // the crash moment still has a place to send the player to.
+        AddressMap map = AddressMap.Default;
+        AddressStreet zoneStreet = map.Streets[0];
+        var directory = new PoiDirectory();
+        for (int number = 1; number <= HouseNumberPlan.Count(zoneStreet, map); number++)
+        {
+            directory.Add(new PointOfInterest(
+                $"story_{number}", $"Story Door {number}",
+                new AddressLocation(zoneStreet.Name, number, HouseNumberPlan.SideOf(number))));
+        }
+        var saved = DriverState.Fresh with { StreetIds = [OperatingZone.HomeStreetId] };
+        var fixture = Build(progress: Done, directory: directory, saved: saved, map: map);
+
+        PointOfInterest broker = Assert.IsType<PointOfInterest>(
+            fixture.World.OpenGrantedFirst(PoiTypes.Insurance));
+
+        Assert.Equal(map.Streets[1].Name, broker.Address.StreetName);
+        Assert.Contains(broker, fixture.Directory.All);
+        Assert.Contains(broker, fixture.Store.Saved);
+    }
+
+    [Fact]
+    public void OpenGrantedFirst_OpensTheInsuranceBrokerOnce_AndBanksIt()
+    {
+        // The first crash repair is what opens the broker: the world places the
+        // family's one granted door, banks it like any other, and answers null
+        // the second time so the moment stays a single event.
+        var fixture = Build(progress: Done);
+
+        PointOfInterest broker = Assert.IsType<PointOfInterest>(
+            fixture.World.OpenGrantedFirst(PoiTypes.Insurance));
+
+        Assert.Equal(PoiTypes.Insurance, broker.Type);
+        Assert.Contains(broker, fixture.Directory.All);
+        Assert.Contains(broker, fixture.Store.Saved);
+        Assert.Equal(1, fixture.Store.Saves);
+        Assert.Null(fixture.World.OpenGrantedFirst(PoiTypes.Insurance));
+        Assert.Single(fixture.Directory.All, poi => poi.Type == PoiTypes.Insurance);
     }
 
     [Fact]

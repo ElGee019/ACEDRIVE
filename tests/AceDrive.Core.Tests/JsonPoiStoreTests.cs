@@ -122,6 +122,10 @@ public sealed class JsonPoiStoreTests
         AssertStore(
             Assert.Single(table, poi => poi.Type == PoiTypes.CoffeeShop),
             "coffee_beans", 14);
+        // No pizzeria in the growth curve: the Saturday run's pickup shop is
+        // its own door (TouristenDoors), so a new career's first business is
+        // the car wash at 6 streets and never a pizzeria on the home street.
+        Assert.DoesNotContain(table, poi => poi.Type == PoiTypes.PizzaPlace);
     }
 
     [Fact]
@@ -163,7 +167,9 @@ public sealed class JsonPoiStoreTests
 
     private static void AssertInsurance(PoiDefinition poi)
     {
-        Assert.Equal(PoiPacing.Streets, poi.Spawn!.Pacing);
+        // The first broker is earned by the crash repair, not the street count;
+        // Unity's 13/57 numbers still space the ones after it.
+        Assert.Equal(PoiPacing.GrantedFirstThenStreets, poi.Spawn!.Pacing);
         Assert.Equal(13, poi.Spawn.FirstStreets);
         Assert.Equal(57, poi.Spawn.IntervalStreets);
     }

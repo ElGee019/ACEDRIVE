@@ -121,16 +121,17 @@ public sealed class PanelPresenter
 
     /// <summary>
     /// Reveals a page that interrupts the player without them having started
-    /// it (a shift that just ran out) and remembers the page and visibility it
-    /// takes away, so <see cref="ResumeInterrupted"/> can hand them back. The
-    /// capture happens before the swap, so it records the player's own screen,
-    /// never this page.
+    /// it (a shift that just ran out, the broker page a crash repair opens) and
+    /// remembers the page and visibility it takes away, so
+    /// <see cref="ResumeInterrupted"/> can hand them back. The capture happens
+    /// before the swap, so it records the player's own screen, never this page.
+    /// <paramref name="reason"/> names the interruption on the log line only.
     /// </summary>
-    public void PresentInterruption(object screen)
+    public void PresentInterruption(object screen, string reason)
     {
         _interruptedScreen = _shell.CurrentScreen;
         _interruptedShown = _shell.IsShown;
-        Reveal(screen, "overlay shown (shift ended)");
+        Reveal(screen, $"overlay shown ({reason})");
     }
 
     /// <summary>

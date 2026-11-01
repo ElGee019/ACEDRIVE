@@ -29,6 +29,52 @@ public sealed class PoiSpawnerTests
     }
 
     [Fact]
+    public void SpawnGrantedFirst_FallsBackToTheWholeMap_WhenTheZoneHasNoFreeHouse()
+    {
+        // The moment is the player's, not the map's: a zone whose streets are
+        // all taken must still open the broker on the map it was cut from, so a
+        // crash repair never promises a place that is not there.
+        AddressMap map = AddressMap.Default;
+        AddressStreet zoneStreet = map.Streets[0];
+        PoiDirectory directory = FullStreet(zoneStreet, map);
+        AddressMap zoneMap = map with { Streets = [zoneStreet] };
+
+        Assert.Null(Spawner().SpawnGrantedFirst(PoiTypes.Insurance, directory, zoneMap));
+
+        PointOfInterest broker = Assert.IsType<PointOfInterest>(
+            Spawner().SpawnGrantedFirst(PoiTypes.Insurance, directory, zoneMap, map));
+
+        Assert.Equal(PoiTypes.Insurance, broker.Type);
+        Assert.Equal(map.Streets[1].Name, broker.Address.StreetName);
+    }
+
+    [Fact]
+    public void SpawnGrantedFirst_StaysInTheZone_WhenItHasRoom()
+    {
+        // The fallback is a last resort: a free house in the zone always wins.
+        AddressMap map = AddressMap.Default;
+        AddressMap zoneMap = map with { Streets = [map.Streets[1]] };
+
+        PointOfInterest broker = Assert.IsType<PointOfInterest>(
+            Spawner().SpawnGrantedFirst(
+                PoiTypes.Insurance, new PoiDirectory(), zoneMap, map));
+
+        Assert.Equal(map.Streets[1].Name, broker.Address.StreetName);
+    }
+
+    private static PoiDirectory FullStreet(AddressStreet street, AddressMap map)
+    {
+        var directory = new PoiDirectory();
+        for (int number = 1; number <= HouseNumberPlan.Count(street, map); number++)
+        {
+            directory.Add(new PointOfInterest(
+                $"story_{number}", $"Story Door {number}",
+                new AddressLocation(street.Name, number, HouseNumberPlan.SideOf(number))));
+        }
+        return directory;
+    }
+
+    [Fact]
     public void Place_DrawsAUniqueFreeDoorForACareerHub()
     {
         var directory = new PoiDirectory();
@@ -75,17 +121,43 @@ public sealed class PoiSpawnerTests
     }
 
     [Fact]
-    public void StreetThresholds_OpenInsuranceAtThirteenAndBankAtFifteen()
+    public void StreetThresholds_OpenTheCarWashAndTheBank_ButNeverTheFirstBroker()
     {
+        // The insurance broker's first door is earned by the player's first
+        // crash repair, never by a street count: its family stays empty here
+        // even past Unity's 13-street threshold.
         Assert.Equal(
-            [PoiTypes.CarWash, PoiTypes.Insurance],
-            Spawner().Spawn(13, 0, new PoiDirectory(), AddressMap.Default)
-                .Select(poi => poi.Type));
-
-        Assert.Equal(
-            [PoiTypes.CarWash, PoiTypes.Insurance, PoiTypes.Bank],
+            [PoiTypes.CarWash, PoiTypes.Bank],
             Spawner().Spawn(15, 0, new PoiDirectory(), AddressMap.Default)
                 .Select(poi => poi.Type));
+    }
+
+    [Fact]
+    public void SpawnGrantedFirst_OpensTheInsuranceBrokerOnce_ThenTheStreetCurveAddsTheNext()
+    {
+        var directory = new PoiDirectory();
+
+        PointOfInterest broker = Assert.IsType<PointOfInterest>(
+            Spawner().SpawnGrantedFirst(PoiTypes.Insurance, directory, AddressMap.Default));
+
+        Assert.Equal(PoiTypes.Insurance, broker.Type);
+        Assert.Equal("insurance_0", broker.Id);
+        Assert.EndsWith("'s Insurance", broker.Name, StringComparison.Ordinal);
+        Assert.True(directory.Add(broker));
+
+        // The moment is once, and only the families whose first is earned can
+        // be opened this way.
+        Assert.Null(Spawner().SpawnGrantedFirst(PoiTypes.Insurance, directory, AddressMap.Default));
+        Assert.Null(Spawner().SpawnGrantedFirst(PoiTypes.CarWash, new PoiDirectory(), AddressMap.Default));
+
+        // The granted broker holds the 13-street slot: the next one is due one
+        // full interval later, exactly where the paced second door used to open.
+        Assert.DoesNotContain(
+            Spawner().Spawn(13, 0, directory, AddressMap.Default),
+            poi => poi.Type == PoiTypes.Insurance);
+        Assert.Single(
+            Spawner().Spawn(70, 0, directory, AddressMap.Default),
+            poi => poi.Type == PoiTypes.Insurance);
     }
 
     [Fact]
@@ -123,12 +195,17 @@ public sealed class PoiSpawnerTests
     [Fact]
     public void MultipleIntervals_CatchUpInOneCall()
     {
-        // 100 streets: carwash 3, insurance 2, bank 2, dealer 2, mechanic 3.
+        // 100 streets: carwash 3, insurance 1 more (the second door — the first
+        // came from the crash repair), bank 2, dealer 2, mechanic 3.
+        var directory = new PoiDirectory();
+        directory.Add(Assert.IsType<PointOfInterest>(Spawner().SpawnGrantedFirst(
+            PoiTypes.Insurance, directory, AddressMap.Default)));
+
         IReadOnlyList<PointOfInterest> grown =
-            Spawner().Spawn(100, 36, new PoiDirectory(), AddressMap.Default);
+            Spawner().Spawn(100, 36, directory, AddressMap.Default);
 
         Assert.Equal(3, grown.Count(poi => poi.Type == PoiTypes.CarWash));
-        Assert.Equal(2, grown.Count(poi => poi.Type == PoiTypes.Insurance));
+        Assert.Equal(1, grown.Count(poi => poi.Type == PoiTypes.Insurance));
         Assert.Equal(2, grown.Count(poi => poi.Type == PoiTypes.Bank));
         Assert.Equal(2, grown.Count(poi => poi.Type == PoiTypes.Dealer));
         Assert.Equal(3, grown.Count(poi => poi.Type == PoiTypes.Mechanic));
@@ -205,12 +282,12 @@ public sealed class PoiSpawnerTests
         PoiDirectory directory = StreetTwoFullExceptFirst();
 
         IReadOnlyList<PointOfInterest> grown = Spawner().Spawn(
-            13, 0, directory, AddressMap.Default, openedStreet: "Street 2");
+            13, 10, directory, AddressMap.Default, openedStreet: "Street 2");
 
         Assert.Equal(2, grown.Count);
         Assert.Equal(PoiTypes.CarWash, grown[0].Type);
         Assert.Equal(new AddressLocation("Street 2", 1, HouseSide.Right), grown[0].Address);
-        Assert.Equal(PoiTypes.Insurance, grown[1].Type);
+        Assert.Equal(PoiTypes.Dealer, grown[1].Type);
         Assert.Equal("Street 1", grown[1].Address.StreetName);
     }
 

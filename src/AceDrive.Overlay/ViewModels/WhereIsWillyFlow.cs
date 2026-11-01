@@ -71,8 +71,8 @@ public sealed class WhereIsWillyFlow
     private bool _dispatched;
 
     // TEMPORARY (testing): true skips the Wednesday-window and completed-stamp
-    // gates, so the run can start any time and be replayed after it paid. The
-    // app passes true; the tests keep the shipping reading.
+    // gates, so the run can start any time and be replayed after it paid. Only
+    // the tests set it; the app keeps the shipping gates.
     private readonly bool _ignoreEventGates;
 
     public WhereIsWillyFlow(

@@ -39,6 +39,31 @@ public sealed class JsonDriverStoreTests
     }
 
     [Fact]
+    public void SaveAndLoad_RoundTripsTheCalendarStamps()
+    {
+        // The once-per-week stamps ride the driver file as a map, so a restart
+        // inside the same week keeps the rows closed (WeeklyEventLedger).
+        string file = TempFile();
+        try
+        {
+            var store = new JsonDriverStore(file, new TestLog());
+            var ledger = new WeeklyEventLedger();
+            ledger.MarkTaken(
+                ControlCalendar.RoadTest, new DateTime(2026, 10, 13, 12, 0, 0, DateTimeKind.Utc));
+
+            store.Save(DriverState.Fresh with { WeeklyEventDates = ledger.Snapshot });
+            DriverState? loaded = store.Load();
+
+            Assert.NotNull(loaded);
+            Assert.True(
+                new WeeklyEventLedger(loaded).TakenOn(
+                    ControlCalendar.RoadTest,
+                    new DateTime(2026, 10, 13, 20, 0, 0, DateTimeKind.Utc)));
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
     public void Load_PreRatingSave_OpensOnUnitysNewGameProfile()
     {
         // A driver.json written before PORTPLAN 06 has no skill fields; the
@@ -90,6 +115,35 @@ public sealed class JsonDriverStoreTests
             Assert.Equal("groceries_grocers_and_sons", hub.Key);
             // The second delivery after the restart keeps the ramp moving.
             Assert.Equal(2, resumed.RegisterDelivery("groceries").CredPEarned);
+            Assert.Empty(log.Warnings);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void SaveAndLoad_KeepsACashDebt()
+    {
+        // The crash repair is a charge the player cannot refuse, so
+        // DriverWallet.ChargeInFull lets the cash overdraw. A save carrying that
+        // debt must survive the next launch: rejecting it reset cash, XP, the
+        // discovered streets and the delivery career right after the player had
+        // been billed for a crash.
+        string file = TempFile();
+        try
+        {
+            var log = new TestLog();
+            var store = new JsonDriverStore(file, log);
+            store.Save(DriverState.Fresh with
+            {
+                Cash = -563.37,
+                StreetIds = ["home", "s1", "s2"],
+            });
+
+            DriverState? loaded = store.Load();
+
+            Assert.NotNull(loaded);
+            Assert.Equal(-563.37, loaded.Cash, 2);
+            Assert.Equal(["home", "s1", "s2"], loaded.StreetIds);
             Assert.Empty(log.Warnings);
         }
         finally { File.Delete(file); }

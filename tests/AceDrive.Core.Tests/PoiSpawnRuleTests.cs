@@ -73,6 +73,26 @@ public sealed class PoiSpawnRuleTests
     }
 
     [Fact]
+    public void GrantedFirstThenStreets_WaitsForTheCareerEvent_ThenKeepsTheIntervals()
+    {
+        // Unity's insurance broker: the first crash repair opens the first door,
+        // and the street curve then adds the ones after it — counted from
+        // FirstStreets plus one interval, so the second door opens exactly where
+        // the paced second door used to (13 + 57).
+        var rule = new PoiSpawnRule(
+            PoiPacing.GrantedFirstThenStreets, FirstStreets: 13, IntervalStreets: 57);
+
+        Assert.Equal(0, rule.ExpectedCount(13, 0));
+        Assert.Equal(0, rule.ExpectedCount(69, 0));
+        Assert.Equal(0, rule.ExpectedCount(1000, 0));
+
+        Assert.Equal(1, rule.ExpectedCount(13, 0, firstGranted: true));
+        Assert.Equal(1, rule.ExpectedCount(69, 0, firstGranted: true));
+        Assert.Equal(2, rule.ExpectedCount(70, 0, firstGranted: true));
+        Assert.Equal(3, rule.ExpectedCount(127, 0, firstGranted: true));
+    }
+
+    [Fact]
     public void NegativeCounters_AnswerZero()
     {
         var rule = new PoiSpawnRule(

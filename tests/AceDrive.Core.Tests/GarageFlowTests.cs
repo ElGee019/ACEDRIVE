@@ -91,6 +91,9 @@ public sealed class GarageFlowTests
         Assert.True(garage.Owns(Mx5.Key));
         Assert.Equal(Mx5.Key, garage.CurrentKey);
         Assert.Equal(1, store.Saves);
+        // Grandma hands her car over insured: the broker's page promises it, and
+        // the walk's first crash must pay the claim, not the whole bill.
+        Assert.True(garage.Current!.HasInsurance);
 
         // Walking the introduction again keeps the car that already exists.
         session.Story.ChooseCar(Mx5.Key);
@@ -117,6 +120,8 @@ public sealed class GarageFlowTests
         Assert.Equal(2, garage.Cars.Count);
         Assert.Equal(1, store.Saves);
         Assert.Equal(Mx5.Key, store.Load()!.CurrentKey);
+        // The re-walked pick joins the garage covered, like the first walk.
+        Assert.True(garage.Current!.HasInsurance);
     }
 
     [Fact]

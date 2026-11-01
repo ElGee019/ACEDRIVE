@@ -124,6 +124,8 @@ public sealed class InsuranceFlowTests
 
         var insurance = MainViewModelTests.OpenPoi<InsuranceScreenViewModel>(
             vm, hud, "Insurance Broker");
+        // The broker opens on its landing page: MANAGE shows the cover rows.
+        insurance.ManageCommand.Execute(null);
         insurance.ToggleCommand.Execute(insurance.Rows.Single(r => r.Key == PricedCar.Key));
 
         Assert.True(garage.Current!.HasInsurance);

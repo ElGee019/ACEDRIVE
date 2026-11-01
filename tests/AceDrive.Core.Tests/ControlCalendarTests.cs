@@ -36,6 +36,28 @@ public sealed class ControlCalendarTests
         // the Saturday button (TouristenfahrtenFlow).
         Assert.Equal(7, ControlCalendar.Week[5].DayOfWeek);
         Assert.Equal(ControlCalendar.Touristenfahrten, ControlCalendar.Week[5].EventId);
+        Assert.Equal(2, ControlCalendar.Week[5].OpensFromWeek);
+    }
+
+    [Fact]
+    public void IsOpenInWeek_TouristenfahrtenWaitsForItsSecondWeek()
+    {
+        // The run's row is not part of the first week's strip: the career's
+        // first Saturday has to be behind the player. Every other row opens at
+        // once, and a weekday with no row has nothing to gate.
+        Assert.False(ControlCalendar.IsOpenInWeek(7, 1));
+        Assert.True(ControlCalendar.IsOpenInWeek(7, 2));
+        Assert.True(ControlCalendar.IsOpenInWeek(7, 9));
+
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.DayOfWeek != 7)
+            {
+                Assert.True(ControlCalendar.IsOpenInWeek(day.DayOfWeek, 1));
+            }
+        }
+
+        Assert.True(ControlCalendar.IsOpenInWeek(5, 1)); // Thursday: no row
     }
 
     [Fact]

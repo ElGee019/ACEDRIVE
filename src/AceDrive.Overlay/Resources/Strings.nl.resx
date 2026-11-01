@@ -376,7 +376,8 @@ Deze klus aannemen?</value></data>
   <data name="PoiIntroCarWashTitle" xml:space="preserve"><value>Carwashes</value></data>
   <data name="PoiIntroCarWashBody" xml:space="preserve"><value>Klanten en vracht vervoeren maakt je auto vies. Houd hem schoon, want een vuile auto kan tot geweigerde ritten leiden. Sommige goederen verzamelen sneller vuil dan andere.&#10;&#10;Bezoek een Carwash om het vuil weg te spoelen.</value></data>
   <data name="PoiIntroInsuranceTitle" xml:space="preserve"><value>Verzekeringsmakelaars</value></data>
-  <data name="PoiIntroInsuranceBody" xml:space="preserve"><value>Een crash is duur. Bescherm jezelf met een verzekering. Bij een ongeluk betaal je de volledige reparatiekosten vooraf.&#10;Bezoek de Verzekeringsmakelaar om je vergoeding te innen.</value></data>
+  <data name="PoiIntroInsuranceBody" xml:space="preserve"><value>Een crash is duur. Bescherm jezelf met een verzekering.&#10;&#10;Bezoek de Verzekeringsmakelaar op de kaart om de verzekering per auto te beheren of je vergoeding te innen.&#10;&#10;Bij een ongeluk betaal je de volledige reparatiekosten vooraf en kun je het grootste deel van die kosten terugkrijgen als je verzekerd bent.</value></data>
+  <data name="PoiIntroInsuranceGrandma" xml:space="preserve"><value>Gelukkig heeft oma Sonja deze auto al voor je verzekerd.</value></data>
   <data name="PoiIntroBankTitle" xml:space="preserve"><value>Banken</value></data>
   <data name="PoiIntroBankBody" xml:space="preserve"><value>Oma Sonja heeft 1.000 CR naar je bankrekening overgemaakt. Je rente stijgt op basis van het aantal opeenvolgende dagen dat je ACEDrive speelt en de grootte van je werkgebied.&#10;&#10;Je kunt je geld op elk moment opnemen door de Bank te bezoeken.</value></data>
   <data name="PoiIntroDealerTitle" xml:space="preserve"><value>Autodealers</value></data>
@@ -387,7 +388,11 @@ Deze klus aannemen?</value></data>
   <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
   <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
   <data name="HomeAddresses" xml:space="preserve"><value>ADRESSEN</value></data>
+  <data name="HomeSuggestCarMod" xml:space="preserve"><value>STEL EEN CARMOD VOOR</value></data>
   <data name="HomeBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="SuggestCarModPrompt" xml:space="preserve"><value>Ken of heb je een goede carmod die je graag aan de gameplay zou willen toevoegen?</value></data>
+  <data name="SuggestCarModBack" xml:space="preserve"><value>TERUG</value></data>
+  <data name="SuggestCarModSubmit" xml:space="preserve"><value>VOORSTELLEN</value></data>
   <!-- Adressenpagina (PORTPLAN 24/27 + TOZONES §3.5): eerst de weergave van
        het werkgebied — aantal straten met de oppervlakte, de klussen tot de
        volgende uitbreiding (of de compleetregel als de stratenpool op is) en
@@ -527,7 +532,6 @@ Deze klus aannemen?</value></data>
   <data name="MechanicNewEngine" xml:space="preserve"><value>NIEUWE MOTOR KOPEN</value></data>
   <data name="MechanicBodyDamage" xml:space="preserve"><value>Carrosserieschade: {0:0.0}% — reparatie CR{1:0.00}</value></data>
   <data name="MechanicRepairBody" xml:space="preserve"><value>CARROSSERIE REPAREREN</value></data>
-  <data name="AccidentNotice" xml:space="preserve"><value>Ongeluk! Impact bij {0:0} km/u — geschatte reparatie CR{1:0.00}.</value></data>
   <data name="MechanicPartOilChange" xml:space="preserve"><value>Olie-efficiëntie</value></data>
   <data name="MechanicPartWipers" xml:space="preserve"><value>Ruitenwissers</value></data>
   <data name="MechanicPartAirFilter" xml:space="preserve"><value>Luchtfilter</value></data>
@@ -537,16 +541,20 @@ Deze klus aannemen?</value></data>
   <data name="MechanicPartTransmissionFluid" xml:space="preserve"><value>Transmissievloeistof</value></data>
   <data name="MechanicPartCarBattery" xml:space="preserve"><value>Autobatterij</value></data>
   <!-- Verzekeringsmakelaar (PORTPLAN item 34, Unity InsuranceScreen): de
-       schakelaar per auto, de dagprijsregels, het totaal en het blok om de
-       dekking te innen. -->
+       landingspagina met BEHEREN en INNEN, de dekking per auto met de dagprijs
+       van de gekozen auto, en het blok om de dekking te innen. -->
   <data name="InsuranceTitle" xml:space="preserve"><value>VERZEKERING</value></data>
-  <data name="InsuranceCash" xml:space="preserve"><value>Huidig saldo: CR{0:0.00}</value></data>
   <data name="InsuranceEmpty" xml:space="preserve"><value>Nog geen auto's om te verzekeren.</value></data>
-  <data name="InsuranceDaily" xml:space="preserve"><value>Dagprijs: CR{0:0.00}/dag</value></data>
-  <data name="InsuranceNotCovered" xml:space="preserve"><value>Niet verzekerd</value></data>
-  <data name="InsuranceTotal" xml:space="preserve"><value>Totale dagprijs: CR{0:0.00}/dag</value></data>
-  <data name="InsurancePending" xml:space="preserve"><value>Te innen verzekering: CR{0:0.00}</value></data>
+  <data name="InsuranceManage" xml:space="preserve"><value>BEHEREN</value></data>
   <data name="InsuranceCollect" xml:space="preserve"><value>INNEN</value></data>
+  <data name="InsuranceCollectIt" xml:space="preserve"><value>INNEN</value></data>
+  <data name="InsuranceCarValue" xml:space="preserve"><value>Nieuwprijs auto: CR{0:0.00}</value></data>
+  <data name="InsuranceDailyCar" xml:space="preserve"><value>Dagprijs voor deze auto: CR{0:0.00}/dag</value></data>
+  <data name="InsuranceDailyDiscount" xml:space="preserve"><value> (CR{0:0.00} − {1:0}% rijdersbeoordeling)</value></data>
+  <data name="InsuranceTotal" xml:space="preserve"><value>Totale dagprijs: CR{0:0.00}/dag</value></data>
+  <data name="InsuranceCollectRepair" xml:space="preserve"><value>Totale reparatiekosten: CR{0:0.00}</value></data>
+  <data name="InsuranceCollectPay" xml:space="preserve"><value>Wat de verzekering je uitkeert: CR{0:0.00}</value></data>
+  <data name="InsuranceCollectCash" xml:space="preserve"><value>Je saldo na overboeking: CR{0:0.00}</value></data>
   <data name="InsuranceAdd" xml:space="preserve"><value>TOEVOEGEN</value></data>
   <data name="InsuranceRemove" xml:space="preserve"><value>VERWIJDEREN</value></data>
   <!-- Pechsessie (PORTPLAN 39, Unity BreakdownPopup + BreakdownFlow): het
@@ -656,9 +664,8 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
 
   <!-- Wekelijkse vermiste-persoonrit (ToWhereIsWilly.md §3.5). -->
   <data name="EventWillyCompleted" xml:space="preserve"><value>Waar is Willy (Voltooid)</value></data>
-  <data name="EventWillyLocked" xml:space="preserve"><value>ONTGRENDEL EERST DE KOFFIEBONEN-CARRIÈRE</value></data>
   <data name="ControlGateWillyDone" xml:space="preserve"><value>TOT VOLGENDE WOENSDAG</value></data>
-  <data name="ControlGateWillyLocked" xml:space="preserve"><value>ONTGRENDEL EERST DE KOFFIEBONEN-CARRIÈRE</value></data>
+  <data name="ControlGateWillyCareer" xml:space="preserve"><value>START EERST EEN KOFFIEBONEN-BEZORGCARRIÈRE</value></data>
 
   <!-- De speurpagina (de kaartvervanger): titel, de twee Unity-taken, de hint
        na een misse winkel en het ene werkwoord. -->
@@ -674,7 +681,8 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="HudWillyFound" xml:space="preserve"><value>Gelukkig maar, alles goed en wel! Vermiste gevonden. Breng {0} nu naar huis.</value></data>
   <data name="HudDrive" xml:space="preserve"><value>RIJDEN</value></data>
   <data name="HudAccidentRideLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de rit is voorbij. 1 vriendschap verloren met {1}. Repareer de auto om verder te kunnen. Reparatiekosten: CR{2}.</value></data>
-  <data name="HudAccidentCargoLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de lading is verloren. 1 vriendschap verloren met de hubeigenaar. Repareer de auto om verder te kunnen. Reparatiekosten: CR{2}.</value></data>
+  <data name="HudAccidentCargoLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de lading is verloren. 1 vriendschap verloren met de hubeigenaar. Repareer de auto om verder te kunnen. Reparatiekosten: CR{1}.</value></data>
+  <data name="HudAccidentSolo" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — repareer de auto om verder te kunnen. Reparatiekosten: CR{1}.</value></data>
   <data name="HudAccidentRepair" xml:space="preserve"><value>REPAREER DE AUTO</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Breng {0} naar huis, naar {1} nr. {2} in {3}</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>AFZETTEN</value></data>

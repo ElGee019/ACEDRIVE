@@ -114,14 +114,16 @@ public sealed class ShopInteriors
             });
 
     // Insurance broker (PORTPLAN 34, Unity InsuranceScreen): a fresh page per
-    // visit, so the cover flags and the escrow are live. A toggle and a
+    // visit, so the cover flags and the escrow are live. The broker's own name
+    // heads the page (Unity _textStore reads the POI row). A toggle and a
     // collection are banked here (the garage for the flag, the driver through
     // onChanged for the cash + escrow) and logged.
-    public InsuranceScreenViewModel Insurance(ICommand back, Action onChanged)
+    public InsuranceScreenViewModel Insurance(
+        string storeName, ICommand back, Action onChanged)
     {
         _visits.MarkInsuranceBroker();
         return new InsuranceScreenViewModel(
-            _garage, _wallet, _insurance, _wallet.Rating.Overall, _beat, back,
+            _garage, _wallet, _insurance, _wallet.Rating.Overall, storeName, _beat, back,
             (key, insured) =>
             {
                 _saver.SaveGarage();

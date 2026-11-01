@@ -23,6 +23,9 @@ public sealed class PoiWorld
     private readonly PoiSpawner _growth;
     private readonly PoiDirectory _directory;
     private readonly IPoiDirectoryStore _store;
+    // The whole address map: the granted door's fallback when the zone's own
+    // streets have no free house left (see OpenGrantedFirst).
+    private readonly AddressMap _map;
     private readonly DeliveryBoard _board;
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
@@ -41,13 +44,14 @@ public sealed class PoiWorld
 
     public PoiWorld(
         PoiSpawner growth, PoiDirectory directory, IPoiDirectoryStore store,
-        DeliveryBoard board, DeliveryCareer career, CityEconomy city,
+        AddressMap map, DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         StoreCatalog stores, OperatingZone zone, JobLedger jobs,
         IOnboardingStore onboarding, ShopInteriors shops, DayCycle day, ILog log)
     {
         _growth = growth;
         _directory = directory;
         _store = store;
+        _map = map;
         _board = board;
         _career = career;
         _city = city;
@@ -129,6 +133,67 @@ public sealed class PoiWorld
     }
 
     /// <summary>
+    /// Opens the first door of a family whose curve leaves it to a career event
+    /// (<see cref="PoiPacing.GrantedFirstThenStreets"/>) instead of a street
+    /// count: the insurance broker, which the player earns by paying the bill
+    /// of their first crash repair. The moment is once — a family that already
+    /// has a door, a street-paced family, or a map with nothing free left
+    /// answers null, so a second repair never opens another broker and the
+    /// street growth never opens the first. The zone's own streets are drawn
+    /// first; only when they are full does the door fall back to the whole map.
+    /// Cold path (the repair click, never the poll).
+    /// </summary>
+    public PointOfInterest? OpenGrantedFirst(string type)
+    {
+        PointOfInterest? door = _growth.SpawnGrantedFirst(
+            type, _directory, _zone.ZoneMap, _map);
+        if (door is null)
+        {
+            // A family that already has its door is the normal repeat. One with
+            // no door that could not draw at all is a map with nothing free
+            // left: the earned moment must not disappear without a trace.
+            if (!HasDoorOfType(type))
+            {
+                _log.LogWarning(
+                    $"[Poi] {type}: the earned door has no free house on any street");
+            }
+            return null;
+        }
+
+        if (!_directory.Add(door))
+        {
+            _log.LogWarning($"[Poi] {type}: the earned door could not be banked");
+            return null;
+        }
+
+        if (AddressBook.StreetByName(_zone.ZoneMap, door.Address.StreetName) is null)
+        {
+            // The zone's streets were full, so the draw fell back to the whole
+            // map: an address the player has not discovered yet, but the place
+            // they were just told to visit is better than a silent dead end.
+            _log.LogInfo($"[Poi] {door.Name} opened outside the operating zone " +
+                $"({door.Address.StreetName} has no zone street left)");
+        }
+
+        _store.Save(_directory.All);
+        _log.LogInfo($"[Poi] opened {door.Name} at " +
+            AddressFormatter.Format(door.Address));
+        return door;
+    }
+
+    private bool HasDoorOfType(string type)
+    {
+        foreach (PointOfInterest poi in _directory.All)
+        {
+            if (string.Equals(poi.Type, type, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// Adds every known shop POI to the delivery board and the town, once.
     /// This is what makes the board list real stores instead of printed
     /// placeholder rows: Max's grocery plus the stores each owned hub has
@@ -185,7 +250,7 @@ public sealed class PoiWorld
         handlers.Add(new DelegatePoiHandler(
             PoiTypes.Mechanic, (_, back, changed) => _shops.Mechanic(back, changed)));
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Insurance, (_, back, changed) => _shops.Insurance(back, changed)));
+            PoiTypes.Insurance, (poi, back, changed) => _shops.Insurance(poi.Name, back, changed)));
         return handlers;
     }
 

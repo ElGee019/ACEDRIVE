@@ -1667,6 +1667,31 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void TapSaturday_InTheFirstWeek_LeavesTheRunForItsSecondWeek()
+    {
+        // The run's button is not part of the first week's strip: the career's
+        // first Saturday has to be behind the player, so the row paints only
+        // its day name and the tap opens nothing.
+        var log = new TestLog();
+        var session = Create(
+            speedKmh: 0f, log: log, progress: FinishedTour(),
+            gameStart: new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc));
+        var (vm, _, _, _) = session;
+        CalendarScreenViewModel calendar = ShowCalendar(vm);
+
+        Assert.Equal(
+            string.Empty,
+            Assert.Single(calendar.Days, d => d.DayOfWeek == 7).EventLabel);
+
+        calendar.DayCommand.Execute(7);
+
+        Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
+        Assert.DoesNotContain(
+            log.Infos,
+            line => line.StartsWith("touristenfahrten briefing open", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void TapSaturday_OpensTheBriefing_ThenRunsTheTouristenfahrtenDeliveries()
     {
         // Saturday is the run's own row: the tap explains the run first (the
@@ -1680,7 +1705,7 @@ public sealed class MainViewModelTests
         var wallet = new DriverWallet(new DriverState(0.0, 0.0));
         var session = Create(
             speedKmh: 0f, log: log, hud: hud, wallet: wallet,
-            progress: FinishedTour(),
+            progress: FinishedTour(), startWeek: 2,
             gameStart: new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc));
         var (vm, _, _, _) = session;
         CalendarScreenViewModel calendar = ShowCalendar(vm);
@@ -1763,6 +1788,7 @@ public sealed class MainViewModelTests
         var hud = new FakeTelemetryHud();
         TestSessionResult session = Create(
             speedKmh: 0f, hud: hud, wallet: wallet, progress: FinishedTour(),
+            startWeek: 2,
             gameStart: new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc),
             deliveryFares: new DeliveryFareTable([new FareTier(0.0, 0.0)]),
             touristenWeekends: weekends);
@@ -2414,6 +2440,61 @@ public sealed class MainViewModelTests
         Assert.Contains(
             log.Infos,
             line => line.Contains($"entered {expected.Name}", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void EnterRequested_DuringATaxiJob_DoesNotOpenAnInterior()
+    {
+        // A door a live job uses as its pickup/drop-off is a job point: the
+        // player stops there, they do not walk in. The story tap is dropped
+        // even when the same address is a discovered POI.
+        var hud = new FakeTelemetryHud();
+        var progress = FinishedTour() with { MaxDeliveryIntroSeen = true };
+        var (vm, _, _, _) = Create(progress: progress, hud: hud, speedKmh: 0f);
+        var store = new PointOfInterest(
+            "test-store", "Test Store",
+            new AddressLocation(
+                AddressMap.Default.Streets[0].Name, 1, HouseSide.Left),
+            PoiTypes.Grocery);
+        hud.SetDestination(store);
+
+        TaxiFlow.Propose(vm); // ACCEPT: the job is live, the panel hides
+        hud.SetDestination(store); // the story door stays pinned underneath
+        hud.RaiseEnter();
+
+        // Nothing entered: the job page is untouched, the panel stays down
+        // and the companion keeps its task text for the job.
+        Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
+        Assert.False(vm.IsShown);
+        Assert.Equal(0, hud.DestinationEnteredCalls);
+    }
+
+    [Fact]
+    public void EnterRequested_AfterTheTaxiJob_OpensTheStoryInterior()
+    {
+        // The same door is an ordinary POI again once no job is live.
+        var hud = new FakeTelemetryHud();
+        var progress = FinishedTour() with { MaxDeliveryIntroSeen = true };
+        var (vm, clock, tel, _) = Create(progress: progress, hud: hud, speedKmh: 0f);
+        var store = new PointOfInterest(
+            "test-store", "Test Store",
+            new AddressLocation(
+                AddressMap.Default.Streets[0].Name, 1, HouseSide.Left),
+            PoiTypes.Grocery);
+        hud.SetDestination(store);
+
+        TaxiFlow.Propose(vm);
+        vm.PickupCommand.Execute(null);
+        TaxiFlow.AnswerRequest(vm);
+        TaxiFlow.Drive(vm, clock, tel);
+        vm.DropoffCommand.Execute(null);
+        Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen)
+            .ContinueCommand.Execute(null);
+
+        hud.RaiseEnter();
+
+        Assert.IsType<StoreScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal(1, hud.DestinationEnteredCalls);
     }
 
     [Fact]

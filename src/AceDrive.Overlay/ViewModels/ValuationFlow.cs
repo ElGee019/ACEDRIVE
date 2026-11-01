@@ -76,8 +76,8 @@ public sealed class ValuationFlow
     private ValuationEntry? _houseEntry;
 
     // TEMPORARY (testing): true skips the Monday-window and one-entry-a-week
-    // gates, so the showcase can be driven and entered again at any time. The
-    // app passes true; the tests keep the shipping reading.
+    // gates, so the showcase can be driven and entered again at any time. Only
+    // the tests set it; the app keeps the shipping gates.
     private readonly bool _ignoreEventGates;
 
     public ValuationFlow(

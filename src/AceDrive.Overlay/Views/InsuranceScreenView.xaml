@@ -3,47 +3,65 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <UserControl.Resources>
-        <!-- Insured car row: teal edge, the shared activation tell. -->
-        <Style x:Key="InsuranceRowBorder" TargetType="Border">
+        <!-- The selected car's name is teal, Unity's one tell for which row the
+             detail block below describes. -->
+        <Style x:Key="InsuranceCarName" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFF"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding IsInsured}" Value="True">
-                    <Setter Property="BorderBrush" Value="#FF97EAD2"/>
+                <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                    <Setter Property="Foreground" Value="#FF97EAD2"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
     </UserControl.Resources>
-    <!-- Insurance broker page (PORTPLAN 34, Unity InsuranceScreen): every owned
-         car with its daily premium and ADD/REMOVE toggle, the combined daily
-         cost, and the collect block for the escrow a covered repair paid into. -->
+    <!-- Insurance broker page (PORTPLAN 34, Unity InsuranceScreen): the broker's
+         landing page with MANAGE and COLLECT, the per-car cover list behind
+         MANAGE (rows, the selected car's price and premium, the garage total)
+         and the escrow behind COLLECT (the repair bill, the payout and the cash
+         after). Unity swaps the three blocks on the same screen, so BACK closes
+         the open block before it leaves the shop. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20" Text="{loc:Loc Key=InsuranceTitle}"/>
-        <StackPanel Grid.Row="1" VerticalAlignment="Center">
-            <TextBlock Text="{Binding CashLine}" Foreground="#FFF" FontSize="14"
-                       TextAlignment="Center" Margin="0,0,0,6"/>
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding StoreLine}"/>
+
+        <!-- Landing: the two verbs the broker offers. -->
+        <StackPanel Grid.Row="1" VerticalAlignment="Center"
+                    Visibility="{Binding IsLandingView, Converter={StaticResource BoolToVis}}">
+            <Button Content="{loc:Loc Key=InsuranceManage}" Command="{Binding ManageCommand}"
+                    Margin="0,0,0,6"/>
+            <Button Content="{loc:Loc Key=InsuranceCollect}" Command="{Binding OpenCollectCommand}"/>
+        </StackPanel>
+
+        <!-- Manage: one row per owned car (tap the name to select it, the verb
+             covers or uncovers it), then the selected car and the garage total. -->
+        <StackPanel Grid.Row="1" VerticalAlignment="Center"
+                    Visibility="{Binding IsManageView, Converter={StaticResource BoolToVis}}">
             <TextBlock Text="{Binding EmptyLine}" Foreground="#FFBFC4C9" FontSize="14"
                        TextAlignment="Center" Margin="0,0,0,6"
                        Visibility="{Binding IsEmpty, Converter={StaticResource BoolToVis}}"/>
             <ItemsControl ItemsSource="{Binding Rows}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Margin="0,2" Padding="6,4" BorderThickness="1" BorderBrush="Transparent"
-                                Style="{StaticResource InsuranceRowBorder}">
+                        <Border Margin="0,2" Padding="6,4" BorderThickness="1" BorderBrush="Transparent">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Title}" Foreground="#FFF" FontSize="13" FontWeight="Bold"/>
-                                    <TextBlock Text="{Binding DailyLine}" Foreground="#FFBFC4C9" FontSize="11"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Content="{Binding ToggleLabel}" FontSize="11" Padding="8,2"
-                                        VerticalAlignment="Center"
+                                <Button Grid.Column="0" HorizontalContentAlignment="Left"
+                                        Background="Transparent" BorderThickness="0" Padding="0"
+                                        Command="{Binding DataContext.SelectCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding}">
+                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Bold"
+                                               Style="{StaticResource InsuranceCarName}"/>
+                                </Button>
+                                <Button Grid.Column="1" Content="{Binding ToggleLabel}" FontSize="11"
+                                        Padding="8,2" VerticalAlignment="Center"
                                         Command="{Binding DataContext.ToggleCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                         CommandParameter="{Binding}"/>
                             </Grid>
@@ -51,16 +69,31 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <TextBlock Text="{Binding ValueCarLine}" Foreground="#FFF" FontSize="13"
+                       TextAlignment="Center" Margin="0,8,0,0"/>
+            <TextBlock Text="{Binding DailyCostLine}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,0"/>
             <TextBlock Text="{Binding TotalLine}" Foreground="#FFF" FontSize="13" FontWeight="Bold"
                        TextAlignment="Center" Margin="0,8,0,0"/>
-            <TextBlock Text="{Binding PendingLine}" Foreground="#FF97EAD2" FontSize="13"
-                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"
-                       Visibility="{Binding PendingVisible, Converter={StaticResource BoolToVis}}"/>
         </StackPanel>
+
+        <!-- Collect: the bill behind the escrow, the payout and the cash after. -->
+        <StackPanel Grid.Row="1" VerticalAlignment="Center"
+                    Visibility="{Binding IsCollectView, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="{Binding CollectRepairLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" Margin="0,2"/>
+            <TextBlock Text="{Binding CollectPayLine}" Foreground="#FF97EAD2" FontSize="15"
+                       FontWeight="Bold" TextAlignment="Center" Margin="0,6"/>
+            <TextBlock Text="{Binding CollectCashLine}" Foreground="#FFF" FontSize="13"
+                       TextAlignment="Center" Margin="0,2"/>
+        </StackPanel>
+
+        <!-- The block's own verb: it belongs to the escrow page, so it only
+             shows once COLLECT was clicked and the escrow holds something. -->
         <StackPanel Grid.Row="2">
-            <Button Content="{loc:Loc Key=InsuranceCollect}" Command="{Binding CollectCommand}"
+            <Button Content="{loc:Loc Key=InsuranceCollectIt}" Command="{Binding CollectItCommand}"
                     Margin="0,0,0,6"
-                    Visibility="{Binding PendingVisible, Converter={StaticResource BoolToVis}}"/>
+                    Visibility="{Binding ShowCollectIt, Converter={StaticResource BoolToVis}}"/>
             <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">

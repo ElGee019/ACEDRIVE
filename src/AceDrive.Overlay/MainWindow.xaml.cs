@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using AceDrive.Core;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
+using AceDrive.Overlay.Views;
 
 namespace AceDrive.Overlay;
 
@@ -293,43 +294,28 @@ public partial class MainWindow : Window
     // WHY deferred: the click's command may swap screens or hide the panel
     // first. Handing the game the foreground on the next idle turn lets that
     // work finish, then driving input resumes without a click into EVO.
+    // WHY the click's origin and not its Source: a page button's Click names
+    // the page host as Source, so only OriginalSource points at the button
+    // (see ClickTarget). The Source test never matched, which is what silently
+    // broke the hand-back for every button on every page.
+    // WHY Button and not ButtonBase: the template parts that excludes are a
+    // ComboBox's box/arrow and a scrollbar's thumb (ToggleButton and
+    // RepeatButton). Taking the foreground mid-interaction would send the next
+    // keystroke to EVO instead of the open dropdown.
     private void OnButtonClick(object sender, RoutedEventArgs e)
     {
-        if (e.Source is Button)
+        if (ClickTarget.OwnerOf(e.OriginalSource as DependencyObject) is Button)
         {
             Dispatcher.BeginInvoke(
                 DispatcherPriority.Background, new Action(Native.FocusGame));
         }
     }
 
-    // Controls that own a click keep it; everything else is window chrome.
-    // ComboBoxItem matters: while the dropdown is open the ComboBox captures
-    // the mouse, so a row's press tunnels through this window's preview
-    // handler. DragMove() there steals the click and the row only commits on
-    // Enter; letting the row keep it is what selects on a normal click.
-    // TextBoxBase matters the same way: the opening name, bank amount and job
-    // radius fields need the click to place the caret. DragMove() swallowed
-    // that press and started a window drag instead, so the field never got
-    // keyboard focus and typing went to the game (the new-game name stayed
-    // unchanged and its availability check never ran).
-    private static bool OwnsClick(DependencyObject source) =>
-        source is ButtonBase or TextBoxBase or ComboBoxItem;
-
+    // Controls that own a click keep it; everything else is window chrome and
+    // drags the panel (ClickTarget spells out which controls those are).
     private void OnDragMove(object sender, MouseButtonEventArgs e)
     {
-        // The walk-up must never throw: inline content (Run/Hyperlink) is a
-        // ContentElement, not a Visual, and VisualTreeHelper.GetParent on it
-        // crashed the app in a live session (2026-10-13 log). Such an origin
-        // simply stops the walk and counts as "not interactive" -> drag
-        // allowed. 2D-only overlay, so checking Visual (not Visual3D) is enough.
-        DependencyObject? source = e.OriginalSource as DependencyObject;
-        while (source is not null && !OwnsClick(source))
-        {
-            if (source is not Visual) break;
-            source = VisualTreeHelper.GetParent(source);
-        }
-
-        if (source is null || !OwnsClick(source))
+        if (ClickTarget.OwnerOf(e.OriginalSource as DependencyObject) is null)
         {
             DragMove();
         }

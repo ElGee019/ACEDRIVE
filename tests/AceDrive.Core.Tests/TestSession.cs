@@ -124,6 +124,9 @@ internal static class TestSession
         var valuationInstance = new ValuationLedger(options.SavedDriver);
         // The weekly missing-person run's persisted half, resumed the same way.
         var willyLedgerInstance = new WhereIsWillyLedger(options.SavedDriver);
+        // The calendar's once-per-week stamps for the events that keep no ledger
+        // of their own (road test, Cento Miglia, Touristenfahrten).
+        var weeklyEventsInstance = new WeeklyEventLedger(options.SavedDriver);
         IValuationBoard valuationBoard = options.ValuationBoard ?? new FakeValuationBoard();
         var todoStoreInstance = options.TodoStore ?? new FakeTodoProgressStore();
         var saver = new GameStateSaver(
@@ -132,7 +135,7 @@ internal static class TestSession
             walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
             cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance,
             jobsInstance, pinsInstance, visitsInstance, valuationInstance,
-            willyLedgerInstance, deliveryCareer);
+            willyLedgerInstance, deliveryCareer, weeklyEventsInstance);
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
             brands, contentSource);
@@ -202,7 +205,7 @@ internal static class TestSession
             game, cityInstance, hungerInstance, fleet, deliveryBoard, deliveryCareer,
             saver, rivalsInstance, logger);
         var poiWorld = new PoiWorld(
-            spawnerInstance, directory, directoryStore, deliveryBoard, deliveryCareer,
+            spawnerInstance, directory, directoryStore, map, deliveryBoard, deliveryCareer,
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
             onboardingStore, shops, dayCycle, logger);
         // The ToDo list: its own ledger + file, synced on the cold edges the
@@ -293,6 +296,7 @@ internal static class TestSession
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
             willyFlow, willyLedgerInstance, roadTestFlow, touristenFlow,
+            weeklyEventsInstance,
             () => brands.Brand, new Random(6), logger, options.IgnoreEventGates);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.

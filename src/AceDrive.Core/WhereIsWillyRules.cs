@@ -195,6 +195,16 @@ public sealed record WhereIsWillyRules(
         && string.Equals(a.StreetName.Trim(), b.StreetName.Trim(), StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// True once the player has started the coffee-beans delivery career, i.e.
+    /// bought a hub of that category on the delivery screen. The calendar's
+    /// Wednesday tap asks this before it draws a search: the missing-person run
+    /// belongs to that career, while a merely discovered coffee-shop door does
+    /// not count as a career.
+    /// </summary>
+    public static bool OwnsCoffeeCareer(DeliveryCareer career) =>
+        career.OwnsCategory(CoffeeCareerId);
+
+    /// <summary>
     /// Unity HasCoffeeBeansCareer: a coffee-shop door the player has discovered
     /// or a coffee-beans hub owned. False only locks the calendar row's label;
     /// the click still runs its own shop-count checks.

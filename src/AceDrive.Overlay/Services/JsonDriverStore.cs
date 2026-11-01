@@ -31,8 +31,13 @@ public sealed class JsonDriverStore : IDriverStore
         }
 
         // A corrupt save degrades to a fresh driver, never takes the overlay
-        // down (AGENTS.md: Try* at every external boundary).
-        if (state is null || state.Cash < 0 || state.Xp < 0 || state.Bank < 0)
+        // down (AGENTS.md: Try* at every external boundary). WHY a negative
+        // cash is NOT corruption: the crash repair is a charge the player
+        // cannot refuse and DriverWallet.ChargeInFull lets it overdraw, so the
+        // debt is the balance — rejecting it used to wipe cash, XP, the
+        // discovered streets and the whole delivery career on the next launch,
+        // exactly when the player had just been billed for a crash.
+        if (state is null || state.Xp < 0 || state.Bank < 0)
         {
             _log.LogWarning(
                 $"driver.json {JsonFile.Describe(error)} at {_file}; starting a fresh driver");

@@ -110,7 +110,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 ## 7. Time / World sim
 - [x] 50 Game clock (16x) + calendar — CONFIRMED (start from Kunos clock + add calendar)
 - [ ] 51 Persistent save + migration + glovebox/trunk — PENDING/CONDITIONAL (see what Kunos provides)
-- [x] 52 Weekly/daily gates (club/pancakes/valuation/roster) — CONFIRMED (the Wednesday gate is wired: the missing-person row reads completed/locked from the completion stamp and the coffee-beans career, answers a closed tap with SEE YOU NEXT WEDNESDAY or the unlock hint, and a run in flight blocks the other event rows, the taxi shift and the delivery career)
+- [x] 52 Weekly/daily gates (club/pancakes/valuation/roster) — CONFIRMED (the Wednesday gate is wired: the missing-person row reads completed/locked from the completion stamp and the coffee-beans career, answers a closed tap with SEE YOU NEXT WEDNESDAY or the unlock hint, and a run in flight blocks the other event rows, the taxi shift and the delivery career; the playtest bypass is gone, so every row answers only on its own weekday inside the 8am-8pm window, and every event is once a week: the valuation and the missing-person run keep their own stamps, while the road test, the Cento Miglia and the Touristenfahrten run share `WeeklyEventLedger`'s persisted game-date stamps; the Saturday row paints no button in the first display week, so the career's first Saturday is behind the player before the run is offered)
 
 ## 8. UI / Screens
 - [x] 53 Screen system (registry/stack/HUD/dialogue) — CONFIRMED (rework for ACEVO Lua UI)

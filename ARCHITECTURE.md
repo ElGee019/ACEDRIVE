@@ -521,6 +521,7 @@ dictionary. If a slice adds a cache, it adds its row here.
 | `_lastPacketId` | `TelemetryReadouts` | — | packet id change | 1 value |
 | `_zoneMap` (the discovered streets, home first, as an `AddressMap`) | `OperatingZone` | discovered street count (`StreetIds`), ordered once at construct | `TryExpand` rebuilds it in the same call — the cache's only writer | at most the map's street rows |
 | `_houseEntry`, `_snapshots`, `_results` | `ValuationFlow` | week / arrival order | `ResetWeek` drops the house entry; a snapshot or result is dequeued once | one house entry, one drain pass per poll |
+| `Snapshot` (event id → game date) | `WeeklyEventLedger` | — | `MarkTaken` replaces the map in the same call | one entry per calendar event |
 
 Two rules the table makes checkable: **no row's owner is a View or the
 coordinator** (a cache whose owner is `MainViewModel` is a mirror of someone
@@ -544,6 +545,12 @@ elder, attempts, home address and priced receipt are session state owned by
 calendar's 10 Hz `CompletedOn` check is an allocation-free date compare instead
 of a per-tick string format; the parsed twin is the same value, not a second
 copy of it.
+
+The calendar's once-per-week stamps follow the same shape: `WeeklyEventLedger`
+holds one game date per event (the road test, the Cento Miglia, the
+Touristenfahrten run), resumes that map from the driver file and is its only
+writer — `MarkTaken` replaces the cached `Snapshot` in the same call, so the
+saver's next bank and the page's `TakenOn` read never touch the disk twice.
 
 ### Stores: read once, then cache
 

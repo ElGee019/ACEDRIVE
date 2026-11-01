@@ -37,6 +37,31 @@ public sealed class PoiIntroScreenViewModelTests
     }
 
     [Fact]
+    public void InsuranceCopy_NamesTheBrokerAndClosesOnGrandmasCarOnly()
+    {
+        // The broker's page is the one with a conditional closing line: only the
+        // car Grandma Sonja handed over is insured by her, so a career driving
+        // anything else keeps the plain body.
+        PoiIntro plain = Assert.IsType<PoiIntro>(PoiIntroCopy.For(PoiTypes.Insurance));
+        PoiIntro grandma = Assert.IsType<PoiIntro>(
+            PoiIntroCopy.For(PoiTypes.Insurance, grandmaCar: true));
+
+        Assert.Equal(Strings.Get("PoiIntroInsuranceBody"), plain.Body);
+        Assert.Contains("Visit the Insurance Broker on the map", plain.Body, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            Strings.Get("PoiIntroInsuranceGrandma"), plain.Body, StringComparison.Ordinal);
+
+        Assert.Equal(
+            Strings.Get("PoiIntroInsuranceBody") + "\n\n" +
+                Strings.Get("PoiIntroInsuranceGrandma"),
+            grandma.Body);
+        // The flag is the broker's own: no other family grows a closing line.
+        Assert.Equal(
+            Strings.Get("PoiIntroBankBody"),
+            Assert.IsType<PoiIntro>(PoiIntroCopy.For(PoiTypes.Bank, grandmaCar: true)).Body);
+    }
+
+    [Fact]
     public void ForAdded_OpensOnePagePerFamily_InBankOrder()
     {
         IReadOnlyList<PoiIntro> intros = PoiIntroCopy.ForAdded(

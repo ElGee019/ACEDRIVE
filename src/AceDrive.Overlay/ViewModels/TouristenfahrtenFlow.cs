@@ -86,20 +86,22 @@ public sealed class TouristenfahrtenFlow
     /// the calendar names one; its START draws and pins the run (<see
     /// cref="StartRun"/>), its BACK hands the panel back to the calendar with
     /// nothing drawn. A live run owns the HUD, so a second tap is ignored
-    /// instead of stacking a briefing over it.
+    /// instead of stacking a briefing over it. Returns whether the briefing was
+    /// shown, which is what the calendar stamps as this week's entry.
     /// </summary>
-    public void Begin()
+    public bool Begin()
     {
         if (_run is not null)
         {
             _log.LogInfo("touristenfahrten ignored: a run is already in progress");
-            return;
+            return false;
         }
 
         string title = TouristenCopy.WeekendTitle(_weekends.Find(RealToday()));
         _host.ShowBriefing(new TouristenBriefingScreenViewModel(
             title, StartRun, new RelayCommand(CloseBriefing), _beat));
         _log.LogInfo($"touristenfahrten briefing open: {title}");
+        return true;
     }
 
     /// <summary>

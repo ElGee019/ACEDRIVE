@@ -17,6 +17,13 @@ public static class ControlCalendar
     // (TouristenfahrtenFlow), the only calendar row without a Unity source.
     public const string Touristenfahrten = "Touristenfahrten";
 
+    // The week its button first appears in. WHY 2: a career starts on the
+    // clock's seeded Saturday, and the week rolls at the Sunday midnight that
+    // ends it, so the second display week is the first one whose Saturday the
+    // player already has behind them. The run is a day trip around the
+    // circuit; it must not be the first thing a new driver is offered.
+    public const int TouristenfahrtenFirstWeek = 2;
+
     // Event days are open 8am-8pm (companion parity).
     public const int OpenFromHour = 8;
     public const int OpenUntilHour = 20;
@@ -37,7 +44,7 @@ public static class ControlCalendar
         new(4, Willy),
         new(5, null),
         new(6, Pancakes),
-        new(7, Touristenfahrten),
+        new(7, Touristenfahrten, TouristenfahrtenFirstWeek),
         new(1, CentoMiglia),
     ];
 
@@ -71,6 +78,24 @@ public static class ControlCalendar
 
     /// <summary>Maps a moment to 1=Sunday..7=Saturday.</summary>
     public static int ToDayOfWeek(DateTime moment) => (int)moment.DayOfWeek + 1;
+
+    /// <summary>
+    /// True when the weekday's event may appear in the given display week (see
+    /// <see cref="CalendarDay.OpensFromWeek"/>). A weekday with no row carries
+    /// no event, so nothing gates it.
+    /// </summary>
+    public static bool IsOpenInWeek(int dayOfWeek, int week)
+    {
+        foreach (CalendarDay day in Week)
+        {
+            if (day.DayOfWeek == dayOfWeek)
+            {
+                return week >= day.OpensFromWeek;
+            }
+        }
+
+        return true;
+    }
 
     /// <summary>True inside the 8am-8pm event window. Day matching is the caller's job.</summary>
     public static bool IsEventWindow(int hour) => hour is >= OpenFromHour and < OpenUntilHour;

@@ -87,8 +87,8 @@ public sealed class RoadTestFlow
     private readonly int _eventDay = EventDay();
 
     // TEMPORARY (testing): true opens the window gate on any day and hour, so
-    // the leg can be driven and replayed. The app passes true; the tests keep
-    // the shipping reading.
+    // the leg can be driven and replayed without waiting for the weekday. Only
+    // the tests set it; the app keeps the shipping gates.
     private readonly bool _ignoreEventGates;
 
     // WHY late: the host is the coordinator, which is built after this flow.
@@ -198,19 +198,21 @@ public sealed class RoadTestFlow
     /// briefing so the player reads what the test is before a drive that cannot
     /// be cancelled starts (the market valuation's briefing shape). A page
     /// already built is reopened instead of drawing a second visit, and the
-    /// entry gate is re-checked here so a caller can never jump it.
+    /// entry gate is re-checked here so a caller can never jump it. Returns
+    /// whether the tap left a page (or a pinned leg) on screen, which is what
+    /// the calendar stamps as this week's entry.
     /// </summary>
-    public void Begin()
+    public bool Begin()
     {
         if (!GateOpen())
         {
-            return;
+            return false;
         }
 
         if (IsLegRunning())
         {
             AbandonRunningLeg();
-            return;
+            return false;
         }
 
         // The visit is over once the receipt is up: its CONTINUE is the one way
@@ -218,13 +220,13 @@ public sealed class RoadTestFlow
         if (_phase == RoadTestPhase.Receipt)
         {
             _log.LogInfo("road test ignored: the receipt is still up");
-            return;
+            return false;
         }
 
         if (_screen is not null)
         {
             _host.RevealPage(_screen);
-            return;
+            return true;
         }
 
         if (_phase is RoadTestPhase.Driving && _door is not null)
@@ -232,10 +234,10 @@ public sealed class RoadTestFlow
             // A second tap re-pins the same door instead of drawing a visit.
             PinDoor(_door);
             _host.HidePanel();
-            return;
+            return true;
         }
 
-        PresentBriefing();
+        return PresentBriefing();
     }
 
     /// <summary>
@@ -1023,17 +1025,18 @@ public sealed class RoadTestFlow
 
     // The week's terms on a page of their own: the pick, the venue and what the
     // two legs and the photo ask. Built per tap, like the market valuation's
-    // briefing, so a language switch repaints instead of freezing copy.
-    private void PresentBriefing()
+    // briefing, so a language switch repaints instead of freezing copy. Returns
+    // false when the visit cannot be revealed (no car, no venue).
+    private bool PresentBriefing()
     {
         if (_roads.Current is not { } car)
         {
             _log.LogWarning("road test not begun: no car to test");
-            return;
+            return false;
         }
         if (!EnsureDoor() || _door is not { } door)
         {
-            return;
+            return false;
         }
 
         string venue = AddressFormatter.Format(door.Address);
@@ -1041,6 +1044,7 @@ public sealed class RoadTestFlow
             CarTitles.Of(car), Strings.Format("RoadTestBriefVenue", venue),
             BeginDrive, new RelayCommand(CloseBriefing), _beat));
         _log.LogInfo($"road test briefing open: {CarTitles.Of(car)} at {venue}");
+        return true;
     }
 
     private bool IsLegRunning() =>

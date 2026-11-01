@@ -1,39 +1,65 @@
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>The crash that ends a job (Unity's accident arrival): the ride is
-/// abandoned without a receipt, the customer loses one friendship, and the
+/// <summary>The crash prompt (Unity's accident arrival): a crash that lands
+/// during a job abandons the ride without a receipt and costs the customer one
+/// friendship, a crash in free roam offers the repair as well, and the
 /// companion's REPAIR THE CAR button pays the bill, banks the insured share for
-/// the broker and hands the panel back to the main page.</summary>
+/// the broker and hands a job's panel back to the main page. The first repair
+/// of a career is also the moment the insurance broker opens: its door joins
+/// the map and its explanation page interrupts the drive. None of it happens
+/// through the introduction: the feed opens once the community centre is done.
+/// </summary>
 public sealed class JobAccidentTests
 {
     private static readonly CarSpec Car = new(
         "ks_test_car", 2020, "Test", "Car", Passengers: 2, Class: 16,
         Price: 40000.0, TopSpeedKmh: 240);
 
+    // A career past the guided tour: the community centre is the last leg the
+    // introduction drives, and the crash feed only starts after it.
+    private static OnboardingState TourDone =>
+        OnboardingState.Fresh with { BirthdayDone = true, CommunityCentreDone = true };
+
     private static Garage GarageWith(bool insured) =>
         new([Car], new GarageState(Car.Key, [
             new OwnedCarState(Car.Key, 1, 0.0, HasInsurance: insured),
         ]));
 
+    // The rig opens before the insurance premium's due hour (01:00), so these
+    // suites read the crash money alone; the premium itself is WorldTicks' and
+    // InsuranceFlow's to pin.
+    private static FakeClock BeforeThePremium() =>
+        new() { Now = new DateTime(2026, 10, 12, 0, 30, 0, DateTimeKind.Utc) };
+
+    // A past-the-tour save whose login bonus is already banked for the rig's day:
+    // the boot must not add the streak CR the cash assertions read.
+    private static DriverState BonusBanked() =>
+        new(0.0, 0.0, LastDailyBonusDate: "2026-10-12");
+
     private static TestSessionResult New(
         Garage garage, FakeTelemetryHud hud, FakeFriendshipStore friends,
-        DriverWallet wallet) =>
+        DriverWallet wallet, PoiDirectory? poiDirectory = null) =>
         MainViewModelTests.Create(
             speedKmh: 0f, hud: hud, friendships: friends, wallet: wallet,
-            cars: [Car], carKsId: Car.Key, garage: garage);
+            cars: [Car], carKsId: Car.Key, garage: garage,
+            poiDirectory: poiDirectory, clock: BeforeThePremium(),
+            progress: TourDone, savedDriver: BonusBanked());
 
     // One crash: a poll at speed, then a poll whose damage counter jumped. The
     // detector prices the hit off the speed of the sample before it.
-    private static void Crash(MainViewModel vm, FakeClock clock, FakeTelemetry tel)
+    private static void Crash(
+        MainViewModel vm, FakeClock clock, FakeTelemetry tel,
+        float damageBefore = 0f, float damageAfter = 50f)
     {
-        tel.Next = tel.Next with { SpeedKmh = 120f, CarDamage = 0f };
+        tel.Next = tel.Next with { SpeedKmh = 120f, CarDamage = damageBefore };
         clock.Advance(TimeSpan.FromSeconds(0.1));
         vm.Poll();
-        tel.Next = tel.Next with { SpeedKmh = 0f, CarDamage = 50f };
+        tel.Next = tel.Next with { SpeedKmh = 0f, CarDamage = damageAfter };
         clock.Advance(TimeSpan.FromSeconds(0.1));
         vm.Poll();
     }
@@ -126,14 +152,218 @@ public sealed class JobAccidentTests
     }
 
     [Fact]
-    public void AccidentOutsideAJob_KeepsThePlainNotice()
+    public void AccidentOutsideAJob_AlsoOffersTheRepair()
     {
         var hud = new FakeTelemetryHud();
-        TestSessionResult rig = New(GarageWith(insured: false), hud, new FakeFriendshipStore(), new DriverWallet());
+        var friends = new FakeFriendshipStore();
+        TestSessionResult rig = New(GarageWith(insured: false), hud, friends, new DriverWallet());
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        // No job was live, so the prompt names no lost friendship: just the
+        // impact speed and the bill the button takes (120 of 240 km/h on a
+        // 40 000 CR car: a twentieth of its value).
+        Assert.NotNull(hud.TaskPrompt);
+        Assert.Equal("HudAccidentSolo", hud.TaskPrompt!.TextKey);
+        Assert.Equal("HudAccidentRepair", hud.TaskPrompt.ActionKey);
+        Assert.Equal("120", hud.TaskPrompt.Args![0]);
+        Assert.Equal("2000.00", hud.TaskPrompt.Args[1]);
+        Assert.Equal(2, hud.TaskPrompt.Args.Count);
+        Assert.Empty(friends.Deltas);
+    }
+
+    [Fact]
+    public void RepairOutsideAJob_TakesTheCash_ClaimsTheInsuredShare_AndStaysHidden()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        Garage garage = GarageWith(insured: true);
+        TestSessionResult rig = New(garage, hud, new FakeFriendshipStore(), wallet);
+        // The free-roam drive keeps the panel down; only a call or a job raises it.
+        if (rig.Vm.IsShown)
+        {
+            rig.Vm.ToggleShowCommand.Execute(null);
+        }
+        Assert.False(rig.Vm.IsShown);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+        hud.RaiseTaskAction();
+
+        Assert.Equal(48000.0, wallet.Cash, 6);              // 40000 × 0.05 paid
+        Assert.Equal(1800.0, wallet.PendingInsurance, 6);   // 90 % of the bill
+        Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
+        Assert.Null(hud.TaskPrompt);
+        // A free-roam crash is not an interruption: the drive keeps the screen.
+        Assert.False(rig.Vm.IsShown);
+    }
+
+    [Fact]
+    public void TheFirstCrashRepair_OpensTheInsuranceBroker_AndShowsItsPage()
+    {
+        // A career that never met a broker: the crash repair is the moment the
+        // first broker door joins the map, and the page that explains insurance
+        // opens on top of the drive with the bill the player just paid.
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        var directory = new PoiDirectory();
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, new FakeFriendshipStore(), wallet,
+            directory);
+        if (rig.Vm.IsShown)
+        {
+            rig.Vm.ToggleShowCommand.Execute(null);
+        }
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+        hud.RaiseTaskAction();
+
+        Assert.Equal(48000.0, wallet.Cash, 6);
+        PointOfInterest broker = Assert.Single(
+            directory.All, poi => poi.Type == PoiTypes.Insurance);
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
+        Assert.Equal(Strings.Get("PoiIntroInsuranceTitle"), intro.Title);
+        // This rig drives the test car, not Grandma Sonja's, so the page keeps
+        // the plain body: only her car earned the closing line.
+        Assert.DoesNotContain(
+            Strings.Get("PoiIntroInsuranceGrandma"), intro.Body, StringComparison.Ordinal);
+        Assert.True(rig.Vm.IsShown);
+
+        // CONTINUE hands the drive back: the page was the interruption, not a
+        // new place for the player to be left in.
+        intro.ContinueCommand.Execute(null);
+        Assert.False(rig.Vm.IsShown);
+
+        // The moment is once: the next crash pays its bill and opens nothing,
+        // and the door the first one earned stays the only broker.
+        rig.Clock.Advance(TimeSpan.FromSeconds(2));
+        Crash(rig.Vm, rig.Clock, rig.Tel, damageBefore: 50f, damageAfter: 100f);
+        hud.RaiseTaskAction();
+
+        Assert.False(rig.Vm.IsShown);
+        Assert.Equal(
+            broker.Id,
+            Assert.Single(directory.All, poi => poi.Type == PoiTypes.Insurance).Id);
+    }
+
+    [Fact]
+    public void FirstRepairOnAFullZone_StillOpensTheBrokerPage()
+    {
+        // A career whose whole discovered area is built over (one street, every
+        // house taken — what the old negative-cash save reset left behind) must
+        // still get the broker and its page: the door falls back to the next
+        // street of the map instead of silently dropping the moment.
+        AddressMap map = AddressMap.Default;
+        AddressStreet zoneStreet = map.Streets[0];
+        var directory = new PoiDirectory();
+        for (int number = 1; number <= HouseNumberPlan.Count(zoneStreet, map); number++)
+        {
+            directory.Add(new PointOfInterest(
+                $"story_{number}", $"Story Door {number}",
+                new AddressLocation(zoneStreet.Name, number, HouseNumberPlan.SideOf(number))));
+        }
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        TestSessionResult rig = MainViewModelTests.Create(
+            speedKmh: 0f, hud: hud, wallet: wallet, cars: [Car], carKsId: Car.Key,
+            garage: GarageWith(insured: false), poiDirectory: directory,
+            addressMap: map, progress: TourDone,
+            savedDriver: BonusBanked() with { StreetIds = [OperatingZone.HomeStreetId] });
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+        hud.RaiseTaskAction();
+
+        PointOfInterest broker = Assert.Single(
+            directory.All, poi => poi.Type == PoiTypes.Insurance);
+        Assert.Equal(map.Streets[1].Name, broker.Address.StreetName);
+        Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
+        Assert.True(rig.Vm.IsShown);
+    }
+
+    [Fact]
+    public void GrandmasCar_IsCovered_SoTheFirstCrashPaysTheClaim()
+    {
+        // Grandma Sonja hands her car over covered (the walk's pick and the
+        // boot's seed both set it), and the broker's page says so: the crash
+        // repair then recovers Unity's 90 % into the escrow the broker collects
+        // instead of billing the player the whole bill.
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        var directory = new PoiDirectory();
+        TestSessionResult rig = MainViewModelTests.Create(
+            speedKmh: 0f, hud: hud, wallet: wallet, cars: [Car], carKsId: Car.Key,
+            garage: GarageWith(insured: true), poiDirectory: directory,
+            progress: TourDone with { GrandmaCarId = Car.Key },
+            clock: BeforeThePremium(), savedDriver: BonusBanked());
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+        hud.RaiseTaskAction();
+
+        Assert.Equal(48000.0, wallet.Cash, 6);            // the bill is still taken
+        Assert.Equal(1800.0, wallet.PendingInsurance, 6); // 90 % of the 2 000 CR bill
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
+        Assert.EndsWith(
+            Strings.Get("PoiIntroInsuranceGrandma"), intro.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CrashingThroughTheIntroduction_IsNotDetected()
+    {
+        // The first drives are grandma's errand and the guided tour (the
+        // community centre is its last leg): a bump there bills nothing, offers
+        // no repair and opens no broker page. The dent counts from the moment
+        // the centre hands the career over.
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        var directory = new PoiDirectory();
+        Garage garage = GarageWith(insured: false);
+        TestSessionResult rig = MainViewModelTests.Create(
+            speedKmh: 0f, hud: hud, wallet: wallet, cars: [Car], carKsId: Car.Key,
+            garage: garage, poiDirectory: directory, clock: BeforeThePremium());
+        Assert.True(rig.Story.IntroInProgress);
 
         Crash(rig.Vm, rig.Clock, rig.Tel);
 
         Assert.Null(hud.TaskPrompt);
-        Assert.NotNull(hud.Notice);
+        Assert.Equal(0, hud.ShowTaskTextCalls); // no companion summon either
+        Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
+        Assert.Equal(50000.0, wallet.Cash, 6);
+        Assert.Empty(directory.All);
+    }
+
+    [Fact]
+    public void FreeRoamCrashOverAnOpenPanel_SurfacesTheCompanion_ThenTheRepairShowsTheBrokerOnThePanel()
+    {
+        // The panel is up on a page, so the companion has stepped aside: the
+        // crash must still reach the player, which is the host surfacing the
+        // companion's task text over the page. Taking the offer then hands the
+        // panel the broker page the first crash earned, and CONTINUE gives the
+        // interrupted page back.
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        var directory = new PoiDirectory();
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, new FakeFriendshipStore(), wallet,
+            directory);
+        rig.Story.FinishDialogue();
+        rig.Vm.Show();
+        Assert.True(rig.Vm.IsShown);
+        object? page = rig.Vm.CurrentScreen;
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        Assert.Equal(1, hud.ShowTaskTextCalls);
+        Assert.Equal("HudAccidentSolo", hud.TaskPrompt!.TextKey);
+
+        hud.RaiseTaskAction();
+
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
+        Assert.Equal(Strings.Get("PoiIntroInsuranceTitle"), intro.Title);
+        Assert.True(rig.Vm.IsShown);
+
+        intro.ContinueCommand.Execute(null);
+
+        // The page the crash interrupted comes back, still on the open panel.
+        Assert.Same(page, rig.Vm.CurrentScreen);
+        Assert.True(rig.Vm.IsShown);
     }
 }

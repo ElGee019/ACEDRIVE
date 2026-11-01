@@ -8,9 +8,11 @@ namespace AceDrive.Overlay.ViewModels;
 /// A POI family's explanation page (TOZONES §4.5): the operating-zone
 /// expansion page's CONTINUE opens it before the page the receipt would have
 /// shown, so a business is explained the moment its door appears — every
-/// time, not only the first one of the career. Same skeleton as the calendar
-/// briefings: title band, body copy, one forward verb. CONTINUE runs the
-/// continuation; the page paints copy and decides nothing.
+/// time, not only the first one of the career. The insurance broker's first
+/// door is the exception: the first crash repair opens the door, and that
+/// moment opens this page directly. Same skeleton as the calendar briefings:
+/// title band, body copy, one forward verb. CONTINUE runs the continuation;
+/// the page paints copy and decides nothing.
 ///
 /// It keeps the panel open (<see cref="IKeepPanelOpen"/>): the body outlives
 /// the 15 s idle window, and a reader hidden mid-page would have to reopen

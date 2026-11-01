@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
+using AceDrive.Overlay.Views;
 
 namespace AceDrive.Overlay;
 
@@ -25,8 +26,15 @@ public partial class HudWindow : Window
     private readonly ISettingsStore _store;
     private bool _panelOpen;
     // A page can summon the task text while the panel is still up (pinning an
-    // address); the strip then stays over the panel until the panel next opens.
+    // address, or the crash repair offer); the strip then stays over the panel
+    // until the summon ends — the panel next opens, or the prompt it surfaced is
+    // consumed.
     private bool _showTaskTextOverPanel;
+    // The task prompt that summon was asked for, when it was one: the strip
+    // steps aside as soon as that prompt is consumed, so the page its button
+    // opened is left uncovered. Null when the summon came from a page pinning a
+    // destination, which has nothing to consume until the door is entered.
+    private HudTaskPrompt? _summonedPrompt;
 
     public HudWindow(
         HudViewModel viewModel, ISettingsStore store,
@@ -104,20 +112,31 @@ public partial class HudWindow : Window
         // bridges the panel session that was already up when it happened.
         if (open)
         {
-            _showTaskTextOverPanel = false;
+            EndSummon();
         }
         ApplyShown();
     }
 
     /// <summary>
     /// Shows the companion's task text without waiting for the panel to hide.
-    /// A page calls this when it pins a destination the player should read at
-    /// once; the normal step-aside resumes the next time the panel opens.
+    /// The host calls this when it puts something in the task slot the player
+    /// must read at once — a destination just pinned from a page, or the crash
+    /// repair offer; the normal step-aside resumes the next time the panel
+    /// opens (and as soon as the task text is gone).
     /// </summary>
     public void ShowTaskTextOverPanel()
     {
         _showTaskTextOverPanel = true;
+        // A prompt summon is scoped to that prompt: the button's own page must
+        // get the panel back once the offer is taken.
+        _summonedPrompt = (DataContext as HudViewModel)?.CurrentTaskPrompt;
         ApplyShown();
+    }
+
+    private void EndSummon()
+    {
+        _showTaskTextOverPanel = false;
+        _summonedPrompt = null;
     }
 
     private void OnViewModelChanged(object? sender, PropertyChangedEventArgs e)
@@ -149,7 +168,7 @@ public partial class HudWindow : Window
             return;
         }
 
-        if (vm.IsRevealed && (!_panelOpen || (_showTaskTextOverPanel && vm.HasTaskText)))
+        if (vm.IsRevealed && (!_panelOpen || Summoned(vm)))
         {
             if (!IsVisible)
             {
@@ -161,6 +180,13 @@ public partial class HudWindow : Window
             Hide();
         }
     }
+
+    // The over-panel exception: the summoned task text may stay over the page,
+    // but only while it is actually up. A prompt summon ends with its prompt,
+    // so taking the offer hands the panel back the page the button opened.
+    private bool Summoned(HudViewModel vm) =>
+        _showTaskTextOverPanel && vm.HasTaskText
+        && (_summonedPrompt is null || ReferenceEquals(vm.CurrentTaskPrompt, _summonedPrompt));
 
     // A customer request takes the companion over; its page is taller than the
     // driving strip, so the frame grows to the page instead of scrolling inside
@@ -185,7 +211,7 @@ public partial class HudWindow : Window
     {
         // Buttons own their clicks (ENTER, the request options and BACK); only
         // the surrounding chrome drags.
-        if (IsOverButton(e.OriginalSource as DependencyObject))
+        if (ClickTarget.OwnerOf(e.OriginalSource as DependencyObject) is not null)
         {
             return;
         }
@@ -196,30 +222,6 @@ public partial class HudWindow : Window
         }
     }
 
-    // WHY the walk: a button's label is inline content (a Run), which is a
-    // ContentElement, not a Visual — VisualTreeHelper.GetParent on it throws.
-    // Such an origin stops the walk and counts as "not a button" (2D-only
-    // overlay, so checking Visual, not Visual3D, is enough).
-    private static bool IsOverButton(DependencyObject? source)
-    {
-        while (source is not null)
-        {
-            if (source is ButtonBase)
-            {
-                return true;
-            }
-
-            if (source is not Visual)
-            {
-                return false;
-            }
-
-            source = VisualTreeHelper.GetParent(source);
-        }
-
-        return false;
-    }
-
     // WHY deferred: the ENTER command may open the panel or swap screens
     // first. Handing the foreground back on the next idle turn puts the game
     // on top with the click fully processed, so driving resumes at once.
@@ -227,11 +229,13 @@ public partial class HudWindow : Window
         Dispatcher.BeginInvoke(
             DispatcherPriority.Background, new Action(Native.FocusGame));
 
-    // The source test keeps template parts (a future ComboBox arrow, a
-    // scrollbar) from bouncing focus to the game mid-interaction.
+    // WHY the click's origin and not its Source: a page button's Click names
+    // the page host as Source, so only OriginalSource points at the button
+    // (see ClickTarget). Template parts (a ComboBox's box/arrow, a scrollbar's
+    // thumb) are not Buttons, so they never bounce focus to the game mid-use.
     private void OnButtonClick(object sender, RoutedEventArgs e)
     {
-        if (e.Source is Button)
+        if (ClickTarget.OwnerOf(e.OriginalSource as DependencyObject) is Button)
         {
             RestoreGameFocus();
         }

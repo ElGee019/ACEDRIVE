@@ -29,4 +29,11 @@ public enum PoiPacing
     /// immediately, then one per <see cref="PoiSpawnRule.IntervalStreets"/>
     /// streets (Unity's grocery and coffee store backfill).</summary>
     OwnedCategory,
+
+    /// <summary>The first door is earned by a career event, never by the street
+    /// count; the street curve then adds the ones after it, counted from
+    /// <see cref="PoiSpawnRule.FirstStreets"/> plus one interval (the insurance
+    /// broker: the first crash repair opens the first at 13 + 57 streets the
+    /// second, and every further interval the next).</summary>
+    GrantedFirstThenStreets,
 }

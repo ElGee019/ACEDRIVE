@@ -24,5 +24,6 @@ internal static class TestSaveState
             garage, new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
             new RoadTestLedger([], seed: 0), new TaxiShift(), new ShiftRecord(null), new JobLedger(),
             new DestinationPins(), new VisitLedger(), valuation ?? new ValuationLedger(),
-            new WhereIsWillyLedger(), career ?? new DeliveryCareer(HubCatalog.Default, 0));
+            new WhereIsWillyLedger(), career ?? new DeliveryCareer(HubCatalog.Default, 0),
+            new WeeklyEventLedger());
 }

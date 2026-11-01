@@ -153,9 +153,11 @@ public interface ITelemetryHud
 
     /// <summary>
     /// Surfaces the companion's task text even while the main panel is open,
-    /// so a destination pinned from a page (the addresses list) is readable at
+    /// so a destination pinned from a page (the addresses list) — or a crash
+    /// repair offer raised while the player left a page up — is readable at
     /// once instead of waiting for the panel to hide. The companion keeps it
-    /// up until the panel next opens or the player enters the pinned door.
+    /// up until the panel next opens, the player enters the pinned door, or the
+    /// task text goes away.
     /// </summary>
     void ShowTaskText();
 

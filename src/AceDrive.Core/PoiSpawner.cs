@@ -9,8 +9,10 @@ namespace AceDrive.Core;
 /// carries a <see cref="PoiSpawnRule"/> is compared against the saved
 /// progress; every missing door is drawn on a street the operating zone has
 /// already discovered, at a house no known POI uses, with a procedural owner
-/// name. Business families gate on streets/jobs, store families on an owned
-/// hub category. Randomness is a seeded instance, never the shared global
+/// name. A family whose first door is earned by a career event instead (the
+/// insurance broker's first crash repair) opens that one through
+/// <see cref="SpawnGrantedFirst"/>, and the curve then only adds the ones
+/// after it. Randomness is a seeded instance, never the shared global
 /// (AGENTS), so tests pin the addresses.
 /// </summary>
 public sealed class PoiSpawner
@@ -83,8 +85,12 @@ public sealed class PoiSpawner
             bool categoryOwned = definition.Category.Length > 0
                 && ownsCategory is not null
                 && ownsCategory(definition.Category);
+            // A door already in the family is the "first granted" fact the
+            // career-event curve reads: the event opened it, whatever the save
+            // that holds it was written by.
             int expected = rule.ExpectedCount(
-                discoveredStreets, settledJobs, categoryOwned);
+                discoveredStreets, settledJobs, categoryOwned,
+                firstGranted: existing > 0);
             while (existing < expected && added.Count < maxDoors)
             {
                 // The first missing door of the whole call is the expansion's
@@ -131,6 +137,60 @@ public sealed class PoiSpawner
         return DrawFreeAddress(addressable, known, []) is { } door
             ? new PointOfInterest(id, name, door, type, ownerName, category)
             : null;
+    }
+
+    /// <summary>
+    /// Places the one door of a family whose first is granted by a career event
+    /// rather than the street curve
+    /// (<see cref="PoiPacing.GrantedFirstThenStreets"/>): the same free-house
+    /// pool and the same generated owner name as the paced doors, drawn the
+    /// moment the player earns it. Answers null when the family already has a
+    /// door (the moment is once), its rule is not that curve, or no street in
+    /// <paramref name="addressable"/> has a free house and
+    /// <paramref name="fallback"/> cannot either.
+    /// </summary>
+    /// <param name="fallback">WHY it exists: a paced business is announced by
+    /// the street that unlocked it, so a full map simply delays it. A granted
+    /// door is the opposite — the player has just been told to go there — so
+    /// when the discovered streets are full (a tiny or over-built zone) the
+    /// draw falls back to the whole map instead of dropping the moment. The
+    /// fallback is only read when the zone has no free house.</param>
+    public PointOfInterest? SpawnGrantedFirst(
+        string type, PoiDirectory known, AddressMap addressable,
+        AddressMap? fallback = null)
+    {
+        ArgumentNullException.ThrowIfNull(addressable);
+        if (known is null || addressable.Streets is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        PoiDefinition? definition = GrantedFirst(type);
+        if (definition is null || CountOfType(known.All, definition.Type) > 0)
+        {
+            return null;
+        }
+
+        return SpawnOne(definition, 0, known, [], addressable, null)
+            ?? (fallback is { Streets.Count: > 0 }
+                ? SpawnOne(definition, 0, known, [], fallback, null)
+                : null);
+    }
+
+    // The family whose first door is earned, never paced: a type without that
+    // rule is not openable by the event that asked for it.
+    private PoiDefinition? GrantedFirst(string type)
+    {
+        foreach (PoiDefinition definition in _definitions)
+        {
+            if (definition.Spawn is { Pacing: PoiPacing.GrantedFirstThenStreets }
+                && string.Equals(definition.Type, type, StringComparison.OrdinalIgnoreCase))
+            {
+                return definition;
+            }
+        }
+
+        return null;
     }
 
     private PointOfInterest? SpawnOne(

@@ -53,7 +53,7 @@ on its own.
 | Decision | Choice |
 |---|---|
 | POI screens in scope | **Only the families the zone spawns** (car wash, bank, insurance, dealer, mechanic, grocery, coffee). The five business interiors + the store page already exist; this slice verifies and wires them for freshly placed doors. No generic "place" page, no fuel-station/La Strada page (PORTPLAN 37 declined). |
-| POI timing + naming | **Unity's curves and the name pool stay untouched** (car wash at 6 streets, dealer at 10 jobs/37 streets, mechanic at 36 jobs, insurance 13, bank 15, stores per owned hub). Demo invention is limited to the **street identities** (Street 3, 4, …). |
+| POI timing + naming | **Unity's curves and the name pool stay untouched** (car wash at 6 streets, dealer at 10 jobs/37 streets, mechanic at 36 jobs, insurance 13, bank 15, stores per owned hub). One deliberate exception: the insurance broker's **first** door is not street-paced — the first crash repair opens it (and its explanation page), and the 13/57 curve then spaces the next ones. Demo invention is limited to the **street identities** (Street 3, 4, …). |
 | Street geometry | **Split the existing 1,929 m lap into thirty-two 3-house streets.** Each row owns one contiguous 1/32 slice (60.28 m, 30 m spacing), so house numbers, drive-to guidance and distances resolve and every door has its own spot. Story doors join the ring's neighbours (§4.1). Temporary until the real free-roam map lands (§10). |
 | Zone standings | **Wire the existing Firestore board** behind a new `IZoneStandings` seam with an offline null-object, and show rank + delta on the expansion page. |
 

@@ -14,24 +14,44 @@ public sealed class HomeScreenViewModelTests
     }
 
     private static (HomeScreenViewModel Vm, FakeClock Clock, VoiceBeat Beat) Create(
-        Action? garage = null, Action? addresses = null, Action? back = null)
+        Action? garage = null, Action? addresses = null, Action? suggest = null,
+        Action? back = null)
     {
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
         return (new HomeScreenViewModel(
             new RelayCommand(garage ?? (() => { })),
             new RelayCommand(addresses ?? (() => { })),
+            new RelayCommand(suggest ?? (() => { })),
             new RelayCommand(back ?? (() => { })),
             beat), clock, beat);
     }
 
     [Fact]
-    public void Voices_OfferTheGarageAddressesAndBack()
+    public void Voices_OfferTheGarageAddressesSuggestAndBack()
     {
         var (vm, _, _) = Create();
         Assert.Contains("GARAGE", vm.VoiceActions.Keys);
         Assert.Contains("ADDRESSES", vm.VoiceActions.Keys);
+        Assert.Contains("SUGGEST CAR MOD", vm.VoiceActions.Keys);
         Assert.Contains("BACK", vm.VoiceActions.Keys);
+    }
+
+    [Fact]
+    public void VoiceSuggestCarMod_GlowsThenOpensThePageAfterTheBeat()
+    {
+        bool opened = false;
+        var (vm, clock, beat) = Create(suggest: () => opened = true);
+
+        vm.VoiceActions["SUGGEST CAR MOD"].Invoke();
+        Assert.True(vm.SuggestFlash);
+        Assert.False(vm.GarageFlash);
+        Assert.False(opened); // the acknowledgment owns the beat
+
+        clock.Advance(VoiceBeat.Duration + TimeSpan.FromMilliseconds(1));
+        beat.Poll();
+        Assert.True(opened);
+        Assert.False(vm.SuggestFlash); // no stale glow to re-show later
     }
 
     [Fact]

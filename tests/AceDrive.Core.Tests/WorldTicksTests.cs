@@ -38,7 +38,8 @@ public sealed class WorldTicksTests
     public WorldTicksTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
-    private static Fixture Build(DateTime gameStart, Hunger? hunger = null, CarSpec? car = null)
+    private static Fixture Build(
+        DateTime gameStart, Hunger? hunger = null, CarSpec? car = null, bool insured = true)
     {
         var clock = new FakeClock { Now = gameStart };
         var game = new GameClock(clock, gameStart);
@@ -53,7 +54,7 @@ public sealed class WorldTicksTests
         var garage = new Garage(pool);
         if (car is not null)
         {
-            garage.Add(car.Key, week: 0).SetInsurance(insured: true);
+            garage.Add(car.Key, week: 0).SetInsurance(insured: insured);
         }
         var driverStore = new FakeDriverStore();
         var hungerStore = new FakeHungerStore();
@@ -72,7 +73,8 @@ public sealed class WorldTicksTests
             new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage, city, appetite,
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
             new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), new WhereIsWillyLedger(), career);
+            new ValuationLedger(), new WhereIsWillyLedger(), career,
+            new WeeklyEventLedger());
         var world = new WorldTicks(
             game, city, appetite, fleet, board, career, saver, rivals, log);
         return new Fixture(world, clock, city, appetite, garage, wallet, driverStore, hungerStore, log);
@@ -199,16 +201,51 @@ public sealed class WorldTicksTests
     }
 
     [Fact]
-    public void Tick_OutsideTheChargeHour_ChargesNothing()
+    public void Tick_BeforeTheChargeHour_ChargesNothing()
     {
-        // 12:00 is not the nightly charge hour: no premium, and no save per
-        // poll either.
-        var fixture = Build(MondayNoon, car: Insured);
+        // 00:30 is before the rules' 01:00 due hour: the day's premium is not
+        // due yet, so no charge and no save per poll.
+        var beforeDue = new DateTime(2026, 10, 12, 0, 30, 0, DateTimeKind.Utc);
+        var fixture = Build(beforeDue, car: Insured);
         double before = fixture.Wallet.Cash;
 
         _ = fixture.World.Tick(onboardingDone: true);
 
         Assert.Equal(before, fixture.Wallet.Cash);
         Assert.Empty(fixture.Drivers.Saved);
+    }
+
+    [Fact]
+    public void Tick_FromTheChargeHourOn_PaysTheDayItIsOn()
+    {
+        // WHY the whole day, not just the hour: cover has to cost from the
+        // moment the garage holds an insured car. A career that starts — or a
+        // session that opens — at noon used to drive that day for free.
+        var fixture = Build(MondayNoon, car: Insured);
+        double before = fixture.Wallet.Cash;
+
+        _ = fixture.World.Tick(onboardingDone: true);
+
+        Assert.True(fixture.Wallet.Cash < before);
+        Assert.NotNull(fixture.Wallet.LastInsuranceChargeDate);
+    }
+
+    [Fact]
+    public void Tick_ACarInsuredLaterToday_StillPaysTodaysPremium()
+    {
+        // Grandma's car is insured at the walk's pick, long after the career's
+        // first ticks: an uncovered garage stamps no date, so the same day still
+        // charges instead of handing out the first day of cover for free.
+        var fixture = Build(MondayNoon, car: Insured, insured: false);
+        _ = fixture.World.Tick(onboardingDone: true);
+        Assert.Null(fixture.Wallet.LastInsuranceChargeDate);
+
+        fixture.Garage.Cars[0].SetInsurance(insured: true);
+        double before = fixture.Wallet.Cash;
+
+        _ = fixture.World.Tick(onboardingDone: true);
+
+        Assert.True(fixture.Wallet.Cash < before);
+        Assert.NotNull(fixture.Wallet.LastInsuranceChargeDate);
     }
 }

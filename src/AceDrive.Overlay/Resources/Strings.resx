@@ -500,7 +500,10 @@ Accept this job?</value></data>
   <data name="PoiIntroCarWashTitle" xml:space="preserve"><value>Car Washes</value></data>
   <data name="PoiIntroCarWashBody" xml:space="preserve"><value>Transporting customers and cargo will leave your vehicle dirty. Keep it clean, as a filthy ride can lead to rejected fares. Certain goods accumulate dirt and grime faster than others.&#10;&#10;Visit any Car Wash to wash away the dirt.</value></data>
   <data name="PoiIntroInsuranceTitle" xml:space="preserve"><value>Insurance Brokers</value></data>
-  <data name="PoiIntroInsuranceBody" xml:space="preserve"><value>Crashing your car is not cheap. Better protect yourself with insurance. In case of an accident you will pay the full repair cost upfront.&#10;Visit the Insurance Broker to cash in on your reimbursement.</value></data>
+  <data name="PoiIntroInsuranceBody" xml:space="preserve"><value>Crashing your car is not cheap. Better protect yourself with insurance.&#10;&#10;Visit the Insurance Broker on the map to manage your insurance for each car or to cash in your reimbursement.&#10;&#10;In case of an accident you will pay the full repair cost upfront and are able to recover most of the cost if insured.</value></data>
+  <!-- The courtesy line closes the broker's page while the garage still holds
+       the car Grandma Sonja handed over (she insured that one). -->
+  <data name="PoiIntroInsuranceGrandma" xml:space="preserve"><value>Luckily for you Grandma Sonja has insured this car for you already.</value></data>
   <data name="PoiIntroBankTitle" xml:space="preserve"><value>Banks</value></data>
   <data name="PoiIntroBankBody" xml:space="preserve"><value>Grandma Sonja has transferred 1,000 CR into your bank account. Your interest rate will increase based on the number of consecutive days you play ACEDrive and the size of your operating zone.&#10;&#10;You can withdraw your funds anytime by visiting the Bank.</value></data>
   <data name="PoiIntroDealerTitle" xml:space="preserve"><value>Car Dealers</value></data>
@@ -509,11 +512,17 @@ Accept this job?</value></data>
   <data name="PoiIntroMechanicBody" xml:space="preserve"><value>Keep your car in top condition to avoid sudden breakdowns—visit a Car Mechanic to swap out worn-out parts.&#10;&#10;Engine Health drops naturally over time as your odometer goes up, with the exact wear rate depending on the engine model. Once it reaches critical condition, the engine will break completely, and your only option will be to buy a full replacement.</value></data>
   <data name="PoiIntroContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <!-- Home page (Unity YouScreen): the player's own doors, starting with the
-       garage and the addresses page. -->
+       garage, the addresses page and the car-mod suggestion page. -->
   <data name="HomeTitle" xml:space="preserve"><value>HOME</value></data>
   <data name="HomeGarage" xml:space="preserve"><value>GARAGE</value></data>
   <data name="HomeAddresses" xml:space="preserve"><value>ADDRESSES</value></data>
+  <data name="HomeSuggestCarMod" xml:space="preserve"><value>SUGGEST CAR MOD</value></data>
   <data name="HomeBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- Car-mod suggestion page: the question the player answers with a mod they
+       want added, plus the two buttons in the page's top band. -->
+  <data name="SuggestCarModPrompt" xml:space="preserve"><value>know/have a good car mod you would like to see added to the gameplay?</value></data>
+  <data name="SuggestCarModBack" xml:space="preserve"><value>BACK</value></data>
+  <data name="SuggestCarModSubmit" xml:space="preserve"><value>SUGGEST</value></data>
   <!-- Addresses page (PORTPLAN 24/27 + TOZONES §3.5): the operating-zone
        readout first — street count with the area, the jobs to the next
        expansion (or the completion line once the street pool ends) and the
@@ -670,7 +679,6 @@ Accept this job?</value></data>
   <data name="MechanicNewEngine" xml:space="preserve"><value>BUY NEW ENGINE</value></data>
   <data name="MechanicBodyDamage" xml:space="preserve"><value>Body damage: {0:0.0}% — repair CR{1:0.00}</value></data>
   <data name="MechanicRepairBody" xml:space="preserve"><value>REPAIR BODY</value></data>
-  <data name="AccidentNotice" xml:space="preserve"><value>Accident! {0:0} km/h impact — repair estimate CR{1:0.00}.</value></data>
   <data name="MechanicPartOilChange" xml:space="preserve"><value>Oil efficiency</value></data>
   <data name="MechanicPartWipers" xml:space="preserve"><value>Wipers</value></data>
   <data name="MechanicPartAirFilter" xml:space="preserve"><value>Air filter</value></data>
@@ -683,13 +691,17 @@ Accept this job?</value></data>
        toggle, the daily-cost lines, the combined total and the escrow collect
        block. {0:0.00} = CR amounts; the placeholders survive translation. -->
   <data name="InsuranceTitle" xml:space="preserve"><value>INSURANCE</value></data>
-  <data name="InsuranceCash" xml:space="preserve"><value>Current Saldo: CR{0:0.00}</value></data>
   <data name="InsuranceEmpty" xml:space="preserve"><value>No cars to insure yet.</value></data>
-  <data name="InsuranceDaily" xml:space="preserve"><value>Daily cost: CR{0:0.00}/day</value></data>
-  <data name="InsuranceNotCovered" xml:space="preserve"><value>Not insured</value></data>
-  <data name="InsuranceTotal" xml:space="preserve"><value>Total daily cost: CR{0:0.00}/day</value></data>
-  <data name="InsurancePending" xml:space="preserve"><value>Insurance to collect: CR{0:0.00}</value></data>
+  <data name="InsuranceManage" xml:space="preserve"><value>MANAGE</value></data>
   <data name="InsuranceCollect" xml:space="preserve"><value>COLLECT</value></data>
+  <data name="InsuranceCollectIt" xml:space="preserve"><value>COLLECT IT</value></data>
+  <data name="InsuranceCarValue" xml:space="preserve"><value>Car newprice: CR{0:0.00}</value></data>
+  <data name="InsuranceDailyCar" xml:space="preserve"><value>Daily cost for this car: CR{0:0.00}/day</value></data>
+  <data name="InsuranceDailyDiscount" xml:space="preserve"><value> (CR{0:0.00} − {1:0}% driver rating)</value></data>
+  <data name="InsuranceTotal" xml:space="preserve"><value>Total daily cost: CR{0:0.00}/day</value></data>
+  <data name="InsuranceCollectRepair" xml:space="preserve"><value>Total repair cost: CR{0:0.00}</value></data>
+  <data name="InsuranceCollectPay" xml:space="preserve"><value>What the insurance will pay you: CR{0:0.00}</value></data>
+  <data name="InsuranceCollectCash" xml:space="preserve"><value>Your cash after transfer: CR{0:0.00}</value></data>
   <data name="InsuranceAdd" xml:space="preserve"><value>ADD</value></data>
   <data name="InsuranceRemove" xml:space="preserve"><value>REMOVE</value></data>
   <!-- Breakdown session (PORTPLAN 39, Unity BreakdownPopup + BreakdownFlow):
@@ -862,12 +874,11 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>While you were away you won {0} Valuation events and gained {1:0.000} XP</value></data>
 
   <!-- Weekly missing-person run (ToWhereIsWilly.md §2.1/§3.5): the calendar
-       row's completed and locked labels plus the two gate hints that share the
-       strip's one three-second warning slot. -->
+       row's completed label (a closed coffee career keeps the plain one) plus
+       the two gate hints that share the strip's one three-second warning slot. -->
   <data name="EventWillyCompleted" xml:space="preserve"><value>Where is Willy (Completed)</value></data>
-  <data name="EventWillyLocked" xml:space="preserve"><value>UNLOCK COFFEE BEANS CAREER FIRST</value></data>
   <data name="ControlGateWillyDone" xml:space="preserve"><value>SEE YOU NEXT WEDNESDAY</value></data>
-  <data name="ControlGateWillyLocked" xml:space="preserve"><value>UNLOCK COFFEE BEANS CAREER FIRST</value></data>
+  <data name="ControlGateWillyCareer" xml:space="preserve"><value>START A COFFEE BEANS DELIVERY CAREER FIRST</value></data>
 
   <!-- The quest page (Unity's map stand-in): the title, the two Unity task
        sentences, the failed-visit hint and the one verb. -->
@@ -888,9 +899,11 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="HudDrive" xml:space="preserve"><value>DRIVE</value></data>
   <!-- The crash that ends a job (Unity's accident arrival): the sentence names
        the impact speed, who lost the friendship and the bill the button takes;
-       the one button pays it and hands the panel back to the main page. -->
+       the one button pays it and hands the panel back to the main page. A crash
+       in free roam ends no job, so its sentence names no lost friendship. -->
   <data name="HudAccidentRideLost" xml:space="preserve"><value>Accident! {0} km/h impact — the ride is over. Lost 1 friendship with {1}. Repair the car to be able to continue. Repair cost: CR{2}.</value></data>
-  <data name="HudAccidentCargoLost" xml:space="preserve"><value>Accident! {0} km/h impact — the cargo is lost. Lost 1 friendship with the hub owner. Repair the car to be able to continue. Repair cost: CR{2}.</value></data>
+  <data name="HudAccidentCargoLost" xml:space="preserve"><value>Accident! {0} km/h impact — the cargo is lost. Lost 1 friendship with the hub owner. Repair the car to be able to continue. Repair cost: CR{1}.</value></data>
+  <data name="HudAccidentSolo" xml:space="preserve"><value>Accident! {0} km/h impact — repair the car to be able to continue. Repair cost: CR{1}.</value></data>
   <data name="HudAccidentRepair" xml:space="preserve"><value>REPAIR THE CAR</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Drive {0} home to {1} No. {2} in {3}</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>DROP OFF</value></data>

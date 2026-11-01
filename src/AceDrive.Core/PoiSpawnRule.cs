@@ -30,13 +30,19 @@ public sealed record PoiSpawnRule(
     /// <item>jobs-first: the job-gated first, then the street intervals;</item>
     /// <item>either: the larger of the job-gated first and the street curve;</item>
     /// <item>owned category: one immediately, then one per interval, and none
-    /// until the hub category is owned.</item>
+    /// until the hub category is owned;</item>
+    /// <item>granted first: none until the career event opened the first, then
+    /// that one plus the street intervals.</item>
     /// </list>
     /// </summary>
     /// <param name="categoryOwned">Whether the definition's hub category is
     /// owned; only <see cref="PoiPacing.OwnedCategory"/> reads it.</param>
+    /// <param name="firstGranted">Whether the family already has its first door
+    /// (or its career event just opened it); only
+    /// <see cref="PoiPacing.GrantedFirstThenStreets"/> reads it.</param>
     public int ExpectedCount(
-        int discoveredStreets, int settledJobs, bool categoryOwned = true)
+        int discoveredStreets, int settledJobs, bool categoryOwned = true,
+        bool firstGranted = false)
     {
         int streets = Math.Max(0, discoveredStreets);
         int jobs = Math.Max(0, settledJobs);
@@ -52,6 +58,9 @@ public sealed record PoiSpawnRule(
                 jobOpening ? 1 : 0, StreetOpening(streets)),
             PoiPacing.OwnedCategory => categoryOwned && IntervalStreets > 0
                 ? Math.Max(1, streets / IntervalStreets)
+                : 0,
+            PoiPacing.GrantedFirstThenStreets => firstGranted
+                ? 1 + StreetIntervals(streets)
                 : 0,
             _ => 0,
         };

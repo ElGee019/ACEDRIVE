@@ -96,6 +96,11 @@ public sealed class Navigation
     private readonly WhereIsWillyFlow _willy;
     private readonly WhereIsWillyLedger _willyLedger;
 
+    // The calendar's once-per-week stamps for the events that keep no ledger of
+    // their own (the road test, Cento Miglia and the Touristenfahrten run): a
+    // row already opened this week refuses instead of opening a second page.
+    private readonly WeeklyEventLedger _weeklyEvents;
+
     // The road test (PORTPLAN 49): the Tuesday row is its job-centre button, so
     // the tap sends the player to La Strada and the flow owns the drive, the
     // 0-60 leg and the result page from there.
@@ -146,7 +151,8 @@ public sealed class Navigation
     private readonly int _touristenDay = TouristenDayOfWeek();
 
     // TEMPORARY (testing): forwarded to the calendar page so every event row
-    // answers on any day and hour (see CalendarScreenViewModel).
+    // answers on any day and hour (see CalendarScreenViewModel). Only the tests
+    // set it; the app keeps the shipping gates.
     private readonly bool _ignoreEventGates;
 
     // WHY late: the host is the coordinator, which is built after this
@@ -168,6 +174,7 @@ public sealed class Navigation
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
         RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
+        WeeklyEventLedger weeklyEvents,
         Func<string> carBrand, Random rng, ILog log, bool ignoreEventGates = false)
     {
         _shell = shell;
@@ -203,6 +210,7 @@ public sealed class Navigation
         _valuation = valuation;
         _willy = willy;
         _willyLedger = willyLedger;
+        _weeklyEvents = weeklyEvents;
         _roadTest = roadTest;
         _touristen = touristen;
         _carBrand = carBrand;
@@ -430,6 +438,7 @@ public sealed class Navigation
             CalendarStamp.Default with { Week = _day.DisplayWeek },
             _openDay, MenuCommand, _willyLedger,
             () => WhereIsWillyRules.HasCoffeeCareer(_directory, _career),
+            () => WhereIsWillyRules.OwnsCoffeeCareer(_career),
             _ignoreEventGates);
         return _calendar;
     }
@@ -468,7 +477,7 @@ public sealed class Navigation
             // player to La Strada and the flow owns the 0-60 leg and its result.
             // The pick is only banked as tested once the whole test (accel,
             // brake, photo) is driven, so the row keeps naming the same car.
-            _roadTest.Begin();
+            OpenWeekly(ControlCalendar.RoadTest, _roadTest.Begin);
             return;
         }
 
@@ -477,7 +486,7 @@ public sealed class Navigation
         // the day and the 8am-8pm window.
         if (day == _centoDay)
         {
-            OpenCento();
+            OpenWeekly(ControlCalendar.CentoMiglia, OpenCento);
             return;
         }
 
@@ -506,13 +515,24 @@ public sealed class Navigation
         // this row instead of stealing its line.
         if (day == _touristenDay)
         {
+            // The row has its own first week (the career's first Saturday must
+            // be over). The page paints no button before then; the dispatcher
+            // refuses it too, so a cached page or a voice tap cannot open it.
+            if (!_ignoreEventGates
+                && !ControlCalendar.IsOpenInWeek(day, _day.DisplayWeek))
+            {
+                _log.LogInfo(
+                    "touristenfahrten refused: the run opens from the second week");
+                return;
+            }
+
             if (_taxi.InProgress || _delivery.InProgress || _cento.InProgress)
             {
                 _log.LogInfo("touristenfahrten refused: another job owns the companion");
                 return;
             }
 
-            _touristen.Begin();
+            OpenWeekly(ControlCalendar.Touristenfahrten, _touristen.Begin);
             return;
         }
 
@@ -521,12 +541,36 @@ public sealed class Navigation
         _log.LogInfo($"calendar day {day} tapped: no page behind this event yet");
     }
 
+    // Unity's per-event "one entry a week" (the valuation's lastValuationGameDay
+    // shape) for the events that keep no ledger of their own. The row opens the
+    // event once a game day, and the stamp is banked immediately, so a restart
+    // inside the same week cannot reopen what was already used — the day-of-week
+    // gate above then keeps that day the week's only slot. A refused or empty
+    // draw leaves the week untouched, so a missing venue or route costs nothing.
+    private void OpenWeekly(string eventId, Func<bool> open)
+    {
+        DateTime now = _game.GameNow;
+        if (_weeklyEvents.TakenOn(eventId, now))
+        {
+            _log.LogInfo($"calendar event {eventId} refused: already taken this week");
+            return;
+        }
+
+        if (!open())
+        {
+            return;
+        }
+
+        _weeklyEvents.MarkTaken(eventId, now);
+        _saver.SaveDriver(_rivals.LastResult);
+    }
+
     // The event page per visit, never cached: the reputation it prints and the
     // garage size it counts are the driver's current ones, and the route it
     // plans grows as the zone does. BACK returns to the calendar it was opened
     // from; the built event starts the race flow, which owns the drive to the
     // start, the registration check and the finish.
-    private void OpenCento()
+    private bool OpenCento()
     {
         // The year is not persisted (PORTPLAN 51): the game's fixed 1924 seed is
         // what every page stamps, and Unity prints the same pair.
@@ -538,7 +582,7 @@ public sealed class Navigation
             // instead of opening a page whose ENTER would have no route.
             _log.LogWarning(
                 $"cento miglia not opened: {streets.Count} zone street(s) hold no two doors");
-            return;
+            return false;
         }
 
         var facts = new CentoMigliaFacts(
@@ -556,6 +600,7 @@ public sealed class Navigation
             $"cento miglia opened: week {facts.Week}, rep {facts.ClubReputation:0.00}, " +
             $"{facts.CarsOwned} cars, class {facts.CarClass}, {_centoTiers.Count} tiers, " +
             $"route {route.DistanceKm:0.000} km over {streets.Count} street(s)");
+        return true;
     }
 
     // The zone's streets on the address map, home street first (the interim
@@ -645,8 +690,17 @@ public sealed class Navigation
     private HomeScreenViewModel CreateHomeScreen() =>
         new(GarageCommand,
             new RelayCommand(OpenAddresses),
+            new RelayCommand(OpenSuggestCarMod),
             MenuCommand,
             _beat);
+
+    // The car-mod suggestion page: one centred question, with SUGGEST above
+    // BACK in the bottom band. The page is the whole feature for now: there is
+    // no submission path yet, so SUGGEST runs an inert command that the future
+    // submission flow replaces here, without touching the page.
+    private void OpenSuggestCarMod() =>
+        ShowScreen(new SuggestCarModScreenViewModel(
+            new RelayCommand(OpenHome), new RelayCommand(() => { }), _beat));
 
     // The addresses page (PORTPLAN 24/27): the discovered POIs alphabetic, the
     // temporary stand-in for markers on the map. A row pins the HUD's drive-to
@@ -671,15 +725,18 @@ public sealed class Navigation
     /// in front of that continuation, so every way off the page passes through
     /// it. The board is ranked against the new area first, so the page's
     /// standings block renders a fresh result instead of polling.
+    /// <paramref name="grandmaCar"/> reaches those pages' copy (the broker
+    /// closes on the line only Grandma Sonja's car earns).
     /// </summary>
     public void ShowZoneExpansion(
-        ZoneExpansion zone, IReadOnlyList<PointOfInterest> added, Action next)
+        ZoneExpansion zone, IReadOnlyList<PointOfInterest> added, Action next,
+        bool grandmaCar = false)
     {
         ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(added);
         ArgumentNullException.ThrowIfNull(next);
         _zoneStandings.Refresh(zone.NewKm);
-        Action continuation = WithPoiIntros(added, next);
+        Action continuation = WithPoiIntros(added, next, grandmaCar);
         var page = new ZoneExpansionScreenViewModel(
             zone, added, _zoneStandings, _beat,
             new RelayCommand(continuation),
@@ -691,9 +748,10 @@ public sealed class Navigation
     // The explanation pages this growth earned, one per family, ahead of the
     // continuation. A family with no authored copy (a store door) adds none, so
     // an expansion that opened no explained business leaves the target alone.
-    private Action WithPoiIntros(IReadOnlyList<PointOfInterest> added, Action next)
+    private Action WithPoiIntros(
+        IReadOnlyList<PointOfInterest> added, Action next, bool grandmaCar)
     {
-        IReadOnlyList<PoiIntro> intros = PoiIntroCopy.ForAdded(added);
+        IReadOnlyList<PoiIntro> intros = PoiIntroCopy.ForAdded(added, grandmaCar);
         return intros.Count == 0 ? next : () => ShowPoiIntro(intros, 0, next);
     }
 
@@ -711,6 +769,21 @@ public sealed class Navigation
         ShowScreen(new PoiIntroScreenViewModel(
             intros[index], () => ShowPoiIntro(intros, index + 1, next), _beat));
     }
+
+    /// <summary>
+    /// The explanation page for one family whose door opened outside an
+    /// expansion (the insurance broker the first crash repair earns): the page
+    /// the expansion flow announces, built here so no caller news a page. Null
+    /// when the family has no authored copy, so the caller hands straight back
+    /// instead of painting a page that would say nothing. Revealing it (and
+    /// handing the player back afterwards) stays the caller's policy.
+    /// <paramref name="grandmaCar"/> adds the closing line only Grandma Sonja's
+    /// car earns (see <see cref="PoiIntroCopy.For"/>).
+    /// </summary>
+    public object? PoiIntroPage(string type, Action next, bool grandmaCar = false) =>
+        PoiIntroCopy.For(type, grandmaCar) is { } intro
+            ? new PoiIntroScreenViewModel(intro, next, _beat)
+            : null;
 
     // The trunk page (PORTPLAN 26, Unity YouScreen's TrunkScreen) is rebuilt on
     // every visit like Unity's RebuildTrunkScreen: a shop purchase made since

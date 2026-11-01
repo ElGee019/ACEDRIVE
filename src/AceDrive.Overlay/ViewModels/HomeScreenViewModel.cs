@@ -6,30 +6,33 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The home page (Unity's YouScreen): the player's own doors rather than the
-/// job board. The garage (PORTPLAN item 30) and the addresses page (the
-/// discovered POIs behind the marker-network stand-in) live here because
-/// Unity opens them from the You menu, not from the job list; later You-menu
-/// entries (trunk, settings, statistics) join the same page as they land. The
-/// page owns only navigation and its voice acknowledgment; the host builds
-/// the screen on every visit.
+/// job board. The garage (PORTPLAN item 30), the addresses page (the
+/// discovered POIs behind the marker-network stand-in) and the car-mod
+/// suggestion box live here because Unity opens them from the You menu, not
+/// from the job list; later You-menu entries (trunk, settings, statistics)
+/// join the same page as they land. The page owns only navigation and its
+/// voice acknowledgment; the host builds the screen on every visit.
 /// </summary>
 public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly ICommand _garageCommand;
     private readonly ICommand _addressesCommand;
+    private readonly ICommand _suggestCommand;
     private readonly ICommand _backCommand;
     private readonly VoiceBeat _beat;
 
     public HomeScreenViewModel(
-        ICommand garageCommand, ICommand addressesCommand, ICommand backCommand,
-        VoiceBeat beat)
+        ICommand garageCommand, ICommand addressesCommand, ICommand suggestCommand,
+        ICommand backCommand, VoiceBeat beat)
     {
         _garageCommand = garageCommand;
         _addressesCommand = addressesCommand;
+        _suggestCommand = suggestCommand;
         _backCommand = backCommand;
         _beat = beat;
         GarageCommand = new RelayCommand(Garage);
         AddressesCommand = new RelayCommand(Addresses);
+        SuggestCommand = new RelayCommand(Suggest);
         BackCommand = new RelayCommand(Back);
         RebuildVoice();
     }
@@ -39,6 +42,9 @@ public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
 
     /// <summary>Opens the addresses page (discovered POIs, alphabetical).</summary>
     public ICommand AddressesCommand { get; }
+
+    /// <summary>Opens the car-mod suggestion page.</summary>
+    public ICommand SuggestCommand { get; }
 
     /// <summary>The page's way back to the menu.</summary>
     public ICommand BackCommand { get; }
@@ -50,6 +56,10 @@ public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
     /// <summary>Teal-glow acknowledgment for the navigating ADDRESSES tap.</summary>
     public bool AddressesFlash { get => _addressesFlash; private set => SetField(ref _addressesFlash, value); }
     private bool _addressesFlash;
+
+    /// <summary>Teal-glow acknowledgment for the navigating SUGGEST CAR MOD tap.</summary>
+    public bool SuggestFlash { get => _suggestFlash; private set => SetField(ref _suggestFlash, value); }
+    private bool _suggestFlash;
 
     /// <summary>Teal-glow acknowledgment for the navigating BACK tap.</summary>
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
@@ -74,6 +84,13 @@ public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
         _addressesCommand.Execute(null);
     }
 
+    private void Suggest()
+    {
+        _beat.Cancel();
+        ClearFlash();
+        _suggestCommand.Execute(null);
+    }
+
     private void Back()
     {
         _beat.Cancel();
@@ -85,10 +102,11 @@ public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
     {
         VoiceActions = new Dictionary<string, Action>
         {
-            // Both buttons navigate: glow first, act at the end of the shared
+            // Every button navigates: glow first, act at the end of the shared
             // beat, and clear the glow on the way out (bank-page precedent).
             [Strings.Get("HomeGarage")] = () => FireVoice("garage", _garageCommand),
             [Strings.Get("HomeAddresses")] = () => FireVoice("addresses", _addressesCommand),
+            [Strings.Get("HomeSuggestCarMod")] = () => FireVoice("suggest", _suggestCommand),
             [Strings.Get("HomeBack")] = () => FireVoice("back", _backCommand),
         };
     }
@@ -97,6 +115,7 @@ public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
     {
         GarageFlash = target == "garage";
         AddressesFlash = target == "addresses";
+        SuggestFlash = target == "suggest";
         BackFlash = target == "back";
         _beat.Defer(() =>
         {
@@ -109,6 +128,7 @@ public sealed class HomeScreenViewModel : ViewModelBase, IVoiceScreen
     {
         GarageFlash = false;
         AddressesFlash = false;
+        SuggestFlash = false;
         BackFlash = false;
     }
 }

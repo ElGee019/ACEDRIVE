@@ -356,20 +356,26 @@ public sealed class WhereIsWillyFlowTests
     [Fact]
     public void NoCoffeeShop_LocksTheRowAndDrawsNothing()
     {
+        // No coffee-shop door discovered and no coffee-beans hub opened: the
+        // row stays closed and the tap only shows the career hint. The button
+        // keeps the plain label; the hint belongs to the click.
         var hud = new FakeTelemetryHud();
-        TestSessionResult session = Create(hud, directory: new PoiDirectory());
+        TestSessionResult session = Create(
+            hud, directory: new PoiDirectory(),
+            career: new DeliveryCareer(HubCatalog.Default, 0));
 
         CalendarScreenViewModel calendar = OpenCalendar(session);
         CalendarRow willy = WillyRow(calendar);
         Assert.True(willy.Locked);
         Assert.False(willy.Completed);
-        Assert.Equal("UNLOCK COFFEE BEANS CAREER FIRST", willy.EventLabel);
+        Assert.Equal("Where is Willy", willy.EventLabel);
 
         calendar.DayCommand.Execute(4);
         session.Clock.Advance(TimeSpan.FromSeconds(0.51));
         session.Vm.Poll();
 
-        Assert.Equal("UNLOCK COFFEE BEANS CAREER FIRST", WillyRow(calendar).EventLabel);
+        Assert.Equal(
+            "START A COFFEE BEANS DELIVERY CAREER FIRST", WillyRow(calendar).EventLabel);
         Assert.False(session.Willy.InFlight);
         Assert.Null(hud.Destination);
     }
@@ -542,13 +548,15 @@ public sealed class WhereIsWillyFlowTests
         FakeDriverStore? drivers = null, Garage? garage = null,
         PoiDirectory? directory = null, DriverState? saved = null,
         TaxiShift? shift = null, DateTime? gameStart = null,
-        AddressMap? map = null, bool ignoreGates = false)
+        AddressMap? map = null, DeliveryCareer? career = null,
+        bool ignoreGates = false)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         return TestSession.Create(new TestSessionOptions
         {
             SpeedKmh = 0f,
             GameStart = gameStart ?? WednesdayNoon,
+            Career = career ?? CoffeeBeansCareer(),
             Hud = hud,
             Wallet = wallet,
             Friendships = friends,
@@ -563,6 +571,22 @@ public sealed class WhereIsWillyFlowTests
             Shift = shift,
             IgnoreEventGates = ignoreGates,
         });
+    }
+
+    // The missing-person run belongs to the coffee-beans delivery career (the
+    // calendar row's gate), so a session that starts the run has opened that
+    // hub on the delivery screen first, like a player would.
+    private static DeliveryCareer CoffeeBeansCareer()
+    {
+        var career = new DeliveryCareer(
+            new HubCatalog(
+                [new HubTier(1, true,
+                    [new HubCareer("coffee_beans", "COFFEE BEANS", [new HubLevel("CoffeeUs", 100)])])],
+                Ramp: null,
+                OwnerNames: []),
+            1000.0);
+        Assert.True(career.TryOpenCareer(1, 0, 0));
+        return career;
     }
 
     private static WhereIsWillyScreenViewModel Begin(

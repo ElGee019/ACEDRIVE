@@ -113,6 +113,48 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void ArrivingAtTheDestination_TakesTheBannerBackFromATaskPrompt()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.SetTaskPrompt(new HudTaskPrompt(
+            "HudAccidentSolo", ["120", "2000.00"], "HudAccidentRepair"));
+        Assert.Equal(
+            "Accident! 120 km/h impact — repair the car to be able to continue. " +
+            "Repair cost: CR2000.00.",
+            vm.BannerText);
+
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        // The door the car just reached owns the slot: its ENTER comes back and
+        // the prompt the player drove past goes, so the arrival is never buried
+        // under the prompt's own button.
+        Assert.True(vm.AtDestination);
+        Assert.Null(vm.CurrentTaskPrompt);
+        Assert.False(vm.ShowTaskAction);
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal("ENTER", vm.EnterText);
+    }
+
+    [Fact]
+    public void TaskPrompt_SetAfterADoorWasEntered_StillShowsItsButton()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand());
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+        vm.DestinationEntered();
+
+        vm.SetTaskPrompt(new HudTaskPrompt(
+            "HudAccidentSolo", ["120", "2000.00"], "HudAccidentRepair"));
+
+        // A prompt is a fresh announcement, not the arrival the player already
+        // consumed: the repair button can never be latched away, and the
+        // arrival's ENTER stays down for the same slot.
+        Assert.True(vm.ShowTaskAction);
+        Assert.False(vm.ShowEnterButton);
+    }
+
+    [Fact]
     public void ApplyPreferences_KeepsTheTaskPromptPainted()
     {
         var vm = Create();

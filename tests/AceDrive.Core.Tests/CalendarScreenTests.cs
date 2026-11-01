@@ -14,7 +14,7 @@ public sealed class CalendarScreenTests
         DateTime? gameStart = null, int week = 1,
         Action<int>? openDay = null, Action? back = null,
         WhereIsWillyLedger? willy = null, bool coffeeCareer = true,
-        bool ignoreGates = false)
+        bool coffeeBeansCareer = true, bool ignoreGates = false)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
@@ -26,7 +26,8 @@ public sealed class CalendarScreenTests
             CalendarStamp.Default with { Week = week },
             new ParameterizedCommand<int>(day => openDay?.Invoke(day)),
             new RelayCommand(() => back?.Invoke()),
-            willy ?? new WhereIsWillyLedger(), () => coffeeCareer, ignoreGates);
+            willy ?? new WhereIsWillyLedger(), () => coffeeCareer,
+            () => coffeeBeansCareer, ignoreGates);
     }
 
     [Fact]
@@ -57,12 +58,61 @@ public sealed class CalendarScreenTests
     [Fact]
     public void SaturdayButton_ReadsTouristenfahrtenDeliveries()
     {
-        // The Saturday row owns the Touristenfahrten run, so the strip renders
-        // its button between Grandma's pancakes and Cento Miglia.
-        var vm = Create();
+        // The Saturday row owns the Touristenfahrten run, so once its first
+        // week has passed the strip renders its button between Grandma's
+        // pancakes and Cento Miglia.
+        var vm = Create(week: 2);
         CalendarRow saturday = Assert.Single(vm.Days, d => d.DayLabel == "Saturday");
         Assert.Equal(7, saturday.DayOfWeek);
         Assert.Equal("Touristenfahrten Deliveries", saturday.EventLabel);
+    }
+
+    [Fact]
+    public void SaturdayButton_HidesUntilItsSecondWeek()
+    {
+        // The run is not part of the first week's strip. The real start: a
+        // career opens on Saturday morning, week 1, so the row is today and
+        // inside the window and still offers nothing — the player's first
+        // Saturday has to be over first.
+        int opened = -1;
+        var vm = Create(
+            gameStart: new DateTime(2026, 10, 10, 12, 0, 0, DateTimeKind.Utc),
+            openDay: day => opened = day);
+        CalendarRow saturday = Assert.Single(vm.Days, d => d.DayLabel == "Saturday");
+
+        Assert.True(saturday.IsToday);
+        Assert.Equal(string.Empty, saturday.EventLabel);
+        Assert.False(saturday.IsOpen);
+        Assert.DoesNotContain("Touristenfahrten Deliveries", vm.VoiceActions.Keys);
+
+        vm.DayCommand.Execute(7);
+        Assert.Equal(-1, opened);
+        Assert.All(vm.Days, d => Assert.False(d.Flash));
+
+        // The week rolls at the Sunday midnight that ends the first Saturday.
+        vm.DisplayWeek = 2;
+        vm.Refresh();
+        saturday = Assert.Single(vm.Days, d => d.DayLabel == "Saturday");
+        Assert.Equal("Touristenfahrten Deliveries", saturday.EventLabel);
+        Assert.Contains("Touristenfahrten Deliveries", vm.VoiceActions.Keys);
+        vm.DayCommand.Execute(7);
+        Assert.Equal(7, opened);
+    }
+
+    [Fact]
+    public void SaturdayButton_WithGatesIgnored_ShowsInTheFirstWeek()
+    {
+        // TEMPORARY (testing): the tester switch makes every event row
+        // available, so a playtest can replay the run without waiting a week.
+        int opened = -1;
+        var vm = Create(openDay: day => opened = day, ignoreGates: true);
+
+        Assert.Equal(
+            "Touristenfahrten Deliveries",
+            Assert.Single(vm.Days, d => d.DayLabel == "Saturday").EventLabel);
+
+        vm.DayCommand.Execute(7);
+        Assert.Equal(7, opened);
     }
 
     [Fact]
@@ -311,8 +361,11 @@ public sealed class CalendarScreenTests
     }
 
     [Fact]
-    public void WillyRow_CoffeeCareerClosed_ReadsLockedAndWarnsWithoutOpening()
+    public void WillyRow_CoffeeCareerClosed_KeepsThePlainLabelAndWarnsWithoutOpening()
     {
+        // The closed coffee career never touches the button: same label, same
+        // styling as every other row. The tap is what explains what to start
+        // first, and Locked only carries that behaviour.
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
         int opened = -1;
@@ -324,7 +377,7 @@ public sealed class CalendarScreenTests
         CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
         Assert.True(willy.Locked);
         Assert.False(willy.Completed);
-        Assert.Equal("UNLOCK COFFEE BEANS CAREER FIRST", willy.EventLabel);
+        Assert.Equal("Where is Willy", willy.EventLabel);
 
         vm.DayCommand.Execute(4);
         Assert.Equal(-1, opened);
@@ -333,7 +386,13 @@ public sealed class CalendarScreenTests
         beat.Poll();
         vm.UpdateFlash();
         Assert.Equal(
-            "UNLOCK COFFEE BEANS CAREER FIRST",
+            "START A COFFEE BEANS DELIVERY CAREER FIRST",
+            Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(3.1));
+        vm.UpdateFlash();
+        Assert.Equal(
+            "Where is Willy",
             Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
     }
 
@@ -374,6 +433,44 @@ public sealed class CalendarScreenTests
         Assert.False(willy.Completed);
         Assert.False(willy.Locked);
         Assert.Equal("Where is Willy", willy.EventLabel);
+    }
+
+    [Fact]
+    public void WillyRow_WithGatesIgnoredAndNoCoffeeBeansCareer_WarnsForThreeSeconds()
+    {
+        // The playtest switch keeps every row playable, but the missing-person
+        // run belongs to the coffee-beans delivery career: without that career
+        // the tap shows the hint for the strip's three real seconds and never
+        // dispatches.
+        var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
+        int opened = -1;
+        var vm = Create(
+            clock, beat: beat,
+            gameStart: new DateTime(2026, 10, 12, 12, 0, 0, DateTimeKind.Utc),
+            openDay: day => opened = day,
+            coffeeBeansCareer: false,
+            ignoreGates: true);
+
+        CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
+        Assert.False(willy.Locked);
+        Assert.Equal("Where is Willy", willy.EventLabel);
+
+        vm.DayCommand.Execute(4);
+        Assert.Equal(-1, opened);
+
+        clock.Advance(TimeSpan.FromSeconds(0.51));
+        beat.Poll();
+        vm.UpdateFlash();
+        Assert.Equal(
+            "START A COFFEE BEANS DELIVERY CAREER FIRST",
+            Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(3));
+        vm.UpdateFlash();
+        Assert.Equal(
+            "Where is Willy",
+            Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
     }
 
     [Fact]

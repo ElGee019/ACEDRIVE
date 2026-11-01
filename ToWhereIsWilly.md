@@ -70,11 +70,13 @@ Unity source: `C:\Users\gouwy\Documents\BS\BS\LATESTDRIVEBS2\Assets\Scripts`.
   The row then reads `Where are Willy and Lily (Completed)`, grey italic, not
   clickable. Only the receipt writes the stamp, so an abandoned or restarted
   search leaves the row open.
-- Coffee career gate: the job-centre button label is
+- Coffee career gate: Unity's job-centre button relabels itself
   `UNLOCK COFFEE BEANS CAREER FIRST` when the player has neither a
   `coffee_shop` POI nor an owned `coffee_beans` wholesale hub
-  (`HasCoffeeBeansCareer`). The row itself stays the event text; the gate is
-  guidance, not a hard refusal (Unity still runs the click's own checks).
+  (`HasCoffeeBeansCareer`). The port keeps the row's own event text and carries
+  the gate as the tap's 3 s hint instead (§3.5), so the button never renames
+  itself; the gate stays guidance, not a hard refusal (Unity still runs the
+  click's own checks).
 - Outside the window a click flashes
   `COME BACK ON WEDNESDAY BETWEEN 8am AND 8pm`; when completed,
   `SEE YOU NEXT WEDNESDAY` (3 s, then the label restores).
@@ -427,11 +429,19 @@ for the Willy day:
 |---|---|---|
 | open | `EventWilly` | dispatch + teal flash |
 | completed today | `EventWillyCompleted` (`Where are Willy and Lily (Completed)` equivalent: `Where is Willy (Completed)`), grey italic | 3 s warning `ControlGateWillyDone` (`SEE YOU NEXT WEDNESDAY`) |
-| coffee career closed | `EventWillyLocked` (`UNLOCK COFFEE BEANS CAREER FIRST`), grey | 3 s warning `ControlGateWillyLocked` |
+| coffee career closed | `EventWilly` (`Where is Willy`), styled exactly like every other row — the button announces nothing | 3 s warning `ControlGateWillyCareer` (`START A COFFEE BEANS DELIVERY CAREER FIRST`) |
+| coffee-beans career not started (gates ignored for testing) | normal | 3 s warning `ControlGateWillyCareer` |
 | outside Wed 08–20 | normal | existing `ControlGateWarning` |
 
+The row's second predicate is the career itself, not its label state: `OwnsCoffeeCareer`
+is true only once a `coffee_beans` hub is bought on the delivery screen, so a merely
+discovered coffee-shop door does not open the search. The tap asks it live, which keeps
+the day-gate bypass (`IgnoreEventGatesForTesting`) from opening a run the player has no
+career for.
+
 The page's existing 3 s warning slot carries both new warnings, so no new
-timer. The view adds two `DataTrigger`s for the grey/italic state.
+timer. `Locked` is behaviour only: the view's single grey/italic `DataTrigger`
+binds `Completed`, and the locked row renders like every other row.
 
 ### 3.6 Wiring
 
@@ -439,7 +449,7 @@ timer. The view adds two `DataTrigger`s for the grey/italic state.
 |---|---|
 | `Navigation` | ctor takes `WhereIsWillyFlow`; `_willyDay` read off `ControlCalendar.Week`; `OnDay(day == _willyDay)` → `_willy.Begin()` (a running quest reopens its page); the *other* event days plus `OpenTaxiShift` and `ShowDelivery` guard on `_willy.InFlight` (Unity's blocked job centre) |
 | `MainViewModel` | ctor takes the flow; `Attach(this)`; `Poll` calls `_willy.Advance(s)` after `_hud.Update` (the valuation venue now opens through its own POI handler, not the poll); implements `IWhereIsWillyHost` |
-| `CalendarScreenViewModel` | ctor takes the ledger + the career predicate; builds Completed/Locked labels and the two warnings |
+| `CalendarScreenViewModel` | ctor takes the ledger + the two career predicates (`HasCoffeeCareer` for the locked state, `OwnsCoffeeCareer` for the tap); builds the Completed label (the locked row keeps its plain label) and the two warnings |
 | `PoiWorld` | the flow's handler joins `Handlers(...)` (registered first) |
 | `GameStateSaver` | ctor takes `WhereIsWillyLedger`; `SaveDriver` writes `LastWillyDate` |
 | `App.OnStartup` | load the rules; build the ledger from `savedDriver`; build the flow after `dayCycle`/`poiDirectory`/`residents`; pass ledger to the saver/nav/calendar, flow to nav/VM |
@@ -454,9 +464,8 @@ timer. The view adds two `DataTrigger`s for the grey/italic state.
 
 ```
 EventWillyCompleted          Where is Willy (Completed)
-EventWillyLocked             UNLOCK COFFEE BEANS CAREER FIRST
 ControlGateWillyDone         SEE YOU NEXT WEDNESDAY
-ControlGateWillyLocked       UNLOCK COFFEE BEANS CAREER FIRST
+ControlGateWillyCareer       START A COFFEE BEANS DELIVERY CAREER FIRST
 
 WillyTitle                   WHERE IS WILLY
 WillyIntro                   Old {0} has gone missing! Can you find our lovely elder in one of the coffeeshops inside your operating zone and bring {1} home?&#10;&#10;Select a coffee shop in {2} to find out whether {1} is there.

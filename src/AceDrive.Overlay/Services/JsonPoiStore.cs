@@ -96,6 +96,7 @@ public sealed class JsonPoiStore
             PoiPacing.JobsFirstThenStreets => rule.FirstJobs > 0 && rule.FirstStreets >= 0,
             PoiPacing.Either => rule.FirstJobs > 0 && rule.FirstStreets > 0,
             PoiPacing.OwnedCategory => !string.IsNullOrWhiteSpace(poi.Category),
+            PoiPacing.GrantedFirstThenStreets => rule.FirstStreets >= 0,
             _ => false,
         };
     }

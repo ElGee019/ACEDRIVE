@@ -29,6 +29,7 @@ public sealed class GameStateSaver
     private readonly VisitLedger _visits;
     private readonly ValuationLedger _valuation;
     private readonly WhereIsWillyLedger _willy;
+    private readonly WeeklyEventLedger _weeklyEvents;
     private readonly DeliveryCareer _career;
     private readonly Trunk _trunk;
     private readonly Garage _garage;
@@ -48,7 +49,7 @@ public sealed class GameStateSaver
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
         TaxiShift shift, ShiftRecord shifts, JobLedger jobs,
         DestinationPins pins, VisitLedger visits, ValuationLedger valuation,
-        WhereIsWillyLedger willy, DeliveryCareer career)
+        WhereIsWillyLedger willy, DeliveryCareer career, WeeklyEventLedger weeklyEvents)
     {
         _clock = clock;
         _game = game;
@@ -67,6 +68,7 @@ public sealed class GameStateSaver
         _visits = visits;
         _valuation = valuation;
         _willy = willy;
+        _weeklyEvents = weeklyEvents;
         _career = career;
         _trunk = trunk;
         _garage = garage;
@@ -197,6 +199,12 @@ public sealed class GameStateSaver
             // (ToWhereIsWilly.md §2.9): the search itself is session state, so
             // a restart inside the run reopens the row with nothing paid.
             LastWillyDate = _willy.LastCompletedDate,
+            // The calendar's once-per-week stamps (WeeklyEventLedger): the game
+            // date each stamped event was last taken, so a restart inside the
+            // same week keeps those rows closed instead of reopening an event
+            // the player already used. The valuation and the missing-person run
+            // keep the two stamps above; this map holds the rest.
+            WeeklyEventDates = _weeklyEvents.Snapshot,
             // The delivery career (PORTPLAN 18/51): the CredP left, the hubs
             // bought and each hub's ramp count. Every career mutation is
             // followed by this save, so a closed overlay reopens the career

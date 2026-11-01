@@ -47,6 +47,9 @@ Unity facts (`Models/CarStats.cs`, `Models/PlayerData.cs` OwnedCar,
   lock, no insurance requirement, no trade-in.
 - New car defaults: `odometer 0`, `fuel = tank × 0.5`, `hasInsurance false`,
   `breakdownChance 0`, maintenance parts initialized at the current odometer.
+  One exception: the walk's Grandma car is handed over **insured** (she covered
+  it), which is what the insurance broker's page promises. Bought cars stay
+  uncovered until the player insures them at a broker.
 - After buying: `BoughtFirstCar` = DRIVE NEW / KEEP CURRENT, with a summary
   block only when the garage now holds two cars. The current car
   (`PlayerData.grandmaCar`) is what the game spawns and what every per-car
@@ -127,9 +130,11 @@ flat **CR50** wash clears it, filth 25 refuses a taxi pickup (−1 friendship,
 −1 concentration — both wired, the concentration half at the pickup refusal).
 
 Insurance: per car, `max(1, price × 0.0005 × 1.15 × (1 − driverRating/100))`
-charged nightly at 01:00 game time for every insured car (needs a saved
-`LastInsuranceDay` stamp); a repair pays out `× 0.9` into an escrow the player
-collects. Cargo cover waits for the reward catalog (61).
+due once per game date from 01:00 game time onward for every insured car (a
+saved `LastInsuranceDay` stamp; an uncovered garage stamps nothing, so the
+first day a car is covered is billed on that same day); a repair pays out
+`× 0.9` into an escrow the player collects. Cargo cover waits for the reward
+catalog (61).
 
 Breakdown: one roll at trip start (`rand < chance`), then a fixed fraction
 0.10-0.90 of the route; pickup fee **CR100**; consequences per job kind (taxi job
@@ -157,11 +162,12 @@ Port to ACEDRIVE:
       concentration −1 (item 06); the wash owner's friendship bump stays
       parked.
 - [x] `InsuranceRules` + `InsurancePricing` (Core) + the per-car flag + the
-      nightly charge (once per game date in the 01:00 hour, `ChargeUnavoidable`
-      so a premium is a commitment and the ledger never goes negative) + the
-      broker page and the escrow collect (the 0.9× payout is wired to the
-      mechanic repair — DIVERGENCE: Unity fed it from the accident RepairScreen,
-      which item 40 declines; the ACE accident signal could feed it later).
+      nightly charge (once per game date from the 01:00 hour onward,
+      `ChargeUnavoidable` so a premium is a commitment and the ledger never goes
+      negative) + the broker page and the escrow collect (the 0.9× payout is
+      wired to the mechanic repair — DIVERGENCE: Unity fed it from the accident
+      RepairScreen, which item 40 declines; the ACE accident signal could feed
+      it later).
 - [x] `BreakdownStrategy`/`BreakdownKind`/`BreakdownOutcome` (Core) + the roll at
       the trip start (taxi ACCEPT, delivery DELIVER — the placeholder's trip
       starts, since there is no driving distance yet) + the per-kind consequences

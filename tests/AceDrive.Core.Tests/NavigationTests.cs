@@ -70,6 +70,8 @@ public sealed class NavigationTests
         // One instance per service graph: the saver writes the same stores the
         // assertions read.
         var willyLedger = new WhereIsWillyLedger();
+        // The calendar's once-per-week stamps for the events without a ledger.
+        var weeklyEvents = new WeeklyEventLedger();
         // One career instance the saver, the POI world and the navigator share.
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var saver = new GameStateSaver(
@@ -78,7 +80,7 @@ public sealed class NavigationTests
             wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
             new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), willyLedger, career);
+            new ValuationLedger(), willyLedger, career, weeklyEvents);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
         var directory = new PoiDirectory();
         IReadOnlyList<CarSpec> poolCars = pool;
@@ -90,7 +92,7 @@ public sealed class NavigationTests
             new PoiSpawner(
                 PoiCatalog.Default,
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0),
-            directory, new FakePoiDirectoryStore(), board, career, city,
+            directory, new FakePoiDirectoryStore(), AddressMap.Default, board, career, city,
             StoreCatalog.Default, new OperatingZone(null, seed: 0, AddressMap.Default), new JobLedger(),
             onboarding,
             new ShopInteriors(
@@ -185,7 +187,7 @@ public sealed class NavigationTests
             trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
-            valuation, willy, willyLedger, roadTest, touristen,
+            valuation, willy, willyLedger, roadTest, touristen, weeklyEvents,
             () => "mazda", new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);
@@ -218,6 +220,23 @@ public sealed class NavigationTests
         menu.HomeCommand.Execute(null);
         var second = Assert.IsType<HomeScreenViewModel>(shell.CurrentScreen);
         Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void Home_SuggestCarModOpensTheSuggestionPageAndBackReturnsToAHomePage()
+    {
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
+
+        nav.ShowMenuPage();
+        var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(shell.CurrentScreen);
+
+        home.SuggestCommand.Execute(null);
+        var page = Assert.IsType<SuggestCarModScreenViewModel>(shell.CurrentScreen);
+
+        page.BackCommand.Execute(null);
+        Assert.IsType<HomeScreenViewModel>(shell.CurrentScreen);
     }
 
     [Fact]
@@ -441,6 +460,37 @@ public sealed class NavigationTests
         Assert.Same(calendar, shell.CurrentScreen);
         Assert.Contains(
             log.Infos, line => line.StartsWith("cento miglia opened:", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CentoDay_TwiceInTheSameWeek_RefusesTheSecondPage()
+    {
+        // The Sunday row is once a week (the calendar's stamp): the page opens
+        // once, and a second tap after BACK is refused with a log line instead
+        // of a second event page.
+        var (nav, shell, _, clock, _, _, _, _, _, _, log, _) = Create();
+        nav.ShowMenuPage();
+        Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(
+            ((6 * 24 * 60) + 1) * GameClock.RealSecondsPerGameMinute));
+        nav.Tick();
+        var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
+        int centoDay = ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.CentoMiglia).DayOfWeek;
+
+        calendar.DayCommand.Execute(centoDay);
+        Assert.IsType<CentoMigliaScreenViewModel>(shell.CurrentScreen)
+            .BackCommand.Execute(null);
+        Assert.Same(calendar, shell.CurrentScreen);
+
+        calendar.DayCommand.Execute(centoDay);
+
+        Assert.Same(calendar, shell.CurrentScreen);
+        Assert.Contains(
+            log.Infos,
+            line => line.StartsWith(
+                $"calendar event {ControlCalendar.CentoMiglia} refused:",
+                StringComparison.Ordinal));
     }
 
     [Fact]

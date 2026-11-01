@@ -55,7 +55,7 @@ public sealed class DriverCatchUpTests
             new Hunger(HungerRules.Default), TestRoadCars.Ledger(), new TaxiShift(),
             new ShiftRecord(null), new JobLedger(), new DestinationPins(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0));
+            new DeliveryCareer(HubCatalog.Default, 0), new WeeklyEventLedger());
         var catchUp = new DriverCatchUp(
             onboarding, garage, streak, wallet, new Random(0), saver, new FakeRivals(), log);
         return new Fixture(catchUp, garage, wallet, streak, drivers, garages, log);
@@ -74,6 +74,9 @@ public sealed class DriverCatchUpTests
         OwnedCar car = Assert.Single(fixture.Garage.Cars);
         Assert.Equal(Starter, car.Key);
         Assert.Equal(3, car.PurchaseWeek);
+        // The seeded car is the one grandma handed over, so it comes insured
+        // like the walk's own pick.
+        Assert.True(car.HasInsurance);
         Assert.Equal(Starter, fixture.Garage.CurrentKey);
         Assert.Equal(1, fixture.Garages.Saves);
         Assert.Equal(Starter, fixture.Garages.Load()!.CurrentKey);

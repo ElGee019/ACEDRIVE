@@ -3,10 +3,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Home page (Unity's YouScreen): the player's own doors, not the job
-         board. The garage lives here, and so does the addresses page that
-         stands in for POI markers on the map; the remaining You-menu entries
-         join it as their pages land. Same page skeleton as the wallet page:
-         title band, centred body, BACK flush at the bottom. -->
+         board. The garage lives here, and so do the addresses page that
+         stands in for POI markers on the map and the car-mod suggestion box;
+         the remaining You-menu entries join it as their pages land. Same page
+         skeleton as the wallet page: title band, centred body, BACK flush at
+         the bottom. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -28,11 +29,23 @@
                     </Style>
                 </Button.Style>
             </Button>
-            <Button Content="{loc:Loc Key=HomeAddresses}" Command="{Binding AddressesCommand}">
+            <Button Content="{loc:Loc Key=HomeAddresses}" Command="{Binding AddressesCommand}"
+                    Margin="0,0,0,6">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding AddressesFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{loc:Loc Key=HomeSuggestCarMod}" Command="{Binding SuggestCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding SuggestFlash}" Value="True">
                                 <Setter Property="Foreground" Value="#FF97EAD2"/>
                             </DataTrigger>
                         </Style.Triggers>

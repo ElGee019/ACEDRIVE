@@ -32,6 +32,10 @@ public sealed class FleetService
     // damage per zone, not a crash event, so the detector turns a jump in it
     // into one impact with the pre-hit speed attached.
     private readonly AccidentDetector _accidents = new();
+    // The premium's day cache: the poll runs at 10 Hz and the rules' stamp is a
+    // string, so it is built once per game date instead of once per tick.
+    private DateTime _premiumDate;
+    private string _premiumStamp = string.Empty;
 
     public FleetService(
         Garage garage, IReadOnlyList<CarSpec> cars, GameClock game,
@@ -238,27 +242,30 @@ public sealed class FleetService
 
     /// <summary>
     /// The nightly per-car insurance premium (PORTPLAN 34, Unity
-    /// GameClockManager.UpdateInsurance): once per game date, inside the rules'
-    /// charge hour, for every insured car with a price. The charge takes what
-    /// the cash covers (a premium is a commitment, not a purchase), and the
-    /// stamp rides the driver save so a restart inside the same hour never
+    /// GameClockManager.UpdateInsurance): once per game date, from the rules'
+    /// charge hour onward, for every insured car with a price. The charge takes
+    /// what the cash covers (a premium is a commitment, not a purchase), and the
+    /// stamp rides the driver save so a restart inside the same day never
     /// double-charges. True when a charge was banked, so the caller can run the
     /// shared driver save. The discount reads the wallet's LIVE overall rating
     /// (PORTPLAN 06): a skill gained earlier today lowers tonight's premium.
+    /// WHY the due window instead of the exact hour: cover has to cost from the
+    /// moment the garage holds an insured car. Grandma Sonja hands her car over
+    /// insured on the first game day, and a session that opens (or a career that
+    /// starts) after the charge hour would otherwise drive that whole day free.
     /// </summary>
     public bool ChargeDailyInsurance()
     {
         DateTime now = _game.GameNow;
-        if (now.Hour != _insurance.ChargeHour)
+        if (now.Hour < _insurance.ChargeHour)
         {
             return false;
         }
-        string date = now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        string date = Stamp(now);
         if (string.Equals(_wallet.LastInsuranceChargeDate, date, StringComparison.Ordinal))
         {
             return false;
         }
-        _wallet.MarkInsuranceCharged(date);
         double total = 0.0;
         int insured = 0;
         double driverRating = _wallet.Rating.Overall;
@@ -274,12 +281,29 @@ public sealed class FleetService
         }
         if (insured == 0)
         {
+            // Nothing is covered yet, so no date is stamped: a car insured later
+            // today then pays today's premium instead of waiting for tomorrow.
             return false;
         }
 
+        _wallet.MarkInsuranceCharged(date);
         _log.LogInfo($"[Insurance] daily premium {total:0.00} CR for {insured} car(s) " +
             $"(cash {_wallet.Cash:0.00})");
         return true;
+    }
+
+    // The driver save's date stamp ("yyyy-MM-dd"), cached per game date so the
+    // 10 Hz poll never formats one.
+    private string Stamp(DateTime now)
+    {
+        DateTime day = now.Date;
+        if (day != _premiumDate)
+        {
+            _premiumDate = day;
+            _premiumStamp = day.ToString(
+                "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        }
+        return _premiumStamp;
     }
 
     // Unity DrivingManager.RunEngineInspections: the weekly check is

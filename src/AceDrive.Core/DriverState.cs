@@ -103,7 +103,11 @@ public sealed record DriverState(
     int LastValuationResetWeek = -1,
     string? LastWillyDate = null,
     DateTime? ValuationEnteredAtUtc = null,
-    DeliveryCareerState? Career = null)
+    DeliveryCareerState? Career = null,
+    // The calendar's once-per-week stamps (WeeklyEventLedger): event id to the
+    // game date it was last taken, so a restart inside the same week keeps the
+    // row closed instead of reopening an event the player already used.
+    IReadOnlyDictionary<string, string>? WeeklyEventDates = null)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

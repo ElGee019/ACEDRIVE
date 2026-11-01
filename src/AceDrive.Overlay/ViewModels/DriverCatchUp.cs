@@ -80,7 +80,8 @@ public sealed class DriverCatchUp
     // 30): a save whose onboarding already ran but whose garage is still empty —
     // every save written before the garage existed — seeds the car it picked
     // instead of opening on an empty garage. Unity creates the starter OwnedCar
-    // at the pick itself, so this is the same state one session later.
+    // at the pick itself, so this is the same state one session later — insured,
+    // like the pick (grandma hands her car over covered).
     private void SeedStarterCar(string? starter, int displayWeek)
     {
         if (_garage.Cars.Count != 0 || starter is not { Length: > 0 })
@@ -88,7 +89,7 @@ public sealed class DriverCatchUp
             return;
         }
 
-        _garage.Add(starter, displayWeek);
+        _garage.Add(starter, displayWeek).SetInsurance(insured: true);
         _saver.SaveGarage();
         _log.LogInfo($"garage seeded with grandma's car: {starter}");
     }

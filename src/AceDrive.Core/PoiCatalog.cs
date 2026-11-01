@@ -12,9 +12,11 @@ public static class PoiCatalog
     /// The built-in table: Max's story shop plus the generated businesses and
     /// stores. A new career owns none of them yet: the spawn rules carry
     /// Unity's thresholds, so the car wash opens at 6 discovered streets, the
-    /// insurance broker at 13, the bank at 15, the dealer after 10 jobs and
-    /// the mechanic after 36. Grocery and coffee shops open from an owned hub
-    /// (one immediately, then per street interval). Data/pois.json is the
+    /// bank at 15, the dealer after 10 jobs and the mechanic after 36. The
+    /// insurance broker's first door is not street-paced: the first crash
+    /// repair opens it, and the street curve then adds one at 13 + 57 and
+    /// every interval after that. Grocery and coffee shops open from an owned
+    /// hub (one immediately, then per street interval). Data/pois.json is the
     /// source of truth.
     /// </summary>
     public static IReadOnlyList<PoiDefinition> Default { get; } =
@@ -35,7 +37,8 @@ public static class PoiCatalog
             "insurance", "Insurance Broker", PoiTypes.Insurance,
             NamePattern: "{0}'s Insurance",
             Spawn: new PoiSpawnRule(
-                PoiPacing.Streets, FirstStreets: 13, IntervalStreets: 57)),
+                PoiPacing.GrantedFirstThenStreets,
+                FirstStreets: 13, IntervalStreets: 57)),
         new PoiDefinition(
             "bank", "Bank", PoiTypes.Bank,
             NamePattern: "{0}'s Bank",

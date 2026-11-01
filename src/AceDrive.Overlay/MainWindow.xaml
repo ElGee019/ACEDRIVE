@@ -47,6 +47,9 @@
         <DataTemplate DataType="{x:Type vm:AddressesScreenViewModel}">
             <views:AddressesScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:SuggestCarModScreenViewModel}">
+            <views:SuggestCarModScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:WalletScreenViewModel}">
             <views:WalletScreenView/>
         </DataTemplate>

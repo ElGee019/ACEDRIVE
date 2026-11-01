@@ -122,9 +122,9 @@ public sealed class WorldTicks
     }
 
     // Nightly insurance charge (PORTPLAN 34, Unity GameClockManager.
-    // UpdateInsurance): once per game date, in the charge hour. Runs on the
-    // game clock, so it lands whether or not EVO is attached. A charged premium
-    // is progress the player loses on a kill, so it banks now.
+    // UpdateInsurance): once per game date, from the charge hour onward. Runs on
+    // the game clock, so it lands whether or not EVO is attached. A charged
+    // premium is progress the player loses on a kill, so it banks now.
     private void TickInsurance()
     {
         if (_fleet.ChargeDailyInsurance())

@@ -397,11 +397,11 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         _taskPrompt is { } prompt ? Strings.Get(prompt.ActionKey) : string.Empty;
 
     /// <summary>
-    /// True while the task prompt's action button is up. It needs no arrival
-    /// (the found-elder prompt is up the moment the shop is parked at), so the
-    /// race/enter rule does not apply here.
+    /// True while the task prompt's action button is up. A prompt is announced
+    /// content, so it always arms its own button: the arrival latch a walk-in
+    /// consumes belongs to the door, never to a prompt set afterwards.
     /// </summary>
-    public bool ShowTaskAction => _taskPrompt is not null && !_entered;
+    public bool ShowTaskAction => _taskPrompt is not null;
 
     /// <summary>
     /// Spoken words the prompt's button answers to ("drive", plus the shared
@@ -480,6 +480,14 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
                 // The car left the door: the next arrival invites ENTER again.
                 SetEntered(false);
             }
+            else if (_taskPrompt is not null)
+            {
+                // The car reached the door it was driving to: the arrival takes
+                // the banner back from a one-off prompt (a repair offer the
+                // player drove past on the way), so the door's own action is
+                // never buried under the prompt's button.
+                SetTaskPrompt(null);
+            }
             OnPropertyChanged(nameof(ShowEnterButton));
             OnPropertyChanged(nameof(ParkedAtTarget));
             RepaintDestination();
@@ -504,8 +512,11 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
 
     // WHY the label check: a Cento Miglia leg carries no action (the start
     // opens its own page, the finish settles itself), so the arrival must not
-    // paint an empty button the player can press for nothing.
-    public bool ShowEnterButton => AtDestination && !_entered && _enterText.Length > 0;
+    // paint an empty button the player can press for nothing. A task prompt
+    // owns the action row while it is up, so the arrival's ENTER yields to it
+    // (one row, one button).
+    public bool ShowEnterButton =>
+        AtDestination && !_entered && _enterText.Length > 0 && _taskPrompt is null;
 
     /// <summary>
     /// The host entered the pinned door (a shop interior, a story dialogue or
@@ -634,9 +645,10 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     }
 
     /// <summary>
-    /// Raised when a page asks the companion to surface its task text while
-    /// the main panel is still open. The window owns visibility; the HUD only
-    /// reports the request.
+    /// Raised when the host asks the companion to surface its task text while
+    /// the main panel is still open (a destination just pinned, or a crash
+    /// repair offer). The window owns visibility; the HUD only reports the
+    /// request.
     /// </summary>
     public event EventHandler? TaskTextRequested;
 
@@ -852,6 +864,8 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         OnPropertyChanged(nameof(HasTaskText));
         OnPropertyChanged(nameof(TaskActionText));
         OnPropertyChanged(nameof(ShowTaskAction));
+        // The prompt owns the action row, so the arrival's ENTER yields to it.
+        OnPropertyChanged(nameof(ShowEnterButton));
     }
 
     // The prompt's one button. A click is newer input than a pending voice
