@@ -15,6 +15,9 @@ internal sealed class FakeCarHaulHost : ICarHaulHost
 
     public string? Notice { get; private set; }
 
+    /// <summary>How many times the flow named the brand-loyalty gate.</summary>
+    public int BrandLoyaltyGates { get; private set; }
+
     public int Refreshes { get; private set; }
 
     /// <summary>The control page the flow hands back when no offer can be drawn.</summary>
@@ -29,4 +32,6 @@ internal sealed class FakeCarHaulHost : ICarHaulHost
     public void PinTarget(HudJobGuidance? guidance) => Guidance = guidance;
 
     public void ShowNotice(string text) => Notice = text;
+
+    public void ShowBrandLoyaltyGate() => BrandLoyaltyGates++;
 }

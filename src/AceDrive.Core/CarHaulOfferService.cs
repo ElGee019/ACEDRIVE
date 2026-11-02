@@ -32,7 +32,9 @@ public sealed class CarHaulOfferService
     /// or above the policy's floor, no car in the brand's band (and no
     /// fallback), no dealer door with a resolvable address, or no customer
     /// door on the map. The caller flashes the matching hint; the draw never
-    /// throws for empty pools.
+    /// throws for empty pools. <see cref="CarHaulDraw.BlockedByBrandLoyalty"/>
+    /// separates the loyalty floor from the world-data gaps, because that is
+    /// the only refusal the player can act on.
     /// </summary>
     /// <param name="homeDoor">The player's home door, kept out of the customer
     /// draw while the map has another street; null before onboarding resolves
@@ -40,7 +42,7 @@ public sealed class CarHaulOfferService
     /// <param name="customerAt">Resolves the customer's identity at the drawn
     /// door (Unity's name pool per cultural zone; the port's generator).
     /// Called once, only after the door is drawn.</param>
-    public CarHaulOffer? TryDraw(
+    public CarHaulDraw TryDraw(
         IReadOnlyList<CarSpec> cars,
         IReadOnlyList<PointOfInterest> dealers,
         AddressMap map,
@@ -60,7 +62,7 @@ public sealed class CarHaulOfferService
             EligibleBrands(cars, brandLoyaltyPercent, policy);
         if (eligible.Count == 0)
         {
-            return null;
+            return new CarHaulDraw(null, BlockedByBrandLoyalty: true);
         }
 
         // Unity's draw order: brand, then car, then dealer. Keeping it makes a
@@ -70,7 +72,7 @@ public sealed class CarHaulOfferService
         CarSpec? car = PickCar(cars, brand, band);
         if (car is null)
         {
-            return null;
+            return new CarHaulDraw(null, BlockedByBrandLoyalty: false);
         }
 
         PointOfInterest? dealer = PickDealer(dealers);
@@ -78,11 +80,13 @@ public sealed class CarHaulOfferService
             || !CarHaulAddressPlan.TryDraw(
                 map, _rng, dealer.Address, homeDoor, out AddressLocation customerAddress))
         {
-            return null;
+            return new CarHaulDraw(null, BlockedByBrandLoyalty: false);
         }
 
-        return new CarHaulOffer(
-            car, dealer, customerAddress, customerAt(customerAddress), percent);
+        return new CarHaulDraw(
+            new CarHaulOffer(
+                car, dealer, customerAddress, customerAt(customerAddress), percent),
+            BlockedByBrandLoyalty: false);
     }
 
     // One entry per distinct car brand (first-seen order, so the pool order is

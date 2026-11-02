@@ -98,7 +98,9 @@ public sealed class CarHaulFlow
     /// <summary>
     /// The CAR HAULING tap: draws an offer when none is running, otherwise
     /// reopens the active leg's page. An unavailable draw keeps the control
-    /// page and flashes the hint instead of opening an empty one.
+    /// page and flashes the hint instead of opening an empty one: the brand
+    /// loyalty floor is named on the control page's own button, every other
+    /// empty pool keeps the generic notice.
     /// </summary>
     public object Open(ICommand back, object controlPage)
     {
@@ -108,10 +110,23 @@ public sealed class CarHaulFlow
 
         if (_run is null)
         {
-            if (!_policy.CanOffer(_game.GameNow, _lastDeliveredOn, haulInProgress: false)
-                || !TryDrawOffer())
+            if (!_policy.CanOffer(_game.GameNow, _lastDeliveredOn, haulInProgress: false))
             {
                 _host.ShowNotice(Strings.Get("HaulUnavailable"));
+                return controlPage;
+            }
+
+            if (!TryDrawOffer(out bool brandLoyaltyGate))
+            {
+                if (brandLoyaltyGate)
+                {
+                    _host.ShowBrandLoyaltyGate();
+                }
+                else
+                {
+                    _host.ShowNotice(Strings.Get("HaulUnavailable"));
+                }
+
                 return controlPage;
             }
         }
@@ -154,11 +169,16 @@ public sealed class CarHaulFlow
         }
     }
 
-    private bool TryDrawOffer()
+    // The loyalty floor answers "no brand the player has driven clears it",
+    // which the control page prints on the button; every other empty pool is a
+    // world-data gap the player cannot act on (see CarHaulDraw).
+    private bool TryDrawOffer(out bool brandLoyaltyGate)
     {
-        _offer = new CarHaulOfferService(_rng).TryDraw(
+        CarHaulDraw draw = new CarHaulOfferService(_rng).TryDraw(
             _cars, _pois.All, _zone.ZoneMap, _home(), LoyaltyPercent, _ => _names.Next(), _policy);
-        return _offer is not null;
+        _offer = draw.Offer;
+        brandLoyaltyGate = draw.BlockedByBrandLoyalty;
+        return draw.Offer is not null;
     }
 
     // Unity's BrandLoyaltyPct: never-driven brands answer 0 (not the curve's

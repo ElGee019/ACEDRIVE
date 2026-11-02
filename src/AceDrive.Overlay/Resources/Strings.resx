@@ -174,6 +174,10 @@ For instance "{0}".</value></data>
   <data name="ControlTaxiContinue" xml:space="preserve"><value>CONTINUE TAXI SHIFT</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>CAR HAULING JOB</value></data>
+  <!-- The haul's brand-loyalty gate, printed on the button itself for three
+       seconds after a refused tap: the customer's brand-new cars need a brand
+       the player has driven up to the loyalty floor (PORTPLAN 20). -->
+  <data name="ControlHaulLocked" xml:space="preserve"><value>NOT ENOUGH BRAND LOYALTY YET</value></data>
   <!-- Police job entry (PORTPLAN 41): the door is live and speakable, but its
        flow has not landed, so a tap swaps the button's own text for the COMING
        SOON line and restores it three seconds later. -->

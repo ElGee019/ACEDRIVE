@@ -323,6 +323,75 @@ public sealed class MainControlScreenTests
         Assert.Equal("POLICE", vm.PoliceLabel);
     }
 
+    // The haul's own three-second hold: a refused tap (the brand-loyalty gate
+    // the flow reports) names the reason on the button the player tapped and
+    // the button is its own name again before the next tap.
+    [Fact]
+    public void HaulGate_SaysTheLoyaltyFloorForThreeSecondsThenRestores()
+    {
+        var clock = new FakeClock();
+        var vm = Create(clock);
+        Assert.Equal("CAR HAULING JOB", vm.HaulLabel);
+
+        vm.ShowBrandLoyaltyGate();
+        Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
+
+        clock.Advance(TimeSpan.FromMilliseconds(2999));
+        vm.UpdateFlash();
+        Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel); // still inside the hold
+
+        clock.Advance(TimeSpan.FromMilliseconds(2));
+        vm.UpdateFlash();
+        Assert.Equal("CAR HAULING JOB", vm.HaulLabel);
+    }
+
+    [Fact]
+    public void HaulGate_Again_RestartsTheHold()
+    {
+        var clock = new FakeClock();
+        var vm = Create(clock);
+
+        vm.ShowBrandLoyaltyGate();
+        clock.Advance(TimeSpan.FromSeconds(2));
+        vm.ShowBrandLoyaltyGate(); // latest tap wins
+        clock.Advance(TimeSpan.FromSeconds(2));
+        vm.UpdateFlash();
+        Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(1));
+        vm.UpdateFlash();
+        Assert.Equal("CAR HAULING JOB", vm.HaulLabel);
+    }
+
+    [Fact]
+    public void HaulGate_KeepsTheVoiceDoorThroughARebuild()
+    {
+        // A refresh can rebuild the voice table inside the hold; the door must
+        // stay keyed off the button's own name, never the gate text.
+        var clock = new FakeClock();
+        var shift = new TaxiShift();
+        var vm = Create(clock, shift: shift);
+
+        vm.ShowBrandLoyaltyGate();
+        shift.Start(clock.UtcNow);
+        vm.Refresh();
+
+        Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
+        Assert.Contains("CAR HAULING JOB", vm.VoiceActions.Keys);
+        Assert.DoesNotContain("NOT ENOUGH BRAND LOYALTY YET", vm.VoiceActions.Keys);
+    }
+
+    [Fact]
+    public void HaulGateBack_RestoresTheNameOnTheWayOut()
+    {
+        var vm = Create();
+        vm.ShowBrandLoyaltyGate();
+        Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
+
+        vm.BackCommand.Execute(null);
+        Assert.Equal("CAR HAULING JOB", vm.HaulLabel);
+    }
+
     [Fact]
     public void Voice_OffersOpenDelivery()
     {

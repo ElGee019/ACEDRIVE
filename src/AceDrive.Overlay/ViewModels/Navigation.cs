@@ -275,6 +275,13 @@ public sealed class Navigation
     /// <summary>Re-reads the cached control page (the taxi flow's tick does).</summary>
     public void RefreshControl() => _control?.Refresh();
 
+    /// <summary>
+    /// Names the haul's brand-loyalty floor on the control page's own button
+    /// (the page owns the three-second hold). The page is always built by the
+    /// time a haul tap reaches here: the tap comes from it.
+    /// </summary>
+    public void ShowBrandLoyaltyGate() => _control?.ShowBrandLoyaltyGate();
+
     // Unity JobSelectionScreen's OnStartTaxiShift: the tap owns the shift
     // bookkeeping (start fresh, or end an idle-timed-out one first), then opens
     // the proposal page — the job itself only exists once ACCEPTed. A shift that

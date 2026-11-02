@@ -163,7 +163,33 @@ public sealed class CarHaulOfferTests
         Assert.Equal(first.CustomerAddress, second.CustomerAddress);
     }
 
+    [Fact]
+    public void Draw_ReportsTheLoyaltyFloor_SeparatelyFromWorldGaps()
+    {
+        // The loyalty floor is the one refusal the control page names on its
+        // own button; a missing dealer door keeps the generic line, so the two
+        // must not collapse into one null.
+        CarHaulDraw gated = DrawResult(Cars(("Abarth", 3)), loyalty: _ => 0.0);
+        CarHaulDraw noDealer = DrawResult(
+            Cars(("Abarth", 3)), dealers: [], loyalty: _ => 250.0);
+
+        Assert.Null(gated.Offer);
+        Assert.True(gated.BlockedByBrandLoyalty);
+        Assert.Null(noDealer.Offer);
+        Assert.False(noDealer.BlockedByBrandLoyalty);
+    }
+
     private static CarHaulOffer? Draw(
+        List<CarSpec> cars,
+        Func<string, double> loyalty,
+        IReadOnlyList<PointOfInterest>? dealers = null,
+        AddressLocation? home = null,
+        Func<AddressLocation, ProceduralName>? customerAt = null,
+        CarHaulPolicy? policy = null,
+        int seed = 7) =>
+        DrawResult(cars, loyalty, dealers, home, customerAt, policy, seed).Offer;
+
+    private static CarHaulDraw DrawResult(
         List<CarSpec> cars,
         Func<string, double> loyalty,
         IReadOnlyList<PointOfInterest>? dealers = null,

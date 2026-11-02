@@ -20,6 +20,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// swaps the button's own text for COMING SOON and restores it three real
 /// seconds later, so the button is live and speakable without pretending to
 /// run a job it cannot settle yet.
+/// The car-hauling entry uses the same three-second hold for the one refusal
+/// the player can act on: the haul flow reports a brand-loyalty gate here and
+/// the button says how much loyalty is still missing, instead of the generic
+/// "no job available" line.
 /// The shared <see cref="VoiceBeat"/> times the teal acknowledgment glow on
 /// the injected clock, never tick counts.
 /// </summary>
@@ -78,6 +82,11 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // warning.
     private const double ComingSoonSeconds = 3;
 
+    // The haul button's hold for the brand-loyalty gate, same three seconds and
+    // the same reason: one tap, one readable line, then the button answers to
+    // its own name again.
+    private const double HaulGateSeconds = 3;
+
     private readonly VoiceBeat _beat;
     private readonly IClock _clock;
     private readonly ITodoList _todos;
@@ -90,8 +99,14 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // changes what the button answers to.
     private readonly string _policeName = Strings.Get("ControlPolice");
 
+    // The haul button's own name, kept for the same reason: the loyalty hold
+    // swaps the text, and the voice door must survive a rebuild inside it.
+    private readonly string _haulName = Strings.Get("ControlHaul");
+
     // Deadline of the COMING SOON text, null while the button shows its name.
     private DateTime? _policeUntil;
+    // Deadline of the loyalty-gate text on the haul button, same contract.
+    private DateTime? _haulGateUntil;
     // Null until the first Refresh, so the ctor's paint always runs (the HUD
     // lines used to force it with their -1 sentinels).
     private bool? _deliveryOffered;
@@ -114,7 +129,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         PoliceCommand = new RelayCommand(ShowComingSoon);
         BackCommand = new RelayCommand(Back);
         DeliveryLabel = Strings.Get("ControlDelivery");
-        HaulLabel = Strings.Get("ControlHaul");
+        HaulLabel = _haulName;
         PoliceLabel = _policeName;
         Refresh();
     }
@@ -142,7 +157,11 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     public string TaxiLabel { get => _taxiLabel; private set => SetField(ref _taxiLabel, value); }
     private string _taxiLabel = "";
     public string DeliveryLabel { get; }
-    public string HaulLabel { get; }
+
+    /// <summary>The haul entry's text: its own name, or the brand-loyalty gate
+    /// a refused tap names for three seconds.</summary>
+    public string HaulLabel { get => _haulLabel; private set => SetField(ref _haulLabel, value); }
+    private string _haulLabel = "";
 
     /// <summary>The police entry's text: its own name, or COMING SOON while a
     /// tap's three-second hold runs.</summary>
@@ -275,7 +294,9 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
             [ShiftLabel(started: false)] = taxi,
             [ShiftLabel(started: true)] = taxi,
             [DeliveryLabel] = () => FireVoiceDelayed("delivery", DeliveryCommand),
-            [HaulLabel] = haul,
+            // Keyed off the stable name like the police entry: a rebuild that
+            // lands inside the loyalty-gate hold must not rename the door.
+            [_haulName] = haul,
             // Keyed off the stable name, never the mutable label: a rebuild
             // that lands inside the COMING SOON hold must not rename the door.
             [_policeName] = police,
@@ -338,6 +359,18 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         PoliceLabel = Strings.Get("ControlPoliceSoon");
     }
 
+    /// <summary>
+    /// The haul flow's refusal, named on the button itself: the player asked
+    /// for a haul and did not get one because no brand has reached the floor,
+    /// so the button says so for three seconds instead of opening a page. A
+    /// second tap inside the hold restarts it, like every latest-tap-wins slot.
+    /// </summary>
+    public void ShowBrandLoyaltyGate()
+    {
+        _haulGateUntil = _clock.UtcNow + TimeSpan.FromSeconds(HaulGateSeconds);
+        HaulLabel = Strings.Get("ControlHaulLocked");
+    }
+
     private void Flash(string target)
     {
         TaxiFlash = target == "taxi";
@@ -353,8 +386,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     /// guard would swallow a same-minute expiry): one DateTime compare per
     /// tick, allocations only on transitions. When the flash targeted the
     /// taxi button, the shift-label flip it held back (START glows while the
-    /// shift already runs) lands here. The police text's own hold expires on
-    /// the same tick, on its own deadline.
+    /// shift already runs) lands here. The police and haul texts' own holds
+    /// expire on the same tick, each on its own deadline.
     /// </summary>
     public void UpdateFlash()
     {
@@ -368,6 +401,11 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         {
             RestorePoliceLabel();
         }
+
+        if (_haulGateUntil is { } gateDue && _clock.UtcNow >= gateDue)
+        {
+            RestoreHaulLabel();
+        }
     }
 
     // The button's own name returns: the hold's expiry (poll) and the way out
@@ -379,6 +417,14 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         PoliceLabel = _policeName;
     }
 
+    // The haul button's own name returns on the same two paths: the hold's
+    // expiry (poll) and the way out (Back).
+    private void RestoreHaulLabel()
+    {
+        _haulGateUntil = null;
+        HaulLabel = _haulName;
+    }
+
     // The one path back: a click and the voice tap's deferred end both land
     // here, so the glow clears on the way out — a click during a pending
     // voice tap never leaves a stale teal behind (bank-page precedent).
@@ -386,6 +432,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     {
         BackFlash = false;
         RestorePoliceLabel();
+        RestoreHaulLabel();
         _backCommand.Execute(null);
     }
 

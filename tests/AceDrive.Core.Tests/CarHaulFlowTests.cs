@@ -81,17 +81,24 @@ public sealed class CarHaulFlowTests
 
         Assert.Same(h.Host.ControlPage, page);
         Assert.Equal(Strings.Get("HaulUnavailable"), h.Host.Notice);
+        // A missing dealer door is world data, not progress: the button keeps
+        // its own name and the generic line explains the refusal.
+        Assert.Equal(0, h.Host.BrandLoyaltyGates);
     }
 
     [Fact]
-    public void Open_ForANeverDrivenPlayer_ShowsTheHint()
+    public void Open_ForANeverDrivenPlayer_NamesTheLoyaltyGate()
     {
+        // The one refusal the player can act on: no brand has been driven, so
+        // the control page's own button says which loyalty is missing instead
+        // of the generic hint.
         Harness h = Create(brandKm: new Dictionary<string, double>());
 
         object page = h.Flow.Open(Back(), h.Host.ControlPage);
 
         Assert.Same(h.Host.ControlPage, page);
-        Assert.Equal(Strings.Get("HaulUnavailable"), h.Host.Notice);
+        Assert.Null(h.Host.Notice);
+        Assert.Equal(1, h.Host.BrandLoyaltyGates);
     }
 
     [Fact]
