@@ -248,9 +248,13 @@ documented deviation — not a missing feature.
    friendship increase and the receipt hides the line.
 3. **The control-page CAR HAULING button stays the entry.** It draws the offer
    when none is running and reopens the active leg otherwise.
-4. **No loyalty gate yet.** `CarHaulPolicy.Development` accepts any brand the
-   player has driven (0 km never unlocks); `CarHaulPolicy.Unity` is the 100%
-   release gate, one composition-root line.
-5. **No daily cap yet.** `CarHaulPolicy.Development` allows another haul the
-   same game day; `CarHaulPolicy.Unity` restores the stamp. The in-flight guard
-   stays on in both (Unity would overwrite the active job — not ported).
+4. **The loyalty gate ships on.** `CarHaulPolicy.LoyaltyGate` is the build
+   (Unity's 100% floor, about 250 km driven in the brand); a refused tap
+   names it on the CAR HAULING button for three seconds.
+   `CarHaulPolicy.Development` keeps the test shell's "any driven brand"
+   reading, and `CarHaulPolicy.Unity` restores the full release rules.
+5. **No daily cap yet.** `CarHaulPolicy.LoyaltyGate` allows another haul the
+   same game day; `CarHaulPolicy.Unity` restores the stamp (it needs the
+   delivery date on the driver save first — the flow keeps it in memory today).
+   The in-flight guard stays on in every reading (Unity would overwrite the
+   active job — not ported).

@@ -4004,8 +4004,9 @@ public sealed class MainViewModelTests
     [Fact]
     public void CarHaulTap_WithADrivenBrand_OpensTheOffer()
     {
-        // One driven brand and one car in its band: the tap draws the offer
-        // (car, dealer, customer) and waits for ACCEPT instead of paying out.
+        // One brand past the loyalty floor (400 km clears Unity's 100%) and one
+        // car in its band: the tap draws the offer (car, dealer, customer) and
+        // waits for ACCEPT instead of paying out.
         var pool = new List<CarSpec>
         {
             new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
@@ -4014,7 +4015,7 @@ public sealed class MainViewModelTests
         var session = Create(
             cars: pool, wallet: wallet,
             brandMileage: new FakeBrandMileageStore(
-                new Dictionary<string, double> { ["Test"] = 60.0 }),
+                new Dictionary<string, double> { ["Test"] = 400.0 }),
             speedKmh: 0f);
         var (vm, _, _, _) = session;
         var control = FinishIntro(session);
@@ -4030,9 +4031,10 @@ public sealed class MainViewModelTests
     public void CarHaulTap_WithoutADealerDoor_OpensOneAndOffersTheJob()
     {
         // The save that reported "the tap does nothing": a driven brand and no
-        // dealer door discovered. The tap opens the dealer the haul rides from
-        // — Unity draws from every dealership in the world — and the offer page
-        // comes up instead of a refusal.
+        // dealer door discovered, and the brand past the loyalty floor. The tap
+        // opens the dealer the haul rides from — Unity draws from every
+        // dealership in the world — and the offer page comes up instead of a
+        // refusal.
         var pool = new List<CarSpec>
         {
             new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
@@ -4041,7 +4043,7 @@ public sealed class MainViewModelTests
         var session = Create(
             cars: pool, poiDirectory: directory,
             brandMileage: new FakeBrandMileageStore(
-                new Dictionary<string, double> { ["Test"] = 60.0 }),
+                new Dictionary<string, double> { ["Test"] = 400.0 }),
             speedKmh: 0f);
         var (vm, _, _, _) = session;
         var control = FinishIntro(session);

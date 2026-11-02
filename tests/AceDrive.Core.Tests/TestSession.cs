@@ -241,7 +241,7 @@ internal static class TestSession
             () => AddressBook.Home(map, profiles.Load()),
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
             walletInstance, friendsInstance, game, taxiRulesInstance, beat, logger,
-            CarHaulPolicy.Development, new Random(13));
+            CarHaulPolicy.LoyaltyGate, new Random(13));
         // The weekly market valuation (PORTPLAN 49): the same ledger, board and
         // wallet the assertions read, with a pinned draw stream of its own.
         var valuationFlow = new ValuationFlow(

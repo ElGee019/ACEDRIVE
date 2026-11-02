@@ -7,9 +7,10 @@ namespace AceDrive.Core;
 /// <summary>
 /// The two rules in front of a haul offer, kept switchable while the job is
 /// being built: the brand-loyalty floor and Unity's one-haul-per-game-day
-/// stamp. <see cref="Development"/> is the build shipped today (no floor, no
-/// limit) and <see cref="Unity"/> is the mother game's release reading, so
-/// turning the rules on later is a one-line change at the composition root
+/// stamp. <see cref="LoyaltyGate"/> is the build shipped today (Unity's floor,
+/// no daily cap yet), <see cref="Development"/> is the test shell's reading (no
+/// floor, no limit) and <see cref="Unity"/> is the mother game's release
+/// reading, so turning a rule on is a one-line change at the composition root
 /// with no branch anywhere in the flow.
 /// </summary>
 public sealed record CarHaulPolicy(bool RequireLoyalty, bool OneHaulPerGameDay)
@@ -17,11 +18,16 @@ public sealed record CarHaulPolicy(bool RequireLoyalty, bool OneHaulPerGameDay)
     /// <summary>
     /// Unity's release gate: a brand must reach 100% loyalty before its
     /// customers' new cars can be hauled (the shipped source carries a 0%
-    /// testing override, which is not ported).
+    /// testing override, which is not ported). The loyalty curve reaches 100%
+    /// after about 250 km driven in the brand.
     /// </summary>
     public const double UnlockLoyaltyPercent = 100.0;
 
-    /// <summary>Today's build: any brand the player has driven, no daily cap.</summary>
+    /// <summary>Today's build: Unity's loyalty floor, no daily cap yet.</summary>
+    public static readonly CarHaulPolicy LoyaltyGate = new(
+        RequireLoyalty: true, OneHaulPerGameDay: false);
+
+    /// <summary>The test shell's reading: any brand the player has driven.</summary>
     public static readonly CarHaulPolicy Development = new(
         RequireLoyalty: false, OneHaulPerGameDay: false);
 

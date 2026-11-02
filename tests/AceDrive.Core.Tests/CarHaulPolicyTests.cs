@@ -2,9 +2,9 @@ using AceDrive.Core;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>The two offer gates: the switchable loyalty floor (off in the
-/// development build, Unity's 100% when it lands) and the switchable one-haul-
-/// per-game-day stamp.</summary>
+/// <summary>The two offer gates: the switchable loyalty floor (Unity's 100% is
+/// what ships today, off in the test shell) and the switchable one-haul-per-
+/// game-day stamp.</summary>
 public sealed class CarHaulPolicyTests
 {
     private static readonly DateTime Noon = new(1924, 6, 3, 12, 0, 0);
@@ -16,6 +16,27 @@ public sealed class CarHaulPolicyTests
     public void Development_UnlocksAnyDrivenBrand(double percent, bool unlocks)
     {
         Assert.Equal(unlocks, CarHaulPolicy.Development.UnlocksOffer(percent));
+    }
+
+    [Theory]
+    [InlineData(0.0, false)]
+    [InlineData(1.0, false)]
+    [InlineData(99.9, false)]
+    [InlineData(100.0, true)]
+    [InlineData(250.0, true)]
+    public void LoyaltyGate_UnlocksOnlyAtTheHundredPercentFloor(
+        double percent, bool unlocks)
+    {
+        // The shipped reading: Unity's floor, so a career that has only just
+        // driven the brand (1% at 1 km) is still refused.
+        Assert.Equal(unlocks, CarHaulPolicy.LoyaltyGate.UnlocksOffer(percent));
+    }
+
+    [Fact]
+    public void LoyaltyGate_HasNoDailyCapYet()
+    {
+        Assert.True(CarHaulPolicy.LoyaltyGate.CanOffer(
+            Noon, lastDeliveredOn: Noon.AddHours(-2), haulInProgress: false));
     }
 
     [Theory]

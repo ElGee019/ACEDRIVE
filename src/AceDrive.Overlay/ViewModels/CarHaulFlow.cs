@@ -125,37 +125,45 @@ public sealed class CarHaulFlow
                 return controlPage;
             }
 
-            // The haul rides out of a dealer: a career that has not discovered
-            // one opens its first on this tap. That is the door the offer would
-            // be drawn from, so it has to exist before the draw (Unity draws
-            // from every dealership in the world).
-            if (_dealerDoor.Dealer() is null)
+            CarHaulDraw draw = DrawOffer();
+            if (draw.Offer is null && !draw.BlockedByBrandLoyalty)
             {
-                _log.LogInfo("haul refused: no dealer door to ride from");
-                _host.ShowNotice(Strings.Get("HaulUnavailable"));
-                _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
-                return controlPage;
+                // One gap the job closes itself: a career without a dealer door
+                // opens the one this haul rides from (Unity draws from every
+                // dealership in the world), then draws once more. The loyalty
+                // floor opens nothing: that refusal is progress the player owes,
+                // and a dealer door appearing would not help them.
+                if (_dealerDoor.Dealer() is not null)
+                {
+                    draw = DrawOffer();
+                }
             }
 
-            if (!TryDrawOffer(out bool brandLoyaltyGate))
+            if (draw.Offer is null)
             {
-                if (brandLoyaltyGate)
-                {
-                    _log.LogInfo("haul refused: no brand reaches the loyalty floor");
-                    _host.ShowHaulGate(Strings.Get("ControlHaulLocked"));
-                }
-                else
-                {
-                    _log.LogInfo("haul refused: no offer could be drawn");
-                    _host.ShowNotice(Strings.Get("HaulUnavailable"));
-                    _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
-                }
-
+                Refuse(draw.BlockedByBrandLoyalty);
                 return controlPage;
             }
         }
 
         return BuildPage();
+    }
+
+    // A refused tap answers on the control page's own button: the loyalty floor
+    // in its own words, every other gap in the generic line plus the
+    // companion's notice (the one place that can explain a world-data gap).
+    private void Refuse(bool brandLoyaltyGate)
+    {
+        if (brandLoyaltyGate)
+        {
+            _log.LogInfo("haul refused: no brand reaches the loyalty floor");
+            _host.ShowHaulGate(Strings.Get("ControlHaulLocked"));
+            return;
+        }
+
+        _log.LogInfo("haul refused: no offer could be drawn");
+        _host.ShowNotice(Strings.Get("HaulUnavailable"));
+        _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
     }
 
     /// <summary>
@@ -196,13 +204,12 @@ public sealed class CarHaulFlow
     // The loyalty floor answers "no brand the player has driven clears it",
     // which the control page prints on the button; every other empty pool is a
     // world-data gap the player cannot act on (see CarHaulDraw).
-    private bool TryDrawOffer(out bool brandLoyaltyGate)
+    private CarHaulDraw DrawOffer()
     {
         CarHaulDraw draw = new CarHaulOfferService(_rng).TryDraw(
             _cars, _pois.All, _zone.ZoneMap, _home(), LoyaltyPercent, _ => _names.Next(), _policy);
         _offer = draw.Offer;
-        brandLoyaltyGate = draw.BlockedByBrandLoyalty;
-        return draw.Offer is not null;
+        return draw;
     }
 
     // Unity's BrandLoyaltyPct: never-driven brands answer 0 (not the curve's

@@ -122,6 +122,23 @@ public sealed class CarHaulFlowTests
     }
 
     [Fact]
+    public void Open_BelowTheShippedFloor_RefusesAndOpensNoDealerDoor()
+    {
+        // CarHaulPolicy.LoyaltyGate is what ships: a brand under Unity's 100%
+        // refuses, and that refusal opens no dealer door — the player owes
+        // progress, not a place to drive to.
+        Harness h = Create(
+            withDealer: false, policy: CarHaulPolicy.LoyaltyGate);
+
+        object page = h.Flow.Open(Back(), h.Host.ControlPage);
+
+        Assert.Same(h.Host.ControlPage, page);
+        Assert.Equal(Strings.Get("ControlHaulLocked"), h.Host.HaulGate);
+        Assert.Equal(0, h.DealerDoor.Calls);
+        Assert.DoesNotContain(h.Directory.All, poi => poi.Type == PoiTypes.Dealer);
+    }
+
+    [Fact]
     public void Settle_WithoutADealerOwner_HidesTheFriendship()
     {
         Harness h = Create(dealerOwner: "");
@@ -151,7 +168,8 @@ public sealed class CarHaulFlowTests
         bool withDealer = true,
         string dealerOwner = "Giulia Bianchi",
         IReadOnlyDictionary<string, double>? brandKm = null,
-        bool canOpenDealer = true)
+        bool canOpenDealer = true,
+        CarHaulPolicy? policy = null)
     {
         var clock = new FakeClock();
         var game = new GameClock(clock, clock.UtcNow);
@@ -173,19 +191,19 @@ public sealed class CarHaulFlowTests
         var brands = new FakeBrandMileageStore(
             brandKm ?? new Dictionary<string, double> { ["Abarth"] = 60.0 });
 
+        var dealerDoor = new FakeHaulDealerDoor(directory, canOpenDealer);
         var flow = new CarHaulFlow(
             brands,
             [new CarSpec("ks_abarth_695", 2014, "Abarth", "695 Biposto", Class: 6)],
-            directory, new FakeHaulDealerDoor(directory, canOpenDealer),
-            zone, AddressMap.Default,
+            directory, dealerDoor, zone, AddressMap.Default,
             () => new AddressLocation("Street 1", 1, HouseSide.Right),
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
             wallet, friends, game, TaxiRules.Default,
             new VoiceBeat(clock), new TestLog(),
-            CarHaulPolicy.Development, new Random(1));
+            policy ?? CarHaulPolicy.Development, new Random(1));
         flow.Attach(host);
 
-        return new Harness(flow, wallet, friends, host, clock, directory);
+        return new Harness(flow, wallet, friends, host, clock, directory, dealerDoor);
     }
 
     private static void AcceptOffer(Harness h)
@@ -198,5 +216,6 @@ public sealed class CarHaulFlowTests
 
     private sealed record Harness(
         CarHaulFlow Flow, DriverWallet Wallet, FakeFriendshipStore Friends,
-        FakeCarHaulHost Host, FakeClock Clock, PoiDirectory Directory);
+        FakeCarHaulHost Host, FakeClock Clock, PoiDirectory Directory,
+        FakeHaulDealerDoor DealerDoor);
 }

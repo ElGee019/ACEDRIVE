@@ -536,23 +536,19 @@ public partial class App : Application, IDisposable
             driver, garage, trunk, centoRaceRules, new Random(taxiSeed + 7), beat, _log);
         // The car haul (PORTPLAN 20): draws the offer, owns the pickup and
         // delivery legs and settles the receipt; the control page's CAR HAULING
-        // entry opens its page and the companion carries each leg. Development
-        // policy: no loyalty floor and no daily cap yet — CarHaulPolicy.Unity
-        // is the one-line swap when those rules ship.
-        // The car haul (PORTPLAN 20): draws the offer, owns the pickup and
-        // delivery legs and settles the receipt; the control page's CAR HAULING
-        // entry opens its page and the companion carries each leg. Development
-        // policy: no loyalty floor and no daily cap yet — CarHaulPolicy.Unity
-        // is the one-line swap when those rules ship. Its pickup dealer is a
-        // door the job owns: a career that has not discovered one opens its
-        // first dealer on the tap (see HaulDealerDoor).
+        // entry opens its page and the companion carries each leg. The shipped
+        // policy is Unity's loyalty floor (100% of a brand, about 250 km
+        // driven in it) with the daily cap still off — the full Unity reading is
+        // the one-line swap once the driver save carries the delivery stamp.
+        // Its pickup dealer is a door the job owns: a career that has not
+        // discovered one opens its first dealer on the tap (see HaulDealerDoor).
         var haulDealerDoor = new HaulDealerDoor(
             poiDirectory, poiStore, poiSpawner, zone, addressMap, _log);
         var haul = new CarHaulFlow(
             brands, cars, poiDirectory, haulDealerDoor, zone, addressMap,
             () => AddressBook.Home(addressMap, profileStore.Load()),
             poiNames, driver, friendships, game, taxiRules, beat, _log,
-            CarHaulPolicy.Development, new Random(taxiSeed + 13));
+            CarHaulPolicy.LoyaltyGate, new Random(taxiSeed + 13));
         // The weekly market valuation (PORTPLAN 49): its own flow owns the
         // Monday week, the venue leg and the live/offline comparison, so the
         // coordinator only forwards the calendar tap, the poll and the one
