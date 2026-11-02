@@ -40,8 +40,12 @@ public sealed class CarHaulOfferService
     /// draw while the map has another street; null before onboarding resolves
     /// it.</param>
     /// <param name="customerAt">Resolves the customer's identity at the drawn
-    /// door (Unity's name pool per cultural zone; the port's generator).
-    /// Called once, only after the door is drawn.</param>
+    /// door (Unity's name pool per cultural zone; the port's resident book,
+    /// which banks one person per address). Called once, only after the door is
+    /// drawn.</param>
+    /// <param name="taken">Doors that already have a non-resident occupant — a
+    /// POI owner. The caller passes <see cref="PoiDirectory.HasDoor"/>, which
+    /// is what keeps one citizen per house.</param>
     public CarHaulDraw TryDraw(
         IReadOnlyList<CarSpec> cars,
         IReadOnlyList<PointOfInterest> dealers,
@@ -49,7 +53,8 @@ public sealed class CarHaulOfferService
         AddressLocation? homeDoor,
         Func<string, double> brandLoyaltyPercent,
         Func<AddressLocation, ProceduralName> customerAt,
-        CarHaulPolicy policy)
+        CarHaulPolicy policy,
+        Predicate<AddressLocation>? taken = null)
     {
         ArgumentNullException.ThrowIfNull(cars);
         ArgumentNullException.ThrowIfNull(dealers);
@@ -78,7 +83,8 @@ public sealed class CarHaulOfferService
         PointOfInterest? dealer = PickDealer(dealers);
         if (dealer is null
             || !CarHaulAddressPlan.TryDraw(
-                map, _rng, dealer.Address, homeDoor, out AddressLocation customerAddress))
+                map, _rng, dealer.Address, homeDoor, out AddressLocation customerAddress,
+                taken))
         {
             return new CarHaulDraw(null, BlockedByBrandLoyalty: false);
         }

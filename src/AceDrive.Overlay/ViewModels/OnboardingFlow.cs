@@ -24,6 +24,7 @@ public sealed class OnboardingFlow : IScreenController
     // reads it and the HUD's ENTER routes from the same destination.
     private readonly PoiDirectory _poiDirectory;
     private readonly IPoiDirectoryStore _poiStore;
+    private readonly ResidentBook _residents;
     private readonly PoiArrivalRouter? _poiArrivals;
     private readonly Trunk _trunk;
     private readonly DeliveryCareer _career;
@@ -109,7 +110,7 @@ public sealed class OnboardingFlow : IScreenController
         IProfileStore profiles, IPlayerNameRegistry playerNames,
         AddressMap addressMap, string? detectedPlayerName,
         PoiGenerator pois, PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
-        PoiArrivalRouter? poiArrivals, Trunk trunk,
+        ResidentBook residents, PoiArrivalRouter? poiArrivals, Trunk trunk,
         DeliveryCareer career, int introCredP,
         IPreferencesStore preferencesStore, PlayerPreferences preferences,
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
@@ -126,6 +127,7 @@ public sealed class OnboardingFlow : IScreenController
         _pois = pois;
         _poiDirectory = poiDirectory;
         _poiStore = poiStore;
+        _residents = residents;
         _poiArrivals = poiArrivals;
         _trunk = trunk;
         _career = career;
@@ -1080,7 +1082,9 @@ public sealed class OnboardingFlow : IScreenController
     // The birthday errand joins the neighbourhood: Max's shop opens on a
     // street connected to the player's own, never on the home street itself.
     // A save without a profile keeps the old whole-map draw so the errand is
-    // still placeable.
+    // still placeable. That blind draw is safe here and only here: the errand
+    // is drawn before the introduction can end, and no taxi, haul or
+    // missing-person run can have put a citizen in a house yet.
     private PointOfInterest? DrawMaxStore()
     {
         if (HomeStreet() is not { } home)
@@ -1192,6 +1196,14 @@ public sealed class OnboardingFlow : IScreenController
         {
             AddNumber(numbers, street, poi.Address);
         }
+
+        // A citizen already lives here, so the story door must open elsewhere:
+        // one citizen per house, and the shop owner would be a second.
+        foreach (Resident resident in _residents.Residents)
+        {
+            AddNumber(numbers, street, resident.Address);
+        }
+
         return [.. numbers];
     }
 

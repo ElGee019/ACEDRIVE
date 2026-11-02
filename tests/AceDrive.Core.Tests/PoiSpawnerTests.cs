@@ -98,6 +98,44 @@ public sealed class PoiSpawnerTests
     }
 
     [Fact]
+    public void Spawn_NeverOpensABusinessOnACitizensHouse()
+    {
+        // One citizen per house, both directions: a shop that opens after a
+        // taxi ride must pick another door, even when the resident's house is
+        // the only free one left on the street.
+        AddressMap map = AddressMap.Default;
+        AddressStreet street = map.Streets[0];
+        AddressMap zoneMap = map with { Streets = [street] };
+        int houses = HouseNumberPlan.Count(street, zoneMap);
+
+        var residentDoor = new AddressLocation(street.Name, 1, HouseNumberPlan.SideOf(1));
+        var free = new AddressLocation(street.Name, 2, HouseNumberPlan.SideOf(2));
+        var residents = new ResidentBook(
+            new FakeResidentStore(),
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            new NullLogger());
+        residents.GetOrCreate(residentDoor);
+
+        var directory = new PoiDirectory();
+        for (int number = 3; number <= houses; number++)
+        {
+            directory.Add(new PointOfInterest(
+                $"story_{number}", $"Story Door {number}",
+                new AddressLocation(street.Name, number, HouseNumberPlan.SideOf(number))));
+        }
+
+        var spawner = new PoiSpawner(
+            PoiCatalog.Default,
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0, residents);
+
+        IReadOnlyList<PointOfInterest> grown = spawner.Spawn(
+            discoveredStreets: 1, settledJobs: 10_000, directory, zoneMap);
+
+        Assert.NotEmpty(grown);
+        Assert.All(grown, poi => Assert.Equal(free.DoorKey, poi.Address.DoorKey));
+    }
+
+    [Fact]
     public void NewCareer_HasNoBusinessDoor()
     {
         Assert.Empty(Spawner().Spawn(0, 0, new PoiDirectory(), AddressMap.Default));

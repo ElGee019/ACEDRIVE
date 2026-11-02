@@ -620,7 +620,7 @@ public sealed class MainViewModelTests
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
         var pushed = Assert.Single(rivals.Pushed);
         Assert.Equal("ElGee", pushed.Name);
-        Assert.Equal(0.0006, pushed.Xp, precision: 9);
+        Assert.Equal(0.0009, pushed.Xp, precision: 9);
     }
 
     [Fact]
@@ -4597,7 +4597,7 @@ public sealed class MainViewModelTests
     public void TaxiXp_OwnedCar_UsesItsClassAndGlobalRarity()
     {
         // The real class/rarity feed: a class-15 car ranked 2nd of 3 earns
-        // 0.06 * 15 * 2 / 100 = 0.018 XP, contributes its rounded 1 km to the
+        // 0.09 * 15 * 2 / 100 = 0.027 XP, contributes its rounded 1 km to the
         // car board and 1 km to the country aggregate.
         var pool = new List<CarSpec>
         {
@@ -4622,7 +4622,7 @@ public sealed class MainViewModelTests
 
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
-        Assert.Equal(0.018, wallet.Xp, precision: 9);
+        Assert.Equal(0.027, wallet.Xp, precision: 9);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(
             "XP: (0.1 km × class 15 × rarity 2) / 100 × street knowledge 100%",
@@ -4666,7 +4666,7 @@ public sealed class MainViewModelTests
         Assert.Equal(0.0, wallet.Xp);
         // The 4-seat fare still pays, and the starter bonus rides along even
         // for an unowned car (it is a payout line, not career progress).
-        Assert.Equal(27.94, wallet.Cash);
+        Assert.Equal(29.85, wallet.Cash);
         var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         Assert.Equal(
             "XP: (0.1 km × class 0 × rarity 0) / 100 × street knowledge 100%",
@@ -4679,7 +4679,7 @@ public sealed class MainViewModelTests
         Assert.Empty(rivals.Pushed);
         // The settle still banks the cash; the zone counter stays put.
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(27.94, saved.Cash);
+        Assert.Equal(29.85, saved.Cash);
         Assert.Equal(0.0, saved.Xp);
         Assert.Equal(0, saved.ExpansionJobs);
     }
@@ -4708,7 +4708,7 @@ public sealed class MainViewModelTests
 
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
 
-        Assert.Equal(0.018, wallet.Xp, precision: 9);
+        Assert.Equal(0.027, wallet.Xp, precision: 9);
         Assert.Equal(("ks_test_sedan", 1), Assert.Single(rarity.Recorded));
     }
 

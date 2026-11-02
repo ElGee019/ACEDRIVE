@@ -48,6 +48,18 @@ public sealed class ResidentBookTests
     }
 
     [Fact]
+    public void HasResident_AnswersOnlyTheBankedDoor()
+    {
+        var book = new ResidentBook(
+            new FakeResidentStore(), new ProceduralNameGenerator(Table, seed: 3), new NullLogger());
+        book.GetOrCreate(Door);
+
+        Assert.True(book.HasResident(Door));
+        Assert.True(book.HasResident(Door with { StreetName = " street 1 " }));
+        Assert.False(book.HasResident(Door with { HouseNumber = 5 }));
+    }
+
+    [Fact]
     public void StreetName_MatchesIgnoringCase()
     {
         var store = new FakeResidentStore();

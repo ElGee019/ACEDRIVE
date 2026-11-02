@@ -102,7 +102,9 @@ public partial class App : Application, IDisposable
         // free houses as the operating zone and the settled-job count cross
         // Unity's thresholds; the host checks it at boot and on every settle.
         // Separate seeded stream so a spawn never reshuffles a resident name.
-        var poiSpawner = new PoiSpawner(poiTable, poiNames, taxiSeed + 4);
+        // The resident book rides along: a business may not open on a house a
+        // citizen already lives in (one citizen per house, both directions).
+        var poiSpawner = new PoiSpawner(poiTable, poiNames, taxiSeed + 4, residents);
         // The addresses page (PORTPLAN 24/27): every discovered door lands in
         // one banked directory. Story doors arrive first, then the spawned
         // businesses; both survive a restart.
@@ -292,8 +294,10 @@ public partial class App : Application, IDisposable
         // The taxi proposal draw reads the zone's own map, never the whole
         // address file: a fictional street the zone has not discovered yet must
         // never be offered as a destination (TOZONES §4.7). Hence it is built
-        // after the zone.
-        var taxiProposals = new TaxiJobProposer(zone, residents, taxiSeed + 1);
+        // after the zone. It also reads the directory: a door with a POI owner
+        // already has its occupant, so no resident is put there.
+        var taxiProposals = new TaxiJobProposer(
+            zone, residents, poiDirectory, taxiSeed + 1);
         // XP world standings (PORTPLAN 60): the live Firestore board when a
         // config exists, otherwise the offline null-object. The saved rank
         // snapshot restores either way (Unity's LoadFromPlayerData), so the
@@ -563,7 +567,7 @@ public partial class App : Application, IDisposable
         var haul = new CarHaulFlow(
             brands, cars, poiDirectory, haulDealerDoor, zone, addressMap,
             () => AddressBook.Home(addressMap, profileStore.Load()),
-            poiNames, driver, friendships, game, taxiRules, beat, _log,
+            residents, driver, friendships, game, taxiRules, beat, _log,
             CarHaulPolicy.LoyaltyGate, new Random(taxiSeed + 13));
         // The weekly market valuation (PORTPLAN 49): its own flow owns the
         // Monday week, the venue leg and the live/offline comparison, so the
@@ -655,7 +659,7 @@ public partial class App : Application, IDisposable
         // off the watcher, the week off the calendar.
         var story = new OnboardingFlow(
             onboardingStore, content, profileStore, playerNames, addressMap, playerName,
-            poiGenerator, poiDirectory, poiStore, poiArrivals, trunk,
+            poiGenerator, poiDirectory, poiStore, residents, poiArrivals, trunk,
             deliveryCareer, deliveryBoard.Catalog.StartCredP,
             preferencesStore, preferences, culture, beat, hud, garage,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => carBrands.Brand,

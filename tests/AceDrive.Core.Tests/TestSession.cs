@@ -165,9 +165,17 @@ internal static class TestSession
         var shops = new ShopInteriors(
             walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver,
             visitsInstance, beat, logger);
+        // The town's citizens: the taxi passengers, the car-haul customers, the
+        // elder and the business doors all share this table. Built before the
+        // spawner, because a business may not open on a resident's house.
+        var residentsInstance = options.Residents ?? new ResidentBook(
+            new FakeResidentStore(),
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            logger);
         var spawnerInstance = options.PoiSpawner ?? new PoiSpawner(
             PoiCatalog.Default,
-            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0);
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), seed: 0,
+            residentsInstance);
         // The session calendar and the readout formatter: the week the pages
         // stamp, the shift timeout that opens its page and the painted strings.
         // One board instance for the cycle and the assertions, like the stores.
@@ -183,10 +191,6 @@ internal static class TestSession
         // drawn from, its own seeded stream keeps the draw deterministic, and
         // the wallet, trunk and friendship store are the instances the
         // assertions read (its receipt pays into all three).
-        var residentsInstance = options.Residents ?? new ResidentBook(
-            new FakeResidentStore(),
-            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
-            logger);
         var willyFlow = new WhereIsWillyFlow(
             zoneInstance, game,
             options.Pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
@@ -261,7 +265,7 @@ internal static class TestSession
         var haul = new CarHaulFlow(
             brandMileageInstance, pool, directory, haulDealerDoor, zoneInstance, map,
             () => AddressBook.Home(map, profiles.Load()),
-            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            residentsInstance,
             walletInstance, friendsInstance, game, taxiRulesInstance, beat, logger,
             CarHaulPolicy.LoyaltyGate, new Random(13));
         // The weekly market valuation (PORTPLAN 49): the same ledger, board and
@@ -333,7 +337,7 @@ internal static class TestSession
             onboardingStore, contentSource, profiles,
             options.PlayerNames ?? new OfflinePlayerNameRegistry(), map,
             options.DetectedName, options.Pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
-            directory, directoryStore, poiArrivals, trunkInstance,
+            directory, directoryStore, residentsInstance, poiArrivals, trunkInstance,
             deliveryCareer, board.StartCredP,
             options.PreferencesStore ?? new FakePreferencesStore(),
             options.Preferences ?? PlayerPreferences.Default,

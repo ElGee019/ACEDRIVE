@@ -11,12 +11,14 @@ internal static class TaxiTestData
 {
     public static TaxiJobProposer Proposer(
         AddressMap? map = null, NamePoolTable? table = null, int seed = 0,
-        IResidentStore? residents = null, OperatingZone? zone = null) =>
+        IResidentStore? residents = null, OperatingZone? zone = null,
+        PoiDirectory? pois = null) =>
         new(zone ?? FullZone(map ?? AddressMap.Default),
             new ResidentBook(
                 residents ?? new FakeResidentStore(),
                 new ProceduralNameGenerator(table ?? NamePoolTable.Default, seed),
                 new NullLogger()),
+            pois ?? new PoiDirectory(),
             seed);
 
     /// <summary>

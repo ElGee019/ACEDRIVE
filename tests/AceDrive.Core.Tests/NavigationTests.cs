@@ -126,7 +126,9 @@ public sealed class NavigationTests
             new FakeBrandMileageStore(), poolCars, directory,
             new FakeHaulDealerDoor(directory), zoneInstance,
             AddressMap.Default, () => null,
-            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            new ResidentBook(
+                new FakeResidentStore(),
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), log),
             wallet, friends, game, TaxiRules.Default, beat, log,
             CarHaulPolicy.Development, new Random(13));
         haul.Attach(new FakeCarHaulHost());

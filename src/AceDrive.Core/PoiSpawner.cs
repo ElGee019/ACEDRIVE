@@ -8,25 +8,30 @@ namespace AceDrive.Core;
 /// Grows the POI directory from the career's progress. Each definition that
 /// carries a <see cref="PoiSpawnRule"/> is compared against the saved
 /// progress; every missing door is drawn on a street the operating zone has
-/// already discovered, at a house no known POI uses, with a procedural owner
-/// name. A family whose first door is earned by a career event instead (the
-/// insurance broker's first crash repair) opens that one through
-/// <see cref="SpawnGrantedFirst"/>, and the curve then only adds the ones
-/// after it. Randomness is a seeded instance, never the shared global
+/// already discovered, at a house no known POI uses and no citizen lives in,
+/// with a procedural owner name. A family whose first door is earned by a
+/// career event instead (the insurance broker's first crash repair) opens that
+/// one through <see cref="SpawnGrantedFirst"/>, and the curve then only adds
+/// the ones after it. Randomness is a seeded instance, never the shared global
 /// (AGENTS), so tests pin the addresses.
 /// </summary>
 public sealed class PoiSpawner
 {
     private readonly IReadOnlyList<PoiDefinition> _definitions;
     private readonly ProceduralNameGenerator _names;
+    private readonly ResidentBook? _residents;
     private readonly Random _rng;
 
+    // WHY the resident book is optional: a test or a tool that never creates
+    // citizens can draw without one. Production always passes it, so a business
+    // can never open on a house a citizen already lives in.
     public PoiSpawner(
         IReadOnlyList<PoiDefinition> definitions,
-        ProceduralNameGenerator names, int seed)
+        ProceduralNameGenerator names, int seed, ResidentBook? residents = null)
     {
         _definitions = definitions ?? [];
         _names = names ?? throw new ArgumentNullException(nameof(names));
+        _residents = residents;
         _rng = new Random(seed);
     }
 
@@ -347,14 +352,40 @@ public sealed class PoiSpawner
             : null;
     }
 
-    private static int[] TakenNumbers(
+    private int[] TakenNumbers(
         string streetName, int houses,
         PoiDirectory known, List<PointOfInterest> added)
     {
         var numbers = new List<int>();
         CollectTaken(streetName, houses, known.All, numbers);
         CollectTaken(streetName, houses, added, numbers);
+        CollectResidents(streetName, houses, numbers);
         return [.. numbers];
+    }
+
+    // A citizen's house is taken too: the shop owner would be a second
+    // household in the same door (one citizen per house, both directions).
+    // Read live from the book, like the directory: both grow mid-session.
+    private void CollectResidents(string streetName, int houses, List<int> numbers)
+    {
+        if (_residents is null)
+        {
+            return;
+        }
+
+        for (int number = 1; number <= houses; number++)
+        {
+            if (numbers.Contains(number))
+            {
+                continue;
+            }
+
+            if (_residents.HasResident(new AddressLocation(
+                streetName, number, HouseNumberPlan.SideOf(number))))
+            {
+                numbers.Add(number);
+            }
+        }
     }
 
     private static void CollectTaken(

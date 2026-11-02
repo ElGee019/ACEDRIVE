@@ -39,6 +39,24 @@ public sealed class CarHaulFlowTests
     }
 
     [Fact]
+    public void Open_BanksTheCustomerAsTheResidentOfTheDrawnDoor()
+    {
+        // One citizen per house: the haul names the customer through the
+        // resident book, so the same door can never produce a second person and
+        // the next launch reopens the same name (the fake store is the save).
+        Harness h = Create();
+
+        var page = Assert.IsType<CarHaulScreenViewModel>(h.Flow.Open(Back(), h.Host.ControlPage));
+        Assert.True(page.IsOffer);
+
+        Resident resident = Assert.Single(h.Residents.Residents);
+        Assert.Equal("Street 2", resident.Address.StreetName);
+        Assert.Equal(1, h.ResidentStore.Saves);
+        Assert.Single(h.ResidentStore.Residents);
+        Assert.Contains(resident.Name.BaseName, page.CustomerLine);
+    }
+
+    [Fact]
     public void ConfirmArrival_PicksUpThenSettlesTheHaul()
     {
         Harness h = Create();
@@ -192,18 +210,24 @@ public sealed class CarHaulFlowTests
             brandKm ?? new Dictionary<string, double> { ["Abarth"] = 60.0 });
 
         var dealerDoor = new FakeHaulDealerDoor(directory, canOpenDealer);
+        var residentStore = new FakeResidentStore();
+        var residents = new ResidentBook(
+            residentStore,
+            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
+            new TestLog());
         var flow = new CarHaulFlow(
             brands,
             [new CarSpec("ks_abarth_695", 2014, "Abarth", "695 Biposto", Class: 6)],
             directory, dealerDoor, zone, AddressMap.Default,
             () => new AddressLocation("Street 1", 1, HouseSide.Right),
-            new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
-            wallet, friends, game, TaxiRules.Default,
+            residents, wallet, friends, game, TaxiRules.Default,
             new VoiceBeat(clock), new TestLog(),
             policy ?? CarHaulPolicy.Development, new Random(1));
         flow.Attach(host);
 
-        return new Harness(flow, wallet, friends, host, clock, directory, dealerDoor);
+        return new Harness(
+            flow, wallet, friends, host, clock, directory, dealerDoor,
+            residents, residentStore);
     }
 
     private static void AcceptOffer(Harness h)
@@ -217,5 +241,6 @@ public sealed class CarHaulFlowTests
     private sealed record Harness(
         CarHaulFlow Flow, DriverWallet Wallet, FakeFriendshipStore Friends,
         FakeCarHaulHost Host, FakeClock Clock, PoiDirectory Directory,
-        FakeHaulDealerDoor DealerDoor);
+        FakeHaulDealerDoor DealerDoor, ResidentBook Residents,
+        FakeResidentStore ResidentStore);
 }

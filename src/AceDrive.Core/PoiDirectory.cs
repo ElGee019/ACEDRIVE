@@ -72,6 +72,27 @@ public sealed class PoiDirectory
             : null;
 
     /// <summary>
+    /// True when a known place already owns this door. A POI's owner lives or
+    /// works there, so the resident draws must leave the house alone: one
+    /// citizen per house, and this one is spoken for. Read live, never cached:
+    /// the directory grows mid-session and a stale door set would hand a
+    /// citizen the shop that just opened. The scan is a cold-path cost (a
+    /// proposal or an offer, never the 10 Hz poll).
+    /// </summary>
+    public bool HasDoor(AddressLocation address)
+    {
+        foreach (PointOfInterest poi in _ordered)
+        {
+            if (poi.Address.Matches(address))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// The page's view: every known door sorted by display name, then id, so
     /// two businesses with the same name still have a stable order.
     /// </summary>

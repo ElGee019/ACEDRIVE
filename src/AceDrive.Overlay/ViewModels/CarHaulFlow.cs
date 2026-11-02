@@ -30,7 +30,7 @@ public sealed class CarHaulFlow
     private readonly OperatingZone _zone;
     private readonly AddressMap _map;
     private readonly Func<AddressLocation?> _home;
-    private readonly ProceduralNameGenerator _names;
+    private readonly ResidentBook _residents;
     private readonly DriverWallet _wallet;
     private readonly IFriendshipStore _friendships;
     private readonly GameClock _game;
@@ -54,7 +54,7 @@ public sealed class CarHaulFlow
         IBrandMileageStore brands, IReadOnlyList<CarSpec> cars, PoiDirectory pois,
         IHaulDealerDoor dealerDoor, OperatingZone zone, AddressMap map,
         Func<AddressLocation?> home,
-        ProceduralNameGenerator names, DriverWallet wallet, IFriendshipStore friendships,
+        ResidentBook residents, DriverWallet wallet, IFriendshipStore friendships,
         GameClock game, TaxiRules rules, VoiceBeat beat, ILog log,
         CarHaulPolicy policy, Random rng)
     {
@@ -65,7 +65,7 @@ public sealed class CarHaulFlow
         ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(home);
-        ArgumentNullException.ThrowIfNull(names);
+        ArgumentNullException.ThrowIfNull(residents);
         ArgumentNullException.ThrowIfNull(wallet);
         ArgumentNullException.ThrowIfNull(friendships);
         ArgumentNullException.ThrowIfNull(game);
@@ -82,7 +82,7 @@ public sealed class CarHaulFlow
         _zone = zone;
         _map = map;
         _home = home;
-        _names = names;
+        _residents = residents;
         _wallet = wallet;
         _friendships = friendships;
         _game = game;
@@ -203,11 +203,16 @@ public sealed class CarHaulFlow
 
     // The loyalty floor answers "no brand the player has driven clears it",
     // which the control page prints on the button; every other empty pool is a
-    // world-data gap the player cannot act on (see CarHaulDraw).
+    // world-data gap the player cannot act on (see CarHaulDraw). The customer
+    // is a resident of the drawn door, banked like a taxi passenger, so the
+    // same house always names the same person and never hosts a second one.
     private CarHaulDraw DrawOffer()
     {
+        AddressLocation? home = _home();
         CarHaulDraw draw = new CarHaulOfferService(_rng).TryDraw(
-            _cars, _pois.All, _zone.ZoneMap, _home(), LoyaltyPercent, _ => _names.Next(), _policy);
+            _cars, _pois.All, _zone.ZoneMap, home, LoyaltyPercent,
+            door => _residents.GetOrCreate(door).Name, _policy,
+            _pois.HasDoor);
         _offer = draw.Offer;
         return draw;
     }

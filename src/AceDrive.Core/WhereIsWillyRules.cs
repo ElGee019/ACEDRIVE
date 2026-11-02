@@ -190,9 +190,7 @@ public sealed record WhereIsWillyRules(
     /// street compared ignoring case and the side ignored (it is derived from
     /// the number anyway).
     /// </summary>
-    public static bool SameDoor(AddressLocation a, AddressLocation b) =>
-        a.HouseNumber == b.HouseNumber
-        && string.Equals(a.StreetName.Trim(), b.StreetName.Trim(), StringComparison.OrdinalIgnoreCase);
+    public static bool SameDoor(AddressLocation a, AddressLocation b) => a.Matches(b);
 
     /// <summary>
     /// True once the player has started the coffee-beans delivery career, i.e.

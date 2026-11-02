@@ -14,18 +14,25 @@ namespace AceDrive.Core;
 ///
 /// The draw reads <see cref="OperatingZone.ZoneMap"/>, never the whole map: a
 /// fictional street the zone has not discovered yet must never be offered as a
-/// destination (TOZONES §4.7).
+/// destination (TOZONES §4.7). The player's own door and every door a POI
+/// already owns are skipped (<see cref="PoiDirectory.HasDoor"/>), so one citizen
+/// lives per house. A house the resident book already knows stays drawable on
+/// purpose: it resolves to the same person every time, which is what makes the
+/// town's citizens persist.
 /// </summary>
-public sealed class TaxiJobProposer(OperatingZone zone, ResidentBook residents, int seed)
+public sealed class TaxiJobProposer(
+    OperatingZone zone, ResidentBook residents, PoiDirectory pois, int seed)
 {
     private readonly Random _rng = new(seed);
+    private readonly PoiDirectory _pois = pois;
 
     public TaxiProposal Next(
         int passengerCapacity, AddressLocation? home = null, int radiusKm = 0)
     {
         bool hasAddresses = TaxiAddressPlan.TryDraw(
             zone.ZoneMap, _rng, home, radiusKm,
-            out AddressLocation customerHome, out AddressLocation secondResidence);
+            out AddressLocation customerHome, out AddressLocation secondResidence,
+            _pois.HasDoor);
 
         // Unity resolves the residents before the flip, so a fixed seed sees
         // the same address/name/flip order as the source generator. The

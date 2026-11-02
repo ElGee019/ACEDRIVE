@@ -102,6 +102,44 @@ public sealed class CarHaulAddressPlanTests
         Assert.NotEqual(3, customer.HouseNumber);
     }
 
+    [Fact]
+    public void Draw_SkipsDoorsThatAlreadyHaveAnOccupant()
+    {
+        // While one street still has a free house, an owned door elsewhere on
+        // it must not be drawn for the customer either.
+        AddressMap map = Map(
+            new AddressStreet("s1", "Street 1", 0.0, 0.5),
+            new AddressStreet("s2", "Street 2", 0.5, 1.0));
+        var free = new AddressLocation("Street 2", 1, HouseSide.Right);
+
+        for (int seed = 0; seed < 20; seed++)
+        {
+            Assert.True(CarHaulAddressPlan.TryDraw(
+                map, new Random(seed),
+                new AddressLocation("Street 1", 4, HouseSide.Left),
+                homeDoor: null,
+                out AddressLocation customer,
+                door => !door.Matches(free)));
+
+            Assert.True(customer.Matches(free));
+        }
+    }
+
+    [Fact]
+    public void Draw_NeverUsesThePlayersOwnDoor()
+    {
+        // The only free house left is the player's: the haul must fail rather
+        // than deliver the car to the player's own address.
+        AddressMap map = Map(new AddressStreet("s1", "Street 1", 0.0, 0.2));
+        var home = new AddressLocation("Street 1", 3, HouseSide.Right);
+
+        Assert.False(CarHaulAddressPlan.TryDraw(
+            map, new Random(1),
+            new AddressLocation("Somewhere else", 1, HouseSide.Left),
+            home, out _,
+            door => !door.Matches(home)));
+    }
+
     private static AddressMap Map(params AddressStreet[] streets) =>
         new("Germany", "Brands", 1929.0, 30.0, streets);
 }

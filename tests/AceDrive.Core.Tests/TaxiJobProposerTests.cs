@@ -182,6 +182,108 @@ public sealed class TaxiJobProposerTests
     }
 
     [Fact]
+    public void Next_NeverPutsAResidentAtTheHomeOrABusinessDoor()
+    {
+        var home = new AddressLocation("Street 1", 9, HouseSide.Right);
+        var business = new AddressLocation("Street 2", 12, HouseSide.Right);
+        var directory = new PoiDirectory(
+            [new PointOfInterest("bank", "Bank", business)]);
+        var proposer = TaxiTestData.Proposer(table: Table, seed: 7, pois: directory);
+
+        foreach (int _ in Enumerable.Range(0, 40))
+        {
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4, home, radiusKm: 0);
+            AddressLocation customer = proposal.CustomerHome!.Value;
+            AddressLocation second = proposal.SecondResidence!.Value;
+
+            // One citizen per house: a door with a business owner, and the
+            // player's own door, never gain a second household.
+            Assert.False(customer.Matches(home));
+            Assert.False(customer.Matches(business));
+            Assert.False(second.Matches(home));
+            Assert.False(second.Matches(business));
+        }
+    }
+
+    [Fact]
+    public void Next_OnlyUsesTheFreeDoorsLeftWhenTheBusinessesOwnTheRest()
+    {
+        // Every door but one per street belongs to a business: the proposal
+        // must find the two survivors instead of failing or reusing an owned
+        // door.
+        AddressLocation[] free =
+        [
+            new AddressLocation("Street 1", 33, HouseSide.Right),
+            new AddressLocation("Street 2", 33, HouseSide.Right),
+        ];
+        var directory = new PoiDirectory();
+        int id = 0;
+        foreach (AddressStreet street in AddressMap.Default.Streets)
+        {
+            int count = HouseNumberPlan.Count(street, AddressMap.Default);
+            for (int number = 1; number <= count; number++)
+            {
+                var door = new AddressLocation(
+                    street.Name, number, HouseNumberPlan.SideOf(number));
+                if (Array.Exists(free, door.Matches))
+                {
+                    continue;
+                }
+
+                id++;
+                directory.Add(new PointOfInterest($"place-{id}", $"Place {id}", door));
+            }
+        }
+
+        TaxiProposal proposal = TaxiTestData
+            .Proposer(table: Table, seed: 5, pois: directory)
+            .Next(passengerCapacity: 4);
+
+        Assert.True(Array.Exists(free, proposal.CustomerHome!.Value.Matches));
+        Assert.True(Array.Exists(free, proposal.SecondResidence!.Value.Matches));
+    }
+
+    [Fact]
+    public void AStreetOfTwoHouses_KeepsTheSameTwoResidentsEveryDraw()
+    {
+        // One citizen per house, and the citizen persists: with only two doors
+        // both are drawn every time, so the same pair of people must come back
+        // instead of two fresh names per proposal.
+        var map = new AddressMap(
+            "Germany", "Test", 1_000.0, 600.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var store = new FakeResidentStore();
+        var proposer = TaxiTestData.Proposer(
+            map: map, table: Table, seed: 6, residents: store);
+
+        TaxiProposal first = proposer.Next(passengerCapacity: 4);
+        TaxiProposal second = proposer.Next(passengerCapacity: 4);
+
+        Assert.Equal(2, store.Residents.Count);
+        Assert.Equal(Doors(first), Doors(second));
+        Assert.Equal(ResidentNames(first), ResidentNames(second));
+    }
+
+    private static string[] Doors(TaxiProposal proposal)
+    {
+        // The two legs may swap roles between draws; the pair is what matters.
+        string[] doors =
+        [
+            proposal.CustomerHome!.Value.DoorKey,
+            proposal.SecondResidence!.Value.DoorKey,
+        ];
+        Array.Sort(doors, StringComparer.Ordinal);
+        return doors;
+    }
+
+    private static string[] ResidentNames(TaxiProposal proposal)
+    {
+        string[] names = [proposal.Customer.BaseName, proposal.SecondResident.BaseName];
+        Array.Sort(names, StringComparer.Ordinal);
+        return names;
+    }
+
+    [Fact]
     public void SingleSeatCar_DropsTheCompanionSuffix_OnTheRideOnly()
     {
         var store = new FakeResidentStore();

@@ -46,6 +46,19 @@ public sealed class PoiDirectoryTests
     }
 
     [Fact]
+    public void HasDoor_AnswersTheSameHouseOrStaysFalse()
+    {
+        var directory = new PoiDirectory();
+        directory.Add(new PointOfInterest(
+            "bank", "Bank", new AddressLocation("Street 1", 4, HouseSide.Right)));
+
+        Assert.True(directory.HasDoor(new AddressLocation("Street 1", 4, HouseSide.Right)));
+        Assert.True(directory.HasDoor(new AddressLocation("  street 1 ", 4, HouseSide.Left)));
+        Assert.False(directory.HasDoor(new AddressLocation("Street 1", 5, HouseSide.Right)));
+        Assert.False(directory.HasDoor(new AddressLocation("Street 2", 4, HouseSide.Right)));
+    }
+
+    [Fact]
     public void Add_RejectsUnusableRows()
     {
         var directory = new PoiDirectory();

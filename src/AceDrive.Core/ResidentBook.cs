@@ -74,13 +74,20 @@ public sealed class ResidentBook
     }
 
     /// <summary>
+    /// True when a citizen already lives at this door. The business spawner
+    /// asks before it opens a POI: the owner would be a second household in
+    /// the same house, so the shop must open elsewhere.
+    /// </summary>
+    public bool HasResident(AddressLocation address) =>
+        _byAddress.ContainsKey(address.DoorKey);
+
+    /// <summary>
     /// An unplaced name for the data-broken fallback (the map cannot supply
     /// two streets). Not persisted: there is no address to remember it by.
     /// </summary>
     public ProceduralName DrawName() => _names.Next();
 
-    private static string KeyOf(AddressLocation address) =>
-        $"{address.StreetName.Trim()}|{address.HouseNumber}";
+    private static string KeyOf(AddressLocation address) => address.DoorKey;
 
     private static bool IsValid(Resident resident) =>
         !string.IsNullOrWhiteSpace(resident.Address.StreetName)
