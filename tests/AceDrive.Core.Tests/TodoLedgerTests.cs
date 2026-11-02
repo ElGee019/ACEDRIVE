@@ -11,10 +11,10 @@ public sealed class TodoLedgerTests
 {
     private static TodoFacts Facts(
         double cr = 0.0, double xp = 0.0, double bank = 1000.0,
-        int taxi = 0, int delivery = 0, int pins = 0, double zone = 0.0,
+        int taxi = 0, int delivery = 0, int reached = 0, double zone = 0.0,
         int cars = 1, bool max = false, bool wash = false, bool dealer = false,
         bool insurance = false, bool bankVisit = false, bool career = false) =>
-        new(cr, xp, bank, taxi, delivery, pins, zone, cars, max, wash, dealer, insurance, bankVisit, career);
+        new(cr, xp, bank, taxi, delivery, reached, zone, cars, max, wash, dealer, insurance, bankVisit, career);
 
     private static TodoLedger Fresh() => TodoLedger.Fresh(TodoTable.Default);
 
@@ -276,7 +276,7 @@ public sealed class TodoLedgerTests
         // the list keeps the cap, the rest are lost.
         TodoFacts facts = Facts(
             cr: 500.0, xp: 2.0, bank: 1002.0, taxi: 5, delivery: 2,
-            pins: 18, zone: 4.0, cars: 2);
+            reached: 18, zone: 4.0, cars: 2);
 
         Assert.Equal(TodoLedger.MaxCompletedTips, ledger.Sync(facts).Completed.Count);
         Assert.Equal(TodoLedger.MaxCompletedTips, ledger.CompletedCount);

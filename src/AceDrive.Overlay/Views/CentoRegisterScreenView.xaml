@@ -12,14 +12,17 @@
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=CentoRegisterTitle}"/>
-        <TextBlock Grid.Row="1" Style="{StaticResource PageBody}" Text="{Binding PromptLine}"/>
-        <StackPanel Grid.Row="2" VerticalAlignment="Center">
+        <!-- Prompt, picked number and pad are one centred column: the prompt
+             wraps at the pad's width so it reads as the keypad's own label
+             rather than a page paragraph parked under the title. -->
+        <StackPanel Grid.Row="1" Width="300" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <TextBlock Style="{StaticResource PageBody}" Text="{Binding PromptLine}"
+                       Margin="0,0,0,10"/>
             <TextBlock Text="{Binding SelectedLine}" Foreground="#FFF" FontSize="18"
                        TextAlignment="Center" Margin="0,0,0,8"/>
             <ItemsControl ItemsSource="{Binding Keys}" Width="300" HorizontalAlignment="Center">
@@ -55,10 +58,10 @@
         </StackPanel>
         <!-- Refusal line: a plain wrong number invites another try, the second
              one closes the entry (Unity's two-attempt rule). -->
-        <TextBlock Grid.Row="3" Text="{Binding FeedbackLine}" Foreground="#FFFF7A7A"
+        <TextBlock Grid.Row="2" Text="{Binding FeedbackLine}" Foreground="#FFFF7A7A"
                    FontSize="13" TextAlignment="Center" TextWrapping="Wrap" Margin="0,6,0,0"
                    Visibility="{Binding HasFeedback, Converter={StaticResource BoolToVis}}"/>
-        <StackPanel Grid.Row="4">
+        <StackPanel Grid.Row="3">
             <Button Content="{loc:Loc Key=ReceiptContinue}" Command="{Binding ContinueCommand}"
                     Margin="0,0,0,6"
                     Visibility="{Binding ShowContinue, Converter={StaticResource BoolToVis}}">

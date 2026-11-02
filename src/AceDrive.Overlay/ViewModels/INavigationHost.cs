@@ -24,9 +24,9 @@ public interface INavigationHost
     void ShowSettings();
 
     /// <summary>
-    /// The addresses page pinned a destination (Unity manuallySetDestinations):
-    /// the coordinator counts it, syncs the ToDo list and hands the panel back so
-    /// the player can drive off.
+    /// The addresses page pinned a destination: the coordinator hands the panel
+    /// back so the player can drive off. Nothing to count — the destination tip
+    /// reads settled jobs, because the port has no GPS (PORTPLAN 46).
     /// </summary>
     void DestinationPinned();
 }

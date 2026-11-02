@@ -25,7 +25,6 @@ public sealed class GameStateSaver
     private readonly DailyStreak _streak;
     private readonly OperatingZone _zone;
     private readonly JobLedger _jobs;
-    private readonly DestinationPins _pins;
     private readonly VisitLedger _visits;
     private readonly ValuationLedger _valuation;
     private readonly WhereIsWillyLedger _willy;
@@ -48,7 +47,7 @@ public sealed class GameStateSaver
         DriverWallet wallet, DailyStreak streak, OperatingZone zone, Trunk trunk,
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
         TaxiShift shift, ShiftRecord shifts, JobLedger jobs,
-        DestinationPins pins, VisitLedger visits, ValuationLedger valuation,
+        VisitLedger visits, ValuationLedger valuation,
         WhereIsWillyLedger willy, DeliveryCareer career, WeeklyEventLedger weeklyEvents)
     {
         _clock = clock;
@@ -64,7 +63,6 @@ public sealed class GameStateSaver
         _streak = streak;
         _zone = zone;
         _jobs = jobs;
-        _pins = pins;
         _visits = visits;
         _valuation = valuation;
         _willy = willy;
@@ -164,7 +162,6 @@ public sealed class GameStateSaver
             JobsCompleted = _jobs.Completed,
             TaxiJobsCompleted = _jobs.TaxiCompleted,
             DeliveryJobsCompleted = _jobs.DeliveryCompleted,
-            ManuallySetDestinations = _pins.Count,
             VisitedCarWash = _visits.CarWash,
             VisitedCarDealer = _visits.CarDealer,
             VisitedInsurance = _visits.InsuranceBroker,

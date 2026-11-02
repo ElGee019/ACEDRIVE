@@ -53,7 +53,7 @@ public sealed class DriverCatchUpTests
             wallet, streak, new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage,
             new CityEconomy(DeliveryCatalog.Default.Stores, CityRules.Default),
             new Hunger(HungerRules.Default), TestRoadCars.Ledger(), new TaxiShift(),
-            new ShiftRecord(null), new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new ShiftRecord(null), new JobLedger(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new WeeklyEventLedger());
         var catchUp = new DriverCatchUp(

@@ -72,7 +72,7 @@ public sealed class WorldTicksTests
             new FakeShiftStore(), wallet, new DailyStreak(clock, null),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage, city, appetite,
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
-            new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new JobLedger(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(), career,
             new WeeklyEventLedger());
         var world = new WorldTicks(

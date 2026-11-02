@@ -117,7 +117,6 @@ internal static class TestSession
         var hungerStoreInstance = options.HungerStore ?? new FakeHungerStore();
         var garageStoreInstance = options.GarageStore ?? new FakeGarageStore();
         var jobsInstance = options.Jobs ?? new JobLedger(options.SavedDriver);
-        var pinsInstance = options.Pins ?? new DestinationPins(options.SavedDriver);
         var visitsInstance = options.Visits ?? new VisitLedger(options.SavedDriver);
         // The weekly valuation's persisted half, resumed exactly like the root
         // does; the board is the scripted fake unless a case supplies one.
@@ -138,7 +137,7 @@ internal static class TestSession
             cityStoreInstance, hungerStoreInstance, roadTestStoreInstance, shiftStoreInstance,
             walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
             cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance,
-            jobsInstance, pinsInstance, visitsInstance, valuationInstance,
+            jobsInstance, visitsInstance, valuationInstance,
             willyLedgerInstance, deliveryCareer, weeklyEventsInstance);
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
@@ -217,7 +216,7 @@ internal static class TestSession
         var todoBoard = new TodoBoard(
             options.Todos ?? TodoTable.Default, todoStoreInstance, directory,
             onboardingStore, walletInstance, jobsInstance, zoneInstance, garageInstance,
-            pinsInstance, visitsInstance, deliveryCareer, logger);
+            visitsInstance, deliveryCareer, logger);
         var proposalsInstance = TaxiTestData.Proposer(zone: zoneInstance, seed: 0);
         var taxi = new TaxiJobFlow(
             proposalsInstance, map, brands, pool, options.Requests,
@@ -335,7 +334,7 @@ internal static class TestSession
             taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             roadTestFlow, touristenFlow,
             navigation, readouts, dayCycle,
-            todoBoard, pinsInstance,
+            todoBoard,
             options.Hud, options.SaveResets, options.Restarter);
         if (options.CarKsId is not null)
         {

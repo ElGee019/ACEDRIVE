@@ -227,10 +227,11 @@ public partial class App : Application, IDisposable
         // the dealer and mechanic POIs gate on it, so it must survive a
         // restart beside the cash it was earned with.
         var jobs = new JobLedger(savedDriver);
-        // The ToDo career readings (PORTPLAN 46): the manual-destination count
-        // and the one-time business visits ride the driver file, so the four
-        // tips measure a real career instead of a placeholder.
-        var pins = new DestinationPins(savedDriver);
+        // The ToDo career readings (PORTPLAN 46): the one-time business visits
+        // ride the driver file, so the four tips measure a real career instead
+        // of a placeholder. The destination tip needs no store of its own: with
+        // no GPS every drive is a drive without GPS, so it reads the settled-job
+        // total (Unity's manual pin count has no source here).
         var visits = new VisitLedger(savedDriver);
         // The weekly market valuation (PORTPLAN 49): the preloaded venue, the
         // in-flight leg, the week's entry and the settled uid set resume from
@@ -434,7 +435,7 @@ public partial class App : Application, IDisposable
         var saver = new GameStateSaver(
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
-            garage, city, hunger, roadTests, shift, shifts, jobs, pins, visits,
+            garage, city, hunger, roadTests, shift, shifts, jobs, visits,
             valuation, willyLedger, deliveryCareer, weeklyEvents);
         // The panel, its page and the activity stamp: view state with an owner
         // the view binds through the shell, not state the coordinator holds.
@@ -594,7 +595,7 @@ public partial class App : Application, IDisposable
         // the ledger and its file, and the jobs page reads only its lines.
         var todoBoard = new TodoBoard(
             todos, todoStore, poiDirectory, onboardingStore, driver, jobs, zone,
-            garage, pins, visits, deliveryCareer, _log);
+            garage, visits, deliveryCareer, _log);
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todoBoard, roadTests, saver,
             driver, garage, rivals, zoneStandings, trunk, hunger, storeCatalog,
@@ -658,7 +659,7 @@ public partial class App : Application, IDisposable
             taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             roadTestFlow, touristen,
             navigation, readouts, dayCycle,
-            todoBoard, pins,
+            todoBoard,
             hud,
             saveResets, restarter, quit);
 

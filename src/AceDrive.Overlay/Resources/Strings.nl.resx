@@ -25,7 +25,8 @@
   <data name="HudHintAnnabella" xml:space="preserve"><value>Vrijdag was altijd pannenkoekendag bij oma! Laten we die traditie nieuw leven inblazen. Rijd naar {0}, {1} nr. {2} in {3} en haal Annabella op zoals vroeger.</value></data>
   <data name="HudHintHome" xml:space="preserve"><value>Rijd terug naar {0}, {1} nr. {2} in {3}. Ze wacht waarschijnlijk op die ahornsiroop.</value></data>
   <data name="HudHintCommunityCentre" xml:space="preserve"><value>Rijd naar het {0}, {1} nr. {2} in {3}. Ze geven vandaag gratis taxipasjes uit.</value></data>
-  <data name="HudArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}, ga naar binnen om ahornsiroop voor oma te kopen.</value></data>
+  <data name="HudArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}.</value></data>
+  <data name="HudArrivedErrand" xml:space="preserve"><value>Je bent aangekomen bij {0}, ga naar binnen om ahornsiroop voor oma te kopen.</value></data>
   <data name="HudArrivedPerson" xml:space="preserve"><value>Je bent aangekomen bij {0}.</value></data>
   <data name="HudArrivedHome" xml:space="preserve"><value>Je bent aangekomen bij het huis van oma.</value></data>
   <data name="HudArrivedCommunityCentre" xml:space="preserve"><value>Je bent aangekomen bij {0}. Ga naar binnen om je taxipasje op te halen.</value></data>
@@ -222,7 +223,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="TodoEarnXp" xml:space="preserve"><value>Verdien in totaal {0} XP. (nu {1:0.00})</value></data>
   <data name="TodoBankStandings" xml:space="preserve"><value>Heb {0} CR op de bank. (nu {1:0.00})</value></data>
   <data name="TodoDeliveryJobs" xml:space="preserve"><value>Voltooi {0} bezorgingen. (nu {1})</value></data>
-  <data name="TodoSetDestinations" xml:space="preserve"><value>Stel {0} keer handmatig een bestemming in. (nu {1})</value></data>
+  <data name="TodoSetDestinations" xml:space="preserve"><value>Bereik {0} bestemmingen zonder gebruik van GPS. (nu {1})</value></data>
   <data name="TodoOperatingZone" xml:space="preserve"><value>Bereik een werkgebied van {0} km. (nu {1:0.00})</value></data>
   <data name="TodoOwnCars" xml:space="preserve"><value>Bezit {0} auto's. (nu {1})</value></data>
   <data name="TodoEnterPoi" xml:space="preserve"><value>Ga naar binnen bij {0}.</value></data>

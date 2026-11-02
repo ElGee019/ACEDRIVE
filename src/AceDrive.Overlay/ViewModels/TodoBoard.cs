@@ -7,8 +7,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// The ToDo list as the session sees it (PORTPLAN item 46, port of Unity's
 /// TodoManager MonoBehaviour): it assembles the career snapshot the
 /// requirements read, activates a subject once its door exists, syncs the
-/// ledger on the cold edges (boot, settle, shop entry, pin, purchase) and
-/// banks its own file.
+/// ledger on the cold edges (boot, settle, shop entry, purchase) and banks its
+/// own file.
 ///
 /// It is a collaborator, not a screen: the jobs page reads the lines and the
 /// DELIVER CARE PACKAGES command it exposes, and nothing here knows about
@@ -25,7 +25,6 @@ public sealed class TodoBoard : ITodoList
     private readonly JobLedger _jobs;
     private readonly OperatingZone _zone;
     private readonly Garage _garage;
-    private readonly DestinationPins _pins;
     private readonly VisitLedger _visits;
     private readonly DeliveryCareer _career;
     private readonly ILog _log;
@@ -38,7 +37,7 @@ public sealed class TodoBoard : ITodoList
     public TodoBoard(
         TodoTable table, ITodoProgressStore store, PoiDirectory directory,
         IOnboardingStore onboarding, DriverWallet wallet, JobLedger jobs,
-        OperatingZone zone, Garage garage, DestinationPins pins, VisitLedger visits,
+        OperatingZone zone, Garage garage, VisitLedger visits,
         DeliveryCareer career, ILog log)
     {
         _store = store;
@@ -48,7 +47,6 @@ public sealed class TodoBoard : ITodoList
         _jobs = jobs;
         _zone = zone;
         _garage = garage;
-        _pins = pins;
         _visits = visits;
         _career = career;
         _log = log;
@@ -130,7 +128,10 @@ public sealed class TodoBoard : ITodoList
             _wallet.BankBalance,
             _jobs.TaxiCompleted,
             _jobs.DeliveryCompleted,
-            _pins.Count,
+            // WHY the settled total: with no GPS in the port every drive is a
+            // drive without GPS, so each settled job is one destination reached
+            // (Unity's manual pins measured a map action this port has none of).
+            _jobs.Completed,
             _zone.Km,
             _garage.Cars.Count,
             progress.MaxDeliveryIntroSeen,

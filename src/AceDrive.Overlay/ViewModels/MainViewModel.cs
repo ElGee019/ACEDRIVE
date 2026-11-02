@@ -143,9 +143,6 @@ public sealed class MainViewModel
     // The ToDo list: the sync the settles and the POI entries report into, and
     // the list the jobs page reads. It banks its own file.
     private readonly TodoBoard _todos;
-    // The manual-destination counter the ToDo subject reads (Unity
-    // manuallySetDestinations).
-    private readonly DestinationPins _pins;
 
     // WHY a throttle at all: a rebuild/Stop-Debugging kills the process, and
     // a killed process never raises Window.Closed — so the shutdown save
@@ -219,7 +216,7 @@ public sealed class MainViewModel
         ValuationFlow valuation, WhereIsWillyFlow willy, RoadTestFlow roadTest,
         TouristenfahrtenFlow touristen,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
-        TodoBoard todos, DestinationPins pins,
+        TodoBoard todos,
         ITelemetryHud? hud = null,
         ISaveDataResetter? saveResets = null,
         IAppRestarter? restarter = null,
@@ -294,7 +291,6 @@ public sealed class MainViewModel
         _day = day;
         _day.Attach(this);
         _todos = todos;
-        _pins = pins;
         // The page graph is built by the root; the navigator only reaches back
         // for the entries whose domain is not a page (shift close, readouts,
         // settings), so the attach closes before any page command can fire —
@@ -604,17 +600,10 @@ public sealed class MainViewModel
     void INavigationHost.ShowSettings() => OpenSettings();
     void INavigationHost.DestinationPinned()
     {
-        _pins.Register();
-        // The pin count is a ToDo reading, so the list syncs and the new
-        // count rides the same driver save the pin already banks.
-        if (_todos.Sync().Changed)
-        {
-            SaveDriver(_rivals.LastResult);
-        }
-
         // The pin is the drive: handing the panel back sends the player off at
         // once, exactly like the road test's START, with the companion carrying
-        // the drive-to line the page just set.
+        // the drive-to line the page just set. No ToDo sync here: the
+        // destination tip counts settled jobs, not pins.
         _panel.Hide();
     }
 

@@ -60,7 +60,7 @@ public sealed class DayCycleTests
             shiftStore, wallet, new DailyStreak(clock, null),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage,
             new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
-            new RoadTestLedger([], seed: 0), shiftInstance, records, new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new RoadTestLedger([], seed: 0), shiftInstance, records, new JobLedger(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new WeeklyEventLedger());
         var log = new TestLog();

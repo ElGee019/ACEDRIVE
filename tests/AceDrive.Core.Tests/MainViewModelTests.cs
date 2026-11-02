@@ -3049,7 +3049,10 @@ public sealed class MainViewModelTests
 
         Assert.Equal("max-grocery", hud.Destination?.Id);
         Assert.Equal(PoiTypes.Grocery, hud.Destination?.Type);
-        Assert.Null(hud.HintKey);
+        // The errand keeps the generic drive line but its own maple arrival,
+        // so it cannot leak onto any other shop's arrival.
+        Assert.Equal("HudDestination", hud.HintKey);
+        Assert.Equal("HudArrivedErrand", hud.Copy?.ArrivedKey);
     }
 
     [Fact]

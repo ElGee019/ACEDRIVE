@@ -30,7 +30,12 @@
   <data name="HudHintAnnabella" xml:space="preserve"><value>Friday has always been Pancake Day at grandma's! Let's bring that tradition back. Drive to {0}, {1} No. {2} in {3} and pick up Annabella like old times.</value></data>
   <data name="HudHintHome" xml:space="preserve"><value>Head back to {0}, {1} No. {2} in {3}. She's probably waiting on that maple syrup by now.</value></data>
   <data name="HudHintCommunityCentre" xml:space="preserve"><value>Drive to the {0}, {1} No. {2} in {3}. They're handing out free taxi licenses today.</value></data>
-  <data name="HudArrived" xml:space="preserve"><value>You have arrived at {0}, enter to buy maple syrup for grandma.</value></data>
+  <data name="HudArrived" xml:space="preserve"><value>You have arrived at {0}.</value></data>
+  <!-- The birthday errand's own arrival line: only Max's store during the
+       intro sells the maple syrup, so the errand leg carries this key and the
+       generic shop arrival (an insurance broker, a delivery store) stays a
+       plain arrival. -->
+  <data name="HudArrivedErrand" xml:space="preserve"><value>You have arrived at {0}, enter to buy maple syrup for grandma.</value></data>
   <data name="HudArrivedPerson" xml:space="preserve"><value>You have arrived at {0}.</value></data>
   <data name="HudArrivedHome" xml:space="preserve"><value>You have arrived at grandma's house.</value></data>
   <data name="HudArrivedCommunityCentre" xml:space="preserve"><value>You have arrived at the {0}. Enter to pick up your taxi license.</value></data>
@@ -271,7 +276,7 @@ For instance "{0}".</value></data>
   <data name="TodoEarnXp" xml:space="preserve"><value>Earn {0} XP in total. (currently {1:0.00})</value></data>
   <data name="TodoBankStandings" xml:space="preserve"><value>Have {0} CR in the bank. (currently {1:0.00})</value></data>
   <data name="TodoDeliveryJobs" xml:space="preserve"><value>Complete {0} delivery jobs. (currently {1})</value></data>
-  <data name="TodoSetDestinations" xml:space="preserve"><value>Set {0} destinations manually. (currently {1})</value></data>
+  <data name="TodoSetDestinations" xml:space="preserve"><value>Reach {0} destinations without using GPS. (currently {1})</value></data>
   <data name="TodoOperatingZone" xml:space="preserve"><value>Reach an operating zone of {0} km. (currently {1:0.00})</value></data>
   <data name="TodoOwnCars" xml:space="preserve"><value>Own {0} cars. (currently {1})</value></data>
   <data name="TodoEnterPoi" xml:space="preserve"><value>Enter {0}.</value></data>

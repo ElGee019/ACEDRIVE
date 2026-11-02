@@ -46,6 +46,8 @@ public sealed class RoadTestFlowTests
         var (session, hud, _, roads, bank) = Create();
         string? pick = roads.Current?.Key;
         string? destinationBefore = hud.Destination?.Id;
+        // The tour's errand owns the standing copy; the tap must leave it alone.
+        HudDestinationCopy? copyBefore = hud.Copy;
 
         TapTheRoadTestRow(session);
 
@@ -54,7 +56,7 @@ public sealed class RoadTestFlowTests
         // The tap explains the week first: no drive is pinned until START.
         Assert.Equal(RoadTestPhase.Idle, session.RoadTest.Phase);
         Assert.Equal(destinationBefore, hud.Destination?.Id);
-        Assert.Null(hud.Copy);
+        Assert.Equal(copyBefore, hud.Copy);
         Assert.Equal(0, hud.ShowTaskTextCalls);
         // The briefing names the week's car on the cover and the door to drive to.
         Assert.Contains(CarTitles.Of(roads.Current!), page.IntroLine);
@@ -91,6 +93,8 @@ public sealed class RoadTestFlowTests
     {
         var (session, hud, _, _, bank) = Create();
         string? destinationBefore = hud.Destination?.Id;
+        // The tour's errand owns the standing copy; BACK pins nothing new.
+        HudDestinationCopy? copyBefore = hud.Copy;
         TapTheRoadTestRow(session);
         var page = Assert.IsType<RoadTestBriefingScreenViewModel>(session.Vm.CurrentScreen);
 
@@ -98,7 +102,7 @@ public sealed class RoadTestFlowTests
 
         Assert.Equal(RoadTestPhase.Idle, session.RoadTest.Phase);
         Assert.Equal(destinationBefore, hud.Destination?.Id);
-        Assert.Null(hud.Copy);
+        Assert.Equal(copyBefore, hud.Copy);
         Assert.Empty(bank.Saved);
         // BACK returns the calendar the row was tapped on, not the jobs page;
         // nothing was started and nothing moved.

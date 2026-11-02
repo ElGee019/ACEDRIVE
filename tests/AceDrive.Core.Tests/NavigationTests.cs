@@ -84,7 +84,7 @@ public sealed class NavigationTests
             new FakeCityStore(), new FakeHungerStore(), roadTests, shiftStore,
             wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
-            new JobLedger(), new DestinationPins(), new VisitLedger(),
+            new JobLedger(), new VisitLedger(),
             valuationLedger, willyLedger, career, weeklyEvents);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
         var directory = new PoiDirectory();
@@ -140,7 +140,7 @@ public sealed class NavigationTests
         var todoBoard = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), directory, onboarding,
             wallet, new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), garageInstance,
-            new DestinationPins(), new VisitLedger(), career, log);
+            new VisitLedger(), career, log);
         // The weekly missing-person run: the calendar's Wednesday tap starts it,
         // so the navigator needs the real flow (its resident table is the one
         // the elder is drawn from).

@@ -35,9 +35,11 @@ namespace AceDrive.Core;
 /// dealer and mechanic POIs; it is separate from the zone's expansion counter,
 /// which resets on every expansion.
 /// The ToDo career readings (PORTPLAN 46) ride here too: the lifetime CR
-/// earned, the per-kind settled job totals, the manual destination pins and
-/// the one-time business visits. Unity keeps them on PlayerData; the driver
-/// file is this port's PlayerData.
+/// earned, the per-kind settled job totals and the one-time business visits.
+/// Unity keeps them on PlayerData; the driver file is this port's PlayerData.
+/// Unity's manual-destination pin count has no field here: the port has no GPS,
+/// so every drive is a drive without GPS and the destination tip reads the
+/// settled-job totals instead.
 /// The Gentlemen Drivers Club reputation (PORTPLAN 49, Unity
 /// PlayerData.clubReputation) starts at Unity's raw 0 — the Cento Miglia page
 /// prints it with Unity's 1.0 floor — and only a finished Cento Miglia moves
@@ -86,7 +88,6 @@ public sealed record DriverState(
     double CreditEarned = 0.0,
     int TaxiJobsCompleted = 0,
     int DeliveryJobsCompleted = 0,
-    int ManuallySetDestinations = 0,
     bool VisitedCarWash = false,
     bool VisitedCarDealer = false,
     bool VisitedInsurance = false,

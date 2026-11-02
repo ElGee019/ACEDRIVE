@@ -23,7 +23,7 @@ internal static class TestSaveState
             wallet, new DailyStreak(clock, null), new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(),
             garage, new CityEconomy([], CityRules.Default), new Hunger(HungerRules.Default),
             new RoadTestLedger([], seed: 0), new TaxiShift(), new ShiftRecord(null), new JobLedger(),
-            new DestinationPins(), new VisitLedger(), valuation ?? new ValuationLedger(),
+            new VisitLedger(), valuation ?? new ValuationLedger(),
             new WhereIsWillyLedger(), career ?? new DeliveryCareer(HubCatalog.Default, 0),
             new WeeklyEventLedger());
 }

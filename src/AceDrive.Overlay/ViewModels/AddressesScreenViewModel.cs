@@ -120,9 +120,9 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
         // only after the panel's deferred hand-back finishes; the companion
         // surfaces its task text over the still-open panel for that gap.
         _hud?.ShowTaskText();
-        // The pin is the "set a destination yourself" action the ToDo subject
-        // counts (Unity manuallySetDestinations); the host does the counting
-        // and the sync, the page only reports the tap.
+        // The pin picks the destination the companion guides to; the ToDo
+        // subject counts settled drives, not pins (the port has no GPS), so
+        // the host only hands the panel back.
         _onPinned?.Invoke();
         Rows = BuildRows();
         SelectedLine = Strings.Format("AddressesSelected", row.Name, row.Address);

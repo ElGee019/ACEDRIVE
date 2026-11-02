@@ -2,7 +2,11 @@
 // Unity TodoEvaluators' PlayerData reads). Pure data: the collaborator that
 // owns each number hands it over as a value, so no requirement ever reaches
 // into a wallet, a garage or a store. The poll never builds one; the sync runs
-// on cold edges only (settle, shop entry, pin, boot).
+// on cold edges only (settle, shop entry, purchase, boot).
+//
+// WHY DestinationsReached is the settled-job total: with no GPS in the port
+// every drive is a drive without GPS, so the destination tip counts drives
+// (PORTPLAN 46) instead of Unity's manual pins.
 namespace AceDrive.Core;
 
 /// <summary>Everything the ToDo requirements ask about the career.</summary>
@@ -12,7 +16,7 @@ public sealed record TodoFacts(
     double Bank,
     int TaxiJobs,
     int DeliveryJobs,
-    int ManuallySetDestinations,
+    int DestinationsReached,
     double ZoneKm,
     int OwnedCars,
     bool MaxGroceryIntroSeen,

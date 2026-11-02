@@ -60,7 +60,6 @@ internal sealed class TestSessionOptions
     public IPoiDirectoryStore? PoiStore { get; init; }
     public PoiSpawner? PoiSpawner { get; init; }
     public JobLedger? Jobs { get; init; }
-    public DestinationPins? Pins { get; init; }
     public VisitLedger? Visits { get; init; }
     public ITodoProgressStore? TodoStore { get; init; }
     public TodoTable? Todos { get; init; }

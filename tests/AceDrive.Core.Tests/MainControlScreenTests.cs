@@ -47,7 +47,7 @@ public sealed class MainControlScreenTests
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(), new JobLedger(),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            new DestinationPins(), new VisitLedger(),
+            new VisitLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
     }
 
@@ -59,7 +59,7 @@ public sealed class MainControlScreenTests
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            new DestinationPins(state), new VisitLedger(),
+            new VisitLedger(),
             new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
     }
 
@@ -97,7 +97,7 @@ public sealed class MainControlScreenTests
         var vm = Create(todos: Board(new DriverState(
             0.0, 2.0, Bank: 1002.0, CreditEarned: 500.0,
             TaxiJobsCompleted: 5, DeliveryJobsCompleted: 2,
-            ManuallySetDestinations: 18)));
+            JobsCompleted: 18)));
 
         Assert.True(vm.ShowDeliverCarePackages);
         Assert.Equal(6, vm.CompletedTodoLines.Count);

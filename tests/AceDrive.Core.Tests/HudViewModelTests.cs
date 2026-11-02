@@ -570,10 +570,32 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
-    public void ParkedOnTheDestination_ShowsTheArrivalLineAndEnterButton()
+    public void ShopDestinationWithoutStoryCopy_ArrivalIsAPlainArrival()
     {
         var vm = Create();
-        vm.SetDestination(Errand());
+        var broker = new PointOfInterest(
+            "insurance-broker", "The Insurance Broker",
+            new AddressLocation("Street 1", 17, HouseSide.Right));
+
+        vm.SetDestination(broker);
+
+        // 0.25 resolves to Street 1 No. 17: the broker's door.
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        // Grandma's maple-syrup errand owns its own arrival line; a later shop
+        // must not inherit that one-time task text.
+        Assert.True(vm.AtDestination);
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal("You have arrived at The Insurance Broker.", vm.DestinationText);
+        Assert.Equal("ENTER", vm.EnterText);
+    }
+
+    [Fact]
+    public void ErrandDestination_KeepsTheMapleSyrupArrivalOnItsOwnCopy()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand(), new HudDestinationCopy(
+            "HudDestination", "HudArrivedErrand"));
 
         // 0.25 resolves to Street 1 No. 17: the errand's own house.
         vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
