@@ -245,6 +245,10 @@ public partial class App : Application, IDisposable
         // each was last taken, so a restart inside the same week keeps those rows
         // closed and the day-of-week gate keeps that day the week's only slot.
         var weeklyEvents = new WeeklyEventLedger(savedDriver);
+        // The calendar's availability rule: the strip's taken rows and the
+        // menu's calendar tile both read it, so an event's used-up slot can
+        // never be shown as playable in one place and done in the other.
+        var calendarGate = new CalendarGate(weeklyEvents, willyLedger, valuation);
         var todoStore = new JsonTodoProgressStore(_log);
         // The open taxi shift resumes with its wall-clock stamps (PORTPLAN 12):
         // the 30-minute idle rule keeps running while the app and EVO are
@@ -443,7 +447,7 @@ public partial class App : Application, IDisposable
         // read the week from here, so no mirror of it lives anywhere else.
         var dayCycle = new DayCycle(
             game, shift, shifts, shiftStandings, telemetry, profileStore,
-            rivals, saver, beat, startWeek, _log);
+            rivals, saver, beat, calendarGate, startWeek, _log);
         // The weekly missing-person run (ToWhereIsWilly.md): its own flow owns
         // the Wednesday draw, the search, the drive home and the receipt, so
         // the coordinator only forwards the calendar tap, the poll and the one
@@ -598,7 +602,7 @@ public partial class App : Application, IDisposable
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
             valuationFlow, willyFlow, willyLedger, roadTestFlow, touristen,
-            weeklyEvents,
+            weeklyEvents, calendarGate,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
             () => carBrands.Brand, new Random(taxiSeed + 6), _log);

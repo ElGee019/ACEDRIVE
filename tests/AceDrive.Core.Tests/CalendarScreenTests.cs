@@ -13,7 +13,8 @@ public sealed class CalendarScreenTests
         FakeClock? clock = null, RoadTestLedger? roads = null, VoiceBeat? beat = null,
         DateTime? gameStart = null, int week = 1,
         Action<int>? openDay = null, Action? back = null,
-        WhereIsWillyLedger? willy = null, bool coffeeCareer = true,
+        WhereIsWillyLedger? willy = null, WeeklyEventLedger? weekly = null,
+        ValuationLedger? valuation = null, bool coffeeCareer = true,
         bool coffeeBeansCareer = true, bool ignoreGates = false)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -21,13 +22,16 @@ public sealed class CalendarScreenTests
         // Game time starts on the wall clock unless a test pins another
         // morning, so the Monday-noon default keeps its header.
         var game = new GameClock(tick, gameStart ?? tick.UtcNow);
+        WhereIsWillyLedger willyLedger = willy ?? new WhereIsWillyLedger();
         return new CalendarScreenViewModel(
             beat ?? new VoiceBeat(tick), game, tick, roads ?? TestRoadCars.Ledger(),
             CalendarStamp.Default with { Week = week },
             new ParameterizedCommand<int>(day => openDay?.Invoke(day)),
             new RelayCommand(() => back?.Invoke()),
-            willy ?? new WhereIsWillyLedger(), () => coffeeCareer,
-            () => coffeeBeansCareer, ignoreGates);
+            willyLedger,
+            new CalendarGate(
+                weekly ?? new WeeklyEventLedger(), willyLedger, valuation ?? new ValuationLedger()),
+            () => coffeeCareer, () => coffeeBeansCareer, ignoreGates);
     }
 
     [Fact]
@@ -244,6 +248,53 @@ public sealed class CalendarScreenTests
         vm.UpdateFlash();
         sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
         Assert.Equal("COME BACK ON SUNDAY BETWEEN 8am AND 8pm", sunday.EventLabel);
+    }
+
+    [Fact]
+    public void TakenEvent_SaysToComeBackNextWeekAndDoesNotDispatch()
+    {
+        // The Cento Miglia was taken this Sunday: the row says so instead of
+        // leaving the tap to the refusal behind it, and the mic still reaches
+        // the row by the event's own name.
+        var clock = new FakeClock();
+        var sundayNoon = new DateTime(2026, 10, 11, 12, 0, 0, DateTimeKind.Utc);
+        var weekly = new WeeklyEventLedger();
+        weekly.MarkTaken(ControlCalendar.CentoMiglia, sundayNoon);
+        int opened = 0;
+        var vm = Create(
+            clock, gameStart: sundayNoon, weekly: weekly, openDay: day => opened = day);
+
+        CalendarRow sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
+        Assert.True(sunday.Taken);
+        Assert.Equal("COME BACK NEXT WEEK", sunday.EventLabel);
+        Assert.True(vm.VoiceActions.ContainsKey("Cento Miglia"));
+
+        vm.DayCommand.Execute(1); // Sunday
+
+        Assert.Equal(0, opened);
+        sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
+        Assert.True(sunday.Flash);
+        Assert.Equal("COME BACK NEXT WEEK", sunday.EventLabel);
+    }
+
+    [Fact]
+    public void TakenEvent_RepaintsInsideTheSameGameMinute()
+    {
+        // The stamp can land while the page is on screen: the refresh guard
+        // must notice it without waiting for the next game minute.
+        var clock = new FakeClock();
+        var sundayNoon = new DateTime(2026, 10, 11, 12, 0, 0, DateTimeKind.Utc);
+        var weekly = new WeeklyEventLedger();
+        var vm = Create(clock, gameStart: sundayNoon, weekly: weekly);
+        Assert.Equal(
+            "Cento Miglia", Assert.Single(vm.Days, d => d.DayLabel == "Sunday").EventLabel);
+
+        weekly.MarkTaken(ControlCalendar.CentoMiglia, sundayNoon);
+        vm.Refresh();
+
+        Assert.Equal(
+            "COME BACK NEXT WEEK",
+            Assert.Single(vm.Days, d => d.DayLabel == "Sunday").EventLabel);
     }
 
     [Fact]

@@ -83,7 +83,10 @@ public sealed class PoiWorldTests
         var day = new DayCycle(
             new GameClock(clock, clock.UtcNow), new TaxiShift(), new ShiftRecord(null),
             new FakeShiftStandings(), new FakePlayerTelemetry(),
-            new FakeProfileStore(), new FakeRivals(), saver, beat, week, logger);
+            new FakeProfileStore(), new FakeRivals(), saver, beat,
+            new CalendarGate(
+                new WeeklyEventLedger(), new WhereIsWillyLedger(), new ValuationLedger()),
+            week, logger);
         var world = new PoiWorld(
             new PoiSpawner(
                 PoiCatalog.Default,

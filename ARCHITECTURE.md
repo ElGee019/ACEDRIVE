@@ -108,7 +108,7 @@ coordinator. Pages take commands from the domain that owns them.
 | `PoiWorld` ✅ | the board growth (`Grow`, `AdoptDoors`, hub doors) | `Grow(expansion)` → the doors it banked, `AdoptDoors()`, `EnsureHubDoor`, `StopDoor(leg)`, `PlaceHubDoor`, `Handlers(supplied)` | `IPoiWorldHost`: board refresh, bought-car page |
 | `Navigation` ✅ | `_control`, `_menu`, `_calendar`, `_openDay`, `_roadTestDay` | `ShowScreen`, `ShowMenuPage`, `ShowControl`, `ShowDelivery`, `ShowHub`, `ShowDeliveryBoard`, `ShowZoneExpansion`, `ControlPage`, `MenuPage`, `Tick`, `DisplayWeekChanged`, `CarBought`, `ControlCommand`, `MenuCommand`, `GarageCommand`, `TaxiShiftCommand` | `INavigationHost` (3 members) |
 | `TelemetryReadouts` ✅ | the seven painted strings' caches (`_lastPacketId`, speed, gear, rpm/throttle/brake, the waiting key) | `Paint(sample, gameRunning)`, `PaintWaiting(gameRunning)`, `PaintJob(job, shift, now)` → `ReadoutPaint` | none: the coordinator's `Apply` copies the record |
-| `DayCycle` ✅ | `_lastDay`, `_lastHour`, `_lastShiftSecs`, the display week and the event gate | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EventPlayable`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `EventGateChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `ResumeAfterShiftEnded` |
+| `DayCycle` ✅ | `_lastDay`, `_lastHour`, `_lastShiftSecs`, the display week and the event gate | `Tick(now, jobInProgress, legActive)`, `DisplayWeek`, `EventPlayable`, `RefreshEventGate`, `EndShift(idle)` | `IDayCycleHost`: `DisplayWeekChanged`, `EventGateChanged`, `ReadoutsChanged`, `ShowShiftEnded`, `ResumeAfterShiftEnded` |
 | `WorldTicks` ✅ | the hunger-block latch | `Tick(onboardingDone)` → whether the town moved | none: the movement returns to the coordinator, which owns the cached board page |
 | `DriverCatchUp` ✅ | none: the streak counter and the garage are the services' state; it runs once and exits | `Run(displayWeek)` | none: it banks through `GameStateSaver` and never reaches back into the panel |
 | `ZoneGrowth` ✅ | none: the zone's counters are the services' state | `Expand()` → the `ZoneExpansion` report (street, count, km, jobs to next) or null | none: the settle hook calls it, `PoiWorld.Grow(expansion)` banks the doors, and the coordinator keeps the report until the receipt's CONTINUE shows it |
@@ -551,6 +551,14 @@ holds one game date per event (the road test, the Cento Miglia, the
 Touristenfahrten run), resumes that map from the driver file and is its only
 writer — `MarkTaken` replaces the cached `Snapshot` in the same call, so the
 saver's next bank and the page's `TakenOn` read never touch the disk twice.
+
+The rule those ledgers feed is `CalendarGate` (Core): the weekday/week/window
+gate joined to each event's own used-up stamp (the weekly ledger, the
+missing-person completion, the valuation week's entry). The strip paints a
+taken row with the COME BACK NEXT WEEK copy and the menu's calendar tile rests,
+so the two can never promise an entry the flow would refuse. The day cycle
+re-reads the gate on the hour/day boundary and when a page is revealed
+(`RefreshEventGate`), never per tick.
 
 ### Stores: read once, then cache
 

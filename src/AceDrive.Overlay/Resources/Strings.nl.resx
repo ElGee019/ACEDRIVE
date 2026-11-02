@@ -150,6 +150,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TAKENLIJST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>KOM TERUG OP {0} TUSSEN 8 EN 20 UUR</value></data>
+  <data name="ControlGateNextWeek" xml:space="preserve"><value>KOM VOLGENDE WEEK TERUG</value></data>
   <data name="DaySun" xml:space="preserve"><value>Zondag</value></data>
   <data name="DayMon" xml:space="preserve"><value>Maandag</value></data>
   <data name="DayTue" xml:space="preserve"><value>Dinsdag</value></data>

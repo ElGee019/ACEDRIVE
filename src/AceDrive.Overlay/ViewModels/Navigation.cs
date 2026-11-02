@@ -101,6 +101,11 @@ public sealed class Navigation
     // row already opened this week refuses instead of opening a second page.
     private readonly WeeklyEventLedger _weeklyEvents;
 
+    // The availability rule the strip's rows read: the same one the day cycle
+    // watches for the menu's calendar tile, so a taken row and a resting tile
+    // can never disagree.
+    private readonly CalendarGate _gate;
+
     // The road test (PORTPLAN 49): the Tuesday row is its job-centre button, so
     // the tap sends the player to La Strada and the flow owns the drive, the
     // 0-60 leg and the result page from there.
@@ -174,7 +179,7 @@ public sealed class Navigation
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
         RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
-        WeeklyEventLedger weeklyEvents,
+        WeeklyEventLedger weeklyEvents, CalendarGate gate,
         Func<string> carBrand, Random rng, ILog log, bool ignoreEventGates = false)
     {
         _shell = shell;
@@ -211,6 +216,7 @@ public sealed class Navigation
         _willy = willy;
         _willyLedger = willyLedger;
         _weeklyEvents = weeklyEvents;
+        _gate = gate;
         _roadTest = roadTest;
         _touristen = touristen;
         _carBrand = carBrand;
@@ -451,7 +457,7 @@ public sealed class Navigation
         _calendar ??= new CalendarScreenViewModel(
             _beat, _game, _clock, _roads,
             CalendarStamp.Default with { Week = _day.DisplayWeek },
-            _openDay, MenuCommand, _willyLedger,
+            _openDay, MenuCommand, _willyLedger, _gate,
             () => WhereIsWillyRules.HasCoffeeCareer(_directory, _career),
             () => WhereIsWillyRules.OwnsCoffeeCareer(_career),
             _ignoreEventGates);
@@ -683,27 +689,25 @@ public sealed class Navigation
     // Built once and reused so its clock keeps ticking behind another page. The
     // settings tile is the coordinator's page (it owns the preferences writer
     // and RESET GAME), so it travels through the host. The event gate is the day
-    // cycle's to watch, so the page is seeded with it and only hears the flips
-    // (<see cref="EventGateChanged"/>) instead of deriving it on the poll.
+    // cycle's to watch, so the page is seeded from it and only hears the flips
+    // (<see cref="EventGateChanged"/>) instead of deriving it on the poll; an
+    // event taken while the menu was cached away is re-read here, on the reveal.
     public MenuScreenViewModel MenuPage()
     {
-        if (_menu is null)
-        {
-            _menu = new MenuScreenViewModel(
-                new RelayCommand(OpenWallet),
-                ControlCommand,
-                new RelayCommand(OpenCalendar),
-                new RelayCommand(OpenTrunk),
-                new RelayCommand(_host.ShowSettings),
-                new RelayCommand(OpenHome),
-                _hunger, _garage, _carBrand,
-                _beat,
-                _game,
-                _clock,
-                _day.DisplayWeek);
-            _menu.IsCalendarEventPlayable = _day.EventPlayable;
-        }
-
+        _menu ??= new MenuScreenViewModel(
+            new RelayCommand(OpenWallet),
+            ControlCommand,
+            new RelayCommand(OpenCalendar),
+            new RelayCommand(OpenTrunk),
+            new RelayCommand(_host.ShowSettings),
+            new RelayCommand(OpenHome),
+            _hunger, _garage, _carBrand,
+            _beat,
+            _game,
+            _clock,
+            _day.DisplayWeek);
+        _day.RefreshEventGate();
+        _menu.IsCalendarEventPlayable = _day.EventPlayable;
         return _menu;
     }
 

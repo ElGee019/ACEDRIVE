@@ -101,6 +101,12 @@ public static class ControlCalendar
     public static bool IsEventWindow(int hour) => hour is >= OpenFromHour and < OpenUntilHour;
 
     /// <summary>
+    /// The event the given weekday's row opens, or null on an empty weekday
+    /// (Thursday) — the join the availability rule and the strip both need.
+    /// </summary>
+    public static string? EventOfDay(int dayOfWeek) => RowFor(dayOfWeek)?.EventId;
+
+    /// <summary>
     /// True when the moment sits on a weekday that carries an event, inside
     /// that event's 8am-8pm gate, in a display week whose row has already
     /// appeared: the strip's highlighted row is playable now. The menu's

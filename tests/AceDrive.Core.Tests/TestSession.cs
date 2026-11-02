@@ -127,6 +127,10 @@ internal static class TestSession
         // The calendar's once-per-week stamps for the events that keep no ledger
         // of their own (road test, Cento Miglia, Touristenfahrten).
         var weeklyEventsInstance = new WeeklyEventLedger(options.SavedDriver);
+        // The calendar's availability rule, shared by the strip, the menu tile
+        // and the day cycle like the root's one instance.
+        var calendarGate = new CalendarGate(
+            weeklyEventsInstance, willyLedgerInstance, valuationInstance);
         IValuationBoard valuationBoard = options.ValuationBoard ?? new FakeValuationBoard();
         var todoStoreInstance = options.TodoStore ?? new FakeTodoProgressStore();
         var saver = new GameStateSaver(
@@ -171,7 +175,7 @@ internal static class TestSession
         IZoneStandings zoneBoard = options.ZoneStandings ?? new FakeZoneStandings();
         var dayCycle = new DayCycle(
             game, shiftInstance, shiftsInstance, shiftBoard, telemetryInstance,
-            profiles, rivalsInstance, saver, beat, options.StartWeek, logger);
+            profiles, rivalsInstance, saver, beat, calendarGate, options.StartWeek, logger);
         var readouts = new TelemetryReadouts();
         // The missing-person run: its resident table is the one the elder is
         // drawn from, its own seeded stream keeps the draw deterministic, and
@@ -300,7 +304,7 @@ internal static class TestSession
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
             willyFlow, willyLedgerInstance, roadTestFlow, touristenFlow,
-            weeklyEventsInstance,
+            weeklyEventsInstance, calendarGate,
             () => brands.Brand, new Random(6), logger, options.IgnoreEventGates);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.

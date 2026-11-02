@@ -72,6 +72,11 @@ public sealed class NavigationTests
         var willyLedger = new WhereIsWillyLedger();
         // The calendar's once-per-week stamps for the events without a ledger.
         var weeklyEvents = new WeeklyEventLedger();
+        // The valuation week's ledger, shared by the saver, the flow and the
+        // calendar gate like the one the root builds.
+        var valuationLedger = new ValuationLedger();
+        // The availability rule the strip and the menu tile read.
+        var gate = new CalendarGate(weeklyEvents, willyLedger, valuationLedger);
         // One career instance the saver, the POI world and the navigator share.
         var career = new DeliveryCareer(HubCatalog.Default, 0);
         var saver = new GameStateSaver(
@@ -80,14 +85,14 @@ public sealed class NavigationTests
             wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
             new JobLedger(), new DestinationPins(), new VisitLedger(),
-            new ValuationLedger(), willyLedger, career, weeklyEvents);
+            valuationLedger, willyLedger, career, weeklyEvents);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
         var directory = new PoiDirectory();
         IReadOnlyList<CarSpec> poolCars = pool;
         var day = new DayCycle(
             game, shift, new ShiftRecord(null), new FakeShiftStandings(),
             new FakePlayerTelemetry(), new FakeProfileStore(), rivals, saver, beat,
-            startWeek, log);
+            gate, startWeek, log);
         var world = new PoiWorld(
             new PoiSpawner(
                 PoiCatalog.Default,
@@ -127,7 +132,7 @@ public sealed class NavigationTests
         // its drive leg, so the navigator needs the real flow (the list stays
         // empty offline, which is the page's own fallback path).
         var valuation = new ValuationFlow(
-            zoneInstance, game, clock, new ValuationLedger(), new OfflineValuationBoard(),
+            zoneInstance, game, clock, valuationLedger, new OfflineValuationBoard(),
             garageInstance, poolCars, wallet, new FakeProfileStore(), null, saver,
             rivals, beat, new Random(0), log);
         // The ToDo list the jobs page reads: its own ledger over the same
@@ -188,10 +193,13 @@ public sealed class NavigationTests
             trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
-            valuation, willy, willyLedger, roadTest, touristen, weeklyEvents,
+            valuation, willy, willyLedger, roadTest, touristen, weeklyEvents, gate,
             () => "mazda", new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);
+        // The day cycle's own host: a menu reveal re-reads the calendar gate
+        // through it (the coordinator does this in the app).
+        day.Attach(new FakeDayCycleHost());
         // The proposal page asks the job's host for the player's door on every
         // draw; the page is the only part of the flow the navigator opens.
         taxi.Attach(new FakeTaxiJobHost
@@ -464,12 +472,12 @@ public sealed class NavigationTests
     }
 
     [Fact]
-    public void CentoDay_TwiceInTheSameWeek_RefusesTheSecondPage()
+    public void CentoDay_TwiceInTheSameWeek_SaysComeBackNextWeek()
     {
         // The Sunday row is once a week (the calendar's stamp): the page opens
-        // once, and a second tap after BACK is refused with a log line instead
-        // of a second event page.
-        var (nav, shell, _, clock, _, _, _, _, _, _, log, _) = Create();
+        // once, and after BACK the row itself says to come back next week —
+        // the tap no longer falls through to the refusal behind it.
+        var (nav, shell, _, clock, _, _, _, _, _, _, _, _) = Create();
         nav.ShowMenuPage();
         Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
         clock.Advance(TimeSpan.FromSeconds(
@@ -484,14 +492,43 @@ public sealed class NavigationTests
             .BackCommand.Execute(null);
         Assert.Same(calendar, shell.CurrentScreen);
 
+        nav.Tick(); // the poll repaints the strip with the stamp it just took
+        CalendarRow sunday = Assert.Single(calendar.Days, d => d.DayLabel == "Sunday");
+        Assert.True(sunday.Taken);
+        Assert.Equal("COME BACK NEXT WEEK", sunday.EventLabel);
+
         calendar.DayCommand.Execute(centoDay);
 
         Assert.Same(calendar, shell.CurrentScreen);
-        Assert.Contains(
-            log.Infos,
-            line => line.StartsWith(
-                $"calendar event {ControlCalendar.CentoMiglia} refused:",
-                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TakenEvent_RestsTheMenuCalendarTile()
+    {
+        // Sunday noon carries the Cento Miglia, so the menu's calendar tile is
+        // live; once the row is taken nothing is left to play, and the menu
+        // revealed again wears its resting artwork.
+        var (nav, shell, _, clock, _, _, _, _, _, _, _, _) = Create();
+        nav.ShowMenuPage();
+        var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
+        menu.CalendarCommand.Execute(null);
+        clock.Advance(TimeSpan.FromSeconds(
+            ((6 * 24 * 60) + 1) * GameClock.RealSecondsPerGameMinute));
+        nav.Tick();
+        var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
+        int centoDay = ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.CentoMiglia).DayOfWeek;
+
+        nav.ShowMenuPage();
+        Assert.True(menu.IsCalendarEventPlayable);
+
+        nav.ShowCalendarPage();
+        calendar.DayCommand.Execute(centoDay);
+        Assert.IsType<CentoMigliaScreenViewModel>(shell.CurrentScreen)
+            .BackCommand.Execute(null);
+
+        nav.ShowMenuPage();
+        Assert.False(menu.IsCalendarEventPlayable);
     }
 
     [Fact]
@@ -560,15 +597,16 @@ public sealed class NavigationTests
     [Fact]
     public void CalendarTile_MirrorsTheGatesOwnersFlip()
     {
-        // Monday noon is inside the valuation gate, so a menu built now starts
-        // on its live artwork; the day cycle's flip reaches the cached page
-        // without the menu ever reading the clock itself.
+        // Monday noon is inside the valuation gate, so the menu is built on its
+        // live artwork; the day cycle's flip reaches the cached page without the
+        // menu ever reading the clock itself.
         var (nav, _, _, _, _, _, _, _, _, _, _, _) = Create();
-
-        Assert.True(nav.MenuPage().IsCalendarEventPlayable);
+        MenuScreenViewModel menu = nav.MenuPage();
+        Assert.True(menu.IsCalendarEventPlayable);
 
         nav.EventGateChanged(false);
-        Assert.False(nav.MenuPage().IsCalendarEventPlayable);
+
+        Assert.False(menu.IsCalendarEventPlayable);
     }
 
     [Fact]

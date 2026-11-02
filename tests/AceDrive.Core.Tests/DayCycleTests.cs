@@ -36,7 +36,9 @@ public sealed class DayCycleTests
     public DayCycleTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
-    private static Fixture Build(DateTime gameStart, TaxiShift? shift = null, int week = StartWeek)
+    private static Fixture Build(
+        DateTime gameStart, TaxiShift? shift = null, int week = StartWeek,
+        CalendarGate? gate = null)
     {
         var clock = new FakeClock();
         var game = new GameClock(clock, gameStart);
@@ -65,7 +67,10 @@ public sealed class DayCycleTests
         var cycle = new DayCycle(
             game, shiftInstance, records, board, online,
             new FakeProfileStore(new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1)),
-            new FakeRivals(), saver, new VoiceBeat(clock), week, log);
+            new FakeRivals(), saver, new VoiceBeat(clock),
+            gate ?? new CalendarGate(
+                new WeeklyEventLedger(), new WhereIsWillyLedger(), new ValuationLedger()),
+            week, log);
         var host = new FakeDayCycleHost();
         cycle.Attach(host);
         return new Fixture(
@@ -124,6 +129,25 @@ public sealed class DayCycleTests
         fixture.Cycle.Tick(fixture.Clock.UtcNow, jobInProgress: false, legActive: false);
         Assert.True(fixture.Cycle.EventPlayable);
         Assert.Equal([false, true], fixture.Host.Gates);
+    }
+
+    [Fact]
+    public void RefreshEventGate_RestsOnceTheEventIsTaken()
+    {
+        // Sunday noon carries the Cento Miglia; taking it closes the gate with
+        // no clock boundary in sight, and the cached pages hear the flip.
+        var weekly = new WeeklyEventLedger();
+        var sundayNoon = new DateTime(2026, 10, 11, 12, 0, 0, DateTimeKind.Utc);
+        var fixture = Build(
+            sundayNoon,
+            gate: new CalendarGate(weekly, new WhereIsWillyLedger(), new ValuationLedger()));
+        Assert.True(fixture.Cycle.EventPlayable);
+
+        weekly.MarkTaken(ControlCalendar.CentoMiglia, sundayNoon);
+        fixture.Cycle.RefreshEventGate();
+
+        Assert.False(fixture.Cycle.EventPlayable);
+        Assert.Equal([false], fixture.Host.Gates);
     }
 
     [Fact]

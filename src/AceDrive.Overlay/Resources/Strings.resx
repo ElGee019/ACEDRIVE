@@ -191,6 +191,7 @@ For instance "{0}".</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TODO LIST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
   <data name="ControlGateWarning" xml:space="preserve"><value>COME BACK ON {0} BETWEEN 8am AND 8pm</value></data>
+  <data name="ControlGateNextWeek" xml:space="preserve"><value>COME BACK NEXT WEEK</value></data>
   <data name="DaySun" xml:space="preserve"><value>Sunday</value></data>
   <data name="DayMon" xml:space="preserve"><value>Monday</value></data>
   <data name="DayTue" xml:space="preserve"><value>Tuesday</value></data>

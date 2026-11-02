@@ -32,6 +32,9 @@ public sealed class DayCycle
     private readonly GameStateSaver _saver;
     private readonly VoiceBeat _beat;
     private readonly ILog _log;
+    // What the calendar can still open: the weekday/week/window rule joined to
+    // the event ledgers' used-up stamps.
+    private readonly CalendarGate _gate;
 
     // The day and hour the session opened on: the first poll must not report a
     // flip. The hour joins the guard because the event gate opens and closes on
@@ -57,7 +60,7 @@ public sealed class DayCycle
         GameClock game, TaxiShift shift, ShiftRecord records,
         IShiftStandings standings, IPlayerTelemetry online, IProfileStore profiles,
         IRivalsService rivals, GameStateSaver saver, VoiceBeat beat,
-        int startWeek, ILog log)
+        CalendarGate gate, int startWeek, ILog log)
     {
         _game = game;
         _shift = shift;
@@ -69,13 +72,14 @@ public sealed class DayCycle
         _saver = saver;
         _beat = beat;
         _log = log;
+        _gate = gate;
         DisplayWeek = startWeek;
         DateTime gameNow = game.GameNow;
         _lastDay = ControlCalendar.ToDayOfWeek(gameNow);
         _lastHour = gameNow.Hour;
         // Seeded from the clock so a page built before the first tick already
         // wears the artwork the gate calls for.
-        _eventPlayable = ControlCalendar.IsPlayableNow(gameNow, startWeek);
+        _eventPlayable = gate.OpenEventNow(gameNow, startWeek) is not null;
     }
 
     /// <summary>
@@ -186,7 +190,7 @@ public sealed class DayCycle
         }
 
         _lastHour = hour;
-        TickGate(gameNow);
+        ApplyGate(gameNow);
     }
 
     // Game-day flip: the calendar highlight moved.
@@ -210,12 +214,20 @@ public sealed class DayCycle
         _saver.SaveClock(DisplayWeek);
     }
 
-    // The event gate can only move on an hour or day change (see
-    // TickCalendar), so the cached pages hear the two flips a day instead of
+    /// <summary>
+    /// Re-reads the event gate after something the clock did not announce
+    /// changed it — an event taken from the strip, a run stamped. The flip is
+    /// pushed only when the value moved, so the menu keeps its resting artwork
+    /// the next time it is revealed (see <see cref="Navigation.MenuPage"/>).
+    /// </summary>
+    public void RefreshEventGate() => ApplyGate(_game.GameNow);
+
+    // The gate can only move on an hour or day change (see TickCalendar) or on
+    // a stamp (RefreshEventGate), so the cached pages hear the flip instead of
     // re-deriving the rule per tick.
-    private void TickGate(DateTime gameNow)
+    private void ApplyGate(DateTime gameNow)
     {
-        bool playable = ControlCalendar.IsPlayableNow(gameNow, DisplayWeek);
+        bool playable = _gate.OpenEventNow(gameNow, DisplayWeek) is not null;
         if (playable == _eventPlayable)
         {
             return;
