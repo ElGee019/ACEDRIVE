@@ -2389,6 +2389,32 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void Addresses_PinningARow_HandsThePanelBackForTheDrive()
+    {
+        // A pin is the drive (Unity's map selection): the page hands the panel
+        // back with the companion's line set, so the player sets off without a
+        // second click into the overlay.
+        var hud = new FakeTelemetryHud();
+        var session = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true }, hud: hud);
+        var (vm, _, _, _) = session;
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        menu.HomeCommand.Execute(null);
+        var home = Assert.IsType<HomeScreenViewModel>(vm.CurrentScreen);
+        home.AddressesCommand.Execute(null);
+        var addresses = Assert.IsType<AddressesScreenViewModel>(vm.CurrentScreen);
+        AddressRow row = addresses.Rows[0];
+        vm.Show();
+        Assert.True(vm.IsShown);
+
+        addresses.SelectCommand.Execute(row);
+
+        Assert.False(vm.IsShown);
+        Assert.Equal(row.Poi, hud.CurrentDestination);
+        Assert.Equal(1, hud.ShowTaskTextCalls);
+    }
+
+    [Fact]
     public void BirthdayErrand_ReusesTheBankedStoreAcrossLaunches()
     {
         var onboarding = new FakeOnboardingStore();

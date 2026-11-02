@@ -9,9 +9,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// readout — street count, area, jobs to the next expansion and the streets it
 /// covers — then every discovered POI, alphabetical by name, with the street
 /// and house number under it. This is the temporary stand-in for markers on
-/// the map: tapping an address pins the HUD's drive-to line, and driving there
-/// puts ENTER up on the companion so the place can be entered. The page writes
-/// nothing itself — the HUD owns the destination and the host owns navigation.
+/// the map: tapping an address pins the HUD's drive-to line and hands the panel
+/// back so the player can set off, and driving there puts ENTER up on the
+/// companion so the place can be entered. The page writes nothing itself — the
+/// HUD owns the destination and the host owns navigation and the panel.
 /// </summary>
 public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
 {
@@ -98,9 +99,10 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
 
-    // A click and a voice tap both pin at once: the page stays open, so there
-    // is no navigation beat to wait for. The selected row stays teal, which is
-    // the acknowledgment itself.
+    // A click and a voice tap both pin at once and hand the panel back, so
+    // there is no navigation beat to wait for: the host closes the panel and
+    // the companion carries the line. The selected row keeps the teal mark for
+    // the page an interruption can hand back.
     private void Select(AddressRow? row)
     {
         if (row is null)
@@ -115,8 +117,8 @@ public sealed class AddressesScreenViewModel : ViewModelBase, IVoiceScreen
         _selectedId = row.Poi.Id;
         _hud?.SetDestination(row.Poi);
         // WHY: the destination has to be readable the moment it is pinned, not
-        // only after the player closes this page; the companion surfaces its
-        // task text over the still-open panel.
+        // only after the panel's deferred hand-back finishes; the companion
+        // surfaces its task text over the still-open panel for that gap.
         _hud?.ShowTaskText();
         // The pin is the "set a destination yourself" action the ToDo subject
         // counts (Unity manuallySetDestinations); the host does the counting

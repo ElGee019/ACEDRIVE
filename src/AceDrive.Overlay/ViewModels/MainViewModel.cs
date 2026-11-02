@@ -612,6 +612,11 @@ public sealed class MainViewModel
         {
             SaveDriver(_rivals.LastResult);
         }
+
+        // The pin is the drive: handing the panel back sends the player off at
+        // once, exactly like the road test's START, with the companion carrying
+        // the drive-to line the page just set.
+        _panel.Hide();
     }
 
     // The host slice the day cycle sees: the week roll repaints the cached

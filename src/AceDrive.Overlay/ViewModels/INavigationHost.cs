@@ -25,7 +25,8 @@ public interface INavigationHost
 
     /// <summary>
     /// The addresses page pinned a destination (Unity manuallySetDestinations):
-    /// the coordinator counts it and syncs the ToDo list.
+    /// the coordinator counts it, syncs the ToDo list and hands the panel back so
+    /// the player can drive off.
     /// </summary>
     void DestinationPinned();
 }

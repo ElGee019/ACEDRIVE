@@ -5,8 +5,9 @@
     <UserControl.Resources>
         <!-- One row is one POI: the name over its address. The whole row is a
              button, so the touch target is the row rather than a small label.
-             The selected row keeps the shared teal, the page's acknowledgment
-             for a tap that stays on the page. -->
+             The selected row keeps the shared teal: the mark acknowledges the
+             door the player just picked (the host then hands the panel back),
+             and it is still right if an interruption restores the page. -->
         <Style x:Key="AddressRowButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="Padding" Value="8,5"/>
@@ -47,9 +48,10 @@
     <!-- Addresses page (PORTPLAN 24/27 + TOZONES §3.5): the operating zone's
          readout on top, then the discovered POIs alphabetical by name, the
          temporary stand-in for markers on the map. Picking a row pins the HUD's
-         drive-to line; driving there puts ENTER up on the companion so the
-         place can be entered. Same page skeleton as the wallet page: title
-         band, body, BACK flush at the bottom. -->
+         drive-to line and hands the panel back, so the player drives off with
+         the companion guiding; driving there puts ENTER up so the place can be
+         entered. Same page skeleton as the wallet page: title band, body, BACK
+         flush at the bottom. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
