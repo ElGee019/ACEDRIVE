@@ -9,6 +9,10 @@ namespace AceDrive.Core.Tests;
 /// resolve from the stores and resx.</summary>
 public sealed class MainControlScreenTests
 {
+    // The copy the haul flow hands the page for the brand-loyalty refusal. The
+    // page prints whatever it is given (the flow owns the words), so the hold
+    // tests pin these strings rather than the resx key.
+    private const string LoyaltyGate = "NOT ENOUGH BRAND LOYALTY YET";
     // FakeClock default: Monday 2026-10-12 12:00 UTC.
     private static MainControlScreenViewModel Create(
         FakeClock? clock = null, TodoBoard? todos = null,
@@ -323,9 +327,9 @@ public sealed class MainControlScreenTests
         Assert.Equal("POLICE", vm.PoliceLabel);
     }
 
-    // The haul's own three-second hold: a refused tap (the brand-loyalty gate
-    // the flow reports) names the reason on the button the player tapped and
-    // the button is its own name again before the next tap.
+    // The haul's own three-second hold: a refused tap names the reason the flow
+    // gave it on the button the player tapped, and the button is its own name
+    // again before the next tap.
     [Fact]
     public void HaulGate_SaysTheLoyaltyFloorForThreeSecondsThenRestores()
     {
@@ -333,7 +337,7 @@ public sealed class MainControlScreenTests
         var vm = Create(clock);
         Assert.Equal("CAR HAULING JOB", vm.HaulLabel);
 
-        vm.ShowBrandLoyaltyGate();
+        vm.ShowHaulGate(LoyaltyGate);
         Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
 
         clock.Advance(TimeSpan.FromMilliseconds(2999));
@@ -351,9 +355,9 @@ public sealed class MainControlScreenTests
         var clock = new FakeClock();
         var vm = Create(clock);
 
-        vm.ShowBrandLoyaltyGate();
+        vm.ShowHaulGate(LoyaltyGate);
         clock.Advance(TimeSpan.FromSeconds(2));
-        vm.ShowBrandLoyaltyGate(); // latest tap wins
+        vm.ShowHaulGate(LoyaltyGate); // latest tap wins
         clock.Advance(TimeSpan.FromSeconds(2));
         vm.UpdateFlash();
         Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
@@ -372,7 +376,7 @@ public sealed class MainControlScreenTests
         var shift = new TaxiShift();
         var vm = Create(clock, shift: shift);
 
-        vm.ShowBrandLoyaltyGate();
+        vm.ShowHaulGate(LoyaltyGate);
         shift.Start(clock.UtcNow);
         vm.Refresh();
 
@@ -385,11 +389,23 @@ public sealed class MainControlScreenTests
     public void HaulGateBack_RestoresTheNameOnTheWayOut()
     {
         var vm = Create();
-        vm.ShowBrandLoyaltyGate();
+        vm.ShowHaulGate(LoyaltyGate);
         Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", vm.HaulLabel);
 
         vm.BackCommand.Execute(null);
         Assert.Equal("CAR HAULING JOB", vm.HaulLabel);
+    }
+
+    [Fact]
+    public void HaulGate_PrintsTheWordsTheFlowChose()
+    {
+        // The page owns the hold, not the wording: the generic refusal must
+        // reach the button exactly like the loyalty one.
+        var vm = Create();
+
+        vm.ShowHaulGate("NO CAR HAULING JOB AVAILABLE YET");
+
+        Assert.Equal("NO CAR HAULING JOB AVAILABLE YET", vm.HaulLabel);
     }
 
     [Fact]

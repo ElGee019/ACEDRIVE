@@ -3990,7 +3990,8 @@ public sealed class MainViewModelTests
     {
         // The haul draws its offer from the brands the player has driven
         // (PORTPLAN 20); a brand-new driver has none, so the tap keeps the
-        // control page and the companion flashes the hint.
+        // control page and the button names the loyalty that is missing —
+        // through the real shell, not a fake host.
         var session = Create(speedKmh: 0f);
         var (vm, _, _, _) = session;
         var control = FinishIntro(session);
@@ -3998,6 +3999,7 @@ public sealed class MainViewModelTests
         control.HaulCommand.Execute(null);
 
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("NOT ENOUGH BRAND LOYALTY YET", control.HaulLabel);
     }
     [Fact]
     public void CarHaulTap_WithADrivenBrand_OpensTheOffer()

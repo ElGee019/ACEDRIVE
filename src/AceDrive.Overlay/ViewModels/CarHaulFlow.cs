@@ -97,10 +97,11 @@ public sealed class CarHaulFlow
 
     /// <summary>
     /// The CAR HAULING tap: draws an offer when none is running, otherwise
-    /// reopens the active leg's page. An unavailable draw keeps the control
-    /// page and flashes the hint instead of opening an empty one: the brand
-    /// loyalty floor is named on the control page's own button, every other
-    /// empty pool keeps the generic notice.
+    /// reopens the active leg's page. A refused tap keeps the control page and
+    /// answers on that page's own button, in the words that fit the gate: the
+    /// brand-loyalty floor is progress the player can make, so it is named; a
+    /// missing dealer or customer door (and the daily cap) keep the generic
+    /// line, because more driving does not fix those.
     /// </summary>
     public object Open(ICommand back, object controlPage)
     {
@@ -112,7 +113,8 @@ public sealed class CarHaulFlow
         {
             if (!_policy.CanOffer(_game.GameNow, _lastDeliveredOn, haulInProgress: false))
             {
-                _host.ShowNotice(Strings.Get("HaulUnavailable"));
+                _log.LogInfo("haul refused: today's haul is already delivered");
+                _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
                 return controlPage;
             }
 
@@ -120,11 +122,14 @@ public sealed class CarHaulFlow
             {
                 if (brandLoyaltyGate)
                 {
-                    _host.ShowBrandLoyaltyGate();
+                    _log.LogInfo("haul refused: no brand reaches the loyalty floor");
+                    _host.ShowHaulGate(Strings.Get("ControlHaulLocked"));
                 }
                 else
                 {
+                    _log.LogInfo("haul refused: no offer could be drawn");
                     _host.ShowNotice(Strings.Get("HaulUnavailable"));
+                    _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
                 }
 
                 return controlPage;

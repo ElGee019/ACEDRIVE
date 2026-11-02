@@ -276,11 +276,11 @@ public sealed class Navigation
     public void RefreshControl() => _control?.Refresh();
 
     /// <summary>
-    /// Names the haul's brand-loyalty floor on the control page's own button
-    /// (the page owns the three-second hold). The page is always built by the
-    /// time a haul tap reaches here: the tap comes from it.
+    /// Names a refused haul tap on the control page's own button (the page
+    /// owns the three-second hold). The page is always built by the time a haul
+    /// tap reaches here: the tap comes from it.
     /// </summary>
-    public void ShowBrandLoyaltyGate() => _control?.ShowBrandLoyaltyGate();
+    public void ShowHaulGate(string text) => _control?.ShowHaulGate(text);
 
     // Unity JobSelectionScreen's OnStartTaxiShift: the tap owns the shift
     // bookkeeping (start fresh, or end an idle-timed-out one first), then opens

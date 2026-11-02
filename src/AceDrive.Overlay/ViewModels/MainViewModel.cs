@@ -527,8 +527,7 @@ public sealed class MainViewModel
         _hud?.SetJobGuidance(guidance);
     void ICarHaulHost.ShowNotice(string text) =>
         _hud?.ShowNotice(text, TimeSpan.FromSeconds(HaulNoticeSec));
-    void ICarHaulHost.ShowBrandLoyaltyGate() => _nav.ShowBrandLoyaltyGate();
-
+    void ICarHaulHost.ShowHaulGate(string text) => _nav.ShowHaulGate(text);
     // The host slice the Cento Miglia entry sees: the flow owns the phases, the
     // registration check and the reputation ticker; the shell owns the panel,
     // the companion's line and the settle that prices the receipt.

@@ -140,6 +140,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="ControlDelivery" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="ControlHaul" xml:space="preserve"><value>AUTOTRANSPORTKLUS</value></data>
   <data name="ControlHaulLocked" xml:space="preserve"><value>NOG NIET GENOEG MERKLOYALITEIT</value></data>
+  <data name="ControlHaulUnavailable" xml:space="preserve"><value>NOG GEEN AUTOTRANSPORTKLUS BESCHIKBAAR</value></data>
   <!-- Politieklus (PORTPLAN 41): de knop werkt, maar de klus zelf volgt nog;
        een tik zet drie seconden BINNENKORT op de knop en daarna de eigen naam
        terug. -->

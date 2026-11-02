@@ -20,10 +20,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// swaps the button's own text for COMING SOON and restores it three real
 /// seconds later, so the button is live and speakable without pretending to
 /// run a job it cannot settle yet.
-/// The car-hauling entry uses the same three-second hold for the one refusal
-/// the player can act on: the haul flow reports a brand-loyalty gate here and
-/// the button says how much loyalty is still missing, instead of the generic
-/// "no job available" line.
+/// The car-hauling entry uses the same three-second hold for a refused tap:
+/// the haul flow names the gate and the button prints it, so a tap that cannot
+/// open a page still answers.
 /// The shared <see cref="VoiceBeat"/> times the teal acknowledgment glow on
 /// the injected clock, never tick counts.
 /// </summary>
@@ -82,9 +81,9 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // warning.
     private const double ComingSoonSeconds = 3;
 
-    // The haul button's hold for the brand-loyalty gate, same three seconds and
-    // the same reason: one tap, one readable line, then the button answers to
-    // its own name again.
+    // The haul button's hold for a refused tap, same three seconds and the same
+    // reason: one tap, one readable line, then the button answers to its own
+    // name again.
     private const double HaulGateSeconds = 3;
 
     private readonly VoiceBeat _beat;
@@ -99,13 +98,13 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // changes what the button answers to.
     private readonly string _policeName = Strings.Get("ControlPolice");
 
-    // The haul button's own name, kept for the same reason: the loyalty hold
+    // The haul button's own name, kept for the same reason: the refusal hold
     // swaps the text, and the voice door must survive a rebuild inside it.
     private readonly string _haulName = Strings.Get("ControlHaul");
 
     // Deadline of the COMING SOON text, null while the button shows its name.
     private DateTime? _policeUntil;
-    // Deadline of the loyalty-gate text on the haul button, same contract.
+    // Deadline of the refusal text on the haul button, same contract.
     private DateTime? _haulGateUntil;
     // Null until the first Refresh, so the ctor's paint always runs (the HUD
     // lines used to force it with their -1 sentinels).
@@ -158,8 +157,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     private string _taxiLabel = "";
     public string DeliveryLabel { get; }
 
-    /// <summary>The haul entry's text: its own name, or the brand-loyalty gate
-    /// a refused tap names for three seconds.</summary>
+    /// <summary>The haul entry's text: its own name, or the reason a refused tap
+    /// named for three seconds.</summary>
     public string HaulLabel { get => _haulLabel; private set => SetField(ref _haulLabel, value); }
     private string _haulLabel = "";
 
@@ -295,7 +294,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
             [ShiftLabel(started: true)] = taxi,
             [DeliveryLabel] = () => FireVoiceDelayed("delivery", DeliveryCommand),
             // Keyed off the stable name like the police entry: a rebuild that
-            // lands inside the loyalty-gate hold must not rename the door.
+            // lands inside the refusal hold must not rename the door.
             [_haulName] = haul,
             // Keyed off the stable name, never the mutable label: a rebuild
             // that lands inside the COMING SOON hold must not rename the door.
@@ -360,15 +359,17 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     }
 
     /// <summary>
-    /// The haul flow's refusal, named on the button itself: the player asked
-    /// for a haul and did not get one because no brand has reached the floor,
-    /// so the button says so for three seconds instead of opening a page. A
-    /// second tap inside the hold restarts it, like every latest-tap-wins slot.
+    /// A refused haul tap, named on the button itself: the player asked for a
+    /// job and did not get one, so the button says why for three seconds
+    /// instead of leaving the tap silent. The flow supplies the words, because
+    /// it is the only thing that knows which gate refused. A second tap inside
+    /// the hold restarts it, like every latest-tap-wins slot.
     /// </summary>
-    public void ShowBrandLoyaltyGate()
+    public void ShowHaulGate(string text)
     {
+        ArgumentException.ThrowIfNullOrEmpty(text);
         _haulGateUntil = _clock.UtcNow + TimeSpan.FromSeconds(HaulGateSeconds);
-        HaulLabel = Strings.Get("ControlHaulLocked");
+        HaulLabel = text;
     }
 
     private void Flash(string target)

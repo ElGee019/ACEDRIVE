@@ -26,7 +26,8 @@ public interface ICarHaulHost
     /// <summary>One-off line under the banner (an unavailable offer, a settle note).</summary>
     void ShowNotice(string text);
 
-    /// <summary>Names the brand-loyalty floor on the control page's own haul
-    /// button for a few seconds: the one refusal the player can act on.</summary>
-    void ShowBrandLoyaltyGate();
+    /// <summary>Names a refused tap on the control page's own haul button for a
+    /// few seconds: the reason the player did not get a job, in the words the
+    /// flow resolved.</summary>
+    void ShowHaulGate(string text);
 }

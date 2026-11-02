@@ -81,9 +81,10 @@ public sealed class CarHaulFlowTests
 
         Assert.Same(h.Host.ControlPage, page);
         Assert.Equal(Strings.Get("HaulUnavailable"), h.Host.Notice);
-        // A missing dealer door is world data, not progress: the button keeps
-        // its own name and the generic line explains the refusal.
-        Assert.Equal(0, h.Host.BrandLoyaltyGates);
+        // A missing dealer door is world data, not progress: the button says so
+        // in the generic words instead of naming a loyalty the player cannot
+        // fix by driving.
+        Assert.Equal(Strings.Get("ControlHaulUnavailable"), h.Host.HaulGate);
     }
 
     [Fact]
@@ -98,7 +99,7 @@ public sealed class CarHaulFlowTests
 
         Assert.Same(h.Host.ControlPage, page);
         Assert.Null(h.Host.Notice);
-        Assert.Equal(1, h.Host.BrandLoyaltyGates);
+        Assert.Equal(Strings.Get("ControlHaulLocked"), h.Host.HaulGate);
     }
 
     [Fact]

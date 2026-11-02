@@ -178,6 +178,10 @@ For instance "{0}".</value></data>
        seconds after a refused tap: the customer's brand-new cars need a brand
        the player has driven up to the loyalty floor (PORTPLAN 20). -->
   <data name="ControlHaulLocked" xml:space="preserve"><value>NOT ENOUGH BRAND LOYALTY YET</value></data>
+  <!-- The same hold for the refusals the player cannot fix by driving more: no
+       dealer door (or customer door) on the map yet, or today's haul already
+       delivered. -->
+  <data name="ControlHaulUnavailable" xml:space="preserve"><value>NO CAR HAULING JOB AVAILABLE YET</value></data>
   <!-- Police job entry (PORTPLAN 41): the door is live and speakable, but its
        flow has not landed, so a tap swaps the button's own text for the COMING
        SOON line and restores it three seconds later. -->
