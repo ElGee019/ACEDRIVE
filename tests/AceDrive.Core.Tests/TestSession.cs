@@ -104,6 +104,9 @@ internal static class TestSession
         var roadTestStoreInstance = options.RoadTestStore ?? new FakeRoadTestStore();
         var clockStoreInstance = options.Clocks ?? new FakeGameClockStore();
         var driverStoreInstance = options.DriverStore ?? new FakeDriverStore();
+        // The care-package ledger resumes exactly like the root's: the kits on
+        // store shelves and the kits already in the car.
+        var carePackagesInstance = new CarePackageLedger(options.SavedDriver?.CarePackages);
         var streakInstance = new DailyStreak(clock, options.SavedDriver);
         // Production seeds the interim zone length from the placeholder map
         // (App.OnStartup) and leads the discovered order with the profile's
@@ -138,7 +141,7 @@ internal static class TestSession
             walletInstance, streakInstance, zoneInstance, trunkInstance, garageInstance,
             cityInstance, hungerInstance, roadsInstance, shiftInstance, shiftsInstance,
             jobsInstance, visitsInstance, valuationInstance,
-            willyLedgerInstance, deliveryCareer, weeklyEventsInstance);
+            willyLedgerInstance, deliveryCareer, weeklyEventsInstance, carePackagesInstance);
         var fleet = new FleetService(
             garageInstance, pool, game, walletInstance, InsuranceRules.Default, logger,
             brands, contentSource);
@@ -216,7 +219,23 @@ internal static class TestSession
         var todoBoard = new TodoBoard(
             options.Todos ?? TodoTable.Default, todoStoreInstance, directory,
             onboardingStore, walletInstance, jobsInstance, zoneInstance, garageInstance,
-            visitsInstance, deliveryCareer, logger);
+            visitsInstance, deliveryCareer, carePackagesInstance,
+            options.CareRng ?? new Random(14),
+            () => saver.SaveDriver(rivalsInstance.LastResult), logger);
+        // The care-package run: the same directory, ledger and HUD the jobs page
+        // and the companion use, with its host attached by the coordinator. Its
+        // reward picker (PORTPLAN 61) rides here too: the shipped catalogue
+        // shape, the glovebox over the same wallet and trunk the assertions
+        // read, and its own seeded stream so a suite can pin the offer.
+        RewardTable rewardTable = options.Rewards ?? RewardTable.Default;
+        var glovebox = new Glovebox(rewardTable, walletInstance);
+        var careReward = new CarePackageReward(
+            rewardTable, glovebox, trunkInstance, walletInstance,
+            options.RewardRng ?? new Random(15),
+            () => saver.SaveDriver(rivalsInstance.LastResult), logger);
+        var careFlow = new CarePackageFlow(
+            directory, carePackagesInstance, careReward, map, options.Hud,
+            () => saver.SaveDriver(rivalsInstance.LastResult), beat, logger);
         var proposalsInstance = TaxiTestData.Proposer(zone: zoneInstance, seed: 0);
         var taxi = new TaxiJobFlow(
             proposalsInstance, map, brands, pool, options.Requests,
@@ -302,13 +321,14 @@ internal static class TestSession
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
-            willyFlow, willyLedgerInstance, roadTestFlow, touristenFlow,
+            willyFlow, willyLedgerInstance, careFlow, roadTestFlow, touristenFlow,
             weeklyEventsInstance, calendarGate,
             () => brands.Brand, new Random(6), logger, options.IgnoreEventGates);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(
-            shell, navigation, taxi, delivery, touristenFlow, voiceInstance, clock, logger);
+            shell, navigation, taxi, delivery, touristenFlow, careFlow,
+            voiceInstance, clock, logger);
         var story = new OnboardingFlow(
             onboardingStore, contentSource, profiles,
             options.PlayerNames ?? new OfflinePlayerNameRegistry(), map,
@@ -332,7 +352,7 @@ internal static class TestSession
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
-            roadTestFlow, touristenFlow,
+            careFlow, roadTestFlow, touristenFlow,
             navigation, readouts, dayCycle,
             todoBoard,
             options.Hud, options.SaveResets, options.Restarter);
@@ -345,7 +365,9 @@ internal static class TestSession
         return new TestSessionResult(
             vm, clock, tel, store, story, todoBoard,
             valuationFlow, valuationInstance, valuationBoard,
-            willyFlow, willyLedgerInstance, roadTestFlow);
+            willyFlow, willyLedgerInstance, careFlow, carePackagesInstance,
+            glovebox, trunkInstance,
+            roadTestFlow);
     }
 
     // The real career opens these through the street/job thresholds; the flow

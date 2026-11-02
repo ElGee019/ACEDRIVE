@@ -5,9 +5,10 @@ namespace AceDrive.Overlay.Services;
 /// <summary>
 /// One place that banks the live session to disk. Every state owner
 /// (wallet + trunk, streak, zone, garage, city, hunger, road test, weekly
-/// market valuation, missing-person stamp, delivery career) contributes its
-/// slice of a save, so a save from any path can never clobber another owner
-/// with stale numbers — the caller never assembles a snapshot itself.
+/// market valuation, missing-person stamp, delivery career, care packages)
+/// contributes its slice of a save, so a save from any path can never clobber
+/// another owner with stale numbers — the caller never assembles a snapshot
+/// itself.
 /// All stores swallow their own I/O, so none of these methods throw.
 /// </summary>
 public sealed class GameStateSaver
@@ -30,6 +31,7 @@ public sealed class GameStateSaver
     private readonly WhereIsWillyLedger _willy;
     private readonly WeeklyEventLedger _weeklyEvents;
     private readonly DeliveryCareer _career;
+    private readonly CarePackageLedger _carePackages;
     private readonly Trunk _trunk;
     private readonly Garage _garage;
     private readonly CityEconomy _city;
@@ -48,7 +50,8 @@ public sealed class GameStateSaver
         Garage garage, CityEconomy city, Hunger hunger, RoadTestLedger roadTests,
         TaxiShift shift, ShiftRecord shifts, JobLedger jobs,
         VisitLedger visits, ValuationLedger valuation,
-        WhereIsWillyLedger willy, DeliveryCareer career, WeeklyEventLedger weeklyEvents)
+        WhereIsWillyLedger willy, DeliveryCareer career, WeeklyEventLedger weeklyEvents,
+        CarePackageLedger carePackages)
     {
         _clock = clock;
         _game = game;
@@ -68,6 +71,7 @@ public sealed class GameStateSaver
         _willy = willy;
         _weeklyEvents = weeklyEvents;
         _career = career;
+        _carePackages = carePackages;
         _trunk = trunk;
         _garage = garage;
         _city = city;
@@ -207,5 +211,9 @@ public sealed class GameStateSaver
             // followed by this save, so a closed overlay reopens the career
             // instead of a seed that forgets what was paid for it.
             Career = _career.Snapshot(),
+            // The care kits (PORTPLAN 21): the grant, every pickup and the
+            // community-centre drop-off bank through this one slice, so a
+            // closed overlay reopens the shelves and the car as they were.
+            CarePackages = _carePackages.Snapshot(),
         });
 }

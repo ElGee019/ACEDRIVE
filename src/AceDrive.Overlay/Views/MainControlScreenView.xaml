@@ -117,8 +117,8 @@
             </Border>
             <!-- The tips just completed, below Sonja's list: the care-package
                  copy leads the block so the earned kits are explained before
-                 the tips listed, and DELIVER CARE PACKAGES offers itself once
-                 five kits wait (Unity's bag threshold). -->
+                 the tips listed. The bag button itself lives below, outside
+                 this block (see the comment there). -->
             <StackPanel Visibility="{Binding HasCompletedTodos, Converter={StaticResource BoolToVis}}">
                 <Border Style="{StaticResource CompletedTodosSpacer}"/>
                 <TextBlock Text="{loc:Loc Key=TodoCompletedHeader}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
@@ -133,9 +133,15 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <Button Content="{loc:Loc Key=TodoDeliver}" Command="{Binding TodoAcknowledgeCommand}"
-                        Margin="0,6,0,0"
-                        Visibility="{Binding ShowDeliverCarePackages, Converter={StaticResource BoolToVis}}"/>
+            </StackPanel>
+            <!-- DELIVER CARE PACKAGES lives outside the completed block: the
+                 tips may already be cleared while the kits still wait, so the
+                 bag threshold alone decides whether the button is up. -->
+            <StackPanel Margin="0,6,0,0"
+                        Visibility="{Binding ShowDeliverCarePackages, Converter={StaticResource BoolToVis}}">
+                <TextBlock Text="{Binding CarePackageCountLine}" Foreground="#FFBFC4C9" FontSize="13"
+                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                <Button Content="{loc:Loc Key=TodoDeliver}" Command="{Binding DeliverCarePackagesCommand}"/>
             </StackPanel>
         </StackPanel>
         <!-- Bottom band: the one way back to the menu, flush with the panel

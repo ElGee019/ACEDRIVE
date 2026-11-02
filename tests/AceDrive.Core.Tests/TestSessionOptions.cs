@@ -63,6 +63,13 @@ internal sealed class TestSessionOptions
     public VisitLedger? Visits { get; init; }
     public ITodoProgressStore? TodoStore { get; init; }
     public TodoTable? Todos { get; init; }
+    // The care-package grant's own draw stream: a suite that pins which store
+    // holds the kits hands its seeded instance in.
+    public Random? CareRng { get; init; }
+    // The care-package reward catalogue and the picker's own draw stream
+    // (PORTPLAN 61): a suite that pins the two cards on offer hands both in.
+    public RewardTable? Rewards { get; init; }
+    public Random? RewardRng { get; init; }
     public FakeOnboardingStore? Onboarding { get; init; }
     public TaxiRules? TaxiRules { get; init; }
     public ICustomerRequestRoller? Requests { get; init; }

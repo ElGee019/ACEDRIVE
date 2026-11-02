@@ -11,9 +11,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// own file.
 ///
 /// It is a collaborator, not a screen: the jobs page reads the lines and the
-/// DELIVER CARE PACKAGES command it exposes, and nothing here knows about
-/// pages. The care-package grant (PORTPLAN 21) will ride the completions this
-/// sync returns.
+/// care-kit count, and nothing here knows about pages. The care-package grant
+/// (PORTPLAN 21) rides the completions this sync returns — one kit per genuine
+/// completion, dropped at a seeded store draw, banked with the driver save.
 /// </summary>
 public sealed class TodoBoard : ITodoList
 {
@@ -27,6 +27,9 @@ public sealed class TodoBoard : ITodoList
     private readonly Garage _garage;
     private readonly VisitLedger _visits;
     private readonly DeliveryCareer _career;
+    private readonly CarePackageLedger _carePackages;
+    private readonly Random _careRng;
+    private readonly Action _saveDriver;
     private readonly ILog _log;
 
     // The snapshot the lines were built from. The page repaints only when the
@@ -38,7 +41,8 @@ public sealed class TodoBoard : ITodoList
         TodoTable table, ITodoProgressStore store, PoiDirectory directory,
         IOnboardingStore onboarding, DriverWallet wallet, JobLedger jobs,
         OperatingZone zone, Garage garage, VisitLedger visits,
-        DeliveryCareer career, ILog log)
+        DeliveryCareer career, CarePackageLedger carePackages, Random careRng,
+        Action saveDriver, ILog log)
     {
         _store = store;
         _directory = directory;
@@ -49,6 +53,9 @@ public sealed class TodoBoard : ITodoList
         _garage = garage;
         _visits = visits;
         _career = career;
+        _carePackages = carePackages;
+        _careRng = careRng;
+        _saveDriver = saveDriver;
         _log = log;
         _ledger = TodoLedger.Resume(table, store.Load());
         _facts = Facts();
@@ -70,6 +77,9 @@ public sealed class TodoBoard : ITodoList
     /// <summary>How many completed kits the page lists right now.</summary>
     public int CompletedCount => _ledger.CompletedCount;
 
+    /// <summary>Every care kit the career still owes (store shelves + car).</summary>
+    public int CarePackageCount => _carePackages.Total;
+
     /// <summary>The four visible tips, ready for the page to format.</summary>
     public IReadOnlyList<TodoLine> Slots => Lines(_ledger.Slots(_facts));
 
@@ -86,17 +96,64 @@ public sealed class TodoBoard : ITodoList
         ActivatePlacedSubjects();
         _facts = Facts();
         TodoSyncResult result = _ledger.Sync(_facts);
+
+        // WHY the grant banks before the ToDo file: the two states live in
+        // different files, so a kill between the writes must never bank a tip
+        // whose kit was not granted. A kill after the driver save re-flags the
+        // tip on the next sync and grants a second kit — capped, and better
+        // than losing the reward the tip just earned.
+        if (result.Completed.Count > 0)
+        {
+            _log.LogInfo($"todo completed: {string.Join(", ", result.Completed)}");
+            GrantCarePackages(result.Completed.Count);
+        }
+
         if (result.Changed)
         {
             _store.Save(_ledger.Snapshot());
         }
 
-        if (result.Completed.Count > 0)
+        return result;
+    }
+
+    // One kit per genuine completion (Unity TodoManager.SyncWithPlayer): the
+    // grant lives here because most completions happen while the map page is
+    // hidden, and every cold-edge sync funnels through this one method. The
+    // store draw is seeded so a test can reproduce it; the cap can drop a grant
+    // without dropping the tip, exactly like Unity's MaxCarePackages.
+    private void GrantCarePackages(int completed)
+    {
+        IReadOnlyList<PointOfInterest> stores =
+            CarePackageStores.Eligible(_directory.All, _zone.ZoneMap);
+        if (stores.Count == 0)
         {
-            _log.LogInfo($"todo completed: {string.Join(", ", result.Completed)}");
+            _log.LogWarning(
+                $"care package not granted for {completed} completion(s): " +
+                "no store door in town");
+            return;
         }
 
-        return result;
+        bool granted = false;
+        for (int i = 0; i < completed && !_carePackages.IsFull; i++)
+        {
+            if (CarePackageStores.Pick(stores, _careRng.Next) is not { } store)
+            {
+                break;
+            }
+
+            if (_carePackages.Grant(store.Id))
+            {
+                granted = true;
+                _log.LogInfo(
+                    $"care package granted at {store.Name} " +
+                    $"({_carePackages.Total}/{CarePackageLedger.MaxPackages})");
+            }
+        }
+
+        if (granted)
+        {
+            _saveDriver();
+        }
     }
 
     /// <summary>

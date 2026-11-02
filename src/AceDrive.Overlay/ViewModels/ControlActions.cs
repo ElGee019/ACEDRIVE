@@ -11,4 +11,5 @@ public sealed record ControlActions(
     ICommand Taxi,
     ICommand Delivery,
     ICommand Haul,
-    ICommand TodoAcknowledge);
+    ICommand DeliverCarePackages,
+    Func<bool> CanDeliverCarePackages);

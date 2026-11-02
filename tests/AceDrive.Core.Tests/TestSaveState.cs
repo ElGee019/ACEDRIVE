@@ -25,5 +25,5 @@ internal static class TestSaveState
             new RoadTestLedger([], seed: 0), new TaxiShift(), new ShiftRecord(null), new JobLedger(),
             new VisitLedger(), valuation ?? new ValuationLedger(),
             new WhereIsWillyLedger(), career ?? new DeliveryCareer(HubCatalog.Default, 0),
-            new WeeklyEventLedger());
+            new WeeklyEventLedger(), new CarePackageLedger());
 }

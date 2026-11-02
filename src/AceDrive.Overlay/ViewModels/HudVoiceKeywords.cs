@@ -68,9 +68,11 @@ internal static class HudVoiceKeywords
     /// <summary>Keywords for one action resource key; unknown keys answer "enter".</summary>
     public static IReadOnlyList<string> For(string actionKey) => actionKey switch
     {
-        "HudPickUp" or "HudJobPickupAction" or "HudDeliveryHubAction" => PickUp,
+        "HudPickUp" or "HudJobPickupAction" or "HudDeliveryHubAction"
+            or "HudCarePickupAction" => PickUp,
         "HudJobDropoffAction" or "HudWillyDropOff" => DropOff,
-        "HudDeliveryStoreAction" or "HudTouristenDeliverAction" => Deliver,
+        "HudDeliveryStoreAction" or "HudTouristenDeliverAction"
+            or "HudCareDropoffAction" => Deliver,
         "HudPancakes" => Pancakes,
         "HudDrive" => Drive,
         "HudAccidentRepair" => Repair,

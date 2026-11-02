@@ -290,6 +290,34 @@ For instance "{0}".</value></data>
   <data name="TodoCompletedLine" xml:space="preserve"><value>{0}. {1}</value></data>
   <data name="TodoCarePackages" xml:space="preserve"><value>For every completed Todo, Sonja arranges a Care Kit for the neighborhood. Collect 5 and deliver to the Community Centre for a guaranteed reward!</value></data>
   <data name="TodoDeliver" xml:space="preserve"><value>DELIVER CARE PACKAGES</value></data>
+  <!-- Care-package run (PORTPLAN item 21, Unity CarePackageDeliveryHandler):
+       the count beside the bag button, the pickup and drop-off HUD lines, and
+       the receipt. The HUD keys share the address shape first ({0} name, {1}
+       street, {2} number, {3} city); the pickup leg adds its run readings
+       ({4} leg, {5} legs). Placeholders survive translation; translators may
+       reorder, never remove. -->
+  <data name="TodoCarePackageCount" xml:space="preserve"><value>Care kits ready to deliver: {0}</value></data>
+  <data name="HudCarePickupDrive" xml:space="preserve"><value>Care kit run: drive to {0} at {1} No. {2} in {3} to pick up the care packages ({4} of {5}).</value></data>
+  <data name="HudCarePickupArrived" xml:space="preserve"><value>You have arrived at {0}. Press PICK UP to collect the care packages.</value></data>
+  <data name="HudCarePickupAction" xml:space="preserve"><value>PICK UP THE CARE PACKAGES</value></data>
+  <data name="HudCareDropoffDrive" xml:space="preserve"><value>All care packages collected. Drive to the {0} at {1} No. {2} in {3} to drop them off.</value></data>
+  <data name="HudCareDropoffArrived" xml:space="preserve"><value>You have arrived at the {0}. Press DELIVER to drop off the care packages.</value></data>
+  <data name="HudCareDropoffAction" xml:space="preserve"><value>DELIVER THE CARE PACKAGES</value></data>
+  <data name="CareReceiptTitle" xml:space="preserve"><value>CARE PACKAGES RECEIPT</value></data>
+  <data name="CareReceiptDelivered" xml:space="preserve"><value>The neighborhood thanks you for delivering {0} care kits.</value></data>
+  <data name="CareReceiptStores" xml:space="preserve"><value>Picked up at: {0}</value></data>
+  <data name="CareReceiptRemaining" xml:space="preserve"><value>Care kits still waiting for a run: {0}</value></data>
+  <data name="CareReceiptAllDelivered" xml:space="preserve"><value>Every care kit in town has been delivered.</value></data>
+  <!-- The care-package reward picker (PORTPLAN 61): one card per reward, the
+       glovebox reading under them and the claim's outcome. -->
+  <data name="RewardPickerTitle" xml:space="preserve"><value>CARE PACKAGE REWARDS</value></data>
+  <data name="RewardPickerHint" xml:space="preserve"><value>The community centre thanks you for the run. Choose one reward.</value></data>
+  <data name="RewardPickerGlovebox" xml:space="preserve"><value>Glove compartment cards: {0}/{1}</value></data>
+  <data name="RewardPickerStored" xml:space="preserve"><value>{0} is now in your glove compartment.</value></data>
+  <data name="RewardPickerSlotAdded" xml:space="preserve"><value>One more glove compartment slot: {0} cards fit now.</value></data>
+  <data name="RewardPickerCash" xml:space="preserve"><value>The bonus is in your cash: {0:0} CR.</value></data>
+  <data name="RewardPickerFull" xml:space="preserve"><value>Your glove compartment is full. Take the other reward, or continue.</value></data>
+  <data name="RewardPickerContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Credibility Points: {0}</value></data>
   <data name="DeliveryGrowthUp" xml:space="preserve"><value>City growth: ▲ +{0} / hr</value></data>

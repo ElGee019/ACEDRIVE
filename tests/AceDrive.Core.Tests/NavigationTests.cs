@@ -79,13 +79,15 @@ public sealed class NavigationTests
         var gate = new CalendarGate(weeklyEvents, willyLedger, valuationLedger);
         // One career instance the saver, the POI world and the navigator share.
         var career = new DeliveryCareer(HubCatalog.Default, 0);
+        // The care-package ledger the saver banks and the jobs page reads.
+        var carePackages = new CarePackageLedger();
         var saver = new GameStateSaver(
             clock, game, new FakeGameClockStore(), new FakeDriverStore(), garageStore,
             new FakeCityStore(), new FakeHungerStore(), roadTests, shiftStore,
             wallet, new DailyStreak(clock, null), zoneInstance,
             trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
             new JobLedger(), new VisitLedger(),
-            valuationLedger, willyLedger, career, weeklyEvents);
+            valuationLedger, willyLedger, career, weeklyEvents, carePackages);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
         var directory = new PoiDirectory();
         IReadOnlyList<CarSpec> poolCars = pool;
@@ -140,7 +142,16 @@ public sealed class NavigationTests
         var todoBoard = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), directory, onboarding,
             wallet, new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), garageInstance,
-            new VisitLedger(), career, log);
+            new VisitLedger(), career, carePackages, new Random(0),
+            () => saver.SaveDriver(rivals.LastResult), log);
+        // The care-package run the jobs page's DELIVER button starts, with the
+        // reward picker its receipt hands over to (PORTPLAN 61).
+        var careReward = new CarePackageReward(
+            RewardTable.Default, new Glovebox(RewardTable.Default, wallet), trunk, wallet,
+            new Random(15), () => saver.SaveDriver(rivals.LastResult), log);
+        var care = new CarePackageFlow(
+            directory, carePackages, careReward, AddressMap.Default, null,
+            () => saver.SaveDriver(rivals.LastResult), beat, log);
         // The weekly missing-person run: the calendar's Wednesday tap starts it,
         // so the navigator needs the real flow (its resident table is the one
         // the elder is drawn from).
@@ -193,7 +204,7 @@ public sealed class NavigationTests
             trunk, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
-            valuation, willy, willyLedger, roadTest, touristen, weeklyEvents, gate,
+            valuation, willy, willyLedger, care, roadTest, touristen, weeklyEvents, gate,
             () => "mazda", new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);

@@ -1107,6 +1107,53 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void CarePackageLegs_RenderTheRunOrderAndTheirActions()
+    {
+        // PORTPLAN 21: the pickup leg names the shop, its address and which of
+        // the run's stops this is; the drop-off leg names the community centre.
+        var vm = Create();
+        var store = new PointOfInterest(
+            "groceries_store", "Max's Grocery Store",
+            new AddressLocation("Street 1", 17, HouseSide.Right),
+            PoiTypes.GroceryStore);
+
+        vm.SetDestination(store, new HudDestinationCopy(
+            "HudCarePickupDrive", "HudCarePickupArrived", "HudCarePickupAction",
+            ["Max's Grocery Store", "Street 1", "17", "Brands", "1", "2"]));
+
+        Assert.Equal(
+            "Care kit run: drive to Max's Grocery Store at Street 1 No. 17 in Brands " +
+            "to pick up the care packages (1 of 2).",
+            vm.DestinationText);
+        Assert.Equal("PICK UP THE CARE PACKAGES", vm.EnterText);
+        Assert.Contains("pick up", vm.EnterKeywords);
+
+        // Parked on the shop's own house: the arrival line and the same action.
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal(
+            "You have arrived at Max's Grocery Store. Press PICK UP to collect the care packages.",
+            vm.DestinationText);
+
+        // The drop-off leg names the community centre and offers DELIVER.
+        var centre = new PointOfInterest(
+            "community_centre", "Community Centre",
+            new AddressLocation("Street 2", 1, HouseSide.Right),
+            PoiTypes.CommunityCentre);
+        vm.SetDestination(centre, new HudDestinationCopy(
+            "HudCareDropoffDrive", "HudCareDropoffArrived", "HudCareDropoffAction",
+            ["Community Centre", "Street 2", "1", "Brands"]));
+
+        Assert.Equal(
+            "All care packages collected. Drive to the Community Centre at " +
+            "Street 2 No. 1 in Brands to drop them off.",
+            vm.DestinationText);
+        Assert.Equal("DELIVER THE CARE PACKAGES", vm.EnterText);
+        Assert.Contains("deliver", vm.EnterKeywords);
+    }
+
+    [Fact]
     public void PersonDestination_AnswersToPickUp()
     {
         var vm = Create();

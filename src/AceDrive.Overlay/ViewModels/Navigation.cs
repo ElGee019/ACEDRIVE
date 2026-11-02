@@ -96,6 +96,11 @@ public sealed class Navigation
     private readonly WhereIsWillyFlow _willy;
     private readonly WhereIsWillyLedger _willyLedger;
 
+    // The care-package run (PORTPLAN 21): the jobs page's DELIVER CARE PACKAGES
+    // starts it, and while it owns the companion the other job entries refuse,
+    // exactly like the missing-person run.
+    private readonly CarePackageFlow _care;
+
     // The calendar's once-per-week stamps for the events that keep no ledger of
     // their own (the road test, Cento Miglia and the Touristenfahrten run): a
     // row already opened this week refuses instead of opening a second page.
@@ -134,6 +139,7 @@ public sealed class Navigation
     private CalendarScreenViewModel? _calendar;
     private MenuScreenViewModel? _menu;
     private ParameterizedCommand<int>? _openDay;
+    private readonly ICommand _deliverCarePackagesCommand;
 
     // Weekday number of the road-test event (Unity: Tuesday), read off the
     // calendar data by RoadTestDayOfWeek, never hardcoded here.
@@ -178,7 +184,7 @@ public sealed class Navigation
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
-        RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
+        CarePackageFlow care, RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         WeeklyEventLedger weeklyEvents, CalendarGate gate,
         Func<string> carBrand, Random rng, ILog log, bool ignoreEventGates = false)
     {
@@ -215,6 +221,7 @@ public sealed class Navigation
         _valuation = valuation;
         _willy = willy;
         _willyLedger = willyLedger;
+        _care = care;
         _weeklyEvents = weeklyEvents;
         _gate = gate;
         _roadTest = roadTest;
@@ -222,6 +229,7 @@ public sealed class Navigation
         _carBrand = carBrand;
         _rng = rng;
         _log = log;
+        _deliverCarePackagesCommand = new RelayCommand(DeliverCarePackages);
         _ignoreEventGates = ignoreEventGates;
 
         ControlCommand = new RelayCommand(ShowControl);
@@ -273,9 +281,30 @@ public sealed class Navigation
             _beat, _clock, _todos, _shift,
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
-                new RelayCommand(OpenHaul), _todos.AcknowledgeCommand),
+                new RelayCommand(OpenHaul), _deliverCarePackagesCommand,
+                CareDeliveryAvailable),
             MenuCommand);
         return _control;
+    }
+
+    // The bag threshold is the ledger's (Unity TipsCompletedScreen): the kits,
+    // not the completed tip rows, decide whether the run is offered, so a
+    // cleared block with leftovers can still deliver. The flow also offers the
+    // run when a previous session left kits in the car below the threshold.
+    private bool CareDeliveryAvailable() => _care.CanOffer;
+
+    // DELIVER CARE PACKAGES: the flow starts the run (or resumes the drop-off)
+    // and hides the panel; the tips the run just carried are acknowledged like
+    // Unity's popup dismissal, so the block does not linger behind a delivered
+    // run. A refused start leaves the block and its button exactly as they were.
+    private void DeliverCarePackages()
+    {
+        if (!_care.Begin())
+        {
+            return;
+        }
+
+        _todos.AcknowledgeCommand.Execute(null);
     }
 
     /// <summary>Re-reads the cached control page (the taxi flow's tick does).</summary>
@@ -301,6 +330,14 @@ public sealed class Navigation
         if (_willy.InFlight)
         {
             _log.LogInfo("taxi shift refused: the missing-person run is in flight");
+            return;
+        }
+
+        // The same lock for the care-package run: the companion guides one
+        // drive at a time, so a live pickup route starts no second job.
+        if (_care.InFlight)
+        {
+            _log.LogInfo("taxi shift refused: the care-package run is in flight");
             return;
         }
 
@@ -345,6 +382,12 @@ public sealed class Navigation
             return;
         }
 
+        if (_care.InFlight)
+        {
+            _log.LogInfo("delivery career refused: the care-package run is in flight");
+            return;
+        }
+
         // A hub bought on the previous visit may have opened store doors; the
         // board must include them before the cached page paints.
         _world.Grow();
@@ -354,7 +397,16 @@ public sealed class Navigation
     // The haul tap opens the flow's page (offer or active leg); CONTINUE/BACK
     // is the control page it was opened from. The flow owns the run, the HUD
     // leg and the receipt.
-    private void OpenHaul() => ShowScreen(_haul.Open(ControlCommand, ControlPage()));
+    private void OpenHaul()
+    {
+        if (_care.InFlight)
+        {
+            _log.LogInfo("haul refused: the care-package run is in flight");
+            return;
+        }
+
+        ShowScreen(_haul.Open(ControlCommand, ControlPage()));
+    }
 
     /// <summary>Opens the hub page (Unity's OPEN NEW CAREER, PORTPLAN 18).</summary>
     public void ShowHub() =>
@@ -471,6 +523,15 @@ public sealed class Navigation
 
     private void OnDay(int day)
     {
+        // The care-package run owns the companion until the community centre
+        // takes the kits: no calendar event may steal its leg.
+        if (_care.InFlight)
+        {
+            _log.LogInfo(
+                $"calendar day {day} refused: the care-package run is in flight");
+            return;
+        }
+
         // The missing-person lock (ToWhereIsWilly.md §2.1/§3.6): Unity blocks
         // the whole job centre while the run is in flight, so no other event
         // row may dispatch. The Willy row itself is left to the flow, which

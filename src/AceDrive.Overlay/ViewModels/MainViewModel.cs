@@ -20,8 +20,8 @@ public sealed class MainViewModel
     : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
       ICarHaulHost,
       ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost,
-      IValuationHost, IWhereIsWillyHost, IRoadTestHost, ITouristenfahrtenHost,
-      IDisposable
+      IValuationHost, IWhereIsWillyHost, ICarePackageHost, IRoadTestHost,
+      ITouristenfahrtenHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -67,6 +67,10 @@ public sealed class MainViewModel
     // drive home and the receipt. It owns its session state and reaches back
     // only through IWhereIsWillyHost for the panel and the page.
     private readonly WhereIsWillyFlow _willy;
+    // The care-package run (PORTPLAN 21): the jobs page's DELIVER CARE PACKAGES,
+    // the store pickup legs and the community-centre drop-off. It owns its
+    // session route and reaches back only through ICarePackageHost.
+    private readonly CarePackageFlow _care;
     // The road test (PORTPLAN 49): the Tuesday row's drive to La Strada, the
     // 0-60 leg timed on the companion and the result page. It owns its clock
     // and reaches back only through IRoadTestHost for the panel.
@@ -198,7 +202,7 @@ public sealed class MainViewModel
     // cannot mean two different things.
     private bool JobInProgress =>
         _taxi.InProgress || _delivery.InProgress || _cento.InProgress
-        || _touristen.InProgress;
+        || _touristen.InProgress || _care.InFlight;
 
     public MainViewModel(
         ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
@@ -213,8 +217,8 @@ public sealed class MainViewModel
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld poiWorld,
         CentoRaceFlow cento, CentoRaceSettlement centoSettlement,
-        ValuationFlow valuation, WhereIsWillyFlow willy, RoadTestFlow roadTest,
-        TouristenfahrtenFlow touristen,
+        ValuationFlow valuation, WhereIsWillyFlow willy, CarePackageFlow care,
+        RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
         TodoBoard todos,
         ITelemetryHud? hud = null,
@@ -267,6 +271,7 @@ public sealed class MainViewModel
         _centoSettlement = centoSettlement;
         _valuation = valuation;
         _willy = willy;
+        _care = care;
         if (_hud is not null)
         {
             // The companion's action button: the found step's DRIVE home, or
@@ -306,6 +311,7 @@ public sealed class MainViewModel
         _cento.Attach(this);
         _valuation.Attach(this);
         _willy.Attach(this);
+        _care.Attach(this);
         _roadTest.Attach(this);
         _touristen.Attach(this);
         _poiWorld.Attach(this);
@@ -558,6 +564,19 @@ public sealed class MainViewModel
     void IWhereIsWillyHost.HidePanel() => _panel.Hide();
     void IWhereIsWillyHost.ShowMenu() => _nav.ShowMenuPage();
     void IWhereIsWillyHost.ShowCalendar() => _nav.ShowCalendarPage();
+
+    // The host slice the care-package run sees: the flow owns the route, the
+    // pickups and the drop-off; the shell owns the panel, the pages a finished
+    // run opens (receipt, then the reward picker) and the return to the jobs
+    // page. The control page is refreshed before it is shown so the bag button
+    // reflects the kits the run just delivered.
+    void ICarePackageHost.PresentPage(object page) => _panel.PresentJob(page);
+    void ICarePackageHost.HidePanel() => _panel.Hide();
+    void ICarePackageHost.ShowControl()
+    {
+        _nav.ShowControl();
+        _nav.RefreshControl();
+    }
 
     // The host slice the road test sees: the flow owns the drive, the 0-60
     // clock, the photo mission and the board; the shell owns the panel, the
@@ -1120,6 +1139,15 @@ public sealed class MainViewModel
     // not be pinned, where the old story destination is all the HUD has left.
     private void EnterStoryDoor()
     {
+        // The care run's ENTER is PICK UP or DELIVER on its own pinned door. It
+        // owns the tap before the job/story split: it is neither a job-guidance
+        // leg nor a shop visit, and the flow knows which phase the door serves.
+        if (_care.InFlight)
+        {
+            _care.ConfirmStop();
+            return;
+        }
+
         if (JobInProgress)
         {
             _log.LogInfo("enter ignored: a job is in progress");

@@ -11,8 +11,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// the non-food keepsakes below the trunk's rule. The free litres, the meter and
 /// the carried goods all come from the shared Core state; this page owns only
 /// presentation.
-/// Unity's page also lists the reward-card slots; those are not part of this
-/// port yet, so the page ends after the glove compartment.
+/// Unity's page also prints the glovebox's card count; the cards themselves are
+/// carried here as keepsakes already, and the capacity line follows with the
+/// protective-consumables slice (PORTPLAN 42/61), so the page ends after the
+/// glove compartment for now.
 /// Voice parity with the other pages: BACK navigates, so its voice tap glows
 /// teal first and the page waits out the shared beat. Every food stack also
 /// answers its own name ("sandwich"), because the EAT button alone is the same

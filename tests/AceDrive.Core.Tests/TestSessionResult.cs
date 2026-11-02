@@ -21,6 +21,8 @@ internal sealed class TestSessionResult
         OnboardingFlow story, TodoBoard todos, ValuationFlow valuation,
         ValuationLedger ledger, IValuationBoard board,
         WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
+        CarePackageFlow care, CarePackageLedger carePackages,
+        Glovebox glovebox, Trunk trunk,
         RoadTestFlow roadTest)
     {
         Vm = vm;
@@ -34,6 +36,10 @@ internal sealed class TestSessionResult
         Board = board;
         Willy = willy;
         WillyLedger = willyLedger;
+        Care = care;
+        CarePackages = carePackages;
+        Glovebox = glovebox;
+        Trunk = trunk;
         RoadTest = roadTest;
     }
 
@@ -65,6 +71,18 @@ internal sealed class TestSessionResult
 
     /// <summary>The missing-person run's persisted completion stamp.</summary>
     public WhereIsWillyLedger WillyLedger { get; }
+
+    /// <summary>The care-package delivery run (PORTPLAN 21).</summary>
+    public CarePackageFlow Care { get; }
+
+    /// <summary>The care kits on store shelves and in the car.</summary>
+    public CarePackageLedger CarePackages { get; }
+
+    /// <summary>The glove compartment the care-package rewards are claimed into (PORTPLAN 61).</summary>
+    public Glovebox Glovebox { get; }
+
+    /// <summary>The trunk the glove compartment's cards are carried in.</summary>
+    public Trunk Trunk { get; }
 
     /// <summary>The road test's flow (PORTPLAN 49).</summary>
     public RoadTestFlow RoadTest { get; }

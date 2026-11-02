@@ -15,6 +15,9 @@ public interface ITodoList
     /// <summary>How many completed kits are waiting.</summary>
     int CompletedCount { get; }
 
+    /// <summary>Every care kit the career still owes (store shelves + car).</summary>
+    int CarePackageCount { get; }
+
     /// <summary>The four visible tips.</summary>
     IReadOnlyList<TodoLine> Slots { get; }
 

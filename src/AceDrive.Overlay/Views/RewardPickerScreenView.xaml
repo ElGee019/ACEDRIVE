@@ -1,0 +1,90 @@
+<UserControl x:Class="AceDrive.Overlay.Views.RewardPickerScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <!-- Care-package reward picker (PORTPLAN item 61, Unity's CANVASREWARDS):
+         two reward buttons side by side, each printing its title over its
+         function text, the glovebox reading under them and CONTINUE in the
+         bottom band. A claimed reward hides both buttons (Unity's
+         SetButtonsVisible) and leaves the outcome line; a full glovebox keeps
+         them up so the other reward can be taken instead. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding Title}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center">
+            <TextBlock Text="{Binding HintLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"/>
+
+            <!-- The two rewards: equal columns, each a tall button so the card
+                 reads as a card rather than a row. Two is the catalogue's own
+                 page size (Unity's ButtonCount), so a plain grid beats an
+                 ItemsControl's panel plumbing. -->
+            <Grid Visibility="{Binding OfferOpen, Converter={StaticResource BoolToVis}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0" Margin="0,0,4,0" Padding="10,8"
+                        HorizontalAlignment="Stretch" MinHeight="92"
+                        Command="{Binding ClaimCommand}"
+                        CommandParameter="{Binding First}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding First.Title}" Foreground="#FF97EAD2"
+                                   FontSize="15" FontWeight="Bold" TextAlignment="Center"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding First.Description}" Foreground="#FFBFC4C9"
+                                   FontSize="12" TextAlignment="Center" TextWrapping="Wrap"
+                                   Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Button>
+                <Button Grid.Column="1" Margin="4,0,0,0" Padding="10,8"
+                        HorizontalAlignment="Stretch" MinHeight="92"
+                        Command="{Binding ClaimCommand}"
+                        CommandParameter="{Binding Second}">
+                    <StackPanel>
+                        <TextBlock Text="{Binding Second.Title}" Foreground="#FF97EAD2"
+                                   FontSize="15" FontWeight="Bold" TextAlignment="Center"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Second.Description}" Foreground="#FFBFC4C9"
+                                   FontSize="12" TextAlignment="Center" TextWrapping="Wrap"
+                                   Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <TextBlock Text="{Binding Notice}" Foreground="#FFF" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0"
+                       Visibility="{Binding HasNotice, Converter={StaticResource BoolToVis}}"/>
+            <Border Style="{StaticResource SectionDivider}"/>
+            <TextBlock Text="{Binding GloveboxLine}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button Grid.Column="1" Content="{loc:Loc Key=RewardPickerContinue}" Padding="4"
+                    HorizontalAlignment="Stretch" Command="{Binding ContinueCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
+    </Grid>
+</UserControl>

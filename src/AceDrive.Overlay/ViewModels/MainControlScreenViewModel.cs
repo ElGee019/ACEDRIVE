@@ -70,11 +70,6 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // still has to answer "police" (the HUD keyword table's rule).
     private static readonly string[] PoliceKeywords = ["police"];
 
-    // Completed kits needed before DELIVER CARE PACKAGES offers itself (Unity
-    // TipsCompletedScreen.CarePackageBagThreshold). Below it the finished tips
-    // stay listed and the button waits.
-    private const int DeliverThreshold = 5;
-
     // How long the police button keeps its COMING SOON text. Three real
     // seconds: the player reads the toast, and the button is back to its own
     // name before the next tap. Same clock-driven hold as the calendar's gate
@@ -91,7 +86,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly ITodoList _todos;
     private readonly TaxiShift _shift;
     private readonly ICommand _backCommand;
-    private readonly ICommand _todoAcknowledge;
+    private readonly ICommand _deliverCarePackages;
+    private readonly Func<bool> _canDeliverCarePackages;
 
     // The police button's own name, whatever the toast currently prints: the
     // voice entry keys off this and the hold restores it, so the swap never
@@ -110,7 +106,9 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     // lines used to force it with their -1 sentinels).
     private bool? _deliveryOffered;
     private bool? _shiftOffered;
+    private bool? _careDeliveryOffered;
     private int _todoVersion = -1;
+    private int _carePackageCount = -1;
 
     public MainControlScreenViewModel(
         VoiceBeat beat, IClock clock, ITodoList todos,
@@ -121,7 +119,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         _todos = todos;
         _shift = shift;
         _backCommand = back;
-        _todoAcknowledge = actions.TodoAcknowledge;
+        _deliverCarePackages = actions.DeliverCarePackages;
+        _canDeliverCarePackages = actions.CanDeliverCarePackages;
         TaxiCommand = actions.Taxi;
         DeliveryCommand = actions.Delivery;
         HaulCommand = actions.Haul;
@@ -146,12 +145,20 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     public bool HasCompletedTodos { get => _hasCompletedTodos; private set => SetField(ref _hasCompletedTodos, value); }
     private bool _hasCompletedTodos;
 
-    /// <summary>True once DeliverThreshold kits wait: DELIVER CARE PACKAGES is up.</summary>
+    /// <summary>True when the flow offers a run: five kits wait (Unity's bag
+    /// threshold) or the car still carries kits from a previous session.</summary>
     public bool ShowDeliverCarePackages { get => _showDeliverCarePackages; private set => SetField(ref _showDeliverCarePackages, value); }
     private bool _showDeliverCarePackages;
 
-    /// <summary>DELIVER CARE PACKAGES: acknowledges the completed tips and refills the slots.</summary>
-    public ICommand TodoAcknowledgeCommand => _todoAcknowledge;
+    /// <summary>"Care kits ready to deliver: 6" — the count beside the button,
+    /// so a player whose completed block was already cleared still sees how
+    /// many kits the next run would carry.</summary>
+    public string CarePackageCountLine { get => _carePackageCountLine; private set => SetField(ref _carePackageCountLine, value); }
+    private string _carePackageCountLine = string.Empty;
+
+    /// <summary>DELIVER CARE PACKAGES: starts the pickup run and hands the
+    /// completed tip block back to the ledger.</summary>
+    public ICommand DeliverCarePackagesCommand => _deliverCarePackages;
 
     public string TaxiLabel { get => _taxiLabel; private set => SetField(ref _taxiLabel, value); }
     private string _taxiLabel = "";
@@ -224,20 +231,29 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     {
         bool deliveryOpen = DeliveryCommand.CanExecute(null);
         bool shiftStarted = _shift.IsStarted;
+        int careCount = _todos.CarePackageCount;
+        bool careOffered = _canDeliverCarePackages();
         if (deliveryOpen == _deliveryOffered
             && shiftStarted == _shiftOffered
+            && careCount == _carePackageCount
+            && careOffered == _careDeliveryOffered
             && _todos.Version == _todoVersion)
         {
             return;
         }
         _deliveryOffered = deliveryOpen;
         _shiftOffered = shiftStarted;
+        _carePackageCount = careCount;
+        _careDeliveryOffered = careOffered;
         _todoVersion = _todos.Version;
 
         TodoLines = BuildLines(_todos.Slots, numbered: false);
         CompletedTodoLines = BuildLines(_todos.CompletedLines, numbered: true);
         HasCompletedTodos = _todos.HasCompleted;
-        ShowDeliverCarePackages = _todos.CompletedCount >= DeliverThreshold;
+        ShowDeliverCarePackages = careOffered;
+        CarePackageCountLine = careOffered
+            ? Strings.Format("TodoCarePackageCount", careCount)
+            : string.Empty;
         SyncTaxiLabel();
         RebuildVoice();
     }
@@ -310,7 +326,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         {
             // DELIVER CARE PACKAGES is a utility tap, not a navigation: it acts
             // at once like a click.
-            actions[Strings.Get("TodoDeliver")] = () => _todoAcknowledge.Execute(null);
+            actions[Strings.Get("TodoDeliver")] = () => _deliverCarePackages.Execute(null);
         }
         foreach (string keyword in TaxiKeywords)
         {

@@ -155,6 +155,12 @@
         <DataTemplate DataType="{x:Type vm:WhereIsWillyReceiptScreenViewModel}">
             <views:WhereIsWillyReceiptScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CarePackageReceiptScreenViewModel}">
+            <views:CarePackageReceiptScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:RewardPickerScreenViewModel}">
+            <views:RewardPickerScreenView/>
+        </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes
          the edge line 10 px inward so the dark fill frames it. The window fill

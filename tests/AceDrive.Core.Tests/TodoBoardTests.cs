@@ -22,7 +22,8 @@ public sealed class TodoBoardTests
         var board = new TodoBoard(
             TodoTable.Default, store, directory, onboarding, wallet, jobs,
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            visits, new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+            visits, new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
         return (board, store, wallet, onboarding, directory, visits, jobs);
     }
 
@@ -43,7 +44,8 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
 
         Assert.True(resumed.HasCompleted);
         Assert.Equal("TodoEarnCr", Assert.Single(resumed.CompletedLines).CopyKey);
@@ -70,6 +72,48 @@ public sealed class TodoBoardTests
     }
 
     [Fact]
+    public void CompletedTip_GrantsOneCareKitAtAKeptStore()
+    {
+        var directory = new PoiDirectory(
+            [Door("groceries_store", "Max's Grocery Store", PoiTypes.GroceryStore)]);
+        var care = new CarePackageLedger();
+        int saves = 0;
+        var board = new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), directory,
+            new FakeOnboardingStore(),
+            new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
+            new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
+            new Garage(TestRoadCars.Pool), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            () => saves++, new NullLogger());
+
+        // The boot sync met Earn 500 CR: one kit waited at the one shop, and the
+        // grant banked through the driver save right away.
+        Assert.True(board.HasCompleted);
+        Assert.Equal(1, care.Total);
+        Assert.Equal("groceries_store", Assert.Single(care.Stores).StoreId);
+        Assert.Equal(1, saves);
+    }
+
+    [Fact]
+    public void CompletedTip_WithoutAStoreDoor_GrantsNoKit()
+    {
+        var care = new CarePackageLedger();
+        var board = new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
+            new FakeOnboardingStore(),
+            new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
+            new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
+            new Garage(TestRoadCars.Pool), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            () => { }, new NullLogger());
+
+        // The tip still completes and lists; only the kit needs a door to wait at.
+        Assert.True(board.HasCompleted);
+        Assert.Equal(0, care.Total);
+    }
+
+    [Fact]
     public void AcknowledgeCommand_ClearsTheBlockAndPersists()
     {
         var (board, store, _, _, _, _, _) = Create();
@@ -78,7 +122,8 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
         int saves = store.Saves;
 
         board2.AcknowledgeCommand.Execute(null);
@@ -105,14 +150,15 @@ public sealed class TodoBoardTests
     public void Sync_CompletesAQueuedSubjectToo()
     {
         // Unity checks every subject, not only the four on display: a queued
-        // one still completes (and gets its care package) when it is met.
+        // one still completes when it is met. (The kit grant needs a store door,
+        // so the grant itself is covered by its own test below.)
         var board = new TodoBoard(
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(),
             new JobLedger(new DriverState(0.0, 0.0, JobsCompleted: 18)),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0),
-            new NullLogger());
+            new CarePackageLedger(), new Random(0), () => { }, new NullLogger());
 
         Assert.True(board.HasCompleted);
         Assert.Equal(
@@ -132,7 +178,8 @@ public sealed class TodoBoardTests
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(), jobs,
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+            new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0),
+            new CarePackageLedger(), new Random(0), () => { }, new NullLogger());
 
         Assert.DoesNotContain(
             "TodoSetDestinations",
@@ -159,7 +206,8 @@ public sealed class TodoBoardTests
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             onboarding, new DriverWallet(), new JobLedger(),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            new VisitLedger(), career, new NullLogger());
+            new VisitLedger(), career, new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
 
         // The boot sync met the grocery gate: the follow-up took its slot.
         Assert.Contains(board.Slots, slot => slot.CopyKey == "TodoOpenDeliveryCareer");

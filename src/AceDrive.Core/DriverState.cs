@@ -57,7 +57,14 @@ namespace AceDrive.Core;
 /// The delivery career (PORTPLAN 18/51, Unity PlayerData.credP +
 /// ownedWholesaleHubs + hubDeliveryStats) keeps its balance, bought hubs and
 /// per-hub ramp counts here too, so a restart reopens the career the player
-/// paid for instead of re-granting the intro gift.</summary>
+/// paid for instead of re-granting the intro gift.
+/// The care-package ledger (PORTPLAN 21, Unity PlayerData.carePackages +
+/// carePackagesCarried + carePackagePois) rides here as well: the kits waiting
+/// on store shelves and the kits already in the car, so a restart mid-run
+/// resumes at the community centre instead of losing them.
+/// The glove compartment's card capacity (PORTPLAN 61, Unity
+/// PlayerData.gloveboxSlots) is the last reading: 0 on a save written before the
+/// reward cards existed, which the Glovebox heals from its own table.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -108,7 +115,15 @@ public sealed record DriverState(
     // The calendar's once-per-week stamps (WeeklyEventLedger): event id to the
     // game date it was last taken, so a restart inside the same week keeps the
     // row closed instead of reopening an event the player already used.
-    IReadOnlyDictionary<string, string>? WeeklyEventDates = null)
+    IReadOnlyDictionary<string, string>? WeeklyEventDates = null,
+    // The care kits on store shelves plus the kits in the car (PORTPLAN 21):
+    // null on a save written before the charity run existed, which resumes as
+    // an empty ledger instead of a migration.
+    CarePackageState? CarePackages = null,
+    // How many reward cards the glove compartment may hold (PORTPLAN 61, Unity
+    // PlayerData.gloveboxSlots). 0 is "never written", never a legal capacity —
+    // the +1 slot reward only ever grows a healed count.
+    int GloveboxSlots = 0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

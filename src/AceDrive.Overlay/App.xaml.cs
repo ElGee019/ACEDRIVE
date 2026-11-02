@@ -210,6 +210,17 @@ public partial class App : Application, IDisposable
         var driverStore = new JsonDriverStore(_log);
         DriverState? savedDriver = driverStore.Load();
         var driver = new DriverWallet(savedDriver);
+        // The care-package ledger (PORTPLAN 21): the kits on store shelves and
+        // the kits in the car resume with the driver, so a restart after a
+        // pickup still owes the community centre the bags it is carrying.
+        var carePackages = new CarePackageLedger(savedDriver?.CarePackages);
+        // The care-package rewards (PORTPLAN 61): the cards the picker offers,
+        // the glovebox's starting capacity and the cash a bonus pays, read once
+        // at startup like the fares so no page touches a file. The glovebox
+        // heals a save written before the cards existed from that same capacity,
+        // and writes the healed count back through the driver file.
+        RewardTable rewardTable = new JsonRewardCardStore(_log).Load();
+        var glovebox = new Glovebox(rewardTable, driver);
         // The delivery career (PORTPLAN 18/51): the CredP balance, the hubs
         // bought and each hub's ramp count resume from the driver save, so a
         // restart reopens the career instead of losing it. A save written
@@ -436,7 +447,7 @@ public partial class App : Application, IDisposable
             wall, game, clockStore, driverStore, garageStore, cityStore,
             hungerStore, roadTestStore, shiftStore, driver, streak, zone, trunk,
             garage, city, hunger, roadTests, shift, shifts, jobs, visits,
-            valuation, willyLedger, deliveryCareer, weeklyEvents);
+            valuation, willyLedger, deliveryCareer, weeklyEvents, carePackages);
         // The panel, its page and the activity stamp: view state with an owner
         // the view binds through the shell, not state the coordinator holds.
         var shell = new OverlayShell();
@@ -595,14 +606,32 @@ public partial class App : Application, IDisposable
         // the ledger and its file, and the jobs page reads only its lines.
         var todoBoard = new TodoBoard(
             todos, todoStore, poiDirectory, onboardingStore, driver, jobs, zone,
-            garage, visits, deliveryCareer, _log);
+            garage, visits, deliveryCareer, carePackages,
+            // The store draw behind each grant: its own seeded stream, offset
+            // from the other launch draws. The save rides the shared driver
+            // bank, so a granted kit survives a kill between sessions.
+            new Random(taxiSeed + 14),
+            () => saver.SaveDriver(rivals.LastResult), _log);
+        // The care-package run (PORTPLAN 21): DELIVER CARE PACKAGES on the jobs
+        // page starts it, the companion carries every pickup and the community
+        // centre drop-off, and its receipt page closes the run. The receipt's
+        // CONTINUE opens the run's reward picker (PORTPLAN 61), whose claim
+        // banks through the same driver save.
+        var careReward = new CarePackageReward(
+            rewardTable, glovebox, trunk, driver,
+            // The picker's own seeded stream, offset from the other launch draws.
+            new Random(taxiSeed + 15),
+            () => saver.SaveDriver(rivals.LastResult), _log);
+        var careFlow = new CarePackageFlow(
+            poiDirectory, carePackages, careReward, addressMap, hud,
+            () => saver.SaveDriver(rivals.LastResult), beat, _log);
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todoBoard, roadTests, saver,
             driver, garage, rivals, zoneStandings, trunk, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
-            valuationFlow, willyFlow, willyLedger, roadTestFlow, touristen,
+            valuationFlow, willyFlow, willyLedger, careFlow, roadTestFlow, touristen,
             weeklyEvents, calendarGate,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use.
@@ -619,7 +648,7 @@ public partial class App : Application, IDisposable
         // the coordinator share this one instance, so the root can build the
         // two host reads the coordinator used to assemble.
         var panel = new PanelPresenter(
-            shell, navigation, taxi, delivery, touristen, voice, wall, _log);
+            shell, navigation, taxi, delivery, touristen, careFlow, voice, wall, _log);
         // The introduction walk and its errand: it reports through its own
         // host (page swaps, panel reveals, the shared driver save), so it is
         // built here like every other collaborator. Its car brand is read live
@@ -657,7 +686,7 @@ public partial class App : Application, IDisposable
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
-            roadTestFlow, touristen,
+            careFlow, roadTestFlow, touristen,
             navigation, readouts, dayCycle,
             todoBoard,
             hud,

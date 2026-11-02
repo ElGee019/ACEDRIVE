@@ -56,6 +56,10 @@ public sealed class DriverWallet
         // The career's Star of the Show wins (Unity starOfTheShowWins): the race
         // prize scales on the new total, so the file must carry it.
         StarOfTheShowWins = Math.Max(0, saved?.StarOfTheShowWins ?? 0);
+        // The glove compartment's capacity (PORTPLAN 61, Unity
+        // PlayerData.gloveboxSlots). 0 means "never written": the Glovebox heals
+        // it from the reward table's own starting capacity on its first read.
+        GloveboxSlots = Math.Max(0, saved?.GloveboxSlots ?? 0);
     }
 
     public double Cash { get; private set; }
@@ -128,6 +132,32 @@ public sealed class DriverWallet
     /// Show; completes the VisitBank todo once progress persistence (item
     /// 51) lands.</summary>
     public bool HasEnteredBank { get; private set; }
+
+    /// <summary>
+    /// How many reward cards the glove compartment may hold (PORTPLAN 61,
+    /// Unity PlayerData.gloveboxSlots). It lives on the driver's readings, so
+    /// the one save that banks the trunk banks the capacity that measures it;
+    /// the Glovebox owns what the number means.
+    /// </summary>
+    public int GloveboxSlots { get; private set; }
+
+    /// <summary>
+    /// Heals a save written before the glove compartment existed: 0 slots is
+    /// never a legal capacity, so the first owner to read it seeds the
+    /// table's default (Unity's GetCapacity does the same at its read site).
+    /// A positive count is never touched, so a slot reward always survives.
+    /// </summary>
+    public void EnsureGloveboxSlots(int fallback)
+    {
+        if (GloveboxSlots <= 0)
+        {
+            GloveboxSlots = Math.Max(0, fallback);
+        }
+    }
+
+    /// <summary>The "+1 Glovebox Slot" reward card (PORTPLAN 61, Unity
+    /// TodoRewardsScreenController's slot branch).</summary>
+    public void AddGloveboxSlot() => GloveboxSlots++;
 
     /// <summary>Unity BankScript.Show: the visit stamps once and rides the
     /// next settle save out (Unity saves with the withdraw, not on open).</summary>
@@ -246,6 +276,14 @@ public sealed class DriverWallet
         Earn(bonus);
     }
 
+    /// <summary>
+    /// A cash gift the player did not work for (PORTPLAN 61, Unity's "+500CR
+    /// Bonus" reward card: <c>bankAmount += 500</c>). It lands in cash and
+    /// deliberately not in the lifetime-earned reading, so a gift never credits
+    /// the "earn CR" ToDo subject the way a settled job does.
+    /// </summary>
+    public void AddGift(double amount) => ApplyCash(amount);
+
     public void AddReceipt(TaxiReceipt receipt)
     {
         ApplyCash(receipt.Total);
@@ -317,6 +355,7 @@ public sealed class DriverWallet
         CreditEarned = CreditEarned,
         ClubReputation = ClubReputation,
         StarOfTheShowWins = StarOfTheShowWins,
+        GloveboxSlots = GloveboxSlots,
     };
 
     // Every cash delta lands here: rounded to the cent, sign preserved. A debt

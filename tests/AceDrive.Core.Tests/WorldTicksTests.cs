@@ -74,7 +74,7 @@ public sealed class WorldTicksTests
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
             new JobLedger(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(), career,
-            new WeeklyEventLedger());
+            new WeeklyEventLedger(), new CarePackageLedger());
         var world = new WorldTicks(
             game, city, appetite, fleet, board, career, saver, rivals, log);
         return new Fixture(world, clock, city, appetite, garage, wallet, driverStore, hungerStore, log);

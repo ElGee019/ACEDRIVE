@@ -234,6 +234,26 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="TodoCompletedLine" xml:space="preserve"><value>{0}. {1}</value></data>
   <data name="TodoCarePackages" xml:space="preserve"><value>Voor elke voltooide taak regelt Sonja een zorgpakket voor de wijk. Verzamel er 5 en bezorg ze bij het buurtcentrum voor een gegarandeerde beloning!</value></data>
   <data name="TodoDeliver" xml:space="preserve"><value>ZORGPAKKETTEN BEZORGEN</value></data>
+  <data name="TodoCarePackageCount" xml:space="preserve"><value>Zorgpakketten klaar om te bezorgen: {0}</value></data>
+  <data name="HudCarePickupDrive" xml:space="preserve"><value>Zorgpakkettenrun: rijd naar {0} op {1} nr. {2} in {3} om de zorgpakketten op te halen ({4} van {5}).</value></data>
+  <data name="HudCarePickupArrived" xml:space="preserve"><value>Je bent aangekomen bij {0}. Druk op OPHALEN om de zorgpakketten te verzamelen.</value></data>
+  <data name="HudCarePickupAction" xml:space="preserve"><value>ZORGPAKKETTEN OPHALEN</value></data>
+  <data name="HudCareDropoffDrive" xml:space="preserve"><value>Alle zorgpakketten zijn opgehaald. Rijd naar het {0} op {1} nr. {2} in {3} om ze af te geven.</value></data>
+  <data name="HudCareDropoffArrived" xml:space="preserve"><value>Je bent aangekomen bij het {0}. Druk op BEZORGEN om de zorgpakketten af te geven.</value></data>
+  <data name="HudCareDropoffAction" xml:space="preserve"><value>ZORGPAKKETTEN BEZORGEN</value></data>
+  <data name="CareReceiptTitle" xml:space="preserve"><value>ZORGPAKKETTENBON</value></data>
+  <data name="CareReceiptDelivered" xml:space="preserve"><value>De buurt bedankt je voor het bezorgen van {0} zorgpakketten.</value></data>
+  <data name="CareReceiptStores" xml:space="preserve"><value>Opgehaald bij: {0}</value></data>
+  <data name="CareReceiptRemaining" xml:space="preserve"><value>Zorgpakketten die nog op een run wachten: {0}</value></data>
+  <data name="CareReceiptAllDelivered" xml:space="preserve"><value>Alle zorgpakketten in de stad zijn bezorgd.</value></data>
+  <data name="RewardPickerTitle" xml:space="preserve"><value>BELONINGEN ZORGRONDE</value></data>
+  <data name="RewardPickerHint" xml:space="preserve"><value>Het buurthuis bedankt je voor de ronde. Kies één beloning.</value></data>
+  <data name="RewardPickerGlovebox" xml:space="preserve"><value>Kaarten in je handschoenenkastje: {0}/{1}</value></data>
+  <data name="RewardPickerStored" xml:space="preserve"><value>{0} zit nu in je handschoenenkastje.</value></data>
+  <data name="RewardPickerSlotAdded" xml:space="preserve"><value>Eén plek extra in je handschoenenkastje: er passen nu {0} kaarten.</value></data>
+  <data name="RewardPickerCash" xml:space="preserve"><value>De bonus staat op je rekening: {0:0} CR.</value></data>
+  <data name="RewardPickerFull" xml:space="preserve"><value>Je handschoenenkastje is vol. Neem de andere beloning, of ga verder.</value></data>
+  <data name="RewardPickerContinue" xml:space="preserve"><value>VERDER</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Vertrouwenspunten: {0}</value></data>
   <data name="DeliveryGrowthUp" xml:space="preserve"><value>Stadsgroei: ▲ +{0} / uur</value></data>

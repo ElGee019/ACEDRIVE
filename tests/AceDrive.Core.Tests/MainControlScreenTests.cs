@@ -18,7 +18,8 @@ public sealed class MainControlScreenTests
         FakeClock? clock = null, TodoBoard? todos = null,
         bool deliveryOpen = false, TaxiShift? shift = null,
         bool taxiStartsShift = false, VoiceBeat? beat = null,
-        ICommand? backCommand = null)
+        ICommand? backCommand = null, bool canDeliverCarePackages = false,
+        ICommand? deliverCarePackages = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
@@ -35,7 +36,8 @@ public sealed class MainControlScreenTests
                     : new RelayCommand(() => { }),
                 new RelayCommand(() => { }, () => deliveryOpen),
                 new RelayCommand(() => { }),
-                board.AcknowledgeCommand),
+                deliverCarePackages ?? new RelayCommand(() => { }),
+                () => canDeliverCarePackages),
             backCommand ?? new RelayCommand(() => { }));
     }
 
@@ -48,7 +50,8 @@ public sealed class MainControlScreenTests
             new FakeOnboardingStore(), new DriverWallet(), new JobLedger(),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
     }
 
     // The real board over a given career: the boot sync flags whatever the
@@ -60,7 +63,33 @@ public sealed class MainControlScreenTests
             new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new NullLogger());
+            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
+    }
+
+    // The real board over a career that meets six tips and a town with one
+    // shop: the boot sync grants one kit per completion (PORTPLAN 21), so the
+    // page has a real bag threshold to read.
+    private static TodoBoard CareBoard()
+    {
+        var directory = new PoiDirectory(
+        [
+            new PointOfInterest(
+                "groceries_store", "Max's Grocery Store",
+                new AddressLocation(
+                    AddressMap.Default.Streets[0].Name, 1, HouseSide.Left),
+                PoiTypes.GroceryStore),
+        ]);
+        var state = new DriverState(
+            0.0, 2.0, Bank: 1002.0, CreditEarned: 500.0,
+            TaxiJobsCompleted: 5, DeliveryJobsCompleted: 2, JobsCompleted: 18);
+        return new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), directory,
+            new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
+            new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
+            new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new Random(0), () => { }, new NullLogger());
     }
 
     [Fact]
@@ -76,7 +105,7 @@ public sealed class MainControlScreenTests
     }
 
     [Fact]
-    public void CompletedTodo_ListsTheKitButWithholdsDeliverBelowFive()
+    public void CompletedTodo_ListsTheKitButWithholdsDeliverWithoutFiveKits()
     {
         // One earned target is a listed kit, not a delivery: the explanation
         // shows, but DELIVER CARE PACKAGES waits for the five-kit threshold.
@@ -91,15 +120,19 @@ public sealed class MainControlScreenTests
     }
 
     [Fact]
-    public void CarePackages_DeliverOffersItselfAtFiveAndClearsTheList()
+    public void CarePackages_DeliverOffersItselfAtFiveAndForwardsTheCommand()
     {
-        // Six subjects already met: the block lists them and the button appears.
-        var vm = Create(todos: Board(new DriverState(
-            0.0, 2.0, Bank: 1002.0, CreditEarned: 500.0,
-            TaxiJobsCompleted: 5, DeliveryJobsCompleted: 2,
-            JobsCompleted: 18)));
+        // Six subjects already met and a shop in town: the boot sync grants one
+        // kit per completion, so the bag threshold is satisfied.
+        TodoBoard board = CareBoard();
+        Assert.True(board.CarePackageCount >= 5);
+        int delivered = 0;
+        var vm = Create(
+            todos: board, canDeliverCarePackages: true,
+            deliverCarePackages: new RelayCommand(() => delivered++));
 
         Assert.True(vm.ShowDeliverCarePackages);
+        Assert.Contains("6", vm.CarePackageCountLine, StringComparison.Ordinal);
         Assert.Equal(6, vm.CompletedTodoLines.Count);
 
         // Numbered 1..6: the ordinal is the page's marker (resx
@@ -110,12 +143,19 @@ public sealed class MainControlScreenTests
         }
         Assert.True(vm.VoiceActions.ContainsKey("DELIVER CARE PACKAGES"));
 
-        vm.TodoAcknowledgeCommand.Execute(null);
-        vm.Refresh();
+        // The page forwards the host's command; clearing the tip block and
+        // starting the run stay the navigator's composition.
+        vm.VoiceActions["DELIVER CARE PACKAGES"].Invoke();
+        Assert.Equal(1, delivered);
+    }
 
-        Assert.False(vm.HasCompletedTodos);
+    [Fact]
+    public void CarePackages_DeliverHiddenWhileTheRunOwnsTheCompanion()
+    {
+        var vm = Create(todos: CareBoard(), canDeliverCarePackages: false);
+
         Assert.False(vm.ShowDeliverCarePackages);
-        Assert.Empty(vm.CompletedTodoLines);
+        Assert.Equal(string.Empty, vm.CarePackageCountLine);
         Assert.DoesNotContain("DELIVER CARE PACKAGES", vm.VoiceActions.Keys);
     }
 
@@ -200,7 +240,8 @@ public sealed class MainControlScreenTests
                 new RelayCommand(() => { }),
                 new RelayCommand(() => fired = true),
                 new RelayCommand(() => { }),
-                new RelayCommand(() => { })),
+                new RelayCommand(() => { }),
+                () => false),
             new RelayCommand(() => { }));
 
         vm.VoiceActions["DELIVERY JOB"].Invoke();

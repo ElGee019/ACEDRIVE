@@ -64,6 +64,35 @@ public sealed class JsonDriverStoreTests
     }
 
     [Fact]
+    public void SaveAndLoad_RoundTripsTheCarePackages()
+    {
+        // The care-kit shelves and the car ride the driver file (PORTPLAN 21):
+        // a restart after a pickup must reopen both halves of every kit.
+        string file = TempFile();
+        try
+        {
+            var store = new JsonDriverStore(file, new TestLog());
+            var ledger = new CarePackageLedger();
+            Assert.True(ledger.Grant("groceries_store"));
+            Assert.True(ledger.Grant("groceries_store"));
+            Assert.True(ledger.Grant("coffee_shop"));
+            Assert.Equal(1, ledger.Pickup("coffee_shop", 1));
+
+            store.Save(DriverState.Fresh with { CarePackages = ledger.Snapshot() });
+            DriverState? loaded = store.Load();
+
+            Assert.NotNull(loaded);
+            var resumed = new CarePackageLedger(loaded.CarePackages);
+            Assert.Equal(1, resumed.Carried);
+            Assert.Equal(3, resumed.Total);
+            CarePackagePlacement shelf = Assert.Single(resumed.Stores);
+            Assert.Equal("groceries_store", shelf.StoreId);
+            Assert.Equal(2, shelf.Count);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
     public void Load_PreRatingSave_OpensOnUnitysNewGameProfile()
     {
         // A driver.json written before PORTPLAN 06 has no skill fields; the
