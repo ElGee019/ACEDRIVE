@@ -251,50 +251,59 @@ public sealed class CalendarScreenTests
     }
 
     [Fact]
-    public void TakenEvent_SaysToComeBackNextWeekAndDoesNotDispatch()
+    public void TakenEvent_TapWarnsComeBackNextWeekForThreeSeconds()
     {
-        // The Cento Miglia was taken this Sunday: the row says so instead of
-        // leaving the tap to the refusal behind it, and the mic still reaches
-        // the row by the event's own name.
+        // The Cento Miglia was taken this Sunday: the row keeps its own label
+        // (nothing to announce before the tap), the tap glows for the beat and
+        // swaps in the hint for the strip's three seconds, and no page opens.
         var clock = new FakeClock();
+        var beat = new VoiceBeat(clock);
         var sundayNoon = new DateTime(2026, 10, 11, 12, 0, 0, DateTimeKind.Utc);
         var weekly = new WeeklyEventLedger();
         weekly.MarkTaken(ControlCalendar.CentoMiglia, sundayNoon);
         int opened = 0;
         var vm = Create(
-            clock, gameStart: sundayNoon, weekly: weekly, openDay: day => opened = day);
+            clock, beat: beat, gameStart: sundayNoon, weekly: weekly,
+            openDay: day => opened = day);
 
         CalendarRow sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
-        Assert.True(sunday.Taken);
-        Assert.Equal("COME BACK NEXT WEEK", sunday.EventLabel);
+        Assert.Equal("Cento Miglia", sunday.EventLabel);
         Assert.True(vm.VoiceActions.ContainsKey("Cento Miglia"));
 
         vm.DayCommand.Execute(1); // Sunday
 
         Assert.Equal(0, opened);
         sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
-        Assert.True(sunday.Flash);
+        Assert.True(sunday.Flash); // the glow lands on the event label first
+        Assert.Equal("Cento Miglia", sunday.EventLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(0.51));
+        beat.Poll(); // what the 10 Hz poll does at the beat's end
+        vm.UpdateFlash();
+        sunday = Assert.Single(vm.Days, d => d.DayLabel == "Sunday");
         Assert.Equal("COME BACK NEXT WEEK", sunday.EventLabel);
+
+        clock.Advance(TimeSpan.FromSeconds(3.1));
+        vm.UpdateFlash();
+        Assert.Equal(
+            "Cento Miglia", Assert.Single(vm.Days, d => d.DayLabel == "Sunday").EventLabel);
     }
 
     [Fact]
-    public void TakenEvent_RepaintsInsideTheSameGameMinute()
+    public void TakenEvent_KeepsItsLabelOnTheNextRepaint()
     {
-        // The stamp can land while the page is on screen: the refresh guard
-        // must notice it without waiting for the next game minute.
+        // A repaint must not turn the used-up slot into a permanent label: the
+        // hint exists only between the tap and its deadline.
         var clock = new FakeClock();
         var sundayNoon = new DateTime(2026, 10, 11, 12, 0, 0, DateTimeKind.Utc);
         var weekly = new WeeklyEventLedger();
-        var vm = Create(clock, gameStart: sundayNoon, weekly: weekly);
-        Assert.Equal(
-            "Cento Miglia", Assert.Single(vm.Days, d => d.DayLabel == "Sunday").EventLabel);
-
         weekly.MarkTaken(ControlCalendar.CentoMiglia, sundayNoon);
+        var vm = Create(clock, gameStart: sundayNoon, weekly: weekly);
+
         vm.Refresh();
 
         Assert.Equal(
-            "COME BACK NEXT WEEK",
-            Assert.Single(vm.Days, d => d.DayLabel == "Sunday").EventLabel);
+            "Cento Miglia", Assert.Single(vm.Days, d => d.DayLabel == "Sunday").EventLabel);
     }
 
     [Fact]

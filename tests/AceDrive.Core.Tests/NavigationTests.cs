@@ -472,11 +472,13 @@ public sealed class NavigationTests
     }
 
     [Fact]
-    public void CentoDay_TwiceInTheSameWeek_SaysComeBackNextWeek()
+    public void CentoDay_TwiceInTheSameWeek_OnlyAcknowledgesTheSecondTap()
     {
         // The Sunday row is once a week (the calendar's stamp): the page opens
-        // once, and after BACK the row itself says to come back next week —
-        // the tap no longer falls through to the refusal behind it.
+        // once, and after BACK the row still names the event — the second tap
+        // glows and leaves the page alone instead of falling through to the
+        // refusal behind it (the hint itself is the page's, see
+        // CalendarScreenTests).
         var (nav, shell, _, clock, _, _, _, _, _, _, _, _) = Create();
         nav.ShowMenuPage();
         Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
@@ -492,14 +494,12 @@ public sealed class NavigationTests
             .BackCommand.Execute(null);
         Assert.Same(calendar, shell.CurrentScreen);
 
-        nav.Tick(); // the poll repaints the strip with the stamp it just took
-        CalendarRow sunday = Assert.Single(calendar.Days, d => d.DayLabel == "Sunday");
-        Assert.True(sunday.Taken);
-        Assert.Equal("COME BACK NEXT WEEK", sunday.EventLabel);
-
         calendar.DayCommand.Execute(centoDay);
 
         Assert.Same(calendar, shell.CurrentScreen);
+        CalendarRow sunday = Assert.Single(calendar.Days, d => d.DayLabel == "Sunday");
+        Assert.True(sunday.Flash);
+        Assert.Equal("Cento Miglia", sunday.EventLabel);
     }
 
     [Fact]

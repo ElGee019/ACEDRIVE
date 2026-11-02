@@ -554,9 +554,9 @@ saver's next bank and the page's `TakenOn` read never touch the disk twice.
 
 The rule those ledgers feed is `CalendarGate` (Core): the weekday/week/window
 gate joined to each event's own used-up stamp (the weekly ledger, the
-missing-person completion, the valuation week's entry). The strip paints a
-taken row with the COME BACK NEXT WEEK copy and the menu's calendar tile rests,
-so the two can never promise an entry the flow would refuse. The day cycle
+missing-person completion, the valuation week's entry). A tap on a taken row
+answers with the three-second COME BACK NEXT WEEK hint and the menu's calendar
+tile rests, so neither can promise an entry the flow would refuse. The day cycle
 re-reads the gate on the hour/day boundary and when a page is revealed
 (`RefreshEventGate`), never per tick.
 
