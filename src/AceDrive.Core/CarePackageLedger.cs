@@ -51,6 +51,14 @@ public sealed class CarePackageLedger
     /// <summary>Kits picked up but not yet dropped off at the community centre.</summary>
     public int Carried { get; private set; }
 
+    /// <summary>
+    /// Kits a completion earned that no shop door could hold yet. They are not
+    /// part of <see cref="Total"/> — a kit nobody can pick up is not
+    /// deliverable — and <see cref="PlaceDeferred"/> moves them onto a shelf as
+    /// soon as the town has a store door for them.
+    /// </summary>
+    public int Unplaced { get; private set; }
+
     /// <summary>Every kit the career still owes the neighbourhood.</summary>
     public int Total => Outstanding + Carried;
 
@@ -77,6 +85,41 @@ public sealed class CarePackageLedger
         }
 
         AddToStore(storeId, 1);
+        return true;
+    }
+
+    /// <summary>
+    /// Banks kits a completion earned when no store door could take them, so a
+    /// reward is never dropped. Capped like the shelves: the career owes at most
+    /// <see cref="MaxPackages"/> kits in total. Returns how many were banked.
+    /// </summary>
+    public int Defer(int kits)
+    {
+        if (kits <= 0 || IsFull)
+        {
+            return 0;
+        }
+
+        int room = Math.Max(0, MaxPackages - Total - Unplaced);
+        int banked = Math.Min(kits, room);
+        Unplaced += banked;
+        return banked;
+    }
+
+    /// <summary>
+    /// Moves one deferred kit onto <paramref name="storeId"/>'s shelf. False
+    /// when nothing is deferred, the door is unusable, or the cap leaves no
+    /// room; the caller keeps the debt for a later sync.
+    /// </summary>
+    public bool PlaceDeferred(string storeId)
+    {
+        if (Unplaced <= 0 || IsFull || string.IsNullOrWhiteSpace(storeId))
+        {
+            return false;
+        }
+
+        AddToStore(storeId, 1);
+        Unplaced--;
         return true;
     }
 
@@ -164,7 +207,7 @@ public sealed class CarePackageLedger
     }
 
     /// <summary>The state the driver file reopens, copied so a later grant cannot move it.</summary>
-    public CarePackageState Snapshot() => new([.. _stores], Carried);
+    public CarePackageState Snapshot() => new([.. _stores], Carried, Unplaced);
 
     // A saved row that cannot name a store or holds no kits is dropped: it can
     // never be picked up, and keeping it would hide a corrupt file behind a
@@ -173,28 +216,30 @@ public sealed class CarePackageLedger
     private void Restore(CarePackageState? saved)
     {
         Carried = Math.Max(0, saved?.Carried ?? 0);
-        if (saved?.Stores is not { } stores)
+        Unplaced = Math.Max(0, saved?.Unplaced ?? 0);
+        if (saved?.Stores is { } stores)
         {
-            return;
+            foreach (CarePackagePlacement? placement in stores)
+            {
+                if (placement is null
+                    || string.IsNullOrWhiteSpace(placement.StoreId)
+                    || placement.Count <= 0)
+                {
+                    continue;
+                }
+
+                int room = MaxPackages - Total;
+                if (room <= 0)
+                {
+                    break;
+                }
+
+                AddToStore(placement.StoreId, Math.Min(placement.Count, room));
+            }
         }
 
-        foreach (CarePackagePlacement? placement in stores)
-        {
-            if (placement is null
-                || string.IsNullOrWhiteSpace(placement.StoreId)
-                || placement.Count <= 0)
-            {
-                continue;
-            }
-
-            int room = MaxPackages - Total;
-            if (room <= 0)
-            {
-                break;
-            }
-
-            AddToStore(placement.StoreId, Math.Min(placement.Count, room));
-        }
+        // A hand-edited file cannot make the career owe more than the cap.
+        Unplaced = Math.Min(Unplaced, Math.Max(0, MaxPackages - Total));
     }
 
     private void AddToStore(string storeId, int count)

@@ -1,21 +1,25 @@
 // Pure gameplay logic. No WPF / Windows / telemetry / backend references.
 // The store draw behind a care-package grant (PORTPLAN item 21, Unity
 // CarePackageService.AvailablePoiKeys): a kit waits at a shop door the player
-// can actually drive to, so an undiscovered street can never hold one.
+// can actually drive to, so a door that does not resolve on the address book
+// can never hold one.
 namespace AceDrive.Core;
 
 /// <summary>
 /// The shops a care kit may be dropped at: the store families the interior
-/// handlers already know, drawn from the discovered zone. Unity filters to the
-/// player's home town; the port's zone is that town, so every discovered store
-/// door qualifies.
+/// handlers already know. Unity filters to the player's home town; every
+/// discovered store door of that town qualifies, whether or not the taxi zone
+/// has reached its street yet — the player has already driven there.
 /// </summary>
 public static class CarePackageStores
 {
     /// <summary>
     /// Every discovered store door that resolves on <paramref name="addressable"/>,
-    /// in directory order. Order is stable so a seeded draw reproduces the same
-    /// store in tests and across a relaunch.
+    /// in directory order. The caller passes the whole address book, not
+    /// <see cref="OperatingZone.ZoneMap"/>: the zone is the taxi job's scope,
+    /// and filtering on it dropped real grants for shops the player had just
+    /// walked into. Order is stable so a seeded draw reproduces the same store
+    /// in tests and across a relaunch.
     /// </summary>
     public static IReadOnlyList<PointOfInterest> Eligible(
         IEnumerable<PointOfInterest>? doors, AddressMap addressable)

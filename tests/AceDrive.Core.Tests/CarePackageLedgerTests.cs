@@ -122,6 +122,49 @@ public sealed class CarePackageLedgerTests
     }
 
     [Fact]
+    public void DeferredKit_WaitsForAShopAndIsPlacedOnce()
+    {
+        var ledger = new CarePackageLedger();
+
+        // A completion whose kit found no shop door: owed, but not deliverable.
+        Assert.Equal(2, ledger.Defer(2));
+        Assert.Equal(2, ledger.Unplaced);
+        Assert.Equal(0, ledger.Total);
+
+        Assert.True(ledger.PlaceDeferred("groceries_store"));
+        Assert.Equal(1, ledger.Unplaced);
+        Assert.Equal(1, ledger.Total);
+        Assert.Equal("groceries_store", Assert.Single(ledger.Stores).StoreId);
+
+        Assert.True(ledger.PlaceDeferred("groceries_store"));
+        Assert.False(ledger.PlaceDeferred("groceries_store"));
+        Assert.Equal(2, ledger.Total);
+        Assert.Equal(0, ledger.Unplaced);
+    }
+
+    [Fact]
+    public void Defer_KeepsTheCareerCap()
+    {
+        var ledger = new CarePackageLedger();
+
+        Assert.Equal(CarePackageLedger.MaxPackages, ledger.Defer(10));
+        Assert.Equal(CarePackageLedger.MaxPackages, ledger.Unplaced);
+        Assert.Equal(0, ledger.Defer(1));
+    }
+
+    [Fact]
+    public void Snapshot_ResumesTheDeferredKits()
+    {
+        var ledger = new CarePackageLedger();
+        _ = ledger.Defer(2);
+
+        var resumed = new CarePackageLedger(ledger.Snapshot());
+
+        Assert.Equal(2, resumed.Unplaced);
+        Assert.Equal(0, resumed.Total);
+    }
+
+    [Fact]
     public void CorruptSavedRows_AreDroppedAndNegativeKitCountsClampToZero()
     {
         var resumed = new CarePackageLedger(new CarePackageState(

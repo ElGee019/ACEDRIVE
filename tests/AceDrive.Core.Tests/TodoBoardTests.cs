@@ -96,11 +96,12 @@ public sealed class TodoBoardTests
     }
 
     [Fact]
-    public void CompletedTip_WithoutAStoreDoor_GrantsNoKit()
+    public void CompletedTip_WithoutAStoreDoor_IsOwedUntilAStoreOpens()
     {
+        var directory = new PoiDirectory();
         var care = new CarePackageLedger();
         var board = new TodoBoard(
-            TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
+            TodoTable.Default, new FakeTodoProgressStore(), directory,
             new FakeOnboardingStore(),
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
@@ -108,9 +109,138 @@ public sealed class TodoBoardTests
             new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
             () => { }, new NullLogger());
 
-        // The tip still completes and lists; only the kit needs a door to wait at.
+        // The tip still completes and lists; the kit is owed, not dropped.
         Assert.True(board.HasCompleted);
         Assert.Equal(0, care.Total);
+        Assert.Equal(1, care.Unplaced);
+
+        // A shop opens: the next cold-edge sync places the owed kit there.
+        Assert.True(directory.Add(
+            Door("groceries_store", "Max's Grocery Store", PoiTypes.GroceryStore)));
+        board.Sync();
+
+        Assert.Equal(1, care.Total);
+        Assert.Equal(0, care.Unplaced);
+        Assert.Equal("groceries_store", Assert.Single(care.Stores).StoreId);
+    }
+
+    [Fact]
+    public void CompletedTip_GrantsTheKitWhenTheStoreStreetIsOutsideTheZone()
+    {
+        // The reported bug: Max's shop sits on Street 2, the taxi zone had only
+        // the home street, and the grant was dropped even though the player had
+        // just driven there. The door is discovered, so it can hold the kit.
+        AddressMap map = AddressMap.Default;
+        AddressStreet home = map.Streets[0];
+        var zone = new OperatingZone(
+            DriverState.Fresh with { StreetIds = [home.Id] }, seed: 0, map,
+            homeStreetId: home.Id, initialKm: AddressBook.MapLengthKm(map));
+        var directory = new PoiDirectory(
+            [new PointOfInterest(
+                "max-grocery", "Max's Grocery Store",
+                new AddressLocation(map.Streets[1].Name, 1, HouseSide.Right),
+                PoiTypes.MaxsGrocery)]);
+        var care = new CarePackageLedger();
+
+        _ = new TodoBoard(
+            TodoTable.Default, new FakeTodoProgressStore(), directory,
+            new FakeOnboardingStore(),
+            new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
+            new JobLedger(), zone, new Garage(TestRoadCars.Pool), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            () => { }, new NullLogger());
+
+        Assert.Equal(1, care.Total);
+        Assert.Equal(0, care.Unplaced);
+        Assert.Equal("max-grocery", Assert.Single(care.Stores).StoreId);
+    }
+
+    [Fact]
+    public void OwedBacklog_AndANewCompletion_AreBothBankedOnce()
+    {
+        // A save with one dropped kit can still meet a fresh tip: the debt and
+        // the new kit must both be banked, and neither counted twice.
+        string[] completed =
+        [
+            "TaxiJobs", "BankStandings", "VisitCarDealer", "GoToMaxGroceryStore",
+            "OpenDeliveryCareer",
+        ];
+        var store = new FakeTodoProgressStore();
+        store.Save(TodoLedger.Fresh(TodoTable.Default).Snapshot() with
+        {
+            Awaiting = completed,
+            CompletedTips = completed.ToDictionary(
+                subject => subject,
+                subject => new TodoTipSnapshot("TodoEarnCr", 1, 1)),
+        });
+        var care = new CarePackageLedger(
+            new CarePackageState([new CarePackagePlacement("groceries_store", 4)]));
+        var directory = new PoiDirectory();
+
+        var board = new TodoBoard(
+            TodoTable.Default, store, directory, new FakeOnboardingStore(),
+            // The wallet meets the Earn CR tip on the boot sync: one new kit.
+            new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
+            new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
+            new Garage(TestRoadCars.Pool), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            () => { }, new NullLogger());
+
+        Assert.Equal(4, care.Total);
+        Assert.Equal(2, care.Unplaced);
+
+        Assert.True(directory.Add(
+            Door("groceries_store", "Max's Grocery Store", PoiTypes.GroceryStore)));
+        board.Sync();
+
+        Assert.Equal(6, care.Total);
+        Assert.Equal(0, care.Unplaced);
+
+        // And a third sync adds nothing.
+        board.Sync();
+        Assert.Equal(6, care.Total);
+    }
+
+    [Fact]
+    public void CompletedBlockOutrunningTheBags_ReconcilesTheDroppedKit()
+    {
+        // The save the old build left behind: five completed tips, four kits and
+        // no record of the fifth. The block is acknowledged only when a run
+        // starts, so its rows are the completions this save has not delivered;
+        // the difference is the kit the old build dropped, and the sync owes it
+        // back.
+        string[] completed =
+        [
+            "CrEarnings", "TaxiJobs", "BankStandings", "VisitCarDealer",
+            "GoToMaxGroceryStore",
+        ];
+        var store = new FakeTodoProgressStore();
+        store.Save(TodoLedger.Fresh(TodoTable.Default).Snapshot() with
+        {
+            Awaiting = completed,
+            CompletedTips = completed.ToDictionary(
+                subject => subject,
+                subject => new TodoTipSnapshot("TodoEarnCr", 1, 1)),
+        });
+        var care = new CarePackageLedger(
+            new CarePackageState([new CarePackagePlacement("groceries_store", 4)]));
+        var directory = new PoiDirectory(
+            [Door("groceries_store", "Max's Grocery Store", PoiTypes.GroceryStore)]);
+
+        var board = new TodoBoard(
+            TodoTable.Default, store, directory, new FakeOnboardingStore(),
+            new DriverWallet(), new JobLedger(),
+            new OperatingZone(null, seed: 0, AddressMap.Default),
+            new Garage(TestRoadCars.Pool), new VisitLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            () => { }, new NullLogger());
+
+        Assert.Equal(5, care.Total);
+        Assert.Equal(0, care.Unplaced);
+
+        // Idempotent: the next boot cannot owe the same kit twice.
+        board.Sync();
+        Assert.Equal(5, care.Total);
     }
 
     [Fact]

@@ -97,6 +97,14 @@ public sealed class OperatingZone
     /// by <see cref="TryExpand"/> — the cache's only writer.</summary>
     public AddressMap ZoneMap => _zoneMap;
 
+    /// <summary>
+    /// The whole address book this zone was cut from. Draws that are not scoped
+    /// to the discovered streets — the care-package store draw, which must be
+    /// able to use a shop the player has already driven to — need every street,
+    /// not just the discovered prefix.
+    /// </summary>
+    public AddressMap Map => _map;
+
     /// <summary>The street the next expansion would add, or null once the map's
     /// pool is exhausted. Read from the cached home-first order at the zone's
     /// street count, so a legacy save needs no migration.</summary>

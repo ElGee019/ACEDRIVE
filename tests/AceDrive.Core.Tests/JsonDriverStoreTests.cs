@@ -77,6 +77,7 @@ public sealed class JsonDriverStoreTests
             Assert.True(ledger.Grant("groceries_store"));
             Assert.True(ledger.Grant("coffee_shop"));
             Assert.Equal(1, ledger.Pickup("coffee_shop", 1));
+            _ = ledger.Defer(1);
 
             store.Save(DriverState.Fresh with { CarePackages = ledger.Snapshot() });
             DriverState? loaded = store.Load();
@@ -85,6 +86,7 @@ public sealed class JsonDriverStoreTests
             var resumed = new CarePackageLedger(loaded.CarePackages);
             Assert.Equal(1, resumed.Carried);
             Assert.Equal(3, resumed.Total);
+            Assert.Equal(1, resumed.Unplaced);
             CarePackagePlacement shelf = Assert.Single(resumed.Stores);
             Assert.Equal("groceries_store", shelf.StoreId);
             Assert.Equal(2, shelf.Count);

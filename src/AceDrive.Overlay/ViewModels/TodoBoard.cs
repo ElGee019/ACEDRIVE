@@ -105,8 +105,10 @@ public sealed class TodoBoard : ITodoList
         if (result.Completed.Count > 0)
         {
             _log.LogInfo($"todo completed: {string.Join(", ", result.Completed)}");
-            GrantCarePackages(result.Completed.Count);
         }
+
+        OweCarePackages(result.Completed.Count);
+        PlaceOwedKits();
 
         if (result.Changed)
         {
@@ -121,38 +123,65 @@ public sealed class TodoBoard : ITodoList
     // hidden, and every cold-edge sync funnels through this one method. The
     // store draw is seeded so a test can reproduce it; the cap can drop a grant
     // without dropping the tip, exactly like Unity's MaxCarePackages.
-    private void GrantCarePackages(int completed)
+    //
+    // A completion never loses its kit: when no shop door can take it, the kit
+    // is owed in the ledger and placed by the next sync that can. The completed
+    // block is the only evidence an older save leaves for a kit that was
+    // dropped — it is acknowledged when a run starts, so its rows are exactly
+    // the completions this save has not delivered yet.
+    private void OweCarePackages(int completed)
+    {
+        int banked = _carePackages.Defer(completed);
+
+        // Then the backlog a save may carry: the completed block is the only
+        // evidence an older build leaves for a kit it dropped. Deferring today's
+        // completions first keeps them out of this difference, so a new
+        // completion and an old debt are banked separately, never twice.
+        int owed = _ledger.CompletedCount - _carePackages.Total - _carePackages.Unplaced;
+        banked += _carePackages.Defer(owed);
+
+        if (banked > 0)
+        {
+            _log.LogInfo(
+                $"care package owed: {banked} kit(s) wait for a shop door " +
+                $"({_carePackages.Unplaced} unplaced)");
+        }
+    }
+
+    // Places every owed kit on a shop shelf. The store draw runs over the whole
+    // address book, not the taxi zone: the player has already driven to these
+    // doors, and a shop that joined the directory before the zone expanded still
+    // has to be able to hold the kit its completion earned.
+    private void PlaceOwedKits()
     {
         IReadOnlyList<PointOfInterest> stores =
-            CarePackageStores.Eligible(_directory.All, _zone.ZoneMap);
-        if (stores.Count == 0)
-        {
-            _log.LogWarning(
-                $"care package not granted for {completed} completion(s): " +
-                "no store door in town");
-            return;
-        }
+            CarePackageStores.Eligible(_directory.All, _zone.Map);
 
         bool granted = false;
-        for (int i = 0; i < completed && !_carePackages.IsFull; i++)
+        while (_carePackages.Unplaced > 0 && !_carePackages.IsFull)
         {
-            if (CarePackageStores.Pick(stores, _careRng.Next) is not { } store)
+            if (CarePackageStores.Pick(stores, _careRng.Next) is not { } store
+                || !_carePackages.PlaceDeferred(store.Id))
             {
                 break;
             }
 
-            if (_carePackages.Grant(store.Id))
-            {
-                granted = true;
-                _log.LogInfo(
-                    $"care package granted at {store.Name} " +
-                    $"({_carePackages.Total}/{CarePackageLedger.MaxPackages})");
-            }
+            granted = true;
+            _log.LogInfo(
+                $"care package granted at {store.Name} " +
+                $"({_carePackages.Total}/{CarePackageLedger.MaxPackages})");
         }
 
         if (granted)
         {
             _saveDriver();
+        }
+
+        if (_carePackages.Unplaced > 0)
+        {
+            _log.LogWarning(
+                $"care package not granted yet for {_carePackages.Unplaced} kit(s): " +
+                "no store door in town");
         }
     }
 
