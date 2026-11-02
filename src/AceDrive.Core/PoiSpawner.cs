@@ -177,6 +177,39 @@ public sealed class PoiSpawner
                 : null);
     }
 
+    /// <summary>
+    /// Places a family's first door the moment a flow needs it, whatever the
+    /// street/job curve says: the car haul picks a customer's car up at a
+    /// dealer (Unity draws from every dealership in the world, while the port's
+    /// directory only holds discovered doors), so the first haul opens the one
+    /// dealer it rides from instead of waiting for the pacing to reach it. The
+    /// door is drawn and named exactly like a paced one. Answers null when the
+    /// family already has a door (the caller uses that one), the type is not in
+    /// the table, or no street in <paramref name="addressable"/> has a free
+    /// house.
+    /// </summary>
+    public PointOfInterest? SpawnOnDemand(
+        string type, PoiDirectory known, AddressMap addressable)
+    {
+        ArgumentNullException.ThrowIfNull(addressable);
+        if (known is null || addressable.Streets is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        PoiDefinition? definition = DefinitionFor(type);
+        if (definition is null
+            || definition.Spawn is not { } rule
+            || rule.Pacing == PoiPacing.None
+            || string.IsNullOrWhiteSpace(definition.NamePattern)
+            || CountOfType(known.All, definition.Type) > 0)
+        {
+            return null;
+        }
+
+        return SpawnOne(definition, 0, known, [], addressable, null);
+    }
+
     // The family whose first door is earned, never paced: a type without that
     // rule is not openable by the event that asked for it.
     private PoiDefinition? GrantedFirst(string type)
@@ -185,6 +218,21 @@ public sealed class PoiSpawner
         {
             if (definition.Spawn is { Pacing: PoiPacing.GrantedFirstThenStreets }
                 && string.Equals(definition.Type, type, StringComparison.OrdinalIgnoreCase))
+            {
+                return definition;
+            }
+        }
+
+        return null;
+    }
+
+    // The first definition of a type, whatever its pacing: the on-demand door
+    // and the event-granted door differ only in which curves they accept.
+    private PoiDefinition? DefinitionFor(string type)
+    {
+        foreach (PoiDefinition definition in _definitions)
+        {
+            if (string.Equals(definition.Type, type, StringComparison.OrdinalIgnoreCase))
             {
                 return definition;
             }

@@ -539,8 +539,17 @@ public partial class App : Application, IDisposable
         // entry opens its page and the companion carries each leg. Development
         // policy: no loyalty floor and no daily cap yet — CarHaulPolicy.Unity
         // is the one-line swap when those rules ship.
+        // The car haul (PORTPLAN 20): draws the offer, owns the pickup and
+        // delivery legs and settles the receipt; the control page's CAR HAULING
+        // entry opens its page and the companion carries each leg. Development
+        // policy: no loyalty floor and no daily cap yet — CarHaulPolicy.Unity
+        // is the one-line swap when those rules ship. Its pickup dealer is a
+        // door the job owns: a career that has not discovered one opens its
+        // first dealer on the tap (see HaulDealerDoor).
+        var haulDealerDoor = new HaulDealerDoor(
+            poiDirectory, poiStore, poiSpawner, zone, addressMap, _log);
         var haul = new CarHaulFlow(
-            brands, cars, poiDirectory, zone, addressMap,
+            brands, cars, poiDirectory, haulDealerDoor, zone, addressMap,
             () => AddressBook.Home(addressMap, profileStore.Load()),
             poiNames, driver, friendships, game, taxiRules, beat, _log,
             CarHaulPolicy.Development, new Random(taxiSeed + 13));

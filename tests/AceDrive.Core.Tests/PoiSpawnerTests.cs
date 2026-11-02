@@ -107,6 +107,39 @@ public sealed class PoiSpawnerTests
     }
 
     [Fact]
+    public void SpawnOnDemand_OpensTheDealerBelowItsOwnCurve()
+    {
+        // The car haul's pickup dealer: a career nowhere near the dealer's ten
+        // jobs still gets the door the first haul rides from, named and placed
+        // like a paced one.
+        var directory = new PoiDirectory();
+
+        PointOfInterest dealer = Assert.IsType<PointOfInterest>(
+            Spawner().SpawnOnDemand(PoiTypes.Dealer, directory, AddressMap.Default));
+
+        Assert.Equal(PoiTypes.Dealer, dealer.Type);
+        Assert.Equal("dealer_0", dealer.Id);
+        Assert.EndsWith("'s Cars", dealer.Name, StringComparison.Ordinal);
+        Assert.False(string.IsNullOrWhiteSpace(dealer.OwnerName));
+        Assert.InRange(dealer.Address.HouseNumber, 1, 33);
+    }
+
+    [Fact]
+    public void SpawnOnDemand_RefusesAFamilyThatAlreadyHasADoor()
+    {
+        // The caller uses the door that exists; a second one would break the
+        // one-dealer-per-family rule the pacing keeps.
+        var directory = new PoiDirectory();
+        directory.Add(new PointOfInterest(
+            "dealer_0", "Bianchi Cars",
+            new AddressLocation("Street 1", 4, HouseSide.Left),
+            PoiTypes.Dealer, "Giulia Bianchi"));
+
+        Assert.Null(Spawner().SpawnOnDemand(
+            PoiTypes.Dealer, directory, AddressMap.Default));
+    }
+
+    [Fact]
     public void SixStreets_OpenTheCarWash()
     {
         PointOfInterest poi = Assert.Single(

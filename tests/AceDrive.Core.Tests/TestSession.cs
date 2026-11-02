@@ -231,9 +231,13 @@ internal static class TestSession
             walletInstance, garageInstance, trunkInstance, CentoRaceRules.Default,
             options.Rng ?? new Random(0), beat, logger);
         // The car haul (PORTPLAN 20): the offer draw and the two legs on the
-        // same directory, wallet and friendship store the assertions read.
+        // same directory, wallet and friendship store the assertions read. Its
+        // dealer door is the real one, so a session whose directory holds no
+        // dealer opens one on the tap exactly like the overlay.
+        var haulDealerDoor = new HaulDealerDoor(
+            directory, directoryStore, spawnerInstance, zoneInstance, map, logger);
         var haul = new CarHaulFlow(
-            brandMileageInstance, pool, directory, zoneInstance, map,
+            brandMileageInstance, pool, directory, haulDealerDoor, zoneInstance, map,
             () => AddressBook.Home(map, profiles.Load()),
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
             walletInstance, friendsInstance, game, taxiRulesInstance, beat, logger,

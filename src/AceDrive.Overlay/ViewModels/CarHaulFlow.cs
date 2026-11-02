@@ -16,13 +16,17 @@ namespace AceDrive.Overlay.ViewModels;
 /// Unity stamps both delivery-leg ends on the game clock and pays the
 /// difference. The loyalty and one-per-day rules live in
 /// <see cref="CarHaulPolicy"/> so turning them on later is a composition-root
-/// change, not a branch here.
+/// change, not a branch here. The pickup dealer is
+/// <see cref="IHaulDealerDoor"/>'s: a career that has not discovered a dealer
+/// door yet opens its first on the tap, so a fresh career can take a haul. The
+/// flow never writes a POI itself.
 /// </summary>
 public sealed class CarHaulFlow
 {
     private readonly IBrandMileageStore _brands;
     private readonly IReadOnlyList<CarSpec> _cars;
     private readonly PoiDirectory _pois;
+    private readonly IHaulDealerDoor _dealerDoor;
     private readonly OperatingZone _zone;
     private readonly AddressMap _map;
     private readonly Func<AddressLocation?> _home;
@@ -48,7 +52,8 @@ public sealed class CarHaulFlow
 
     public CarHaulFlow(
         IBrandMileageStore brands, IReadOnlyList<CarSpec> cars, PoiDirectory pois,
-        OperatingZone zone, AddressMap map, Func<AddressLocation?> home,
+        IHaulDealerDoor dealerDoor, OperatingZone zone, AddressMap map,
+        Func<AddressLocation?> home,
         ProceduralNameGenerator names, DriverWallet wallet, IFriendshipStore friendships,
         GameClock game, TaxiRules rules, VoiceBeat beat, ILog log,
         CarHaulPolicy policy, Random rng)
@@ -56,6 +61,7 @@ public sealed class CarHaulFlow
         ArgumentNullException.ThrowIfNull(brands);
         ArgumentNullException.ThrowIfNull(cars);
         ArgumentNullException.ThrowIfNull(pois);
+        ArgumentNullException.ThrowIfNull(dealerDoor);
         ArgumentNullException.ThrowIfNull(zone);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(home);
@@ -72,6 +78,7 @@ public sealed class CarHaulFlow
         _brands = brands;
         _cars = cars;
         _pois = pois;
+        _dealerDoor = dealerDoor;
         _zone = zone;
         _map = map;
         _home = home;
@@ -114,6 +121,18 @@ public sealed class CarHaulFlow
             if (!_policy.CanOffer(_game.GameNow, _lastDeliveredOn, haulInProgress: false))
             {
                 _log.LogInfo("haul refused: today's haul is already delivered");
+                _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
+                return controlPage;
+            }
+
+            // The haul rides out of a dealer: a career that has not discovered
+            // one opens its first on this tap. That is the door the offer would
+            // be drawn from, so it has to exist before the draw (Unity draws
+            // from every dealership in the world).
+            if (_dealerDoor.Dealer() is null)
+            {
+                _log.LogInfo("haul refused: no dealer door to ride from");
+                _host.ShowNotice(Strings.Get("HaulUnavailable"));
                 _host.ShowHaulGate(Strings.Get("ControlHaulUnavailable"));
                 return controlPage;
             }

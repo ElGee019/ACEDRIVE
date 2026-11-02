@@ -116,7 +116,8 @@ public sealed class NavigationTests
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(
-            new FakeBrandMileageStore(), poolCars, directory, zoneInstance,
+            new FakeBrandMileageStore(), poolCars, directory,
+            new FakeHaulDealerDoor(directory), zoneInstance,
             AddressMap.Default, () => null,
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
             wallet, friends, game, TaxiRules.Default, beat, log,

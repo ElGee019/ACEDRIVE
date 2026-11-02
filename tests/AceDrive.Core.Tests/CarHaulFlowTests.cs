@@ -73,16 +73,35 @@ public sealed class CarHaulFlowTests
     }
 
     [Fact]
-    public void Open_WithoutADealerDoor_ShowsTheHintOnTheControlPage()
+    public void Open_WithoutADiscoveredDealer_OpensOneAndOffers()
     {
+        // A career that has not discovered a dealer door yet still hauls: the
+        // tap opens the dealer the offer rides from (Unity draws from every
+        // dealership in the world) and banks it like any other door.
         Harness h = Create(withDealer: false);
+
+        var page = Assert.IsType<CarHaulScreenViewModel>(
+            h.Flow.Open(Back(), h.Host.ControlPage));
+
+        Assert.True(page.IsOffer);
+        Assert.Null(h.Host.Notice);
+        Assert.Null(h.Host.HaulGate);
+        Assert.Contains(
+            h.Directory.All,
+            poi => poi.Type == PoiTypes.Dealer);
+    }
+
+    [Fact]
+    public void Open_WhenTheMapCannotOpenADealer_ShowsTheGenericHint()
+    {
+        Harness h = Create(withDealer: false, canOpenDealer: false);
 
         object page = h.Flow.Open(Back(), h.Host.ControlPage);
 
         Assert.Same(h.Host.ControlPage, page);
         Assert.Equal(Strings.Get("HaulUnavailable"), h.Host.Notice);
-        // A missing dealer door is world data, not progress: the button says so
-        // in the generic words instead of naming a loyalty the player cannot
+        // A map with no free house is world data, not progress: the button says
+        // so in the generic words instead of naming a loyalty the player cannot
         // fix by driving.
         Assert.Equal(Strings.Get("ControlHaulUnavailable"), h.Host.HaulGate);
     }
@@ -131,7 +150,8 @@ public sealed class CarHaulFlowTests
     private static Harness Create(
         bool withDealer = true,
         string dealerOwner = "Giulia Bianchi",
-        IReadOnlyDictionary<string, double>? brandKm = null)
+        IReadOnlyDictionary<string, double>? brandKm = null,
+        bool canOpenDealer = true)
     {
         var clock = new FakeClock();
         var game = new GameClock(clock, clock.UtcNow);
@@ -156,7 +176,8 @@ public sealed class CarHaulFlowTests
         var flow = new CarHaulFlow(
             brands,
             [new CarSpec("ks_abarth_695", 2014, "Abarth", "695 Biposto", Class: 6)],
-            directory, zone, AddressMap.Default,
+            directory, new FakeHaulDealerDoor(directory, canOpenDealer),
+            zone, AddressMap.Default,
             () => new AddressLocation("Street 1", 1, HouseSide.Right),
             new ProceduralNameGenerator(NamePoolTable.Default, seed: 0),
             wallet, friends, game, TaxiRules.Default,
@@ -164,7 +185,7 @@ public sealed class CarHaulFlowTests
             CarHaulPolicy.Development, new Random(1));
         flow.Attach(host);
 
-        return new Harness(flow, wallet, friends, host, clock);
+        return new Harness(flow, wallet, friends, host, clock, directory);
     }
 
     private static void AcceptOffer(Harness h)
@@ -177,5 +198,5 @@ public sealed class CarHaulFlowTests
 
     private sealed record Harness(
         CarHaulFlow Flow, DriverWallet Wallet, FakeFriendshipStore Friends,
-        FakeCarHaulHost Host, FakeClock Clock);
+        FakeCarHaulHost Host, FakeClock Clock, PoiDirectory Directory);
 }

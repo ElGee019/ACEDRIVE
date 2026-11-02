@@ -4027,6 +4027,33 @@ public sealed class MainViewModelTests
         Assert.Equal(0.0, wallet.Cash);
     }
     [Fact]
+    public void CarHaulTap_WithoutADealerDoor_OpensOneAndOffersTheJob()
+    {
+        // The save that reported "the tap does nothing": a driven brand and no
+        // dealer door discovered. The tap opens the dealer the haul rides from
+        // — Unity draws from every dealership in the world — and the offer page
+        // comes up instead of a refusal.
+        var pool = new List<CarSpec>
+        {
+            new("ks_test_hatch", 2015, "Test", "Hatch", Passengers: 2, Class: 15),
+        };
+        var directory = new PoiDirectory();
+        var session = Create(
+            cars: pool, poiDirectory: directory,
+            brandMileage: new FakeBrandMileageStore(
+                new Dictionary<string, double> { ["Test"] = 60.0 }),
+            speedKmh: 0f);
+        var (vm, _, _, _) = session;
+        var control = FinishIntro(session);
+
+        control.HaulCommand.Execute(null);
+
+        var offer = Assert.IsType<CarHaulScreenViewModel>(vm.CurrentScreen);
+        Assert.True(offer.IsOffer);
+        Assert.Contains(directory.All, poi => poi.Type == PoiTypes.Dealer);
+    }
+
+    [Fact]
     public void StreakGrant_OnFirstLaunchOfDay_LandsInWalletAndSave()
     {
         // Item 47: the boot path (Unity MapScreen.Show) recounts the streak,
