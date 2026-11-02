@@ -723,10 +723,11 @@ public sealed class Navigation
     /// BACK running that same continuation, so the button keeps Unity's map
     /// contract without a map. The newly opened business's explanation page sits
     /// in front of that continuation, so every way off the page passes through
-    /// it. The board is ranked against the new area first, so the page's
-    /// standings block renders a fresh result instead of polling.
-    /// <paramref name="grandmaCar"/> reaches those pages' copy (the broker
-    /// closes on the line only Grandma Sonja's car earns).
+    /// it. The first expansion also earns the hunger explanation (see
+    /// <see cref="WithHungerIntro"/>). The board is ranked against the new area
+    /// first, so the page's standings block renders a fresh result instead of
+    /// polling. <paramref name="grandmaCar"/> reaches those pages' copy (the
+    /// broker closes on the line only Grandma Sonja's car earns).
     /// </summary>
     public void ShowZoneExpansion(
         ZoneExpansion zone, IReadOnlyList<PointOfInterest> added, Action next,
@@ -736,7 +737,8 @@ public sealed class Navigation
         ArgumentNullException.ThrowIfNull(added);
         ArgumentNullException.ThrowIfNull(next);
         _zoneStandings.Refresh(zone.NewKm);
-        Action continuation = WithPoiIntros(added, next, grandmaCar);
+        Action continuation = WithHungerIntro(
+            WithPoiIntros(added, next, grandmaCar));
         var page = new ZoneExpansionScreenViewModel(
             zone, added, _zoneStandings, _beat,
             new RelayCommand(continuation),
@@ -744,6 +746,16 @@ public sealed class Navigation
                 ShowScreen(AddressesPage(new RelayCommand(continuation)))));
         ShowScreen(page);
     }
+
+    // The first street a career discovers also earns the hunger explanation:
+    // its page opens ahead of the business pages and the target, and TO TRUNK
+    // jumps straight to the trunk page the copy names. A later expansion skips
+    // it — the lesson belongs to the first growth only.
+    private Action WithHungerIntro(Action next) =>
+        _zone.ExpansionCount == 1
+            ? () => ShowScreen(new HungerIntroScreenViewModel(
+                next, new RelayCommand(OpenTrunk), _beat))
+            : next;
 
     // The explanation pages this growth earned, one per family, ahead of the
     // continuation. A family with no authored copy (a store door) adds none, so

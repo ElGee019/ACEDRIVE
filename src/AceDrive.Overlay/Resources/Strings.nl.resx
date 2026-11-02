@@ -363,6 +363,10 @@ Deze klus aannemen?</value></data>
   <data name="ZoneExpansionPoiLine" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ZoneExpansionContinue" xml:space="preserve"><value>VERDER</value></data>
   <data name="ZoneExpansionFindStreet" xml:space="preserve"><value>ZOEK STRAAT</value></data>
+  <data name="HungerIntroTitle" xml:space="preserve"><value>JE KRIJGT HONGER</value></data>
+  <data name="HungerIntroBody" xml:space="preserve"><value>Naarmate de tijd verstrijkt, krijg je honger.&#10;Je kunt eten kopen door naar een Pizzeria, Supermarkt of Koffiebar te rijden.&#10;&#10;De gekochte producten worden in je kofferbak gelegd.&#10;Je kunt bij eten komen via het Hoofdmenu en dan KOFFERBAK te kiezen.</value></data>
+  <data name="HungerIntroContinue" xml:space="preserve"><value>VERDER</value></data>
+  <data name="HungerIntroToTrunk" xml:space="preserve"><value>NAAR KOFFERBAK</value></data>
   <data name="ZoneStandingsLabel" xml:space="preserve"><value>Wereldranglijst langste werkgebied</value></data>
   <data name="ZoneStandingsRank" xml:space="preserve"><value>{0} van {1}.</value></data>
   <data name="ZoneStandingsUnknown" xml:space="preserve"><value>—/—</value></data>
@@ -595,7 +599,7 @@ Deze klus aannemen?</value></data>
   <data name="TrunkTitle" xml:space="preserve"><value>KOFFERBAK</value></data>
   <data name="TrunkFree" xml:space="preserve"><value>Vrije ruimte: {0:0.00}/{1}L</value></data>
   <data name="TrunkHunger" xml:space="preserve"><value>HONGER {0}/{1}</value></data>
-  <data name="TrunkEmpty" xml:space="preserve"><value>Je kofferbak is leeg.</value></data>
+  <data name="TrunkEmpty" xml:space="preserve"><value>Je kofferbak is leeg. Rijd naar een Pizzeria, Supermarkt of Koffiebar om eten te kopen.</value></data>
   <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
   <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
   <data name="TrunkEat" xml:space="preserve"><value>ETEN</value></data>

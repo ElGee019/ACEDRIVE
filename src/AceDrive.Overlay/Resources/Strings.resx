@@ -476,6 +476,17 @@ Accept this job?</value></data>
   <data name="ZoneExpansionPoiLine" xml:space="preserve"><value>{0}: {1}</value></data>
   <data name="ZoneExpansionContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="ZoneExpansionFindStreet" xml:space="preserve"><value>FIND STREET</value></data>
+  <!-- Hunger explanation page: the FIRST operating-zone expansion's CONTINUE
+       opens it before the receipt's target, so a new driver learns the
+       appetite, where food is sold and where it is kept. TO TRUNK jumps to the
+       trunk page the body names. The body is four lines in two paragraphs (the
+       &#10; breaks carry that layout): what hunger is and where food is bought,
+       then where the food lands and how to reach it. No placeholders, so
+       translators may reword freely but keep the four lines. -->
+  <data name="HungerIntroTitle" xml:space="preserve"><value>GETTING HUNGRY</value></data>
+  <data name="HungerIntroBody" xml:space="preserve"><value>As time progresses you will get hungry.&#10;You can buy food by driving to any Pizzeria, Grocery Store or Coffee Shop.&#10;&#10;The items you bought will be added to your trunk.&#10;You can access food by going to the Main Menu and selecting TRUNK.</value></data>
+  <data name="HungerIntroContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <data name="HungerIntroToTrunk" xml:space="preserve"><value>TO TRUNK</value></data>
   <!-- Longest-operating-zone world standings (PORTPLAN 58, Unity
        ZoneStandingsService + ZoneExpansionScreen): the section label, the rank
        line ({0} = ordinal rank, {1} = competitors) and the —/— placeholder
@@ -742,14 +753,16 @@ Accept this job?</value></data>
   <data name="StoreFriendshipBff" xml:space="preserve"><value>BFF with {0}!</value></data>
   <!-- Trunk page (PORTPLAN item 26, Unity YouScreen's TrunkScreen copy): the
        free-space line, the appetite reading, the per-stack quantity/hunger
-       columns, the EAT tap and the way back. {0:0.00} = free litres,
-       {1} = the car's rounded capacity; the L suffix is Unity's own unit.
-       Placeholders survive translation; translators may reorder, never
-       remove. -->
+       columns, the EAT tap and the way back. TrunkEmpty is the hint a trunk
+       with no food shows: it names the three shop types that sell food, so a
+       translation keeps those names (see PoiTypeGrocery / PoiTypeCoffee).
+       {0:0.00} = free litres, {1} = the car's rounded capacity; the L suffix
+       is Unity's own unit. Placeholders survive translation; translators may
+       reorder, never remove. -->
   <data name="TrunkTitle" xml:space="preserve"><value>TRUNK</value></data>
   <data name="TrunkFree" xml:space="preserve"><value>Free space: {0:0.00}/{1}L</value></data>
   <data name="TrunkHunger" xml:space="preserve"><value>HUNGER {0}/{1}</value></data>
-  <data name="TrunkEmpty" xml:space="preserve"><value>Your trunk is empty.</value></data>
+  <data name="TrunkEmpty" xml:space="preserve"><value>Your trunk is empty. Select any Pizzeria, Grocery Store, Coffee Shop to drive there and buy food.</value></data>
   <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
   <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
   <data name="TrunkEat" xml:space="preserve"><value>EAT</value></data>

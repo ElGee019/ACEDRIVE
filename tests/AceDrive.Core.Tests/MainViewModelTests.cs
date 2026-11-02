@@ -4095,7 +4095,62 @@ public sealed class MainViewModelTests
         Assert.Equal("STREET 2", page.StreetLine);
         Assert.Equal("Operating Zone: 2 streets", page.ZoneLine);
 
+        // The first expansion also teaches the appetite: the hunger page sits
+        // between the zone page and the control page.
         page.ContinueCommand.Execute(null);
+        var hunger = Assert.IsType<HungerIntroScreenViewModel>(vm.CurrentScreen);
+        Assert.Equal("GETTING HUNGRY", hunger.Title);
+
+        hunger.ContinueCommand.Execute(null);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void FirstZoneExpansion_HungerPageToTrunk_OpensTheTrunkDirectly()
+    {
+        var session = Create(speedKmh: 0f);
+        var (vm, clock, tel, _) = session;
+        session.Story.FinishDialogue();
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var first = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        first.ContinueCommand.Execute(null);
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        receipt.ContinueCommand.Execute(null);
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(vm.CurrentScreen);
+        page.ContinueCommand.Execute(null);
+
+        var hunger = Assert.IsType<HungerIntroScreenViewModel>(vm.CurrentScreen);
+        hunger.ToTrunkCommand.Execute(null);
+
+        Assert.IsType<TrunkScreenViewModel>(vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void LaterZoneExpansion_SkipsTheHungerExplanation()
+    {
+        // The lesson belongs to the first street: a career that already
+        // expanded goes from the zone page straight to the receipt's target.
+        var saved = DriverState.Fresh with
+        {
+            StreetIds = ["street-1", "street-2"],
+            ExpansionJobs = 2,
+            ExpansionCount = 1,
+        };
+        var session = Create(
+            speedKmh: 0f, savedDriver: saved, addressMap: RingMap(8),
+            progress: OnboardingState.Fresh with { BirthdayDone = true });
+        var (vm, clock, tel, _) = session;
+
+        TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        receipt.ContinueCommand.Execute(null);
+
+        var page = Assert.IsType<ZoneExpansionScreenViewModel>(vm.CurrentScreen);
+        page.ContinueCommand.Execute(null);
+
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
@@ -4195,6 +4250,8 @@ public sealed class MainViewModelTests
         Assert.Equal("STREET 2", page.StreetLine);
 
         page.ContinueCommand.Execute(null);
+        var hunger = Assert.IsType<HungerIntroScreenViewModel>(vm.CurrentScreen);
+        hunger.ContinueCommand.Execute(null);
         Assert.Same(board, vm.CurrentScreen);
     }
 

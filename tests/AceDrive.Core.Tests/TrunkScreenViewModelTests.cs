@@ -84,7 +84,10 @@ public sealed class TrunkScreenViewModelTests
         Assert.True(vm.IsCompartmentEmpty);
         Assert.Empty(vm.Rows);
         Assert.Empty(vm.CompartmentRows);
-        Assert.Equal("Your trunk is empty.", vm.TrunkEmptyLine);
+        Assert.Equal(
+            "Your trunk is empty. Select any Pizzeria, Grocery Store, Coffee Shop "
+            + "to drive there and buy food.",
+            vm.TrunkEmptyLine);
         Assert.Equal("Your glove compartment is empty.", vm.CompartmentEmptyLine);
         // No car capacity left over: the whole trunk is free.
         Assert.Equal("Free space: 60.00/60L", vm.FreeSpaceLine);

@@ -1,0 +1,53 @@
+<UserControl x:Class="AceDrive.Overlay.Views.HungerIntroScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- Hunger explanation page: the first operating-zone expansion's CONTINUE
+         opens it before the receipt's target. Title band, the explanation
+         centered in the panel, then TO TRUNK above CONTINUE in the bottom band.
+         Same skeleton as the other explanation pages. The body carries its own
+         line breaks (two paragraphs of two lines), so it is only wrapped here,
+         never reflowed. Teal is the shared voice-ack highlight. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{Binding Title}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Center" Margin="16,0">
+            <TextBlock Text="{Binding Body}" Foreground="#FFF" FontSize="15"
+                       TextAlignment="Center" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <!-- TO TRUNK sits above CONTINUE, as the copy orders them; both are
+             flush with the panel edge. -->
+        <StackPanel Grid.Row="2">
+            <Button Content="{Binding ToTrunkLabel}" Command="{Binding ToTrunkCommand}"
+                    Margin="0,0,0,6">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ToTrunkFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <Button Content="{Binding ContinueLabel}" Command="{Binding ContinueCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ContinueFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

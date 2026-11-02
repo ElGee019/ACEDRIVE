@@ -11,11 +11,14 @@
         </Style>
         <!-- Empty-section hint: one muted line for a trunk holding no food and a
              glove compartment holding no keepsakes, so neither section reads as
-             broken when it has nothing to list. -->
+             broken when it has nothing to list. It wraps because the trunk's
+             hint names the three shops that sell food: a narrow overlay panel
+             would clip that sentence instead of showing the advice. -->
         <Style x:Key="EmptyHint" TargetType="TextBlock">
             <Setter Property="Foreground" Value="#FFBFC4C9"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Margin" Value="0,6"/>
         </Style>
         <!-- One carried-stack row shape for both halves of the page. A food
