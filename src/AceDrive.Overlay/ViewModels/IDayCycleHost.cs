@@ -16,6 +16,13 @@ public interface IDayCycleHost
     /// </summary>
     void DisplayWeekChanged(int week);
 
+    /// <summary>
+    /// The calendar event gate opened or closed: the cached menu swaps its
+    /// calendar tile artwork. Reported on the flip only (twice a day), so no
+    /// page re-derives the rule per tick.
+    /// </summary>
+    void EventGateChanged(bool playable);
+
     /// <summary>The job or shift state moved: the readouts are stale.</summary>
     void ReadoutsChanged();
 

@@ -619,10 +619,11 @@ public sealed class MainViewModel
     }
 
     // The host slice the day cycle sees: the week roll repaints the cached
-    // pages, the countdown forces a readout, and the shift-end page arrives
-    // here to interrupt the panel and hand it back (the panel policy stays in
-    // this class).
+    // pages, the event gate swaps the menu's calendar tile, the countdown
+    // forces a readout, and the shift-end page arrives here to interrupt the
+    // panel and hand it back (the panel policy stays in this class).
     void IDayCycleHost.DisplayWeekChanged(int week) => _nav.DisplayWeekChanged(week);
+    void IDayCycleHost.EventGateChanged(bool playable) => _nav.EventGateChanged(playable);
     void IDayCycleHost.ReadoutsChanged() => RefreshJob();
     void IDayCycleHost.ShowShiftEnded(object page) =>
         _panel.PresentInterruption(page, "shift ended");

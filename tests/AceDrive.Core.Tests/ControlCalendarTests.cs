@@ -78,6 +78,22 @@ public sealed class ControlCalendarTests
     }
 
     [Fact]
+    public void IsPlayableNow_OpensOnlyAnEventsOwnWeekdayInsideItsWindow()
+    {
+        // Monday 12:00 carries the valuation event: playable. The window's
+        // edges close it, an empty weekday is never playable, and Saturday's
+        // run waits for its second week.
+        Assert.True(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 12, 12, 0, 0), 1));
+        Assert.True(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 12, 8, 0, 0), 1));
+        Assert.True(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 12, 19, 59, 0), 1));
+        Assert.False(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 12, 7, 59, 0), 1));
+        Assert.False(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 12, 20, 0, 0), 1));
+        Assert.False(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 15, 12, 0, 0), 1)); // Thursday
+        Assert.False(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 17, 12, 0, 0), 1));
+        Assert.True(ControlCalendar.IsPlayableNow(new DateTime(2026, 10, 17, 12, 0, 0), 2));
+    }
+
+    [Fact]
     public void Keywords_GarbleProneEventsOnly()
     {
         // The fragments Vosk actually emits for the hard event names,

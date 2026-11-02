@@ -23,6 +23,10 @@ public sealed class DayCycleTests
     private static readonly DateTime TuesdayLate = new(2026, 10, 13, 23, 59, 0, DateTimeKind.Utc);
     private static readonly TimeSpan OneGameMinute = TimeSpan.FromSeconds(GameClock.RealSecondsPerGameMinute);
 
+    // A game-clock span, in the real seconds that buy it (see GameClock).
+    private static TimeSpan GameHours(double hours) =>
+        TimeSpan.FromSeconds(GameClock.RealSecondsPerGameMinute * 60 * hours);
+
     private sealed record Fixture(
         DayCycle Cycle, FakeDayCycleHost Host, FakeClock Clock, TaxiShift Shift,
         ShiftRecord Records, FakeGameClockStore Clocks, FakeDriverStore Drivers,
@@ -32,7 +36,7 @@ public sealed class DayCycleTests
     public DayCycleTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
-    private static Fixture Build(DateTime gameStart, TaxiShift? shift = null)
+    private static Fixture Build(DateTime gameStart, TaxiShift? shift = null, int week = StartWeek)
     {
         var clock = new FakeClock();
         var game = new GameClock(clock, gameStart);
@@ -61,7 +65,7 @@ public sealed class DayCycleTests
         var cycle = new DayCycle(
             game, shiftInstance, records, board, online,
             new FakeProfileStore(new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1)),
-            new FakeRivals(), saver, new VoiceBeat(clock), StartWeek, log);
+            new FakeRivals(), saver, new VoiceBeat(clock), week, log);
         var host = new FakeDayCycleHost();
         cycle.Attach(host);
         return new Fixture(
@@ -81,6 +85,45 @@ public sealed class DayCycleTests
         Assert.Null(fixture.Host.Page);
         // Nothing flipped, so the moment was already banked: no write per tick.
         Assert.Empty(fixture.Clocks.Saved);
+    }
+
+    [Fact]
+    public void Constructor_SeedsTheEventGateForAPageBuiltBeforeTheFirstTick()
+    {
+        // Monday noon is inside the valuation gate, Thursday carries no row,
+        // and Saturday's run waits for its second week.
+        Assert.True(Build(MondayNoon).Cycle.EventPlayable);
+        Assert.False(
+            Build(new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc)).Cycle.EventPlayable);
+        Assert.False(
+            Build(new DateTime(2026, 10, 17, 12, 0, 0, DateTimeKind.Utc), week: 1).Cycle.EventPlayable);
+        Assert.True(
+            Build(new DateTime(2026, 10, 17, 12, 0, 0, DateTimeKind.Utc), week: 2).Cycle.EventPlayable);
+    }
+
+    [Fact]
+    public void Tick_EventGate_ReportsOnlyTheFlips()
+    {
+        var fixture = Build(MondayNoon);
+        Assert.True(fixture.Cycle.EventPlayable);
+
+        // A tick inside the window crosses nothing: the guard answers.
+        fixture.Cycle.Tick(fixture.Clock.UtcNow, jobInProgress: false, legActive: false);
+        Assert.Empty(fixture.Host.Gates);
+
+        // 8:30pm closes the gate; a tick inside the same hour stays quiet.
+        fixture.Clock.Advance(GameHours(8.5));
+        fixture.Cycle.Tick(fixture.Clock.UtcNow, jobInProgress: false, legActive: false);
+        fixture.Clock.Advance(TimeSpan.FromSeconds(1));
+        fixture.Cycle.Tick(fixture.Clock.UtcNow, jobInProgress: false, legActive: false);
+        Assert.False(fixture.Cycle.EventPlayable);
+        Assert.Equal([false], fixture.Host.Gates);
+
+        // Stepping back before 8pm opens it again.
+        fixture.Clock.Advance(-GameHours(1));
+        fixture.Cycle.Tick(fixture.Clock.UtcNow, jobInProgress: false, legActive: false);
+        Assert.True(fixture.Cycle.EventPlayable);
+        Assert.Equal([false, true], fixture.Host.Gates);
     }
 
     [Fact]

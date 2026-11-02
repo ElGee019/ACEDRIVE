@@ -23,7 +23,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// up, one step per point of that meter (PORTPLAN 26/33). A tap on either
 /// meter tile swaps the battery for the reading as a whole percent for three
 /// seconds, and the poll puts the battery back; a reading past the danger
-/// band paints red.
+/// band paints red. The CALENDAR tile wears its live artwork while an event
+/// is inside its gate; the day cycle pushes that one flip, so the poll never
+/// re-derives it here.
 /// </summary>
 public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
 {
@@ -308,6 +310,19 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
             if (SetField(ref _week, value)) Refresh();
         }
     }
+
+    /// <summary>True while today's calendar event sits inside its 8am-8pm
+    /// gate: the CALENDAR tile then wears its live artwork, so the menu shows
+    /// there is something to play without opening the strip. Pushed by the day
+    /// cycle, which owns the boundary and reports the flip once, and seeded
+    /// from it when the page is built (<see cref="Navigation.MenuPage"/>); the
+    /// poll never re-derives it.</summary>
+    public bool IsCalendarEventPlayable
+    {
+        get => _isCalendarEventPlayable;
+        set => SetField(ref _isCalendarEventPlayable, value);
+    }
+    private bool _isCalendarEventPlayable;
 
     /// <summary>
     /// Repaints the header, the two battery fills and the readings a reveal

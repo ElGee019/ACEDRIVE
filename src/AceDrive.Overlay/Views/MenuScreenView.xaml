@@ -38,6 +38,20 @@
         <Style x:Key="MenuArt" TargetType="Image" BasedOn="{StaticResource PackArt}">
             <Setter Property="Height" Value="310"/>
         </Style>
+        <!-- The CALENDAR tile wears its live artwork while an event sits
+             inside its gate (ControlCalendar.IsPlayableNow). The swap is a
+             Tag change, so both pack URIs decode once through PackImage and
+             stay cached; no image is read on the 10 Hz poll. -->
+        <Style x:Key="CalendarArt" TargetType="Image" BasedOn="{StaticResource MenuArt}">
+            <Setter Property="Tag"
+                    Value="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonCalendar.webp"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCalendarEventPlayable}" Value="True">
+                    <Setter Property="Tag"
+                            Value="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonCalendar2.webp"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
         <!-- The hunger/filth tiles measure a level in a battery (PORTPLAN
              items 26/33): the tile art is the bare plate, the fill paints the
              red-top/green-bottom gradient over it, and the plate (the icon
@@ -172,8 +186,7 @@
                 <Button Canvas.Left="697" Canvas.Top="0" Style="{StaticResource MenuTile}"
                         Command="{Binding CalendarCommand}"
                         Effect="{Binding CalendarFlash, Converter={StaticResource VoiceGlow}}">
-                    <Image Style="{StaticResource MenuArt}"
-                           Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonCalendar.webp"/>
+                    <Image Style="{StaticResource CalendarArt}"/>
                 </Button>
                 <Button Canvas.Left="105" Canvas.Top="383" Style="{StaticResource MenuTile}"
                         Command="{Binding TrunkCommand}"

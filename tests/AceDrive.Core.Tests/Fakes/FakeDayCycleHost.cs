@@ -3,12 +3,15 @@ using AceDrive.Overlay.ViewModels;
 namespace AceDrive.Core.Tests;
 
 /// <summary>
-/// The coordinator a day cycle reports to: the weeks it rolled, how often the
-/// readouts were forced, the page of the shift that ended and its CONTINUE.
+/// The coordinator a day cycle reports to: the weeks it rolled, the calendar
+/// event gate flips, how often the readouts were forced, the page of the shift
+/// that ended and its CONTINUE.
 /// </summary>
 internal sealed class FakeDayCycleHost : IDayCycleHost
 {
     public List<int> Weeks { get; } = [];
+
+    public List<bool> Gates { get; } = [];
 
     public int Readouts { get; private set; }
 
@@ -17,6 +20,8 @@ internal sealed class FakeDayCycleHost : IDayCycleHost
     public int Resumes { get; private set; }
 
     public void DisplayWeekChanged(int week) => Weeks.Add(week);
+
+    public void EventGateChanged(bool playable) => Gates.Add(playable);
 
     public void ReadoutsChanged() => Readouts++;
 

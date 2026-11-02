@@ -99,4 +99,35 @@ public static class ControlCalendar
 
     /// <summary>True inside the 8am-8pm event window. Day matching is the caller's job.</summary>
     public static bool IsEventWindow(int hour) => hour is >= OpenFromHour and < OpenUntilHour;
+
+    /// <summary>
+    /// True when the moment sits on a weekday that carries an event, inside
+    /// that event's 8am-8pm gate, in a display week whose row has already
+    /// appeared: the strip's highlighted row is playable now. The menu's
+    /// calendar tile reads the same fact to swap its artwork, so the week,
+    /// window and event mapping stay here instead of being re-derived in a
+    /// ViewModel. A weekday the strip leaves empty is never playable.
+    /// </summary>
+    public static bool IsPlayableNow(DateTime now, int week)
+    {
+        int today = ToDayOfWeek(now);
+        return RowFor(today)?.EventId is not null
+            && IsOpenInWeek(today, week)
+            && IsEventWindow(now.Hour);
+    }
+
+    // The strip's row for a weekday (Thursday's carries no event, so its
+    // EventId is the check, not its presence).
+    private static CalendarDay? RowFor(int dayOfWeek)
+    {
+        foreach (CalendarDay day in Week)
+        {
+            if (day.DayOfWeek == dayOfWeek)
+            {
+                return day;
+            }
+        }
+
+        return null;
+    }
 }

@@ -558,6 +558,20 @@ public sealed class NavigationTests
     }
 
     [Fact]
+    public void CalendarTile_MirrorsTheGatesOwnersFlip()
+    {
+        // Monday noon is inside the valuation gate, so a menu built now starts
+        // on its live artwork; the day cycle's flip reaches the cached page
+        // without the menu ever reading the clock itself.
+        var (nav, _, _, _, _, _, _, _, _, _, _, _) = Create();
+
+        Assert.True(nav.MenuPage().IsCalendarEventPlayable);
+
+        nav.EventGateChanged(false);
+        Assert.False(nav.MenuPage().IsCalendarEventPlayable);
+    }
+
+    [Fact]
     public void TaxiShiftTap_StartsTheShiftBanksItAndOpensTheProposal()
     {
         var (nav, shell, host, _, shift, shiftStore, _, _, _, _, _, _) = Create();

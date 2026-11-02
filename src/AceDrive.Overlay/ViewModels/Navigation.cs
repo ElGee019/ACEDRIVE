@@ -389,6 +389,14 @@ public sealed class Navigation
     }
 
     /// <summary>
+    /// The day cycle's event gate opened or closed: the cached menu swaps its
+    /// calendar tile artwork. A page that is not built yet reads the gate from
+    /// its owner when it is (<see cref="MenuPage"/>), so a flip that lands
+    /// while the menu is cached away is never lost.
+    /// </summary>
+    public void EventGateChanged(bool playable) => _menu?.IsCalendarEventPlayable = playable;
+
+    /// <summary>
     /// The day cycle's week roll: the calendar strip and the menu header
     /// repaint now instead of on the next tick, and the road-test pick is named
     /// in the log. The week itself stays with its owner, so only the cached
@@ -674,20 +682,30 @@ public sealed class Navigation
 
     // Built once and reused so its clock keeps ticking behind another page. The
     // settings tile is the coordinator's page (it owns the preferences writer
-    // and RESET GAME), so it travels through the host.
-    public MenuScreenViewModel MenuPage() =>
-        _menu ??= new MenuScreenViewModel(
-            new RelayCommand(OpenWallet),
-            ControlCommand,
-            new RelayCommand(OpenCalendar),
-            new RelayCommand(OpenTrunk),
-            new RelayCommand(_host.ShowSettings),
-            new RelayCommand(OpenHome),
-            _hunger, _garage, _carBrand,
-            _beat,
-            _game,
-            _clock,
-            _day.DisplayWeek);
+    // and RESET GAME), so it travels through the host. The event gate is the day
+    // cycle's to watch, so the page is seeded with it and only hears the flips
+    // (<see cref="EventGateChanged"/>) instead of deriving it on the poll.
+    public MenuScreenViewModel MenuPage()
+    {
+        if (_menu is null)
+        {
+            _menu = new MenuScreenViewModel(
+                new RelayCommand(OpenWallet),
+                ControlCommand,
+                new RelayCommand(OpenCalendar),
+                new RelayCommand(OpenTrunk),
+                new RelayCommand(_host.ShowSettings),
+                new RelayCommand(OpenHome),
+                _hunger, _garage, _carBrand,
+                _beat,
+                _game,
+                _clock,
+                _day.DisplayWeek);
+            _menu.IsCalendarEventPlayable = _day.EventPlayable;
+        }
+
+        return _menu;
+    }
 
     // The home page (Unity YouScreen): the player's own doors, starting with
     // the garage. A fresh page per visit like the wallet, so nothing stale

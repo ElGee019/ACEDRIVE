@@ -33,8 +33,16 @@ public sealed class DayCycle
     private readonly VoiceBeat _beat;
     private readonly ILog _log;
 
-    // The day the session opened on: the first poll must not report a flip.
+    // The day and hour the session opened on: the first poll must not report a
+    // flip. The hour joins the guard because the event gate opens and closes on
+    // the 8am/8pm edges; every tick in between is two int compares.
     private int _lastDay;
+    private int _lastHour;
+
+    // The today-event gate the menu's calendar tile shows. Watched here because
+    // the calendar's day and week are this cycle's: the flip is pushed once,
+    // never re-derived by the page on every tick.
+    private bool _eventPlayable;
 
     // The second the shift readout was last painted, so an open-but-idle shift
     // costs one format per second instead of one per 10 Hz tick.
@@ -62,7 +70,12 @@ public sealed class DayCycle
         _beat = beat;
         _log = log;
         DisplayWeek = startWeek;
-        _lastDay = game.Today;
+        DateTime gameNow = game.GameNow;
+        _lastDay = ControlCalendar.ToDayOfWeek(gameNow);
+        _lastHour = gameNow.Hour;
+        // Seeded from the clock so a page built before the first tick already
+        // wears the artwork the gate calls for.
+        _eventPlayable = ControlCalendar.IsPlayableNow(gameNow, startWeek);
     }
 
     /// <summary>
@@ -71,17 +84,26 @@ public sealed class DayCycle
     /// </summary>
     public int DisplayWeek { get; private set; }
 
+    /// <summary>
+    /// Whether today's calendar event is inside its 8am-8pm gate: the value the
+    /// cached menu's calendar tile mirrors. A page built between two flips reads
+    /// it here (<see cref="Navigation.MenuPage"/>); a page already open hears
+    /// the flip through <see cref="IDayCycleHost.EventGateChanged"/>.
+    /// </summary>
+    public bool EventPlayable => _eventPlayable;
+
     /// <summary>Attaches the coordinator that reveals the pages and paints the readouts.</summary>
     public void Attach(IDayCycleHost host) => _host = host;
 
     /// <summary>
     /// The session's timed transitions, once per poll: the idle shift timeout
     /// (Unity's 30-minute rule), so the taxi button flips back even when the
-    /// player never taps it, the game-day flip with the week it completes, and
-    /// the second-guarded shift countdown. Both job reads arrive as values: an
-    /// accepted job is work in progress and must not idle the shift out
-    /// mid-ride, and a live leg already repaints the readouts every tick.
-    /// Rides the wall clock, so a closed game cannot freeze a shift or a day.
+    /// player never taps it, the game-day flip with the week it completes, the
+    /// event gate the menu's calendar tile mirrors, and the second-guarded shift
+    /// countdown. Both job reads arrive as values: an accepted job is work in
+    /// progress and must not idle the shift out mid-ride, and a live leg already
+    /// repaints the readouts every tick. Rides the wall clock, so a closed game
+    /// cannot freeze a shift or a day.
     /// </summary>
     public void Tick(DateTime now, bool jobInProgress, bool legActive)
     {
@@ -90,7 +112,9 @@ public sealed class DayCycle
             EndShift(idle);
         }
 
-        TickDay();
+        // The calendar reads the clock once for its day and hour compares: the
+        // day flip it reports and the event gate it watches.
+        TickCalendar(_game.GameNow);
         TickShiftCountdown(now, legActive);
     }
 
@@ -141,16 +165,33 @@ public sealed class DayCycle
             new RelayCommand(_host.ResumeAfterShiftEnded)));
     }
 
-    // Game-day flip: the calendar highlight moved. One int compare per tick,
-    // work only on transitions (hot-path discipline).
-    private void TickDay()
+    // Calendar advance: the game-day flip (with the week it completes) and the
+    // event gate the menu's calendar tile shows. The clock is read once, and a
+    // tick that crosses neither boundary costs two int compares; the gate's
+    // rule is only derived on the hour or day that can move it, and only its
+    // flip is reported (hot-path discipline).
+    private void TickCalendar(DateTime gameNow)
     {
-        int today = _game.Today;
-        if (today == _lastDay)
+        int today = ControlCalendar.ToDayOfWeek(gameNow);
+        int hour = gameNow.Hour;
+        bool dayChanged = today != _lastDay;
+        if (!dayChanged && hour == _lastHour)
         {
             return;
         }
 
+        if (dayChanged)
+        {
+            RollDay(today);
+        }
+
+        _lastHour = hour;
+        TickGate(gameNow);
+    }
+
+    // Game-day flip: the calendar highlight moved.
+    private void RollDay(int today)
+    {
         int prev = _lastDay;
         _log.LogInfo($"calendar day changed: {prev} -> {today}");
         _lastDay = today;
@@ -167,6 +208,21 @@ public sealed class DayCycle
         }
 
         _saver.SaveClock(DisplayWeek);
+    }
+
+    // The event gate can only move on an hour or day change (see
+    // TickCalendar), so the cached pages hear the two flips a day instead of
+    // re-deriving the rule per tick.
+    private void TickGate(DateTime gameNow)
+    {
+        bool playable = ControlCalendar.IsPlayableNow(gameNow, DisplayWeek);
+        if (playable == _eventPlayable)
+        {
+            return;
+        }
+
+        _eventPlayable = playable;
+        _host.EventGateChanged(playable);
     }
 
     // Shift countdown: second-guarded so an open-but-idle shift costs one
