@@ -43,12 +43,21 @@ public sealed class JobAccidentTests
 
     private static TestSessionResult New(
         Garage garage, FakeTelemetryHud hud, FakeFriendshipStore friends,
-        DriverWallet wallet, PoiDirectory? poiDirectory = null) =>
+        DriverWallet wallet, PoiDirectory? poiDirectory = null, Trunk? trunk = null) =>
         MainViewModelTests.Create(
             speedKmh: 0f, hud: hud, friendships: friends, wallet: wallet,
             cars: [Car], carKsId: Car.Key, garage: garage,
             poiDirectory: poiDirectory, clock: BeforeThePremium(),
-            progress: TourDone, savedDriver: BonusBanked());
+            progress: TourDone, savedDriver: BonusBanked(), trunk: trunk);
+
+    // One carried reward card in the compartment the coordinator reads.
+    private static Trunk Carrying(DriverWallet wallet, RewardCardEffect effect)
+    {
+        var trunk = new Trunk();
+        new Glovebox(RewardTable.Default, wallet).Claim(
+            RewardTable.Default.Find(effect)!, trunk);
+        return trunk;
+    }
 
     // One crash: a poll at speed, then a poll whose damage counter jumped. The
     // detector prices the hit off the speed of the sample before it.
@@ -303,6 +312,137 @@ public sealed class JobAccidentTests
         var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
         Assert.EndsWith(
             Strings.Get("PoiIntroInsuranceGrandma"), intro.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void InvincibleRidesCard_SkipsTheCrashEntirely()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        Trunk trunk = Carrying(wallet, RewardCardEffect.InvincibleRides);
+        Garage garage = GarageWith(insured: false);
+        TestSessionResult rig = New(garage, hud, new FakeFriendshipStore(), wallet, trunk: trunk);
+        TaxiFlow.Propose(rig.Vm);
+        TaxiFlow.Pickup(rig.Vm, rig.Clock);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        // No accident: no dent, no prompt, and the ride is still running. The
+        // card keeps its rides until the settle ticks the completed job.
+        Assert.Null(hud.TaskPrompt);
+        Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
+        Assert.True(rig.Vm.DropoffCommand.CanExecute(null));
+        Assert.Contains(rig.Trunk.Items, item => item.Name == "INVINCIBLE RIDES");
+    }
+
+    [Fact]
+    public void DrProtectionCard_KeepsTheRatingAndIsSpent()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        Trunk trunk = Carrying(wallet, RewardCardEffect.DriverRatingProtection);
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, new FakeFriendshipStore(), wallet, trunk: trunk);
+        TaxiFlow.Propose(rig.Vm);
+        TaxiFlow.Pickup(rig.Vm, rig.Clock);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        Assert.Equal(DriverRating.NewGame, wallet.Rating);
+        Assert.Contains(
+            hud.TaskPrompt!.Notes!, note => note.TextKey == "RewardDrProtectionNote");
+        Assert.DoesNotContain(rig.Trunk.Items, item => item.Name == "DR PROTECTION");
+    }
+
+    [Fact]
+    public void APlainCrash_DropsTheDrivingSkillsByTheBand()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, new FakeFriendshipStore(), wallet);
+        TaxiFlow.Propose(rig.Vm);
+        TaxiFlow.Pickup(rig.Vm, rig.Clock);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        // A fresh 20-overall driver is in the lowest band: every skill loses 1.
+        Assert.Equal(19.0, wallet.Rating.Cornering);
+        Assert.Equal(19.0, wallet.Rating.Concentration);
+        Assert.Equal(19.0, wallet.Rating.OffTheLine);
+    }
+
+    [Fact]
+    public void AccidentLoyaltyShield_KeepsTheCustomerFriendship()
+    {
+        var hud = new FakeTelemetryHud();
+        var friends = new FakeFriendshipStore();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        Trunk trunk = Carrying(wallet, RewardCardEffect.AccidentLoyalty);
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, friends, wallet, trunk: trunk);
+        TaxiFlow.Propose(rig.Vm);
+        TaxiFlow.Pickup(rig.Vm, rig.Clock);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        Assert.Empty(friends.Deltas);
+        Assert.Equal("HudAccidentRideLostShield", hud.TaskPrompt!.TextKey);
+        Assert.Contains(
+            hud.TaskPrompt.Notes!, note => note.TextKey == "RewardAccidentLoyaltyCustomerNote");
+        Assert.DoesNotContain(rig.Trunk.Items, item => item.Name == "ACCIDENT LOYALTY SHIELD");
+    }
+
+    [Fact]
+    public void HalfDamageCard_HalvesTheQuotedBill_AndIsSpentByTheRepair()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        Trunk trunk = Carrying(wallet, RewardCardEffect.HalfDamage);
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, new FakeFriendshipStore(), wallet, trunk: trunk);
+        TaxiFlow.Propose(rig.Vm);
+        TaxiFlow.Pickup(rig.Vm, rig.Clock);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        // 120 of 240 km/h on a 40 000 CR car is a 2 000 CR bill; half is 1 000.
+        Assert.Equal("1000.00", hud.TaskPrompt!.Args![2]);
+        Assert.Contains(
+            hud.TaskPrompt.Notes!, note => note.TextKey == "RewardHalfDamageNote");
+
+        hud.RaiseTaskAction();
+
+        Assert.Equal(49000.0, wallet.Cash, 6);
+        Assert.Equal(0.0, wallet.PendingInsurance, 6);
+        Assert.DoesNotContain(rig.Trunk.Items, item => item.Name == "HALF DAMAGE REDUCTION");
+    }
+
+    [Fact]
+    public void FreeCarRepairCard_QuotesZeroAndChargesNothing()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        Trunk trunk = Carrying(wallet, RewardCardEffect.FreeCarRepair);
+        Garage garage = GarageWith(insured: true);
+        TestSessionResult rig = New(
+            garage, hud, new FakeFriendshipStore(), wallet, trunk: trunk);
+        TaxiFlow.Propose(rig.Vm);
+        TaxiFlow.Pickup(rig.Vm, rig.Clock);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel);
+
+        Assert.Equal("0.00", hud.TaskPrompt!.Args![2]);
+        Assert.Contains(
+            hud.TaskPrompt.Notes!, note => note.TextKey == "RewardFreeRepairNote");
+
+        hud.RaiseTaskAction();
+
+        Assert.Equal(50000.0, wallet.Cash, 6);
+        // A free repair paid no bill, so there is no insured share to claim.
+        Assert.Equal(0.0, wallet.PendingInsurance, 6);
+        Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
+        Assert.DoesNotContain(rig.Trunk.Items, item => item.Name == "FREE CAR REPAIR");
     }
 
     [Fact]

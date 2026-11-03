@@ -31,6 +31,16 @@ public sealed class RewardCardStoreTests
             RewardCardKind.CashBonus,
             Assert.Single(table.Cards, card => card.Kind == RewardCardKind.CashBonus).Kind);
         Assert.Single(table.Cards, card => card.Kind == RewardCardKind.GloveboxSlot);
+        // A use-limited card carries its countdown limit from the file.
+        Assert.Equal(5, Assert.Single(table.Cards, card => card.Title == "HEAT-FREE RIDES").Uses);
+        // The card effects and their balance amounts are data too: a code
+        // switch on the title would silently break a renamed card.
+        Assert.Equal(
+            RewardCardEffect.DoubleNextTip,
+            table.Find("DOUBLE NEXT TIP")!.Effect);
+        Assert.Equal(1.2, table.Find(RewardCardEffect.DeliveryProfitBoost)!.Amount);
+        Assert.Equal(0.5, table.Find(RewardCardEffect.HalfDamage)!.Amount);
+        Assert.Equal(2.0, table.Find(RewardCardEffect.WorkerBonus)!.Amount);
         Assert.Empty(log.Warnings);
     }
 
@@ -73,6 +83,29 @@ public sealed class RewardCardStoreTests
         try
         {
             File.WriteAllText(file, """{"DefaultCapacity":2,"CashBonus":500}""");
+            var log = new TestLog();
+
+            RewardTable table = new JsonRewardCardStore(file, log).Load();
+
+            Assert.Equal(RewardTable.Default, table);
+            Assert.Single(log.Warnings);
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void Load_StoredCardWithoutAnEffect_FallsBackToTheDefaults()
+    {
+        // A stored card must declare what it does; an effect-less row would sit
+        // in the glovebox forever, so the file is treated as unusable.
+        string file = TempFile();
+        try
+        {
+            File.WriteAllText(file, """
+                {"Cards":[
+                  {"Title":"ONE","Description":"one","Kind":"Card"},
+                  {"Title":"TWO","Description":"two","Kind":"CashBonus"}]}
+                """);
             var log = new TestLog();
 
             RewardTable table = new JsonRewardCardStore(file, log).Load();

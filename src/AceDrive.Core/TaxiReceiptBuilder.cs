@@ -6,12 +6,16 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Builds a settled receipt from dropoff inputs. Skips what has no system
-/// here yet (auto fuel, double-tip card): those arrive as new receipt fields
-/// with their own systems, never as branches in this method. Brand
-/// sponsorship rides along via <see cref="BrandLoyalty"/>: zero km (or no
-/// brand) means no bonus and the receipt hides the lines. The business
-/// starter bonus rides along via <see cref="StarterBonus"/> when the caller
-/// supplies the operating zone; a null zone keeps it out of the math.
+/// here yet (auto fuel): those arrive as new receipt fields with their own
+/// systems, never as branches in this method. Brand sponsorship rides along
+/// via <see cref="BrandLoyalty"/>: zero km (or no brand) means no bonus and
+/// the receipt hides the lines. The business starter bonus rides along via
+/// <see cref="StarterBonus"/> when the caller supplies the operating zone; a
+/// null zone keeps it out of the math. The two reward-card inputs are carried
+/// in by the settle: <paramref name="tipMultiplier"/> doubles the earned tip
+/// (a Double Next Tip card, consumed only when a tip was actually earned) and
+/// <paramref name="finesWaived"/> removes the covered fines from the deduction
+/// while keeping the count for the receipt's waiver row.
 /// </summary>
 public static class TaxiReceiptBuilder
 {
@@ -30,7 +34,9 @@ public static class TaxiReceiptBuilder
         double brandDistanceKm = 0.0,
         string carKey = "",
         double? zoneKm = null,
-        int ownedCars = 0)
+        int ownedCars = 0,
+        int finesWaived = 0,
+        double tipMultiplier = 1.0)
     {
         // Unity scales the distance charge by passenger capacity (the
         // forfait stays flat): a 4-seater runs the same ride at 4x.
@@ -45,8 +51,13 @@ public static class TaxiReceiptBuilder
         double brandKm = Math.Max(0.0, brandDistanceKm);
         double rate = brandName.Length > 0 && brandKm > 0.0 ? BrandLoyalty.Rate(brandKm) : 0.0;
         double brandBonus = rate > 0.0 ? Cents(@base * rate) : 0.0;
-        double tip = TaxiFare.ComputeTip(@base, tipEligible, table);
-        double fine = TaxiFare.ComputeFineDeduction(fines, table);
+        int totalFines = Math.Max(0, fines);
+        int waived = Math.Clamp(finesWaived, 0, totalFines);
+        // A multiplier on a zero tip must not invent one: the card only
+        // doubles what the ride actually earned.
+        double tip = Cents(TaxiFare.ComputeTip(@base, tipEligible, table) * Math.Max(1.0, tipMultiplier));
+        bool tipDoubled = tip > 0.0 && tipMultiplier > 1.0;
+        double fine = TaxiFare.ComputeFineDeduction(totalFines - waived, table);
         // Unity prices the starter bonus on the settled total (base,
         // sponsorship, tip and fine included), then adds it on top.
         double preBonus = Cents(@base + brandBonus + tip - fine);
@@ -68,7 +79,7 @@ public static class TaxiReceiptBuilder
             table.Forfait,
             @base,
             tip,
-            Math.Max(0, fines),
+            totalFines,
             fine,
             total,
             xp,
@@ -84,7 +95,9 @@ public static class TaxiReceiptBuilder
             brandBonus,
             starterRate,
             starterBonus,
-            carKey ?? string.Empty);
+            carKey ?? string.Empty,
+            tipDoubled,
+            waived);
     }
 
     private static double Cents(double value) =>

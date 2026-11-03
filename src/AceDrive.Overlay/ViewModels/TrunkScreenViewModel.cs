@@ -11,10 +11,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// the non-food keepsakes below the trunk's rule. The free litres, the meter and
 /// the carried goods all come from the shared Core state; this page owns only
 /// presentation.
-/// Unity's page also prints the glovebox's card count; the cards themselves are
-/// carried here as keepsakes already, and the capacity line follows with the
-/// protective-consumables slice (PORTPLAN 42/61), so the page ends after the
-/// glove compartment for now.
+/// Unity's page also prints the glove compartment's card count; the cards are
+/// carried here as keepsakes, so the capacity line reads the same Glovebox the
+/// claim and the counter cards use (PORTPLAN 42/61).
 /// Voice parity with the other pages: BACK navigates, so its voice tap glows
 /// teal first and the page waits out the shared beat. Every food stack also
 /// answers its own name ("sandwich"), because the EAT button alone is the same
@@ -23,6 +22,7 @@ namespace AceDrive.Overlay.ViewModels;
 public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private readonly Trunk _trunk;
+    private readonly Glovebox _glovebox;
     private readonly Hunger _hunger;
     private readonly Garage _garage;
     private readonly StoreCatalog _catalog;
@@ -31,10 +31,11 @@ public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly VoiceBeat _beat;
 
     public TrunkScreenViewModel(
-        Trunk trunk, Hunger hunger, Garage garage, StoreCatalog catalog,
+        Trunk trunk, Glovebox glovebox, Hunger hunger, Garage garage, StoreCatalog catalog,
         ICommand backCommand, Action onEaten, VoiceBeat beat)
     {
         _trunk = trunk;
+        _glovebox = glovebox;
         _hunger = hunger;
         _garage = garage;
         _catalog = catalog;
@@ -91,6 +92,10 @@ public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
 
     public string CompartmentEmptyLine { get; } = Strings.Get("TrunkGloveEmpty");
 
+    /// <summary>Unity's glovebox card count under the compartment title.</summary>
+    public string GloveboxLine { get => _gloveboxLine; private set => SetField(ref _gloveboxLine, value); }
+    private string _gloveboxLine = "";
+
     /// <summary>Teal-glow acknowledgment for the navigating BACK tap.</summary>
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
     private bool _backFlash;
@@ -110,17 +115,29 @@ public sealed class TrunkScreenViewModel : ViewModelBase, IVoiceScreen
         foreach (TrunkItem item in _trunk.Items)
         {
             string quantityLine = Strings.Format("TrunkQuantityLine", item.Quantity);
+            // A counter card (the "next 5 rides" pair) prints its charges, so
+            // the player can see the countdown every completed job spends.
+            string usesLine = item.UsesMax > 0
+                ? Strings.Format("TrunkUsesLine", item.UsesLeft, item.UsesMax)
+                : string.Empty;
             if (_catalog.Find(item.Name) is { IsFood: true } def)
             {
                 food.Add(new TrunkItemRow(
                     item.Name, quantityLine, Strings.Format("TrunkHungerLine", def.Hunger),
-                    CanEat: true));
+                    usesLine, CanEat: true));
                 continue;
             }
-            keepsakes.Add(new TrunkItemRow(item.Name, quantityLine, string.Empty, CanEat: false));
+            // A reward card prints its function text beside its title (Unity's
+            // "{Title} - {Describe}" row); a certificate or award has no
+            // catalogue row and keeps the name-only row.
+            keepsakes.Add(new TrunkItemRow(
+                item.Name, quantityLine, string.Empty, usesLine, CanEat: false,
+                DescriptionLine: _glovebox.Definition(item.Name)?.Description ?? string.Empty));
         }
         Rows = food;
         CompartmentRows = keepsakes;
+        GloveboxLine = Strings.Format(
+            "TrunkGloveCount", _glovebox.Count(_trunk), _glovebox.Slots);
         FreeSpaceLine = Strings.Format("TrunkFree", _trunk.Remaining(TrunkCapacity), TrunkCapacity);
         HungerLine = Strings.Format("TrunkHunger", _hunger.Value, _hunger.Max);
         HungerAmber = _hunger.IsAmber;

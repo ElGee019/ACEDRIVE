@@ -542,9 +542,9 @@ elder, attempts, home address and priced receipt are session state owned by
 `WhereIsWillyFlow` (a restart throws them away on purpose, ToWhereIsWilly.md
 §2.9), and the one persisted fact — the completion stamp — is a single field on
 `WhereIsWillyLedger`. The ledger parses that date once at construction so the
-calendar's 10 Hz `CompletedOn` check is an allocation-free date compare instead
-of a per-tick string format; the parsed twin is the same value, not a second
-copy of it.
+calendar's `CompletedOn` read (the tap's gate, `CalendarGate`) is an
+allocation-free date compare instead of a per-tick string format; the parsed
+twin is the same value, not a second copy of it.
 
 The calendar's once-per-week stamps follow the same shape: `WeeklyEventLedger`
 holds one game date per event (the road test, the Cento Miglia, the

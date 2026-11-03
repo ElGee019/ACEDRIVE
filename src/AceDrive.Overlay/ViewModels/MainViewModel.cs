@@ -104,6 +104,11 @@ public sealed class MainViewModel
     private readonly Action? _quit;
     private readonly ILog _log;
     private readonly DriverWallet _wallet;
+    // The carried reward cards the poll applies (Invincible Rides) and the
+    // crash path spends (DR Protection, shield, repair cards). The trunk is
+    // where the cards live; the glovebox owns what they mean.
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     // The session-start catch-up: the starter car and today's login bonus. It
     // owns the streak counter and the seeded roll, so neither lives here.
     private readonly DriverCatchUp _catchUp;
@@ -187,6 +192,13 @@ public sealed class MainViewModel
     // where the panel stays where the player left it.
     private bool _accidentHandsBackMenu;
 
+    // The repair cards offered on the current prompt. They are only spent when
+    // REPAIR THE CAR is pressed, so driving on keeps them — but the bill the
+    // prompt shows must already be the discounted one, which is why the two
+    // flags ride the prompt instead of being re-read at the tap.
+    private bool _accidentFreeRepair;
+    private bool _accidentHalfDamage;
+
     // Whether the garage still holds the car Grandma Sonja handed over: the
     // broker's page then closes on the line that she insured that one, which is
     // only true for her car. The garage's current car stands for the car being
@@ -209,6 +221,7 @@ public sealed class MainViewModel
         ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
         AddressMap addressMap, TaxiRules taxiRules,
         VoiceBeat beat, DriverWallet wallet,
+        Glovebox glovebox, Trunk trunk,
         IRivalsService rivals,
         Garage garage,
         DriverCatchUp catchUp, ZoneGrowth zoneGrowth,
@@ -241,6 +254,8 @@ public sealed class MainViewModel
         _voice = voice;
         _carBrands = carBrands;
         _wallet = wallet;
+        _glovebox = glovebox;
+        _trunk = trunk;
         _rivals = rivals;
         _garage = garage;
         _hud = hud;
@@ -817,6 +832,8 @@ public sealed class MainViewModel
         _fleet.IntegrateOdometer(s, dt, _story.Done);
         // The accident feed rides the same tick: a jump in EVO's collision
         // damage is one crash, priced off the speed the car carried into it.
+        // Invincible Rides stops the billing (the detector still observes, so
+        // the next real crash is not priced off stale damage).
         // Banking the garage immediately means a kill right after the hit
         // keeps the dent (the odometer's own save stays on its throttle).
         // WHY the introduction gate: the first drives are grandma's errand and
@@ -825,7 +842,8 @@ public sealed class MainViewModel
         // centre has handed the career over; skipping the call also leaves the
         // detector unprimed, so the intro's own dents never surface as a crash
         // on the first real tick.
-        if (!_story.IntroInProgress && _fleet.ObserveAccident(s, now) is { } accident)
+        bool invincible = _glovebox.HasCharges(RewardCardEffect.InvincibleRides, _trunk);
+        if (!_story.IntroInProgress && _fleet.ObserveAccident(s, now, invincible) is { } accident)
         {
             SaveGarage();
             EndJobForAccident(accident);
@@ -881,37 +899,102 @@ public sealed class MainViewModel
     // customer loses a friendship. Either way — and outside a job as well — the
     // companion offers the repair with the bill the button takes, so a dent can
     // always be settled from the driver's seat, not only at the mechanic.
+    // The carried reward cards apply here, in Unity's order: DR Protection
+    // absorbs the rating penalty, the Accident Loyalty Shield keeps the
+    // friendship, and the repair cards price the bill the prompt offers.
     private void EndJobForAccident(AccidentDamage accident)
     {
         string impact = accident.ImpactSpeedKmh.ToString("0", CultureInfo.CurrentCulture);
-        string bill = AccidentBill().ToString("0.00", CultureInfo.CurrentCulture);
+        var notes = new List<HudPromptNote>(4);
 
-        if (_taxi.FailForAccident() is { } customer)
+        // Every crash drops all three skills by Unity's banded penalty unless a
+        // DR Protection card covers it (DriverRatingService parity).
+        if (_glovebox.TryConsume(RewardCardEffect.DriverRatingProtection, _trunk))
         {
-            ShowAccidentRepair("HudAccidentRideLost", [impact, customer, bill], handsBackMenu: true);
+            notes.Add(new HudPromptNote("RewardDrProtectionNote"));
+        }
+        else
+        {
+            _wallet.ApplyAccidentPenalty();
+        }
+
+        // The loyalty shield is only worth spending when a job actually ends on
+        // this crash; a free-roam dent leaves it carried.
+        bool jobLive = _taxi.InProgress || _delivery.InProgress;
+        bool loyalty = jobLive
+            && _glovebox.TryConsume(RewardCardEffect.AccidentLoyalty, _trunk);
+
+        // The repair cards are consumed by REPAIR THE CAR, not by the prompt:
+        // the bill shown here is already the discounted one.
+        _accidentFreeRepair = _glovebox.Carries(RewardCardEffect.FreeCarRepair, _trunk);
+        _accidentHalfDamage = !_accidentFreeRepair
+            && _glovebox.Carries(RewardCardEffect.HalfDamage, _trunk);
+        string bill = AccidentBillText(_accidentFreeRepair, _accidentHalfDamage);
+        if (_accidentFreeRepair)
+        {
+            notes.Add(new HudPromptNote("RewardFreeRepairNote"));
+        }
+        else if (_accidentHalfDamage)
+        {
+            notes.Add(new HudPromptNote("RewardHalfDamageNote"));
+        }
+
+        if (_taxi.FailForAccident(loyalty) is { } customer)
+        {
+            if (loyalty)
+            {
+                notes.Add(new HudPromptNote(
+                    "RewardAccidentLoyaltyCustomerNote", [customer]));
+            }
+            SaveDriver(_rivals.LastResult);
+            ShowAccidentRepair(
+                loyalty ? "HudAccidentRideLostShield" : "HudAccidentRideLost",
+                [impact, customer, bill], handsBackMenu: true, notes);
             return;
         }
 
-        if (_delivery.FailForAccident())
+        if (_delivery.FailForAccident(loyalty) is { } invested)
         {
-            ShowAccidentRepair("HudAccidentCargoLost", [impact, bill], handsBackMenu: true);
+            if (loyalty)
+            {
+                notes.Add(new HudPromptNote("RewardAccidentLoyaltyHubNote"));
+            }
+            // Delivery Insurance Shield refunds the wholesale CR the run had
+            // already paid; the cargo itself is still lost (Unity's rule).
+            if (invested > 0.0
+                && _glovebox.TryConsume(RewardCardEffect.DeliveryInsurance, _trunk))
+            {
+                _wallet.AddSale(invested);
+                notes.Add(new HudPromptNote(
+                    "RewardDeliveryInsuranceNote",
+                    [invested.ToString("0.00", CultureInfo.CurrentCulture)]));
+            }
+            SaveDriver(_rivals.LastResult);
+            ShowAccidentRepair(
+                loyalty ? "HudAccidentCargoLostShield" : "HudAccidentCargoLost",
+                [impact, bill], handsBackMenu: true, notes);
             return;
         }
 
         // No job to end: the crash only dented the car, so the same repair offer
         // comes up without a lost friendship and without stealing the panel.
-        ShowAccidentRepair("HudAccidentSolo", [impact, bill], handsBackMenu: false);
+        SaveDriver(_rivals.LastResult);
+        ShowAccidentRepair(
+            "HudAccidentSolo", [impact, bill], handsBackMenu: false, notes);
     }
 
     // The repair prompt: the crash sentence with the bill the button will take,
     // plus the one button that pays it. The prompt is kept, not just handed
     // over, so the button's tap is answered only while this prompt is still the
-    // one on the slot (a destination or a new leg takes the slot back).
+    // one on the slot (a destination or a new leg takes the slot back). A
+    // reward card that absorbed part of the crash rides as a note under the
+    // sentence, formatted from its own resource key.
     private void ShowAccidentRepair(
-        string textKey, IReadOnlyList<string> args, bool handsBackMenu)
+        string textKey, IReadOnlyList<string> args, bool handsBackMenu,
+        IReadOnlyList<HudPromptNote>? notes = null)
     {
         _accidentHandsBackMenu = handsBackMenu;
-        var prompt = new HudTaskPrompt(textKey, args, "HudAccidentRepair");
+        var prompt = new HudTaskPrompt(textKey, args, "HudAccidentRepair", notes);
         _accidentPrompt = prompt;
         _hud?.SetTaskPrompt(prompt);
         // WHY the summon: the companion steps aside while the main panel is up
@@ -921,6 +1004,24 @@ public sealed class MainViewModel
         // consuming the offer clears the slot and it steps aside again. A crash
         // inside a job finds the panel down and this call is a no-op.
         _hud?.ShowTaskText();
+    }
+
+    // The bill the mechanic would quote for the dents on the car driven now:
+    // the car's value times its outstanding body damage, after the repair
+    // cards the prompt is offering. The prompt shows it and the repair charges
+    // it, so the number the player reads is the one taken.
+    private string AccidentBillText(bool freeRepair, bool halfDamage)
+    {
+        double bill = AccidentBill();
+        if (freeRepair)
+        {
+            bill = 0.0;
+        }
+        else if (halfDamage)
+        {
+            bill *= _glovebox.CardFor(RewardCardEffect.HalfDamage)?.Amount ?? 0.5;
+        }
+        return bill.ToString("0.00", CultureInfo.CurrentCulture);
     }
 
     // The bill the mechanic would quote for the dents on the car driven now:
@@ -947,8 +1048,11 @@ public sealed class MainViewModel
     // REPAIR THE CAR: the bill the mechanic would quote for the dents (the
     // car's value times its outstanding body damage) is taken in full — the
     // repair is not optional, so the cash may go into debt — and an insured car
-    // claims the Unity share into the broker's escrow. The repair clears the
-    // dents, and a crash that ended a job hands the main page back.
+    // claims the Unity share into the broker's escrow. A Free Car Repair card
+    // covers the bill, a Half Damage Reduction card halves it before insurance;
+    // both are spent here, at the moment the bill is paid, so a player who
+    // drives on without repairing keeps them. The repair clears the dents, and
+    // a crash that ended a job hands the main page back.
     private void RepairAfterAccident()
     {
         _accidentPrompt = null;
@@ -958,14 +1062,31 @@ public sealed class MainViewModel
             // The crash repair is unavoidable, so it may overdraw the cash
             // (Unity's RepairScreen settles the same way); the insured share is
             // Unity's 90 % of the bill, not of what the cash happened to hold.
-            double bill = AccidentBill();
+            bool free = _accidentFreeRepair
+                && _glovebox.TryConsume(RewardCardEffect.FreeCarRepair, _trunk);
+            bool half = !free
+                && _accidentHalfDamage
+                && _glovebox.TryConsume(RewardCardEffect.HalfDamage, _trunk);
+            double bill = free ? 0.0 : AccidentBill();
+            if (half)
+            {
+                bill *= _glovebox.CardFor(RewardCardEffect.HalfDamage)?.Amount ?? 0.5;
+            }
+            bill = Math.Round(bill, 2, MidpointRounding.AwayFromZero);
             _wallet.ChargeInFull(bill);
-            double claim = car.HasInsurance ? bill * InsuranceRules.RepairPayoutFraction : 0.0;
+            // A free repair paid nothing, so there is no insurance share to
+            // claim — Unity hides the escrow on the same condition.
+            double claim = !free && car.HasInsurance
+                ? bill * InsuranceRules.RepairPayoutFraction
+                : 0.0;
             _wallet.AddInsurancePayout(claim);
             car.RepairBody();
+            _accidentFreeRepair = false;
+            _accidentHalfDamage = false;
             SaveGarage();
             SaveDriver(_rivals.LastResult);
-            _log.LogInfo($"[Accident] body repaired: bill {bill:0.00} CR, " +
+            _log.LogInfo($"[Accident] body repaired: bill {bill:0.00} CR " +
+                $"(free card {free}, half damage {half}), " +
                 $"insurance {claim:0.00} CR, cash {_wallet.Cash:0.00}");
         }
 

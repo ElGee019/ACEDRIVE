@@ -316,7 +316,7 @@ public sealed class WhereIsWillyFlowTests
     }
 
     [Fact]
-    public void StampedWednesday_ReadsCompletedRefusesAndReopensNextWeek()
+    public void StampedWednesday_KeepsTheStandardRowRefusesAndReopensNextWeek()
     {
         var hud = new FakeTelemetryHud();
         var drivers = new FakeDriverStore();
@@ -326,14 +326,13 @@ public sealed class WhereIsWillyFlowTests
 
         CalendarScreenViewModel calendar = OpenCalendar(session);
         CalendarRow willy = WillyRow(calendar);
-        Assert.True(willy.Completed);
         Assert.False(willy.Locked);
-        Assert.Equal("Where is Willy (Completed)", willy.EventLabel);
+        Assert.Equal("Where is Willy", willy.EventLabel);
 
         calendar.DayCommand.Execute(4);
         session.Clock.Advance(TimeSpan.FromSeconds(0.51));
         session.Vm.Poll();
-        Assert.Equal("SEE YOU NEXT WEDNESDAY", WillyRow(calendar).EventLabel);
+        Assert.Equal("COME BACK NEXT WEEK", WillyRow(calendar).EventLabel);
         Assert.False(session.Willy.InFlight);
         Assert.Null(hud.Destination);
 
@@ -367,7 +366,6 @@ public sealed class WhereIsWillyFlowTests
         CalendarScreenViewModel calendar = OpenCalendar(session);
         CalendarRow willy = WillyRow(calendar);
         Assert.True(willy.Locked);
-        Assert.False(willy.Completed);
         Assert.Equal("Where is Willy", willy.EventLabel);
 
         calendar.DayCommand.Execute(4);

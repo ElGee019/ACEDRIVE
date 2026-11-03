@@ -110,4 +110,20 @@ public sealed class DeliveryReceiptTests
         Assert.Equal(0.0, receipt.DistanceCharge);
         Assert.Equal(14.00, receipt.TotalEarned);
     }
+
+    [Fact]
+    public void ProfitBoost_ScalesTheGoodsOnly_AndFlagsTheCard()
+    {
+        // Delivery Profit Boost: 20% on the goods payout, never on the fare.
+        DeliveryReceipt boosted = DeliveryReceiptBuilder.Build(
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
+            profitBoostMultiplier: 1.2);
+
+        Assert.True(boosted.ProfitBoostApplied);
+        Assert.True(boosted.HasProfitBoost);
+        Assert.Equal(0.2, boosted.ProfitBoostRate, precision: 9);
+        Assert.Equal(75.60, boosted.ReceivedForGoods);
+        Assert.Equal(129.40, boosted.DistanceCharge);
+        Assert.Equal(156.00, boosted.TotalEarned);
+    }
 }

@@ -64,6 +64,10 @@ public sealed class RoadTestFlow
     private readonly IRoadTestStandings _standings;
     private readonly IProfileStore _profiles;
     private readonly RoadTestSettlement _settlement;
+    // The carried reward cards: the Journalist Test Retake is offered on the
+    // result page and spent when its button is pressed.
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     // The roster the all-cars board names its rows from: the board itself only
     // stores car keys, and the overlay is the layer that owns the display name.
     private readonly IReadOnlyDictionary<string, CarSpec> _catalog;
@@ -144,6 +148,7 @@ public sealed class RoadTestFlow
         IOnboardingStore onboarding, GameClock game, IClock clock,
         RoadTestLedger roads, ITelemetryHud? hud, IRoadTestStandings standings,
         IProfileStore profiles, RoadTestSettlement settlement,
+        Glovebox glovebox, Trunk trunk,
         IReadOnlyList<CarSpec> catalog, AddressMap map,
         VoiceBeat beat, Func<CarIdentity?> liveCar, Random rng, ILog log,
         bool ignoreEventGates = false)
@@ -155,6 +160,8 @@ public sealed class RoadTestFlow
         ArgumentNullException.ThrowIfNull(standings);
         ArgumentNullException.ThrowIfNull(profiles);
         ArgumentNullException.ThrowIfNull(settlement);
+        ArgumentNullException.ThrowIfNull(glovebox);
+        ArgumentNullException.ThrowIfNull(trunk);
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(beat);
@@ -169,6 +176,8 @@ public sealed class RoadTestFlow
         _standings = standings;
         _profiles = profiles;
         _settlement = settlement;
+        _glovebox = glovebox;
+        _trunk = trunk;
         var byKey = new Dictionary<string, CarSpec>(StringComparer.Ordinal);
         foreach (CarSpec car in catalog)
         {
@@ -301,7 +310,7 @@ public sealed class RoadTestFlow
         // guided back into.
         _hud?.SetDestination(null);
         _screen = new RoadTestScreenViewModel(
-            car, drivesThePick, StartAccel, StartBrake, PhotoMission,
+            car, drivesThePick, StartAccel, StartBrake, PhotoMission, Retake,
             Continue, new RelayCommand(Back), _beat);
         _log.LogInfo(
             $"road test at the test centre: {CarTitles.Of(car)}"
@@ -520,7 +529,42 @@ public sealed class RoadTestFlow
     }
 
     /// <summary>
-    /// The photo mission, offered once both legs ran: the panel goes down and
+    /// The result page's RETAKE: the Journalist Test Retake card is spent and
+    /// the leg just driven starts again, without leaving the test centre. The
+    /// first run already went to the board (best-guarded there), so a retake is
+    /// simply another attempt at the same leg; the card is consumed on the tap,
+    /// exactly like Unity's OnRetakeClicked.
+    /// </summary>
+    public void Retake()
+    {
+        if (_phase != RoadTestPhase.Result || _screen is not { } screen)
+        {
+            return;
+        }
+
+        if (!_glovebox.TryConsume(RewardCardEffect.JournalistRetake, _trunk))
+        {
+            screen.SetRetake(false);
+            return;
+        }
+
+        RoadTestMetric metric = screen.Metric;
+        ForgetBoardReads();
+        _phase = RoadTestPhase.AtTestCentre;
+        screen.SetRetake(false);
+        screen.ShowTestCentre();
+        _log.LogInfo($"road test retake: {_runCarKey} ({metric})");
+        if (metric == RoadTestMetric.BrakeDistance)
+        {
+            StartBrake();
+        }
+        else
+        {
+            StartAccel();
+        }
+    }
+
+    /// <summary>The photo mission, offered once both legs ran: the panel goes down and
     /// the companion hands the player the drive-anywhere brief with the
     /// PHOTOSHOOT button. The shot is taken wherever the car is parked, so the
     /// leg never pins a destination — Unity's photo op lets the player pick any
@@ -718,6 +762,7 @@ public sealed class RoadTestFlow
         screen.ShowResult(
             ResultLine(seconds, screen.CarName), _localRows, _localCarRows,
             RoadTestMetric.AccelerationTime);
+        screen.SetRetake(HasRetakeCard);
         _host.RevealPage(screen);
         SafeTask.Forget(
             _standings.PushAsync(
@@ -752,6 +797,7 @@ public sealed class RoadTestFlow
         screen.ShowResult(
             BrakeResultLine(_brakeMeters, screen.CarName), _localRows, _localCarRows,
             RoadTestMetric.BrakeDistance);
+        screen.SetRetake(HasRetakeCard);
         _host.RevealPage(screen);
         SafeTask.Forget(
             _standings.PushAsync(
@@ -767,6 +813,10 @@ public sealed class RoadTestFlow
 
     private bool PickWasKept() =>
         _pick is null || RoadTestRules.DrivesThePick(_liveCar(), _pick, _cars);
+
+    // A carried Journalist Test Retake is offered on the result page: one more
+    // attempt at the leg just driven, spent only when the button is pressed.
+    private bool HasRetakeCard => _glovebox.Carries(RewardCardEffect.JournalistRetake, _trunk);
 
     // A run driven in another car cannot land on the pick's row: the visit goes
     // back to the test centre asking for the pick instead of banking it.

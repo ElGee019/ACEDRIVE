@@ -89,9 +89,11 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IK
     public bool HasTip => _receipt.Tip > 0.0;
 
     /// <summary>No tip means no mention: the view collapses the row and the
-    /// line itself stays empty, never a zero tip.</summary>
+    /// line itself stays empty, never a zero tip. A doubled tip says so in the
+    /// row's label, like Unity's "(Double Tip applied)" tail.</summary>
     public ReceiptLine TipLine => HasTip
-        ? new(Strings.Get("ReceiptTip"), ReceiptText.Amount(_receipt.Tip))
+        ? new(Strings.Get(_receipt.HasTipDoubled ? "ReceiptTipDouble" : "ReceiptTip"),
+            ReceiptText.Amount(_receipt.Tip))
         : new(string.Empty, string.Empty);
 
     public bool HasFine => _receipt.FineDeduction > 0.0;
@@ -101,6 +103,14 @@ public sealed class TaxiReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IK
     public ReceiptLine FineLine => HasFine
         ? new(Strings.Get("ReceiptFine"), Strings.Format("ReceiptFineAmount", _receipt.FineDeduction))
         : new(string.Empty, string.Empty);
+
+    /// <summary>True when a Next Fine Waived card covered at least one fine.</summary>
+    public bool HasFineWaived => _receipt.HasFineWaived;
+
+    /// <summary>The waiver row under the fine, teal like the other card rows.</summary>
+    public string FineWaivedLine => _receipt.FinesWaived == 1
+        ? Strings.Get("ReceiptFineWaivedOne")
+        : Strings.Format("ReceiptFineWaivedMany", _receipt.FinesWaived);
 
     public ReceiptLine TotalLine => new(Strings.Get("ReceiptTotal"), ReceiptText.Amount(_receipt.Total));
 

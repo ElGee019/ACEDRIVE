@@ -21,6 +21,12 @@
             <TextBlock Text="{Binding FeeLine}" Foreground="#FFBFC4C9" FontSize="13"
                        TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,6"
                        Visibility="{Binding FeeVisible, Converter={StaticResource BoolToVis}}"/>
+            <!-- A reward card that absorbed part of the loss (a Delivery
+                 Insurance refund, an Accident Loyalty shield): teal, like the
+                 receipt's applied-card rows. -->
+            <TextBlock Text="{Binding NoteLine}" Foreground="#FF97EAD2" FontSize="13"
+                       TextWrapping="Wrap" TextAlignment="Center" Margin="0,0,0,6"
+                       Visibility="{Binding NoteVisible, Converter={StaticResource BoolToVis}}"/>
         </StackPanel>
         <StackPanel Grid.Row="2">
             <Button Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">

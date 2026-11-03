@@ -86,6 +86,9 @@
        the fine notice when a patrol catches the car over its limit. -->
   <data name="HudPoliceWarning" xml:space="preserve"><value>Police patrol ahead, {0} km/h limit</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Speeding fine: €{0:0}</value></data>
+  <!-- Next Fine Waived: the toast Unity's SpeedChallengeFineToast shows when the
+       card absorbs the fine. -->
+  <data name="HudPoliceFineWaived" xml:space="preserve"><value>FINE WAIVED (reward card)</value></data>
   <!-- Forced speed challenge (PORTPLAN 14) and a passenger's own hurry
        (PORTPLAN 11): the delivery clock on the companion, in the design's
        Tourney face. {0} is already m:ss. -->
@@ -436,12 +439,18 @@ Accept this job?</value></data>
        starterBonusText): the decayed percentage rides the explanation. -->
   <data name="ReceiptStarterBonus" xml:space="preserve"><value>Business Starter Bonus {0:0.0}%</value></data>
   <data name="ReceiptTip" xml:space="preserve"><value>Customer tip</value></data>
+  <!-- Double Next Tip: Unity appends "(Double Tip applied)" to the tip row. -->
+  <data name="ReceiptTipDouble" xml:space="preserve"><value>Customer tip (Double Tip applied)</value></data>
   <data name="ReceiptFine" xml:space="preserve"><value>Speed fine</value></data>
   <data name="ReceiptTotal" xml:space="preserve"><value>Total earned</value></data>
   <!-- Amount column of the earnings lines; the fine amount keeps the minus
        so the sign reads with the currency, like Unity's row. -->
   <data name="ReceiptAmount" xml:space="preserve"><value>€{0:0.00}</value></data>
   <data name="ReceiptFineAmount" xml:space="preserve"><value>−€{0:0.00}</value></data>
+  <!-- Next Fine Waived on the receipt: a waived fine deducts nothing, so the
+       ordinary fine row is empty and this teal row names the card instead. -->
+  <data name="ReceiptFineWaivedOne" xml:space="preserve"><value>Next Fine Waived card covered the speed fine</value></data>
+  <data name="ReceiptFineWaivedMany" xml:space="preserve"><value>Next Fine Waived card covered {0} speed fines</value></data>
   <data name="ReceiptWallet" xml:space="preserve"><value>Wallet: €{0:0.00}</value></data>
   <data name="ReceiptShift" xml:space="preserve"><value>Shift: {0} jobs · €{1:0.00}</value></data>
   <data name="ReceiptXp" xml:space="preserve"><value>XP earned: {0:0.00}</value></data>
@@ -677,6 +686,9 @@ Accept this job?</value></data>
   <data name="DelReceiptDistance" xml:space="preserve"><value>Total Distance: {0:0.0} km</value></data>
   <data name="DelReceiptPaid" xml:space="preserve"><value>Paid for goods</value></data>
   <data name="DelReceiptReceived" xml:space="preserve"><value>Received for goods</value></data>
+  <!-- Delivery Profit Boost: Unity appends "Delivery Profit Boost applied"
+       under the goods payout. -->
+  <data name="DelReceiptProfitBoost" xml:space="preserve"><value>Delivery Profit Boost applied (+{0:0}% goods earnings)</value></data>
   <data name="DelReceiptFare" xml:space="preserve"><value>Fare</value></data>
   <data name="DelReceiptTotalCr" xml:space="preserve"><value>Total CR: €{0:0.00}</value></data>
   <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points earned: {0}</value></data>
@@ -745,6 +757,10 @@ Accept this job?</value></data>
   <data name="MechanicRepairEngine" xml:space="preserve"><value>REPAIR ENGINE</value></data>
   <data name="MechanicNewEngine" xml:space="preserve"><value>BUY NEW ENGINE</value></data>
   <data name="MechanicBodyDamage" xml:space="preserve"><value>Body damage: {0:0.0}% — repair CR{1:0.00}</value></data>
+  <!-- Free Car Repair: Unity's RepairScreen prints "Thanks to your reward,
+       repair is free this time." on the same line. -->
+  <data name="MechanicBodyDamageFree" xml:space="preserve"><value>Body damage: {0:0.0}% — free repair available</value></data>
+  <data name="MechanicBodyDamageHalf" xml:space="preserve"><value>Body damage: {0:0.0}% — CR{1:0.00} (Half Damage Reduction applied)</value></data>
   <data name="MechanicRepairBody" xml:space="preserve"><value>REPAIR BODY</value></data>
   <data name="MechanicPartOilChange" xml:space="preserve"><value>Oil efficiency</value></data>
   <data name="MechanicPartWipers" xml:space="preserve"><value>Wipers</value></data>
@@ -820,12 +836,14 @@ Accept this job?</value></data>
   <data name="TrunkHunger" xml:space="preserve"><value>HUNGER {0}/{1}</value></data>
   <data name="TrunkEmpty" xml:space="preserve"><value>Your trunk is empty. Select any Pizzeria, Grocery Store, Coffee Shop to drive there and buy food.</value></data>
   <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
+  <data name="TrunkUsesLine" xml:space="preserve"><value>{0}/{1}</value></data>
   <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
   <data name="TrunkEat" xml:space="preserve"><value>EAT</value></data>
   <!-- Glove compartment (the non-food half of the same page): its title wears
        the page title's face, and its empty hint mirrors the trunk's. -->
   <data name="TrunkGloveTitle" xml:space="preserve"><value>GLOVE COMPARTMENT</value></data>
   <data name="TrunkGloveEmpty" xml:space="preserve"><value>Your glove compartment is empty.</value></data>
+  <data name="TrunkGloveCount" xml:space="preserve"><value>Glove compartment: {0}/{1} cards</value></data>
   <data name="TrunkBack" xml:space="preserve"><value>BACK</value></data>
   <!-- Menu meter tiles (PORTPLAN items 26/33): a tap swaps the drawn battery
        for the reading. {0} is a whole percent — no decimals, because the
@@ -945,11 +963,10 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="ValuationNoticeLoss" xml:space="preserve"><value>You just lost a Valuation Event against {0} (+{1:0.00} XP).</value></data>
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>While you were away you won {0} Valuation events and gained {1:0.000} XP</value></data>
 
-  <!-- Weekly missing-person run (ToWhereIsWilly.md §2.1/§3.5): the calendar
-       row's completed label (a closed coffee career keeps the plain one) plus
-       the two gate hints that share the strip's one three-second warning slot. -->
-  <data name="EventWillyCompleted" xml:space="preserve"><value>Where is Willy (Completed)</value></data>
-  <data name="ControlGateWillyDone" xml:space="preserve"><value>SEE YOU NEXT WEDNESDAY</value></data>
+  <!-- Weekly missing-person run (ToWhereIsWilly.md §2.1/§3.5): the calendar row
+       keeps the standard EventWilly label in every state, so the only copy here
+       is the career hint that shares the strip's one three-second warning slot
+       (a stamped run answers with the shared ControlGateNextWeek hint). -->
   <data name="ControlGateWillyCareer" xml:space="preserve"><value>START A COFFEE BEANS DELIVERY CAREER FIRST</value></data>
 
   <!-- The quest page (Unity's map stand-in): the title, the two Unity task
@@ -976,7 +993,19 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="HudAccidentRideLost" xml:space="preserve"><value>Accident! {0} km/h impact — the ride is over. Lost 1 friendship with {1}. Repair the car to be able to continue. Repair cost: CR{2}.</value></data>
   <data name="HudAccidentCargoLost" xml:space="preserve"><value>Accident! {0} km/h impact — the cargo is lost. Lost 1 friendship with the hub owner. Repair the car to be able to continue. Repair cost: CR{1}.</value></data>
   <data name="HudAccidentSolo" xml:space="preserve"><value>Accident! {0} km/h impact — repair the car to be able to continue. Repair cost: CR{1}.</value></data>
+  <!-- Accident Loyalty Shield: the same crash sentences without the lost
+       friendship, so the prompt and the note never contradict each other. -->
+  <data name="HudAccidentRideLostShield" xml:space="preserve"><value>Accident! {0} km/h impact — the ride is over. Thanks to your Accident Loyalty Shield, you did not lose any friendship with {1}. Repair the car to be able to continue. Repair cost: CR{2}.</value></data>
+  <data name="HudAccidentCargoLostShield" xml:space="preserve"><value>Accident! {0} km/h impact — the cargo is lost. Thanks to your Accident Loyalty Shield, you did not lose any friendship with the hub owner. Repair the car to be able to continue. Repair cost: CR{1}.</value></data>
   <data name="HudAccidentRepair" xml:space="preserve"><value>REPAIR THE CAR</value></data>
+  <!-- Reward-card notes under the crash prompt (the HUD joins each note to the
+       sentence with a blank line). -->
+  <data name="RewardAccidentLoyaltyCustomerNote" xml:space="preserve"><value>Thanks to your Accident Loyalty Shield, you did not lose any friendship with {0}.</value></data>
+  <data name="RewardAccidentLoyaltyHubNote" xml:space="preserve"><value>Thanks to your Accident Loyalty Shield, you did not lose any friendship with the hub owner.</value></data>
+  <data name="RewardDeliveryInsuranceNote" xml:space="preserve"><value>Your Delivery Insurance Shield refunded the CR {0} you invested.</value></data>
+  <data name="RewardDrProtectionNote" xml:space="preserve"><value>Your DR Protection card kept your driver rating intact.</value></data>
+  <data name="RewardFreeRepairNote" xml:space="preserve"><value>Your Free Car Repair card covers this repair.</value></data>
+  <data name="RewardHalfDamageNote" xml:space="preserve"><value>Your Half Damage Reduction card halves this bill.</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Drive {0} home to {1} No. {2} in {3}</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>DROP OFF</value></data>
   <data name="HudWillyWrongAddress" xml:space="preserve"><value>This is not {0}'s home address. {0} is still out there somewhere...</value></data>
@@ -1007,6 +1036,10 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="RoadTestStart" xml:space="preserve"><value>0-60</value></data>
   <data name="RoadTestBrakeStart" xml:space="preserve"><value>100-0</value></data>
   <data name="RoadTestPhoto" xml:space="preserve"><value>PHOTO MISSION</value></data>
+  <!-- Journalist Test Retake (Unity RoadTestScreen's buttonRetake): one more
+       attempt at the leg just driven, offered while the card is carried. -->
+  <data name="RoadTestRetake" xml:space="preserve"><value>RETAKE</value></data>
+  <data name="RoadTestRetakeHint" xml:space="preserve"><value>Journalist Test Retake: one more attempt at this leg.</value></data>
   <data name="RoadTestAccelIntro" xml:space="preserve"><value>Set a 0-60 time we can publish in our magazine. Launch the car from 0. You will see the countdown timer on the mini window.</value></data>
   <data name="RoadTestBrakeIntro" xml:space="preserve"><value>Take a 100-0 braking test. Bring the car to 100, watch the countdown timer and brake.</value></data>
   <!-- Unity's photo-op brief: any spot on the map, so this week's shoot is not

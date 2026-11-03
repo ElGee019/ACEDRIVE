@@ -5,17 +5,20 @@
     {
       "Title": "FREE TANK REFILL",
       "Description": "One free tank refill",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "FreeTankRefill"
     },
     {
       "Title": "FREE CAR REPAIR",
       "Description": "One free car repair",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "FreeCarRepair"
     },
     {
       "Title": "CUSTOMER FORGIVENESS PASS",
       "Description": "Do not lose friendship with a customer following selection of a wrong address",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "CustomerForgiveness"
     },
     {
       "Title": "+500CR BONUS",
@@ -30,57 +33,74 @@
     {
       "Title": "DELIVERY INSURANCE SHIELD",
       "Description": "You won't lose the invested money when failing a delivery",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "DeliveryInsurance"
     },
     {
       "Title": "ACCIDENT LOYALTY SHIELD",
       "Description": "You won't lose friendship with a customer following an accident",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "AccidentLoyalty"
     },
     {
       "Title": "HALF DAMAGE REDUCTION",
       "Description": "50% less damage from an accident",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "HalfDamage",
+      "Amount": 0.5
     },
     {
       "Title": "JOURNALIST TEST RETAKE",
       "Description": "Retake a car journalist test of choice to get a better result",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "JournalistRetake"
     },
     {
       "Title": "DELIVERY PROFIT BOOST",
       "Description": "20% more profit on the next delivery",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "DeliveryProfitBoost",
+      "Amount": 1.2
     },
     {
       "Title": "DOUBLE NEXT TIP",
       "Description": "Your next customer tip will be doubled",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "DoubleNextTip",
+      "Amount": 2.0
     },
     {
       "Title": "NEXT FINE WAIVED",
       "Description": "Your next fine will be waived",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "FineWaived"
     },
     {
       "Title": "HEAT-FREE RIDES",
       "Description": "No police the next 5 rides",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "HeatFreeRides",
+      "Uses": 5
     },
     {
       "Title": "INVINCIBLE RIDES",
       "Description": "No accidents for the next 5 rides",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "InvincibleRides",
+      "Uses": 5
     },
     {
       "Title": "WORKER BONUS",
       "Description": "An employee making a delivery gives you double the return",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "WorkerBonus",
+      "Amount": 2.0
     },
     {
       "Title": "DR PROTECTION",
       "Description": "Your driver rating is not reduced by an accident",
-      "Kind": "Card"
+      "Kind": "Card",
+      "Effect": "DriverRatingProtection"
     }
   ]
 }

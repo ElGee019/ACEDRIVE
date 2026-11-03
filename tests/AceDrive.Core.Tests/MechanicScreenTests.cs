@@ -15,12 +15,12 @@ public sealed class MechanicScreenTests
 
     private sealed record Rig(
         MechanicScreenViewModel Vm, Garage Garage, DriverWallet Wallet, FakeClock Clock,
-        VoiceBeat Beat, List<MechanicRepair> Repairs);
+        VoiceBeat Beat, List<MechanicRepair> Repairs, Trunk Trunk);
 
     private static Rig New(
         double cash = 100000.0, double driveKm = 0.0, bool broken = false,
         CarSpec? car = null, bool withCar = true, Action? onBack = null,
-        double bodyDamage = 0.0)
+        double bodyDamage = 0.0, bool freeRepair = false, bool halfDamage = false)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         CarSpec spec = car ?? Car;
@@ -41,10 +41,23 @@ public sealed class MechanicScreenTests
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
         var repairs = new List<MechanicRepair>();
+        var glovebox = new Glovebox(RewardTable.Default, wallet);
+        var trunk = new Trunk();
+        if (freeRepair)
+        {
+            glovebox.Claim(
+                RewardTable.Default.Find(RewardCardEffect.FreeCarRepair)!, trunk);
+        }
+        if (halfDamage)
+        {
+            glovebox.Claim(
+                RewardTable.Default.Find(RewardCardEffect.HalfDamage)!, trunk);
+        }
         var vm = new MechanicScreenViewModel(
-            garage, wallet, new GameClock(clock, clock.UtcNow), beat,
+            garage, wallet, glovebox, trunk,
+            new GameClock(clock, clock.UtcNow), beat,
             new RelayCommand(() => onBack?.Invoke()), repairs.Add);
-        return new Rig(vm, garage, wallet, clock, beat, repairs);
+        return new Rig(vm, garage, wallet, clock, beat, repairs, trunk);
     }
 
     private static MechanicPartRow Row(Rig rig, string key) => rig.Vm.Rows.Single(r => r.Key == key);
@@ -204,6 +217,41 @@ public sealed class MechanicScreenTests
 
         Assert.Equal(60000.0, rig.Wallet.Cash, 6);
         Assert.Equal(40000.0, Assert.Single(rig.Repairs).Cost, 6);
+    }
+
+    [Fact]
+    public void FreeCarRepairCard_CoversTheWholeBodyBill_AndIsSpent()
+    {
+        var rig = New(cash: 1000.0, bodyDamage: 0.5, freeRepair: true);
+
+        // The card is offered on the body line and the button works even though
+        // the cash could not cover the 20 000 CR bill.
+        Assert.Contains("free repair", rig.Vm.BodyDamageLine, StringComparison.OrdinalIgnoreCase);
+        Assert.True(rig.Vm.RepairBodyCommand.CanExecute(null));
+
+        rig.Vm.RepairBodyCommand.Execute(null);
+
+        Assert.Equal(0.0, rig.Garage.Current!.BodyDamage, 6);
+        Assert.Equal(1000.0, rig.Wallet.Cash, 6); // nothing was charged
+        Assert.DoesNotContain(
+            rig.Trunk.Items, item => item.Name == "FREE CAR REPAIR");
+        Assert.Equal(0.0, Assert.Single(rig.Repairs).Cost, 6);
+    }
+
+    [Fact]
+    public void HalfDamageCard_HalvesTheBodyBill_AndIsSpent()
+    {
+        var rig = New(cash: 100000.0, bodyDamage: 0.5, halfDamage: true);
+
+        Assert.Contains("Half Damage Reduction", rig.Vm.BodyDamageLine, StringComparison.Ordinal);
+        Assert.Contains("CR10000.00", rig.Vm.BodyDamageLine, StringComparison.Ordinal);
+
+        rig.Vm.RepairBodyCommand.Execute(null);
+
+        Assert.Equal(0.0, rig.Garage.Current!.BodyDamage, 6);
+        Assert.Equal(90000.0, rig.Wallet.Cash, 6); // half of the 20 000 CR bill
+        Assert.DoesNotContain(rig.Trunk.Items, item => item.Name == "HALF DAMAGE REDUCTION");
+        Assert.Equal(10000.0, Assert.Single(rig.Repairs).Cost, 6);
     }
 
     [Fact]

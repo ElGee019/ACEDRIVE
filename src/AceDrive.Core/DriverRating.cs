@@ -85,6 +85,40 @@ public readonly record struct DriverRating(
             : this;
 
     /// <summary>
+    /// Unity DriverRatingService.AccidentPenaltyForOverall: a crash hurts a
+    /// skilled driver more than a novice's fender bender. The bands are the
+    /// source's (>90 loses 10, >70 loses 7, >50 loses 5, >30 loses 3, else 1);
+    /// a non-finite reading falls back to the novice band rather than moving a
+    /// corrupt save by zero.
+    /// </summary>
+    public static double AccidentPenaltyForOverall(double overall)
+    {
+        if (!double.IsFinite(overall))
+        {
+            return 1.0;
+        }
+        if (overall > 90.0) return 10.0;
+        if (overall > 70.0) return 7.0;
+        if (overall > 50.0) return 5.0;
+        if (overall > 30.0) return 3.0;
+        return 1.0;
+    }
+
+    /// <summary>
+    /// Unity DriverRatingService.ApplyAccidentPenalty: one crash drops all
+    /// three skills by the same banded amount, clamped like every other skill
+    /// move. The DR Protection card is the caller's gate, not this method's.
+    /// </summary>
+    public DriverRating ApplyAccidentPenalty()
+    {
+        double penalty = AccidentPenaltyForOverall(Overall);
+        return new DriverRating(
+            ClampStat(Cornering - penalty),
+            ClampStat(Concentration - penalty),
+            ClampStat(OffTheLine - penalty));
+    }
+
+    /// <summary>
     /// Unity ApplyRandomSkillDelta: hands the delta to one randomly chosen
     /// skill (the daily-streak tail). System.Random stands in for
     /// UnityEngine.Random; the caller owns the seeded instance, so the roll is

@@ -28,7 +28,6 @@ public sealed class CalendarScreenTests
             CalendarStamp.Default with { Week = week },
             new ParameterizedCommand<int>(day => openDay?.Invoke(day)),
             new RelayCommand(() => back?.Invoke()),
-            willyLedger,
             new CalendarGate(
                 weekly ?? new WeeklyEventLedger(), willyLedger, valuation ?? new ValuationLedger()),
             () => coffeeCareer, () => coffeeBeansCareer, ignoreGates);
@@ -385,10 +384,11 @@ public sealed class CalendarScreenTests
     }
 
     [Fact]
-    public void WillyRow_CompletedToday_ReadsCompletedAndWarnsWithoutOpening()
+    public void WillyRow_CompletedToday_KeepsTheStandardLabelAndWarnsNextWeek()
     {
-        // Wednesday, and the run on this game date already paid: the row wears
-        // the completed label, grey in the view, and its tap only hints.
+        // Wednesday, and the run on this game date already paid: the row keeps
+        // the standard label and styling like every other used-up slot, and its
+        // tap answers with the same COME BACK NEXT WEEK hint.
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
         int opened = -1;
@@ -398,9 +398,8 @@ public sealed class CalendarScreenTests
             openDay: day => opened = day,
             willy: new WhereIsWillyLedger(DriverState.Fresh with { LastWillyDate = "2026-10-14" }));
         CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
-        Assert.True(willy.Completed);
         Assert.False(willy.Locked);
-        Assert.Equal("Where is Willy (Completed)", willy.EventLabel);
+        Assert.Equal("Where is Willy", willy.EventLabel);
 
         vm.DayCommand.Execute(4);
         Assert.Equal(-1, opened);
@@ -410,13 +409,13 @@ public sealed class CalendarScreenTests
         beat.Poll();
         vm.UpdateFlash();
         Assert.Equal(
-            "SEE YOU NEXT WEDNESDAY",
+            "COME BACK NEXT WEEK",
             Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
 
         clock.Advance(TimeSpan.FromSeconds(3.1));
         vm.UpdateFlash();
         Assert.Equal(
-            "Where is Willy (Completed)",
+            "Where is Willy",
             Assert.Single(vm.Days, d => d.DayOfWeek == 4).EventLabel);
     }
 
@@ -436,7 +435,6 @@ public sealed class CalendarScreenTests
             coffeeCareer: false);
         CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
         Assert.True(willy.Locked);
-        Assert.False(willy.Completed);
         Assert.Equal("Where is Willy", willy.EventLabel);
 
         vm.DayCommand.Execute(4);
@@ -480,7 +478,7 @@ public sealed class CalendarScreenTests
     public void WillyRow_WithGatesIgnored_ReadsOpenDespiteTheStampAndTheCareer()
     {
         // TEMPORARY (testing): the stamp and the closed coffee career must not
-        // grey the row out while the gates are open.
+        // warn while the gates are open.
         var vm = Create(
             gameStart: new DateTime(2026, 10, 14, 12, 0, 0, DateTimeKind.Utc),
             willy: new WhereIsWillyLedger(
@@ -490,7 +488,6 @@ public sealed class CalendarScreenTests
 
         CalendarRow willy = Assert.Single(vm.Days, d => d.DayOfWeek == 4);
 
-        Assert.False(willy.Completed);
         Assert.False(willy.Locked);
         Assert.Equal("Where is Willy", willy.EventLabel);
     }

@@ -43,6 +43,7 @@ public sealed class NavigationTests
         var garageInstance = garage ?? new Garage(pool);
         var garageStore = new FakeGarageStore();
         var trunk = new Trunk();
+        var glovebox = new Glovebox(RewardTable.Default, wallet);
         var hunger = new Hunger(HungerRules.Default);
         var city = new CityEconomy([], CityRules.Default);
         var roads = new RoadTestLedger(pool, seed: 0);
@@ -103,7 +104,7 @@ public sealed class NavigationTests
             StoreCatalog.Default, new OperatingZone(null, seed: 0, AddressMap.Default), new JobLedger(),
             onboarding,
             new ShopInteriors(
-                wallet, garageInstance, game, InsuranceRules.Default, poolCars,
+                wallet, garageInstance, glovebox, trunk, game, InsuranceRules.Default, poolCars,
                 saver, new VisitLedger(), beat, log),
             day, log);
         var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
@@ -114,12 +115,14 @@ public sealed class NavigationTests
         var taxi = new TaxiJobFlow(
             TaxiTestData.Proposer(), AddressMap.Default, brands, poolCars, null,
             CustomerRequestTable.Empty, null, TaxiRules.Default, FareTable.Default,
-            garageInstance, wallet, friends,
+            garageInstance, wallet, glovebox, trunk, friends,
             new FleetService(
                 garageInstance, poolCars, game, wallet, InsuranceRules.Default, log,
                 brands, new FakeContentSource(TestSession.EmptyContent)),
             game, clock, beat, saver, rivals, breakdowns, null, log);
-        var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, clock, beat, log);
+        var delivery = new DeliveryFlow(
+            board, career, city, friends, wallet, glovebox, trunk, meter, breakdowns,
+            clock, beat, log);
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(
@@ -149,7 +152,7 @@ public sealed class NavigationTests
         // The care-package run the jobs page's DELIVER button starts, with the
         // reward cards its delivered page offers (PORTPLAN 61).
         var careReward = new CarePackageReward(
-            RewardTable.Default, new Glovebox(RewardTable.Default, wallet), trunk, wallet,
+            RewardTable.Default, glovebox, trunk, wallet,
             new Random(15), () => saver.SaveDriver(rivals.LastResult), log);
         var care = new CarePackageFlow(
             directory, carePackages, todoBoard, careReward, AddressMap.Default, null,
@@ -178,7 +181,7 @@ public sealed class NavigationTests
                 wallet, roads,
                 new RoadTestAudienceSource(city, board, friends),
                 RoadTestAudienceRules.Default, saver, rivals, beat, log),
-            poolCars, AddressMap.Default, beat, () => null, new Random(0), log,
+            glovebox, trunk, poolCars, AddressMap.Default, beat, () => null, new Random(0), log,
             ignoreEventGates);
         roadTest.Attach(new FakeRoadTestHost());
         // The Saturday Touristenfahrten run: its own doors, settle and flow, on
@@ -203,10 +206,10 @@ public sealed class NavigationTests
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
-            trunk, hunger, StoreCatalog.Default,
+            trunk, glovebox, hunger, StoreCatalog.Default,
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
-            valuation, willy, willyLedger, care, roadTest, touristen, weeklyEvents, gate,
+            valuation, willy, care, roadTest, touristen, weeklyEvents, gate,
             () => "mazda", () => CallBinding.Default.Label, new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);

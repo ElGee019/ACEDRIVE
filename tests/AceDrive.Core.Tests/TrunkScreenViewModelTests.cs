@@ -26,6 +26,9 @@ public sealed class TrunkScreenViewModelTests
     // catalogue has no row for it and it belongs in the glove compartment.
     private const string Certificate = "Cento Miglia Certificate Week 3 1924 - Tier 1";
 
+    // The counter-limited card the trunk page prints a countdown for.
+    private const string HeatCard = "HEAT-FREE RIDES";
+
     private static (
         TrunkScreenViewModel Vm, Trunk Trunk, Hunger Hunger, List<string> Events)
         Create(
@@ -41,8 +44,9 @@ public sealed class TrunkScreenViewModelTests
         var garage = new Garage([car]);
         garage.Add(car, week: 1);
         var events = new List<string>();
+        var wallet = new DriverWallet();
         var vm = new TrunkScreenViewModel(
-            trunk, appetite, garage,
+            trunk, new Glovebox(RewardTable.Default, wallet), appetite, garage,
             new StoreCatalog(catalog ?? [Maple, Banana], DefaultStock: 20),
             new RelayCommand(() => events.Add("back")),
             () => events.Add("eaten"),
@@ -72,7 +76,28 @@ public sealed class TrunkScreenViewModelTests
         TrunkItemRow row = Row(vm, "MAPLE SYRUP");
         Assert.Equal("x2", row.QuantityLine);
         Assert.Equal("-3", row.HungerLine);
+        Assert.Equal(string.Empty, row.UsesLine);
+        Assert.False(row.HasUses);
         Assert.True(row.CanEat);
+    }
+
+    [Fact]
+    public void Open_PrintsARewardCardsFunctionText()
+    {
+        var (vm, _, _, _) = Create(
+            items:
+            [
+                new TrunkItem("NEXT FINE WAIVED", 0.0) { Quantity = 1 },
+                new TrunkItem("Cento Miglia Certificate", 0.0) { Quantity = 1 },
+            ]);
+
+        TrunkItemRow card = CompartmentRow(vm, "NEXT FINE WAIVED");
+        Assert.True(card.HasDescription);
+        Assert.Equal("Your next fine will be waived", card.DescriptionLine);
+        // A keepsake with no catalogue row keeps the name-only row.
+        Assert.False(CompartmentRow(vm, "Cento Miglia Certificate").HasDescription);
+        // Cards are keepsakes, never food: the trunk half stays empty.
+        Assert.Empty(vm.Rows);
     }
 
     [Fact]
@@ -177,9 +202,32 @@ public sealed class TrunkScreenViewModelTests
         TrunkItemRow keepsake = Assert.Single(vm.CompartmentRows);
         Assert.Equal("x1", keepsake.QuantityLine);
         Assert.Equal(string.Empty, keepsake.HungerLine);
+        Assert.False(keepsake.HasUses);
         Assert.False(keepsake.CanEat);
         Assert.False(vm.IsTrunkEmpty);
         Assert.False(vm.IsCompartmentEmpty);
+    }
+
+    [Fact]
+    public void Open_CounterCardPrintsItsRemainingUses()
+    {
+        // The "next 5 rides" card shows its countdown on the same line as the
+        // count, so the player sees what the next completed job will spend.
+        var (vm, _, _, _) = Create(items:
+        [
+            new TrunkItem(HeatCard, 0.0)
+            {
+                Quantity = 1,
+                UsesLeft = 3,
+                UsesMax = 5,
+            },
+        ]);
+
+        TrunkItemRow card = Assert.Single(vm.CompartmentRows);
+        Assert.Equal("x1", card.QuantityLine);
+        Assert.Equal("3/5", card.UsesLine);
+        Assert.True(card.HasUses);
+        Assert.False(card.CanEat);
     }
 
     [Fact]
@@ -255,7 +303,8 @@ public sealed class TrunkScreenViewModelTests
         var beat = new VoiceBeat(clock);
         var events = new List<string>();
         var vm = new TrunkScreenViewModel(
-            new Trunk(), new Hunger(HungerRules.Default), new Garage([]),
+            new Trunk(), new Glovebox(RewardTable.Default, new DriverWallet()),
+            new Hunger(HungerRules.Default), new Garage([]),
             StoreCatalog.Default, new RelayCommand(() => events.Add("back")),
             () => { }, beat);
 

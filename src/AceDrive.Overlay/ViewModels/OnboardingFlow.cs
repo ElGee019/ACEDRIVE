@@ -837,7 +837,12 @@ public sealed class OnboardingFlow : IScreenController
             return;
         }
 
-        _host.ShowScreen(_host.ControlScreen());
+        // A plain visit lands on the main page the overlay opens on, not on the
+        // jobs page: BACK from a shop the player called up is the way out of
+        // the overlay, so it hands back what a call would have shown (the
+        // repair hand-back ends the same way) instead of a job list they never
+        // opened.
+        _host.ShowScreen(_host.MenuScreen());
     }
 
     // WHY quantities, not presence: driver.json keeps the trunk between runs,

@@ -204,6 +204,53 @@ public sealed class TodoLedgerTests
     }
 
     [Fact]
+    public void RotateOnJob_NeverPullsAPendingTipBackIntoASlot()
+    {
+        TodoLedger ledger = Fresh();
+        TodoFacts facts = Facts(cr: 600.0);
+
+        // CrEarnings completes while visible: it moves to the queue and waits
+        // for the popup, so the page must never show it as an open tip again.
+        _ = ledger.Sync(facts);
+        Assert.True(ledger.IsPending(TodoSubject.CrEarnings));
+
+        for (int i = 0; i < TodoLedger.TurnLimit * 6; i++)
+        {
+            _ = ledger.RotateOnJob(facts);
+            Assert.DoesNotContain(TodoSubject.CrEarnings, Subjects(ledger, facts));
+        }
+
+        Assert.True(ledger.IsPending(TodoSubject.CrEarnings));
+    }
+
+    [Fact]
+    public void ResumeAndSync_NeverPutAPendingTipInASlot()
+    {
+        // The bank tip completed, then the player spent the balance: the fact
+        // is below the target again, but the tip is delivered, not open.
+        TodoLedger ledger = TodoLedger.Resume(TodoTable.Default, new TodoLedgerState(
+            [new TodoSlotState(TodoSubject.CrEarnings, 0)],
+            [TodoSubject.BankStandings],
+            new Dictionary<string, double>
+            {
+                [TodoSubject.CrEarnings] = 500.0,
+                [TodoSubject.BankStandings] = 1032.0,
+            },
+            new Dictionary<string, int>(),
+            new Dictionary<string, int>(),
+            [TodoSubject.BankStandings],
+            [],
+            [],
+            new Dictionary<string, TodoTipSnapshot>()));
+
+        TodoFacts facts = Facts(cr: 600.0, bank: 900.0);
+        _ = ledger.Sync(facts);
+
+        Assert.True(ledger.IsPending(TodoSubject.BankStandings));
+        Assert.DoesNotContain(TodoSubject.BankStandings, Subjects(ledger, facts));
+    }
+
+    [Fact]
     public void Sync_LeavesAnInactiveVisitAloneUntilItsDoorIsPlaced()
     {
         TodoLedger ledger = Fresh();

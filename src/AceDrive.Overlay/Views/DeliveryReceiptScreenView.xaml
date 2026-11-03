@@ -42,6 +42,11 @@
             <ContentPresenter Content="{Binding ReceivedLine}"
                               ContentTemplate="{StaticResource ReceiptLineTemplate}"
                               TextElement.Foreground="#FFF" TextElement.FontSize="16"/>
+            <!-- The Delivery Profit Boost card's row: the payout above is
+                 already the scaled amount, so the row only names the card. -->
+            <TextBlock Text="{Binding ProfitBoostLine}" Foreground="#FF97EAD2" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"
+                       Visibility="{Binding HasProfitBoost, Converter={StaticResource BoolToVis}}"/>
             <ItemsControl ItemsSource="{Binding TierLines}" Foreground="#FFBFC4C9" FontSize="14"
                           ItemTemplate="{StaticResource ReceiptLineTemplate}" Margin="0,8,0,4"/>
             <ContentPresenter Content="{Binding FareLine}"

@@ -22,6 +22,7 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
     private readonly Action _onAccel;
     private readonly Action _onBrake;
     private readonly Action _onPhoto;
+    private readonly Action _onRetake;
     private readonly Action _onContinue;
     private readonly ICommand _backCommand;
     private readonly VoiceBeat _beat;
@@ -37,27 +38,33 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
     private RoadTestMetric _metric = RoadTestMetric.AccelerationTime;
     private bool _accelDone;
     private bool _brakeDone;
+    // The Journalist Test Retake card is carried: the result view offers one
+    // more attempt at the leg just driven, and the flow spends the card.
+    private bool _hasRetake;
     private bool _accelFlash;
     private bool _brakeFlash;
     private bool _photoFlash;
+    private bool _retakeFlash;
     private bool _continueFlash;
     private bool _backFlash;
 
     public RoadTestScreenViewModel(
         CarSpec car, bool drivesThePick,
-        Action onAccel, Action onBrake, Action onPhoto,
+        Action onAccel, Action onBrake, Action onPhoto, Action onRetake,
         Action onContinue, ICommand backCommand, VoiceBeat beat)
     {
         ArgumentNullException.ThrowIfNull(car);
         ArgumentNullException.ThrowIfNull(onAccel);
         ArgumentNullException.ThrowIfNull(onBrake);
         ArgumentNullException.ThrowIfNull(onPhoto);
+        ArgumentNullException.ThrowIfNull(onRetake);
         ArgumentNullException.ThrowIfNull(onContinue);
         ArgumentNullException.ThrowIfNull(backCommand);
         ArgumentNullException.ThrowIfNull(beat);
         _onAccel = onAccel;
         _onBrake = onBrake;
         _onPhoto = onPhoto;
+        _onRetake = onRetake;
         _onContinue = onContinue;
         _backCommand = backCommand;
         _beat = beat;
@@ -67,6 +74,7 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
         AccelCommand = new RelayCommand(Accel, () => CanAccel);
         BrakeCommand = new RelayCommand(Brake, () => CanBrake);
         PhotoCommand = new RelayCommand(Photo, () => CanPhoto);
+        RetakeCommand = new RelayCommand(Retake, () => HasRetake);
         ContinueCommand = new RelayCommand(Continue, () => IsResults);
         BackCommand = new RelayCommand(Back);
         RebuildVoice();
@@ -89,6 +97,12 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
 
     /// <summary>The photo leg's button, revealed after both tests.</summary>
     public string PhotoLabel { get; } = Strings.Get("RoadTestPhoto");
+
+    /// <summary>The Journalist Test Retake button, revealed on a result view.</summary>
+    public string RetakeLabel { get; } = Strings.Get("RoadTestRetake");
+
+    /// <summary>The card's caption under the retake button.</summary>
+    public string RetakeText { get; } = Strings.Get("RoadTestRetakeHint");
 
     /// <summary>The brief under the 0-60 button.</summary>
     public string AccelText { get; } = Strings.Get("RoadTestAccelIntro");
@@ -225,6 +239,9 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
     /// <summary>The photo mission, offered once both legs ran.</summary>
     public ICommand PhotoCommand { get; }
 
+    /// <summary>One more attempt at the finished leg, while the card is carried.</summary>
+    public ICommand RetakeCommand { get; }
+
     /// <summary>Leaves the result view: the flow hands the test centre back.</summary>
     public ICommand ContinueCommand { get; }
 
@@ -250,6 +267,16 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
     {
         get => _photoFlash;
         private set => SetField(ref _photoFlash, value);
+    }
+
+    /// <summary>True while the flow offers the Journalist Test Retake button.</summary>
+    public bool HasRetake => _hasRetake;
+
+    /// <summary>Teal-glow acknowledgment for the RETAKE voice tap.</summary>
+    public bool RetakeFlash
+    {
+        get => _retakeFlash;
+        private set => SetField(ref _retakeFlash, value);
     }
 
     /// <summary>Teal-glow acknowledgment for the CONTINUE voice tap.</summary>
@@ -311,6 +338,27 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
     public void ShowAllCarsBoard(IReadOnlyList<RoadTestCarStanding> standings) =>
         AllCarsRows = BuildAllCarsRows(standings);
 
+    /// <summary>Which board the result view paints: seconds or metres.</summary>
+    public RoadTestMetric Metric => _metric;
+
+    /// <summary>
+    /// The flow reports whether a Journalist Test Retake is carried: the result
+    /// view shows its button and its caption only while it can be spent.
+    /// </summary>
+    public void SetRetake(bool available)
+    {
+        if (_hasRetake == available)
+        {
+            return;
+        }
+
+        _hasRetake = available;
+        OnPropertyChanged(nameof(HasRetake));
+        ((RelayCommand)RetakeCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)ContinueCommand).RaiseCanExecuteChanged();
+        RebuildVoice();
+    }
+
     /// <summary>
     /// CONTINUE from a result: the page goes back to the test centre, with the
     /// leg it just drove banked and the other leg (or the photo mission) now
@@ -323,6 +371,7 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
         ResultText = string.Empty;
         Rows = [];
         AllCarsRows = [];
+        SetRetake(false);
         RaisePhaseChanged();
     }
 
@@ -392,6 +441,17 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
         _onPhoto();
     }
 
+    private void Retake()
+    {
+        if (!HasRetake)
+        {
+            return;
+        }
+        RetakeFlash = false;
+        _beat.Cancel();
+        _onRetake();
+    }
+
     private void Continue()
     {
         if (!IsResults)
@@ -426,6 +486,12 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
     {
         PhotoFlash = true;
         _beat.Defer(Photo);
+    }
+
+    private void FlashThenRetake()
+    {
+        RetakeFlash = true;
+        _beat.Defer(Retake);
     }
 
     private void FlashThenContinue()
@@ -496,10 +562,12 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
         OnPropertyChanged(nameof(CanBrake));
         OnPropertyChanged(nameof(CanPhoto));
         OnPropertyChanged(nameof(ShowPhoto));
+        OnPropertyChanged(nameof(HasRetake));
         OnPropertyChanged(nameof(ShowBack));
         ((RelayCommand)AccelCommand).RaiseCanExecuteChanged();
         ((RelayCommand)BrakeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)PhotoCommand).RaiseCanExecuteChanged();
+        ((RelayCommand)RetakeCommand).RaiseCanExecuteChanged();
         ((RelayCommand)ContinueCommand).RaiseCanExecuteChanged();
         RebuildVoice();
     }
@@ -513,6 +581,10 @@ public sealed class RoadTestScreenViewModel : ViewModelBase, IVoiceScreen, IKeep
         var actions = new Dictionary<string, Action>();
         if (!IsReady)
         {
+            if (HasRetake)
+            {
+                actions[RetakeLabel] = FlashThenRetake;
+            }
             actions[ContinueLabel] = FlashThenContinue;
         }
         else

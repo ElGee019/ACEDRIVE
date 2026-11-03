@@ -40,7 +40,7 @@ public sealed class JobSettlementTests
     public void SettleDeliveryRun_SumsEveryStoreCredPAndBanksTheRun()
     {
         DeliveryCareer career = OwnedGroceryCareer();
-        var (settlement, wallet, _, jobs, zone, online, meter, host) = Build(career);
+        var (settlement, wallet, _, jobs, zone, online, meter, host, _) = Build(career);
         Drive(meter);
 
         settlement.SettleDeliveryRun(Cart, "Germany", host);
@@ -66,7 +66,7 @@ public sealed class JobSettlementTests
         // A borrowed free-roam car must not distort the ownership economy: the
         // goods money still lands, the career counters and XP do not.
         DeliveryCareer career = OwnedGroceryCareer();
-        var (settlement, wallet, garage, jobs, zone, online, meter, host) =
+        var (settlement, wallet, garage, jobs, zone, online, meter, host, _) =
             Build(career, liveCar: "ks_mazda_mx5_na");
         Drive(meter);
 
@@ -83,6 +83,57 @@ public sealed class JobSettlementTests
         Assert.Single(host.DriverSaves); // the cash still banks
     }
 
+    [Fact]
+    public void SettleDeliveryRun_SpendsTheProfitBoostCard_AndScalesTheGoods()
+    {
+        DeliveryCareer career = OwnedGroceryCareer();
+        var trunk = new Trunk(
+        [
+            new TrunkItem("DELIVERY PROFIT BOOST", 0.0) { Quantity = 1 },
+        ]);
+        var (settlement, wallet, _, _, _, _, meter, host, carrying) =
+            Build(career, trunk: trunk);
+        Drive(meter);
+
+        settlement.SettleDeliveryRun(Cart, "Germany", host);
+
+        var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(
+            Assert.Single(host.Receipts));
+        Assert.True(receipt.HasProfitBoost);
+        Assert.Contains("20%", receipt.ProfitBoostLine, StringComparison.Ordinal);
+        // 20% on the 63 CR goods payout, the fare untouched: 75.60 in.
+        Assert.Equal("€75.60", receipt.ReceivedLine.Amount);
+        Assert.DoesNotContain(carrying.Items, item => item.Name == "DELIVERY PROFIT BOOST");
+        Assert.True(wallet.Cash > 0.0);
+    }
+
+    [Fact]
+    public void SettleDeliveryRun_SpendsOneChargeOfACounterCard()
+    {
+        // A completed job is one ride: a carried "next 5 rides" card counts
+        // down, and the settle banks that wear with the job's driver save.
+        DeliveryCareer career = OwnedGroceryCareer();
+        var trunk = new Trunk(
+        [
+            new TrunkItem("HEAT-FREE RIDES", 0.0)
+            {
+                Quantity = 1,
+                UsesLeft = 5,
+                UsesMax = 5,
+            },
+        ]);
+        var (settlement, _, _, _, _, _, meter, host, carrying) =
+            Build(career, trunk: trunk);
+        Drive(meter);
+
+        settlement.SettleDeliveryRun(Cart, "Germany", host);
+
+        Assert.Same(trunk, carrying);
+        TrunkItem card = Assert.Single(carrying.Items);
+        Assert.Equal(4, card.UsesLeft);
+        Assert.Equal(5, card.UsesMax);
+    }
+
     // 8.2 km at 360 km/h in half-second polls: the meter ignores a stalled tick
     // (dt ≥ 1 s), so the drive is fed the way the 10 Hz poll would.
     private static void Drive(DrivenDistanceMeter meter)
@@ -96,8 +147,8 @@ public sealed class JobSettlementTests
     private static (
         JobSettlement Settlement, DriverWallet Wallet, Garage Garage, JobLedger Jobs,
         OperatingZone Zone, FakePlayerTelemetry Online, DrivenDistanceMeter Meter,
-        FakeJobSettlementHost Host)
-        Build(DeliveryCareer career, string? liveCar = null)
+        FakeJobSettlementHost Host, Trunk Trunk)
+        Build(DeliveryCareer career, string? liveCar = null, Trunk? trunk = null)
     {
         // Deterministic locale: the receipt copy is asserted in en-US.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -117,14 +168,17 @@ public sealed class JobSettlementTests
         var jobs = new JobLedger();
         var online = new FakePlayerTelemetry();
         var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
+        var carrying = trunk ?? new Trunk();
+        var glovebox = new Glovebox(RewardTable.Default, wallet);
         var settlement = new JobSettlement(
-            wallet, garage, new TaxiShift(), zone, jobs, new DailyStreak(clock, null), clock,
+            wallet, garage, new TaxiShift(), zone, jobs, glovebox, carrying,
+            new DailyStreak(clock, null), clock,
             fleet, new FakeCarRarity(), new FakeFriendshipStore(), new FakeBrandMileageStore(),
             online, new FakeRivals(), new DeliveryBoard(catalog), career,
             new CityEconomy(catalog.Stores, CityRules.Default), DeliveryFareTable.Default,
             meter, FareTable.Default,
             TaxiRules.Default, new VoiceBeat(clock), null, new NullLogger());
         return (settlement, wallet, garage, jobs, zone, online, meter,
-            new FakeJobSettlementHost());
+            new FakeJobSettlementHost(), carrying);
     }
 }

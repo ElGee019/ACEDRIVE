@@ -29,11 +29,16 @@ public sealed record DeliveryReceipt(
     int FriendshipLevel,
     bool FriendshipTierIncreased,
     int CredPEarned,
-    double TotalCredP)
+    double TotalCredP,
+    bool ProfitBoostApplied = false,
+    double ProfitBoostRate = 0.0)
 {
     /// <summary>False when the run rested on no owned hub.</summary>
     public bool HasFriendship => HubOwnerName.Length > 0;
 
     /// <summary>False when the stores rested on no owned hub.</summary>
     public bool HasCredP => CredPEarned > 0;
+
+    /// <summary>True when a Delivery Profit Boost card scaled this run's goods money.</summary>
+    public bool HasProfitBoost => ProfitBoostApplied;
 }

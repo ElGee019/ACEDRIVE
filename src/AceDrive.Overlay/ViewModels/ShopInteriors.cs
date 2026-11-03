@@ -18,6 +18,8 @@ public sealed class ShopInteriors
 {
     private readonly DriverWallet _wallet;
     private readonly Garage _garage;
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     private readonly GameClock _game;
     private readonly InsuranceRules _insurance;
     private readonly IReadOnlyList<CarSpec> _cars;
@@ -27,12 +29,15 @@ public sealed class ShopInteriors
     private readonly ILog _log;
 
     public ShopInteriors(
-        DriverWallet wallet, Garage garage, GameClock game, InsuranceRules insurance,
+        DriverWallet wallet, Garage garage, Glovebox glovebox, Trunk trunk,
+        GameClock game, InsuranceRules insurance,
         IReadOnlyList<CarSpec> cars, GameStateSaver saver, VisitLedger visits,
         VoiceBeat beat, ILog log)
     {
         _wallet = wallet;
         _garage = garage;
+        _glovebox = glovebox;
+        _trunk = trunk;
         _game = game;
         _insurance = insurance;
         _cars = cars;
@@ -106,7 +111,7 @@ public sealed class ShopInteriors
     // condition) and logged.
     public MechanicScreenViewModel Mechanic(ICommand back, Action onChanged) =>
         new MechanicScreenViewModel(
-            _garage, _wallet, _game, _beat, back,
+            _garage, _wallet, _glovebox, _trunk, _game, _beat, back,
             repair =>
             {
                 // A covered car's repair pays 90% into the escrow the broker

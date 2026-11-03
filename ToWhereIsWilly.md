@@ -421,14 +421,13 @@ Both views join `MainWindow.xaml` as `DataTemplate`s; code-behind stays empty.
 
 ### 3.5 Calendar row states
 
-`CalendarRow` gains `bool Completed` and `bool Locked` (default false). The
-calendar page takes `WhereIsWillyLedger` and `Func<bool> hasCoffeeCareer`, and
-for the Willy day:
+`CalendarRow` gains `bool Locked` (default false). The calendar page takes a
+`CalendarGate` and `Func<bool> hasCoffeeCareer`, and for the Willy day:
 
 | State | Label | Tap |
 |---|---|---|
 | open | `EventWilly` | dispatch + teal flash |
-| completed today | `EventWillyCompleted` (`Where are Willy and Lily (Completed)` equivalent: `Where is Willy (Completed)`), grey italic | 3 s warning `ControlGateWillyDone` (`SEE YOU NEXT WEDNESDAY`) |
+| completed today | `EventWilly` (`Where is Willy`), styled exactly like every other row — the button announces nothing | 3 s warning `ControlGateNextWeek` (`COME BACK NEXT WEEK`), the same hint every used-up slot shows |
 | coffee career closed | `EventWilly` (`Where is Willy`), styled exactly like every other row — the button announces nothing | 3 s warning `ControlGateWillyCareer` (`START A COFFEE BEANS DELIVERY CAREER FIRST`) |
 | coffee-beans career not started (gates ignored for testing) | normal | 3 s warning `ControlGateWillyCareer` |
 | outside Wed 08–20 | normal | existing `ControlGateWarning` |
@@ -439,9 +438,10 @@ discovered coffee-shop door does not open the search. The tap asks it live, whic
 the day-gate bypass (`IgnoreEventGatesForTesting`) from opening a run the player has no
 career for.
 
-The page's existing 3 s warning slot carries both new warnings, so no new
-timer. `Locked` is behaviour only: the view's single grey/italic `DataTrigger`
-binds `Completed`, and the locked row renders like every other row.
+The page's existing 3 s warning slot carries both hints, so no new timer. Neither
+state is drawn on the row: the completion stamp is read through `CalendarGate.Taken`
+on the tap (never mirrored on the row), and `Locked` is behaviour only, so the
+strip's only styling trigger left is the teal tap glow.
 
 ### 3.6 Wiring
 
@@ -449,7 +449,7 @@ binds `Completed`, and the locked row renders like every other row.
 |---|---|
 | `Navigation` | ctor takes `WhereIsWillyFlow`; `_willyDay` read off `ControlCalendar.Week`; `OnDay(day == _willyDay)` → `_willy.Begin()` (a running quest reopens its page); the *other* event days plus `OpenTaxiShift` and `ShowDelivery` guard on `_willy.InFlight` (Unity's blocked job centre) |
 | `MainViewModel` | ctor takes the flow; `Attach(this)`; `Poll` calls `_willy.Advance(s)` after `_hud.Update` (the valuation venue now opens through its own POI handler, not the poll); implements `IWhereIsWillyHost` |
-| `CalendarScreenViewModel` | ctor takes the ledger + the two career predicates (`HasCoffeeCareer` for the locked state, `OwnsCoffeeCareer` for the tap); builds the Completed label (the locked row keeps its plain label) and the two warnings |
+| `CalendarScreenViewModel` | ctor takes the gate + the two career predicates (`HasCoffeeCareer` for the locked state, `OwnsCoffeeCareer` for the tap); the Willy row keeps its plain label in every state and the two warnings share the strip's slot |
 | `PoiWorld` | the flow's handler joins `Handlers(...)` (registered first) |
 | `GameStateSaver` | ctor takes `WhereIsWillyLedger`; `SaveDriver` writes `LastWillyDate` |
 | `App.OnStartup` | load the rules; build the ledger from `savedDriver`; build the flow after `dayCycle`/`poiDirectory`/`residents`; pass ledger to the saver/nav/calendar, flow to nav/VM |
@@ -463,8 +463,6 @@ binds `Completed`, and the locked row renders like every other row.
 ### 3.7 resx (en + nl, no sentences in code)
 
 ```
-EventWillyCompleted          Where is Willy (Completed)
-ControlGateWillyDone         SEE YOU NEXT WEDNESDAY
 ControlGateWillyCareer       START A COFFEE BEANS DELIVERY CAREER FIRST
 
 WillyTitle                   WHERE IS WILLY
@@ -523,8 +521,9 @@ values the flow already resolved.
    `DROP OFF` alone.
 8. `DROP OFF` → paid, certificate in the trunk, stamp saved, receipt opens.
 9. `CONTINUE` → panel back on the main page; the HUD is clear.
-10. Reopen the calendar: the row reads `Where is Willy (Completed)`, grey; a
-    tap answers `SEE YOU NEXT WEDNESDAY` and does nothing else.
+10. Reopen the calendar: the row still reads `Where is Willy` — no completed
+    variant, no grey italic — and a tap answers `COME BACK NEXT WEEK` like any
+    other used-up slot and does nothing else.
 
 Alternative branches that must also work:
 
@@ -635,8 +634,11 @@ receipt line reuses, so the page and the certificate can never drift).
    substitution the Cento receipt already made.
 5. **A5 — copy and the lock.** The row keeps the port's `Where is Willy` label
    (and its "where is" voice alias, tuned against the logged mishearings)
-   instead of Unity's "Where are Willy and Lily"; the completed variant follows
-   the same wording. Unity's unlock text lives on the separate job-centre
+   instead of Unity's "Where are Willy and Lily", and it keeps that label once
+   the run is stamped: the completed variant, the grey italic and Unity's
+   `SEE YOU NEXT WEDNESDAY` are gone, so a used-up Wednesday answers with the
+   strip's shared `COME BACK NEXT WEEK` hint. Unity's unlock text lives on the
+   separate job-centre
    button, which does nothing when clicked without a coffee shop; the port's
    merged row shows that text as the row label and answers the tap with the
    same warning. Flag if you want Unity's exact plural instead.

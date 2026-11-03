@@ -81,6 +81,12 @@ public sealed class TaxiJobState
     public int SpeedChallengeFines { get; set; }
 
     /// <summary>
+    /// How many of those fines a Next Fine Waived card covered: the receipt
+    /// deducts only the rest and prints the waiver, and the ride's tip survives.
+    /// </summary>
+    public int FinesWaived { get; set; }
+
+    /// <summary>
     /// When the accepted speed challenge must reach the drop-off. Null when
     /// the address map cannot supply a route (no deadline is invented) or
     /// when this ride has no speed challenge.

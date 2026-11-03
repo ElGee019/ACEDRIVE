@@ -183,4 +183,59 @@ public sealed class TaxiReceiptTests
         Assert.False(receipt.HasBrandBonus);
         Assert.Equal(13.78, receipt.Total);
     }
+
+    [Fact]
+    public void WaivedFines_DeductNothingAndKeepTheCount()
+    {
+        // Next Fine Waived: the ride still counts the fine it hit, but nothing
+        // is deducted and the tip is untouched (the caller keeps it eligible).
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0,
+            finesWaived: 1);
+
+        Assert.Equal(1, receipt.Fines);
+        Assert.Equal(1, receipt.FinesWaived);
+        Assert.Equal(0.0, receipt.FineDeduction);
+        Assert.True(receipt.HasFineWaived);
+        Assert.Equal(63.78, receipt.Total);
+    }
+
+    [Fact]
+    public void PartlyWaivedFines_DeductTheRest()
+    {
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 2, Table, 0.0,
+            finesWaived: 1);
+
+        Assert.Equal(1, receipt.FinesWaived);
+        Assert.Equal(50.0, receipt.FineDeduction);
+    }
+
+    [Fact]
+    public void DoubleNextTip_DoublesTheEarnedTipAndFlagsIt()
+    {
+        TaxiReceipt normal = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0);
+        TaxiReceipt doubled = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: true, fines: 1, Table, 0.0,
+            tipMultiplier: 2.0);
+
+        Assert.Equal(normal.Tip * 2.0, doubled.Tip);
+        Assert.True(doubled.TipDoubled);
+        Assert.True(doubled.HasTipDoubled);
+        // The extra tip joins the total; the fine still deducts once.
+        Assert.Equal(normal.Total + normal.Tip, doubled.Total);
+    }
+
+    [Fact]
+    public void ATipMultiplierNeverInventsATip()
+    {
+        // Unity only spends the card on a tip the ride actually earned.
+        TaxiReceipt receipt = TaxiReceiptBuilder.Build(
+            8.2, 1, 1, 1, 100, tipEligible: false, fines: 0, Table, 0.0,
+            tipMultiplier: 2.0);
+
+        Assert.Equal(0.0, receipt.Tip);
+        Assert.False(receipt.TipDoubled);
+    }
 }

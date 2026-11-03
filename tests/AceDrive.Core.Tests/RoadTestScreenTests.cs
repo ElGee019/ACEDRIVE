@@ -303,14 +303,36 @@ public sealed class RoadTestScreenTests
         Assert.Contains("1990 MAZDA MX-5 NA", page.PickRequiredText, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Retake_IsOfferedOnlyWhileTheFlowAllowsIt()
+    {
+        bool retaken = false;
+        RoadTestScreenViewModel page = CreatePage(onRetake: () => retaken = true);
+        Assert.False(page.HasRetake);
+        Assert.False(page.RetakeCommand.CanExecute(null));
+
+        page.SetRetake(true);
+
+        Assert.True(page.HasRetake);
+        Assert.True(page.RetakeCommand.CanExecute(null));
+        page.RetakeCommand.Execute(null);
+        Assert.True(retaken);
+
+        page.SetRetake(false);
+        Assert.False(page.HasRetake);
+        Assert.False(page.RetakeCommand.CanExecute(null));
+    }
+
     private static RoadTestScreenViewModel CreatePage(
         Action? onAccel = null, Action? onBrake = null, Action? onPhoto = null,
-        Action? onContinue = null, Action? onBack = null, bool drivesThePick = true)
+        Action? onContinue = null, Action? onBack = null, bool drivesThePick = true,
+        Action? onRetake = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         return new RoadTestScreenViewModel(
             Car, drivesThePick, onAccel ?? NoOp, onBrake ?? NoOp, onPhoto ?? NoOp,
-            onContinue ?? NoOp, new RelayCommand(onBack ?? NoOp), new VoiceBeat(new FakeClock()));
+            onRetake ?? NoOp, onContinue ?? NoOp, new RelayCommand(onBack ?? NoOp),
+            new VoiceBeat(new FakeClock()));
     }
 
     private static void NoOp()

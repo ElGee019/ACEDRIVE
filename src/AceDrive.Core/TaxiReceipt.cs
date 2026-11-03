@@ -39,7 +39,9 @@ public sealed record TaxiReceipt(
     double BrandBonus = 0.0,
     double StarterBonusRate = 0.0,
     double StarterBonus = 0.0,
-    string CarKey = "")
+    string CarKey = "",
+    bool TipDoubled = false,
+    int FinesWaived = 0)
 {
     /// <summary>False when the passenger matched no known resident.</summary>
     public bool HasFriendship => FriendshipName.Length > 0;
@@ -49,4 +51,10 @@ public sealed record TaxiReceipt(
 
     /// <summary>False when the zone/car decay left no starter bonus.</summary>
     public bool HasStarterBonus => StarterBonus > 0.0;
+
+    /// <summary>True when a Double Next Tip card covered this tip.</summary>
+    public bool HasTipDoubled => TipDoubled;
+
+    /// <summary>True when a Next Fine Waived card covered at least one fine.</summary>
+    public bool HasFineWaived => FinesWaived > 0;
 }

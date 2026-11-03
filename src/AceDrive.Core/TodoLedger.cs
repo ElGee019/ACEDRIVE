@@ -522,13 +522,16 @@ public sealed class TodoLedger
         // A resume can leave fewer than four usable slots (a retired one-time
         // subject, a save written by an older list). Inactive candidates go
         // back to the queue instead of being dropped: their door may be
-        // placed later.
+        // placed later. A completed tip waiting for delivery is no candidate
+        // either: it belongs to the popup, not to an open slot.
         int safety = _queue.Count + MaxVisibleSlots;
         while (_visible.Count < MaxVisibleSlots && _queue.Count > 0 && safety-- > 0)
         {
             string candidate = _queue[0];
             _queue.RemoveAt(0);
-            if (!_activated.Contains(candidate) || IsVisible(candidate))
+            if (!_activated.Contains(candidate)
+                || IsVisible(candidate)
+                || _awaiting.Contains(candidate))
             {
                 _queue.Add(candidate);
                 continue;
@@ -645,6 +648,9 @@ public sealed class TodoLedger
     // The next slot candidate: queued, active, not visible in another slot,
     // not the slot's current subject and not already met. Unity skips every
     // one of those for the same reason: a met subject belongs to the popup.
+    // A pending one does too, even when a fact moved back below its target
+    // (a bank balance drops when the player buys something): the tip is
+    // completed, so it must not reappear as an open slot.
     private string? TakeNextCandidate(int slotIndex, TodoFacts facts)
     {
         int safety = _queue.Count + 1;
@@ -655,6 +661,7 @@ public sealed class TodoLedger
             if (string.Equals(candidate, _visible[slotIndex].SubjectId, StringComparison.Ordinal)
                 || !_activated.Contains(candidate)
                 || IsVisibleElsewhere(candidate, slotIndex)
+                || _awaiting.Contains(candidate)
                 || TodoRequirements.Get(candidate).IsMet(facts, _targets[candidate]))
             {
                 _queue.Add(candidate);
@@ -668,7 +675,10 @@ public sealed class TodoLedger
     }
 
     // The turn rotation's candidate: like the met-slot pick, but a met subject
-    // is still a legal tip (Unity's counter never checks the requirement).
+    // is still a legal tip (Unity's counter never checks the requirement). A
+    // *completed* one is not: it belongs to the popup until it is delivered, and
+    // pulling it back into a slot shows "Earn 2530 (currently 3184)" as an open
+    // tip that can never complete again (the target only cycles on acknowledge).
     private string? TakeTurnCandidate(int slotIndex)
     {
         int safety = _queue.Count + 1;
@@ -678,7 +688,8 @@ public sealed class TodoLedger
             _queue.RemoveAt(0);
             if (string.Equals(candidate, _visible[slotIndex].SubjectId, StringComparison.Ordinal)
                 || !_activated.Contains(candidate)
-                || IsVisibleElsewhere(candidate, slotIndex))
+                || IsVisibleElsewhere(candidate, slotIndex)
+                || _awaiting.Contains(candidate))
             {
                 _queue.Add(candidate);
                 continue;

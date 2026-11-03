@@ -150,17 +150,6 @@
                                                         <DataTrigger Binding="{Binding Flash}" Value="True">
                                                             <Setter Property="Foreground" Value="#FF97EAD2"/>
                                                         </DataTrigger>
-                                                        <!-- Only a stamped run reads
-                                                             grey and italic. A closed
-                                                             coffee career looks like
-                                                             every other row: the tap
-                                                             answers with its hint
-                                                             instead of the button
-                                                             announcing the gate. -->
-                                                        <DataTrigger Binding="{Binding Completed}" Value="True">
-                                                            <Setter Property="Foreground" Value="#FFBFC4C9"/>
-                                                            <Setter Property="FontStyle" Value="Italic"/>
-                                                        </DataTrigger>
                                                     </Style.Triggers>
                                                 </Style>
                                             </TextBlock.Style>

@@ -25,6 +25,8 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
 {
     private readonly Garage _garage;
     private readonly DriverWallet _wallet;
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     private readonly GameClock _game;
     private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
@@ -37,11 +39,14 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     private readonly RelayCommand _repairBody;
 
     public MechanicScreenViewModel(
-        Garage garage, DriverWallet wallet, GameClock game, VoiceBeat beat,
+        Garage garage, DriverWallet wallet, Glovebox glovebox, Trunk trunk,
+        GameClock game, VoiceBeat beat,
         ICommand backCommand, Action<MechanicRepair> onRepaired)
     {
         _garage = garage;
         _wallet = wallet;
+        _glovebox = glovebox;
+        _trunk = trunk;
         _game = game;
         _beat = beat;
         _backCommand = backCommand;
@@ -231,6 +236,9 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     // The accident repair: the dents banked by the telemetry feed are paid in
     // one bill and cleared. The cost is the car's catalogue value times the
     // accumulated damage fraction, so a re-priced car re-prices old dents too.
+    // A Free Car Repair card covers it in full, a Half Damage Reduction card
+    // halves it; both are spent only when the repair is confirmed, like Unity's
+    // RepairScreen.
     private void RepairBody()
     {
         ClearBackFlash();
@@ -238,8 +246,15 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         {
             return;
         }
-        double price = BodyRepairPrice(car);
-        if (!_wallet.TrySpend(price))
+        bool free = _glovebox.TryConsume(RewardCardEffect.FreeCarRepair, _trunk);
+        bool half = !free && _glovebox.TryConsume(RewardCardEffect.HalfDamage, _trunk);
+        double price = free ? 0.0 : BodyRepairPrice(car);
+        if (half)
+        {
+            price *= _glovebox.CardFor(RewardCardEffect.HalfDamage)?.Amount ?? 0.5;
+        }
+        price = Math.Round(price, 2, MidpointRounding.AwayFromZero);
+        if (!free && !_wallet.TrySpend(price))
         {
             return;
         }
@@ -262,7 +277,24 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     private bool CanFixEngine() => _garage.Current is { } car && car.Engine.Broken;
 
     private bool CanRepairBody() =>
-        _garage.Current is { } car && car.BodyDamage > 0.0 && _wallet.Cash >= BodyRepairPrice(car);
+        _garage.Current is { } car && car.BodyDamage > 0.0
+        && _wallet.Cash >= EffectiveBodyPrice(car);
+
+    // The bill the page offers: free when a Free Car Repair is carried, halved
+    // when a Half Damage Reduction is, otherwise the plain value × damage.
+    private double EffectiveBodyPrice(OwnedCar car)
+    {
+        if (_glovebox.Carries(RewardCardEffect.FreeCarRepair, _trunk))
+        {
+            return 0.0;
+        }
+        double price = BodyRepairPrice(car);
+        if (_glovebox.Carries(RewardCardEffect.HalfDamage, _trunk))
+        {
+            price *= _glovebox.CardFor(RewardCardEffect.HalfDamage)?.Amount ?? 0.5;
+        }
+        return Math.Round(price, 2, MidpointRounding.AwayFromZero);
+    }
 
     private void Reload()
     {
@@ -303,8 +335,18 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
         RepairEngineCostLine = Strings.Format("MechanicRepairEngineCost", EngineRepairPrice(car, carClass));
         NewEngineCostLine = Strings.Format("MechanicNewEngineCost", NewEnginePrice(car, carClass));
         BodyRepairVisible = car.BodyDamage > 0.0;
+        bool freeRepair = BodyRepairVisible
+            && _glovebox.Carries(RewardCardEffect.FreeCarRepair, _trunk);
+        bool halfDamage = BodyRepairVisible && !freeRepair
+            && _glovebox.Carries(RewardCardEffect.HalfDamage, _trunk);
         BodyDamageLine = BodyRepairVisible
-            ? Strings.Format("MechanicBodyDamage", car.BodyDamage * 100.0, BodyRepairPrice(car))
+            ? freeRepair
+                ? Strings.Format("MechanicBodyDamageFree", car.BodyDamage * 100.0)
+                : halfDamage
+                    ? Strings.Format(
+                        "MechanicBodyDamageHalf", car.BodyDamage * 100.0, EffectiveBodyPrice(car))
+                    : Strings.Format(
+                        "MechanicBodyDamage", car.BodyDamage * 100.0, BodyRepairPrice(car))
             : string.Empty;
         Rows = Paint(car, carClass);
         double total = QueuedTotal(carClass);

@@ -9,9 +9,11 @@ namespace AceDrive.Core;
 /// distance charge, the goods money (wholesale out, retail payout in) and
 /// the delivery XP (the taxi formula at <see cref="XpEarning.DeliveryShare"/>:
 /// distance × class × rarity / 100 × street knowledge, then diminishing).
-/// Skips what has no system here yet (starter bonus, profit-boost and
-/// free-tank-refill cards, auto fuel): those arrive as new receipt fields
-/// with their own systems, never as branches in this method.
+/// Skips what has no system here yet (starter bonus, free-tank-refill cards,
+/// auto fuel): those arrive as new receipt fields with their own systems,
+/// never as branches in this method. <paramref name="profitBoostMultiplier"/>
+/// is the Delivery Profit Boost card's scale on the goods payout; the charge is
+/// never boosted (Unity boosts the goods earnings only).
 /// </summary>
 public static class DeliveryReceiptBuilder
 {
@@ -27,7 +29,8 @@ public static class DeliveryReceiptBuilder
         FriendshipResult? friendship = null,
         int credPEarned = 0,
         double totalCredP = 0.0,
-        bool awardsXp = true)
+        bool awardsXp = true,
+        double profitBoostMultiplier = 1.0)
     {
         distanceKm = Math.Max(0.0, distanceKm);
         List<ReceiptTier> lines = FareTierLines.Of(distanceKm, table.Tiers);
@@ -39,7 +42,11 @@ public static class DeliveryReceiptBuilder
             charge += line.Charge;
         }
         charge = Cents(charge);
-        double totalEarned = Cents(Math.Max(0.0, receivedForGoods) - Math.Max(0.0, paidForGoods) + charge);
+        double goods = Math.Max(0.0, receivedForGoods);
+        double boost = Math.Max(1.0, profitBoostMultiplier);
+        bool boosted = boost > 1.0;
+        goods = Cents(goods * boost);
+        double totalEarned = Cents(goods - Math.Max(0.0, paidForGoods) + charge);
         // An unowned car pays the run but earns no player XP: the caller owns
         // the ownership rule, this builder only knows whether to award.
         double xp = awardsXp
@@ -51,7 +58,7 @@ public static class DeliveryReceiptBuilder
             lines,
             charge,
             Cents(Math.Max(0.0, paidForGoods)),
-            Cents(Math.Max(0.0, receivedForGoods)),
+            goods,
             totalEarned,
             xp,
             carClass,
@@ -61,7 +68,9 @@ public static class DeliveryReceiptBuilder
             friendship?.Level ?? 0,
             friendship?.TierIncreased ?? false,
             Math.Max(0, credPEarned),
-            Math.Max(0.0, totalCredP));
+            Math.Max(0.0, totalCredP),
+            boosted,
+            boosted ? boost - 1.0 : 0.0);
     }
 
     private static double Cents(double value) =>

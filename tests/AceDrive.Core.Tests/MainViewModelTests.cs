@@ -1133,6 +1133,80 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void Pickup_SpeedChallenge_NextFineWaivedCard_KeepsTheTipAndPrintsTheWaiver()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet();
+        var trunk = new Trunk();
+        new Glovebox(RewardTable.Default, wallet).Claim(
+            RewardTable.Default.Find(RewardCardEffect.FineWaived)!, trunk);
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.SpeedRequest,
+        };
+        var police = new PolicePatrolPlanner(AddressMap.Default, TestPoliceRules, seed: 0);
+        TaxiRules rules = TaxiRules.Default with
+        {
+            SpeedChallenge = SpeedChallengeRules.Default with { SlackFactor = 10.0 },
+        };
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, police: police,
+            taxiRules: rules, wallet: wallet, savedDriver: TwoStreetCareer, trunk: trunk);
+
+        TaxiFlow.Propose(vm);
+        TaxiFlow.Pickup(vm, clock);
+        TaxiFlow.AnswerRequest(vm);
+        DriveLaps(vm, clock, tel, laps: 3, speedKmh: 80f);
+        vm.DropoffCommand.Execute(null);
+
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.False(receipt.HasFine);
+        Assert.True(receipt.HasFineWaived);
+        Assert.True(receipt.HasTip);
+        Assert.Contains("FINE WAIVED", hud.Notice ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain(trunk.Items, item => item.Name == "NEXT FINE WAIVED");
+    }
+
+    [Fact]
+    public void Pickup_SpeedChallenge_HeatFreeRidesCard_ArmsNoPatrols()
+    {
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet();
+        var trunk = new Trunk();
+        new Glovebox(RewardTable.Default, wallet).Claim(
+            RewardTable.Default.Find(RewardCardEffect.HeatFreeRides)!, trunk);
+        var requests = new FakeCustomerRequestRoller
+        {
+            Result = CustomerRequestTestData.SpeedRequest,
+        };
+        var police = new PolicePatrolPlanner(AddressMap.Default, TestPoliceRules, seed: 0);
+        TaxiRules rules = TaxiRules.Default with
+        {
+            SpeedChallenge = SpeedChallengeRules.Default with { SlackFactor = 10.0 },
+        };
+        var (vm, clock, tel, _) = Create(
+            speedKmh: 0f, hud: hud, requests: requests, police: police,
+            taxiRules: rules, wallet: wallet, savedDriver: TwoStreetCareer, trunk: trunk);
+
+        TaxiFlow.Propose(vm);
+        TaxiFlow.Pickup(vm, clock);
+        TaxiFlow.AnswerRequest(vm);
+        DriveLaps(vm, clock, tel, laps: 3, speedKmh: 80f);
+        vm.DropoffCommand.Execute(null);
+
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.False(receipt.HasFine);
+        Assert.True(receipt.HasTip);
+        // No patrol means neither the warning nor the fine ever fired; the
+        // completed ride still spends one of the card's five charges.
+        Assert.DoesNotContain("Speeding fine", hud.Notice ?? string.Empty, StringComparison.Ordinal);
+        Assert.DoesNotContain("Police patrol ahead", hud.Notice ?? string.Empty, StringComparison.Ordinal);
+        TrunkItem card = Assert.Single(trunk.Items);
+        Assert.Equal(4, card.UsesLeft);
+        Assert.Equal(5, card.UsesMax);
+    }
+
+    [Fact]
     public void Pickup_SpeedChallenge_BelowTheLimitKeepsTheTip()
     {
         var hud = new FakeTelemetryHud();
@@ -4389,7 +4463,8 @@ public sealed class MainViewModelTests
     public void BankCommand_OpensTheBankScreen_AndBackReturns()
     {
         // Temporary entry (48): the BANK verb opens the withdraw screen and
-        // stamps the visit; CONTINUE hands back to the control page.
+        // stamps the visit; BACK hands back to the main page, not the jobs
+        // page the player never opened.
         var wallet = new DriverWallet();
         var hud = new FakeTelemetryHud();
         var session = Create(speedKmh: 0f, wallet: wallet, hud: hud);
@@ -4399,7 +4474,7 @@ public sealed class MainViewModelTests
         Assert.True(wallet.HasEnteredBank);
         Assert.Equal("Current Bank Saldo: CR1000.00", bank.SaldoLine);
         bank.BackCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -4622,7 +4697,7 @@ public sealed class MainViewModelTests
         Assert.Equal("Removed 6 filth for CR 50.00", wash.ResultLine);
 
         wash.BackCommand.Execute(null);
-        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]

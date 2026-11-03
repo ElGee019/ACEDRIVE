@@ -68,6 +68,12 @@ internal static class TestSession
         var garageInstance = options.Garage ?? new Garage(pool);
         var friendsInstance = options.Friendships ?? new FakeFriendshipStore();
         var trunkInstance = options.Trunk ?? new Trunk(options.SavedDriver?.Trunk);
+        // The glove compartment's card rules sit over the same wallet and trunk
+        // the settle reads; the counter cards heal from the catalogue at boot
+        // exactly like the root does.
+        RewardTable rewardTable = options.Rewards ?? RewardTable.Default;
+        var glovebox = new Glovebox(rewardTable, walletInstance);
+        glovebox.HealCardUses(trunkInstance);
         var storeCatalogInstance = options.StoreCatalog ?? StoreCatalog.Default;
         var storeNetwork = new StoreNetwork(storeCatalogInstance, PoiCatalog.Default);
         IReadOnlyList<IPoiArrivalHandler> handlers = options.PoiHandlers ??
@@ -158,13 +164,14 @@ internal static class TestSession
             garageInstance, onboardingStore, walletInstance, rivalsInstance, saver, beat, logger);
         var settlement = new JobSettlement(
             walletInstance, garageInstance, shiftInstance, zoneInstance, jobsInstance,
+            glovebox, trunkInstance,
             streakInstance, clock, fleet, rarityInstance, friendsInstance,
             brandMileageInstance, telemetryInstance, rivalsInstance, deliveryBoard,
             deliveryCareer, cityInstance, deliveryFaresInstance, meter,
             faresInstance, taxiRulesInstance, beat, options.Hud, logger);
         var shops = new ShopInteriors(
-            walletInstance, garageInstance, game, InsuranceRules.Default, pool, saver,
-            visitsInstance, beat, logger);
+            walletInstance, garageInstance, glovebox, trunkInstance, game,
+            InsuranceRules.Default, pool, saver, visitsInstance, beat, logger);
         // The town's citizens: the taxi passengers, the car-haul customers, the
         // elder and the business doors all share this table. Built before the
         // spawner, because a business may not open on a resident's house.
@@ -231,8 +238,6 @@ internal static class TestSession
         // reward pair (PORTPLAN 61) rides here too: the shipped catalogue
         // shape, the glovebox over the same wallet and trunk the assertions
         // read, and its own seeded stream so a suite can pin the offer.
-        RewardTable rewardTable = options.Rewards ?? RewardTable.Default;
-        var glovebox = new Glovebox(rewardTable, walletInstance);
         var careReward = new CarePackageReward(
             rewardTable, glovebox, trunkInstance, walletInstance,
             options.RewardRng ?? new Random(15),
@@ -245,11 +250,12 @@ internal static class TestSession
             proposalsInstance, map, brands, pool, options.Requests,
             options.RequestTable ?? CustomerRequestTable.Empty, options.Police,
             taxiRulesInstance, faresInstance, garageInstance, walletInstance,
+            glovebox, trunkInstance,
             friendsInstance, fleet, game, clock, beat, saver, rivalsInstance,
             breakdownsInstance, options.Hud, logger);
         var delivery = new DeliveryFlow(
-            deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
-            breakdownsInstance, clock, beat, logger);
+            deliveryBoard, deliveryCareer, cityInstance, friendsInstance, walletInstance,
+            glovebox, trunkInstance, meter, breakdownsInstance, clock, beat, logger);
         // The Cento Miglia entry (PORTPLAN 49): its own flow and settle, on the
         // same wallet, garage and trunk the assertions read.
         var cento = new CentoRaceFlow(walletInstance, garageInstance, beat, logger);
@@ -286,7 +292,7 @@ internal static class TestSession
             RoadTestAudienceRules.Default, saver, rivalsInstance, beat, logger);
         var roadTestFlow = new RoadTestFlow(
             onboardingStore, game, clock, roadsInstance, options.Hud, roadTestStandings,
-            profiles, roadTestSettlementInner, pool, map, beat,
+            profiles, roadTestSettlementInner, glovebox, trunkInstance, pool, map, beat,
             () => brands.CurrentIdentity,
             options.RoadTestRng ?? new Random(10), logger,
             options.IgnoreEventGates);
@@ -320,12 +326,12 @@ internal static class TestSession
         var navigation = new Navigation(
             shell, beat, game, clock, shiftInstance, todoBoard, roadsInstance,
             saver, walletInstance, garageInstance, rivalsInstance, zoneBoard,
-            trunkInstance,
+            trunkInstance, glovebox,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
             deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
-            willyFlow, willyLedgerInstance, careFlow, roadTestFlow, touristenFlow,
+            willyFlow, careFlow, roadTestFlow, touristenFlow,
             weeklyEventsInstance, calendarGate,
             () => brands.Brand,
             () => options.CallInput?.Label ?? CallBinding.Default.Label,
@@ -356,6 +362,7 @@ internal static class TestSession
             voiceInstance, brands, map,
             taxiRulesInstance,
             beat, walletInstance,
+            glovebox, trunkInstance,
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
             saver, fleet, settlement, shell, panel, story, voiceRouter,

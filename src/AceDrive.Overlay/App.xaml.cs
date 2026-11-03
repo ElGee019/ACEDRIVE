@@ -225,7 +225,14 @@ public partial class App : Application, IDisposable
         // heals a save written before the cards existed from that same capacity,
         // and writes the healed count back through the driver file.
         RewardTable rewardTable = new JsonRewardCardStore(_log).Load();
+        // The trunk rides the driver state (Unity PlayerData.trunkItems), so
+        // bought goods, carried cards and the spent cash survive a restart
+        // together. It must exist before the glovebox: the cards live in it.
+        var trunk = new Trunk(savedDriver?.Trunk);
         var glovebox = new Glovebox(rewardTable, driver);
+        // A save written before a card carried its use count heals from the
+        // catalogue here, exactly like the slot count above.
+        glovebox.HealCardUses(trunk);
         // The delivery career (PORTPLAN 18/51): the CredP balance, the hubs
         // bought and each hub's ramp count resume from the driver save, so a
         // restart reopens the career instead of losing it. A save written
@@ -278,9 +285,6 @@ public partial class App : Application, IDisposable
         // beside the wallet; the online layer pushes the record on shift end.
         var shifts = new ShiftRecord(savedDriver);
         shifts.RestoreStandings(savedDriver?.ShiftRank ?? 0, savedDriver?.ShiftTotal ?? 0);
-        // The trunk rides the driver state (Unity PlayerData.trunkItems), so
-        // bought goods and the spent cash survive a restart together.
-        var trunk = new Trunk(savedDriver?.Trunk);
         // The login streak (PORTPLAN 47): recomputed from the saved dates at
         // every boot, so the counter is always fresh against today.
         var streak = new DailyStreak(wall, savedDriver);
@@ -447,7 +451,7 @@ public partial class App : Application, IDisposable
         // Prices and banks one finished job; the poll feeds the same meter, so
         // the instance is shared rather than owned by either side.
         var settlement = new JobSettlement(
-            driver, garage, shift, zone, jobs, streak, wall,
+            driver, garage, shift, zone, jobs, glovebox, trunk, streak, wall,
             fleet, rarity, friendships, brands, telemetry, rivals,
             deliveryBoard, deliveryCareer, city, deliveryFares, meter,
             fares, taxiRules, beat, hud, _log);
@@ -460,7 +464,7 @@ public partial class App : Application, IDisposable
         // the view binds through the shell, not state the coordinator holds.
         var shell = new OverlayShell();
         var shops = new ShopInteriors(
-            driver, garage, game, insuranceRules, cars, saver, visits, beat, _log);
+            driver, garage, glovebox, trunk, game, insuranceRules, cars, saver, visits, beat, _log);
         int startWeek = saved?.Week ?? CalendarStamp.Default.Week;
         // The session's calendar: the day flip, the week it rolls and the idle
         // shift timeout with its ended page. The pages and the dealer's floor
@@ -494,7 +498,7 @@ public partial class App : Application, IDisposable
             saver, rivals, beat, _log);
         var roadTestFlow = new RoadTestFlow(
             onboardingStore, game, wall, roadTests, hud, roadTestStandings,
-            profileStore, roadTestSettlement, cars, addressMap, beat,
+            profileStore, roadTestSettlement, glovebox, trunk, cars, addressMap, beat,
             () => carBrands.CurrentIdentity, new Random(taxiSeed + 10), _log);
         // The quest's marker handler joins the typed arrival list first, so a
         // Willy marker can never fall through to a business interior.
@@ -545,12 +549,12 @@ public partial class App : Application, IDisposable
         // its host right after construction.
         var taxi = new TaxiJobFlow(
             taxiProposals, addressMap, carBrands, cars, requests, requestTable,
-            police, taxiRules, fares, garage, driver, friendships, fleet, game, wall,
-            beat, saver, rivals, breakdowns, hud, _log);
+            police, taxiRules, fares, garage, driver, glovebox, trunk, friendships, fleet,
+            game, wall, beat, saver, rivals, breakdowns, hud, _log);
         // The delivery run from DELIVER to receipt, with its own board page.
         var delivery = new DeliveryFlow(
-            deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,
-            wall, beat, _log);
+            deliveryBoard, deliveryCareer, city, friendships, driver, glovebox, trunk,
+            meter, breakdowns, wall, beat, _log);
         // The Cento Miglia entry (PORTPLAN 49): the drive to the start, the
         // registration check and the race to the finish, in its own collaborator
         // so neither job flow grows a third phase machine. Its settle prices the
@@ -638,11 +642,11 @@ public partial class App : Application, IDisposable
         callInput.Arm(preferences.Call);
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todoBoard, roadTests, saver,
-            driver, garage, rivals, zoneStandings, trunk, hunger, storeCatalog,
+            driver, garage, rivals, zoneStandings, trunk, glovebox, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
-            valuationFlow, willyFlow, willyLedger, careFlow, roadTestFlow, touristen,
+            valuationFlow, willyFlow, careFlow, roadTestFlow, touristen,
             weeklyEvents, calendarGate,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use. The menu's call
@@ -699,6 +703,8 @@ public partial class App : Application, IDisposable
             taxiRules,
             beat,
             driver,
+            glovebox,
+            trunk,
             rivals,
             garage,
             catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,

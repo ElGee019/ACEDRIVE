@@ -28,6 +28,8 @@ public sealed class JobSettlement
     private readonly TaxiShift _shift;
     private readonly OperatingZone _zone;
     private readonly JobLedger _jobs;
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     private readonly DailyStreak _streak;
     private readonly IClock _clock;
     private readonly FleetService _fleet;
@@ -51,7 +53,7 @@ public sealed class JobSettlement
 
     public JobSettlement(
         DriverWallet wallet, Garage garage, TaxiShift shift, OperatingZone zone,
-        JobLedger jobs, DailyStreak streak, IClock clock,
+        JobLedger jobs, Glovebox glovebox, Trunk trunk, DailyStreak streak, IClock clock,
         FleetService fleet, ICarRaritySource rarity, IFriendshipStore friends,
         IBrandMileageStore brands, IPlayerTelemetry online, IRivalsService rivals,
         DeliveryBoard deliveryBoard, DeliveryCareer career, CityEconomy city,
@@ -64,6 +66,8 @@ public sealed class JobSettlement
         _shift = shift;
         _zone = zone;
         _jobs = jobs;
+        _glovebox = glovebox;
+        _trunk = trunk;
         _streak = streak;
         _clock = clock;
         _fleet = fleet;
@@ -125,6 +129,13 @@ public sealed class JobSettlement
         // the current ride already counts toward its own sponsorship rate.
         string brandName = _fleet.SponsorBrand(carBrand);
         double brandKm = _brands.RegisterRide(brandName, job.DistanceKm);
+        // Double Next Tip: one carried card scales the earned customer tip.
+        // The multiplier is read from the catalogue (data, not a constant) and
+        // the card is only spent when the ride actually earned a tip — Unity's
+        // helper has the same guard.
+        RewardCard? tipCard = _glovebox.CardFor(RewardCardEffect.DoubleNextTip);
+        bool tipBoostCarried = tipCard is { Amount: > 1.0 }
+            && _glovebox.Carries(RewardCardEffect.DoubleNextTip, _trunk);
         TaxiReceipt receipt = TaxiReceiptBuilder.Build(
             job.DistanceKm, capacity, carClass,
             carRarity, PlaceholderStreetKnowledgePct,
@@ -134,7 +145,24 @@ public sealed class JobSettlement
             brandName, brandKm, carKey,
             // The starter bonus decays with the operating zone and the car
             // count (PORTPLAN 47, Unity ProvincialStarterBonus).
-            zoneKm: _zone.Km, ownedCars: _garage.Cars.Count);
+            zoneKm: _zone.Km, ownedCars: _garage.Cars.Count,
+            finesWaived: job.FinesWaived,
+            tipMultiplier: tipBoostCarried ? tipCard!.Amount : 1.0);
+        if (receipt.HasTipDoubled)
+        {
+            if (_glovebox.TryConsume(RewardCardEffect.DoubleNextTip, _trunk))
+            {
+                _log.LogInfo("[Reward] DOUBLE NEXT TIP spent on the ride's tip");
+            }
+            else
+            {
+                _log.LogWarning("[Reward] tip doubled but no DOUBLE NEXT TIP card was carried");
+            }
+        }
+        if (receipt.HasFineWaived)
+        {
+            _log.LogInfo($"[Reward] {receipt.FinesWaived} fine(s) waived on the ride");
+        }
         if (friendship.TierIncreased)
         {
             _log.LogInfo($"friendship tier up: {friendship.OwnerName} -> {friendship.Level}");
@@ -174,6 +202,7 @@ public sealed class JobSettlement
                 owned.RegisterJob();
             }
         }
+        WearRewardCards();
         ApplyBankInterest();
         if (earnsProgress)
         {
@@ -271,11 +300,31 @@ public sealed class JobSettlement
         bool earnsProgress = !_fleet.IsDrivingUnownedCar();
         CarSpec? deliveryCar = _fleet.XpCar();
         (int deliveryClass, int deliveryRarity) = XpCarFacts();
+        // Delivery Profit Boost: one carried card scales this run's goods
+        // earnings (the distance charge stays untouched, Unity's rule). The
+        // multiplier is content, so the catalogue owns it.
+        RewardCard? profitCard = _glovebox.CardFor(RewardCardEffect.DeliveryProfitBoost);
+        bool profitBoostCarried = profitCard is { Amount: > 1.0 }
+            && _glovebox.Carries(RewardCardEffect.DeliveryProfitBoost, _trunk);
         DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
             distanceKm, run.PaidForGoods, run.ReceivedForGoods,
             _deliveryFares, deliveryClass, deliveryRarity,
             PlaceholderStreetKnowledgePct, _wallet.Xp,
-            friendship, credPEarned, _career.CredP, awardsXp: earnsProgress);
+            friendship, credPEarned, _career.CredP, awardsXp: earnsProgress,
+            profitBoostMultiplier: profitBoostCarried ? profitCard!.Amount : 1.0);
+        if (receipt.HasProfitBoost)
+        {
+            if (_glovebox.TryConsume(RewardCardEffect.DeliveryProfitBoost, _trunk))
+            {
+                _log.LogInfo(
+                    $"[Reward] DELIVERY PROFIT BOOST spent: goods +{receipt.ProfitBoostRate * 100.0:0}%");
+            }
+            else
+            {
+                _log.LogWarning(
+                    "[Reward] goods boosted but no DELIVERY PROFIT BOOST card was carried");
+            }
+        }
         _wallet.AddDelivery(receipt);
         // Delivery's km feed: the owned car contributes to the global rarity
         // board and the country aggregate, exactly like the taxi settle. Its
@@ -301,6 +350,7 @@ public sealed class JobSettlement
                 owned.RegisterJob();
             }
         }
+        WearRewardCards();
         ApplyBankInterest();
         if (earnsProgress)
         {
@@ -344,6 +394,20 @@ public sealed class JobSettlement
         distanceKm > 0.0 && double.IsFinite(distanceKm)
             ? Math.Max(1, (int)Math.Round(distanceKm))
             : 0;
+
+    // One completed job spends a charge of every counter-limited reward card
+    // the driver carries (the "next 5 rides" pair). It runs before the driver
+    // save below, so the countdown the trunk page prints survives a restart
+    // with the job that spent it.
+    private void WearRewardCards()
+    {
+        int ticked = _glovebox.RegisterCompletedJob(_trunk);
+        if (ticked > 0)
+        {
+            _log.LogInfo(
+                $"[Reward] {ticked} counter card(s) spent one use on the completed job");
+        }
+    }
 
     // Bank interest at the two settle sites (PORTPLAN 48, Unity
     // BankInterestHelper.ApplyForCompletion): credited INTO the bank after

@@ -113,6 +113,22 @@ public sealed class HudViewModelTests
     }
 
     [Fact]
+    public void TaskPromptNotes_JoinUnderTheSentence()
+    {
+        var vm = Create();
+        vm.SetTaskPrompt(new HudTaskPrompt(
+            "HudAccidentSolo", ["120", "2000.00"], "HudAccidentRepair",
+            [new HudPromptNote("RewardHalfDamageNote")]));
+
+        Assert.Contains(
+            "Accident! 120 km/h impact — repair the car to be able to continue. " +
+            "Repair cost: CR2000.00.",
+            vm.BannerText, StringComparison.Ordinal);
+        Assert.Contains("Half Damage Reduction card halves this bill", vm.BannerText, StringComparison.Ordinal);
+        Assert.Contains("\n\n", vm.BannerText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ArrivingAtTheDestination_TakesTheBannerBackFromATaskPrompt()
     {
         var vm = Create();

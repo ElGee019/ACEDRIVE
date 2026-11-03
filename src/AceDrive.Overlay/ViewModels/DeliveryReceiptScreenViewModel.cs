@@ -12,8 +12,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// in), the tiered distance fare, the totals, the Credibility Points the
 /// ramp earned, the XP award with its calculation line, and the XP world
 /// standings pair. Skipped until their systems land (Unity hides them too
-/// or the port defers them): fines, auto fuel, starter bonus, profit-boost
-/// card. Money lines are computed once and never change; the standings
+/// or the port defers them): fines, auto fuel, starter bonus. The Delivery
+/// Profit Boost card prints its teal applied row under the goods payout.
+/// Money lines are computed once and never change; the standings
 /// block follows the backend's live updates. CONTINUE hands the main page
 /// back, so a voice tap flashes teal first and waits out the shared beat.
 /// </summary>
@@ -55,6 +56,13 @@ public sealed class DeliveryReceiptScreenViewModel : ViewModelBase, IVoiceScreen
 
     public ReceiptLine ReceivedLine => new(
         Strings.Get("DelReceiptReceived"), ReceiptText.Amount(_receipt.ReceivedForGoods));
+
+    /// <summary>True when a Delivery Profit Boost card scaled the goods payout.</summary>
+    public bool HasProfitBoost => _receipt.HasProfitBoost;
+
+    /// <summary>The card row under the payout, teal like the other applied-card lines.</summary>
+    public string ProfitBoostLine =>
+        Strings.Format("DelReceiptProfitBoost", _receipt.ProfitBoostRate * 100.0);
 
     public ReceiptLine FareLine => new(
         Strings.Get("DelReceiptFare"), ReceiptText.Amount(_receipt.DistanceCharge));

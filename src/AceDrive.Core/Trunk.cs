@@ -30,7 +30,16 @@ public sealed class Trunk
             {
                 continue;
             }
-            Merge(item.Name, item.UnitVolume, item.Quantity);
+            // A card saved before counters existed carries no limit; the
+            // Glovebox heals it from the catalogue at boot. A limit with no
+            // charge left is a spent card, not a stack to show.
+            int usesMax = Math.Max(0, item.UsesMax);
+            int usesLeft = Math.Clamp(item.UsesLeft, 0, usesMax);
+            if (usesMax > 0 && usesLeft == 0)
+            {
+                continue;
+            }
+            Merge(item.Name, item.UnitVolume, item.Quantity, usesLeft, usesMax);
         }
     }
 
@@ -111,17 +120,118 @@ public sealed class Trunk
         Merge(name, 0.0, quantity);
     }
 
-    private void Merge(string name, double unitVolume, int quantity)
+    /// <summary>
+    /// Adds one counter-limited reward card: a 0 L keepsake that carries its
+    /// charge count, so the trunk page can print the countdown and a completed
+    /// job can spend one charge. Earning the same card again extends the
+    /// carried stack's countdown instead of stacking a second card (Unity's
+    /// OnCardEarned: one card, more rides), which keeps one glovebox slot and
+    /// one row in use.
+    /// </summary>
+    public void AddCard(string name, int uses)
+    {
+        if (string.IsNullOrWhiteSpace(name) || uses <= 0)
+        {
+            return;
+        }
+
+        foreach (TrunkItem item in _items)
+        {
+            if (string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                item.UsesLeft += uses;
+                item.UsesMax += uses;
+                return;
+            }
+        }
+
+        Merge(name, 0.0, 1, uses, uses);
+    }
+
+    /// <summary>
+    /// Spends one charge on a counter-limited card and drops the stack when the
+    /// last charge goes, so a spent card never lingers in the compartment.
+    /// False when the named stack is no live counter card, which keeps the
+    /// caller from ticking an ordinary keepsake.
+    /// </summary>
+    public bool ConsumeUse(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        for (int i = 0; i < _items.Count; i++)
+        {
+            TrunkItem item = _items[i];
+            if (!string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (item.UsesMax <= 0 || item.UsesLeft <= 0)
+            {
+                return false;
+            }
+            item.UsesLeft--;
+            if (item.UsesLeft == 0)
+            {
+                _items.RemoveAt(i);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Gives a card saved before counters existed its full charge. A stack that
+    /// already carries a limit is left untouched, so replaying the boot heal
+    /// can never refill a partly spent card.
+    /// </summary>
+    public bool HealCardUses(string name, int uses)
+    {
+        if (string.IsNullOrWhiteSpace(name) || uses <= 0)
+        {
+            return false;
+        }
+
+        foreach (TrunkItem item in _items)
+        {
+            if (!string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            if (item.UsesMax > 0)
+            {
+                return false;
+            }
+            item.UsesLeft = uses;
+            item.UsesMax = uses;
+            return true;
+        }
+
+        return false;
+    }
+
+    private void Merge(
+        string name, double unitVolume, int quantity, int usesLeft = 0, int usesMax = 0)
     {
         foreach (TrunkItem item in _items)
         {
             if (string.Equals(item.Name, name, StringComparison.OrdinalIgnoreCase))
             {
                 item.Quantity += quantity;
+                item.UsesLeft += usesLeft;
+                item.UsesMax += usesMax;
                 return;
             }
         }
-        _items.Add(new TrunkItem(name, unitVolume) { Quantity = quantity });
+        _items.Add(new TrunkItem(name, unitVolume)
+        {
+            Quantity = quantity,
+            UsesLeft = usesLeft,
+            UsesMax = usesMax,
+        });
     }
 
     /// <summary>

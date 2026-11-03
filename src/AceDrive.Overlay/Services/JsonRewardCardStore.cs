@@ -81,6 +81,11 @@ public sealed class JsonRewardCardStore
             if (card is null
                 || string.IsNullOrWhiteSpace(card.Title)
                 || string.IsNullOrWhiteSpace(card.Description)
+                || card.Uses < 0
+                || !double.IsFinite(card.Amount) || card.Amount < 0.0
+                // A stored card without an effect would be a keepsake that
+                // never fires; the file must say what it does.
+                || (card.IsCard && !card.HasEffect)
                 || !titles.Add(card.Title))
             {
                 return false;

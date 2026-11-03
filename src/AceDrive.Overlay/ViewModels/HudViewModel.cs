@@ -850,14 +850,26 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
     // The prompt's sentence is formatted from its key and values on every
     // repaint, so the unit/language switch reaches it like the banner. The
     // action label is a key of its own; the button's visibility follows the
-    // same latch the task text uses.
+    // same latch the task text uses. A reward-card note joins under the main
+    // line, formatted from its own key for the same reason.
     private void RepaintTaskPrompt()
     {
-        _taskPromptText = _taskPrompt is { } prompt
-            ? prompt.Args is { Count: > 0 } args
-                ? Strings.Format(prompt.TextKey, [.. args])
-                : Strings.Get(prompt.TextKey)
-            : string.Empty;
+        if (_taskPrompt is not { } prompt)
+        {
+            _taskPromptText = string.Empty;
+        }
+        else
+        {
+            string text = FormatPromptLine(prompt.TextKey, prompt.Args);
+            if (prompt.Notes is { Count: > 0 } notes)
+            {
+                foreach (HudPromptNote note in notes)
+                {
+                    text += "\n\n" + FormatPromptLine(note.TextKey, note.Args);
+                }
+            }
+            _taskPromptText = text;
+        }
         OnPropertyChanged(nameof(BannerText));
         OnPropertyChanged(nameof(HasBanner));
         OnPropertyChanged(nameof(ShowBanner));
@@ -867,6 +879,9 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         // The prompt owns the action row, so the arrival's ENTER yields to it.
         OnPropertyChanged(nameof(ShowEnterButton));
     }
+
+    private static string FormatPromptLine(string key, IReadOnlyList<string>? args) =>
+        args is { Count: > 0 } values ? Strings.Format(key, [.. values]) : Strings.Get(key);
 
     // The prompt's one button. A click is newer input than a pending voice
     // tap, so the deferred acknowledgment goes; the host decides the step.

@@ -109,6 +109,13 @@ public sealed class DriverWallet
     /// <summary>Unity DriverRatingService.ApplyOffTheLineDelta.</summary>
     public void AddOffTheLine(double delta) => Rating = Rating.AddOffTheLine(delta);
 
+    /// <summary>
+    /// Unity DriverRatingService.ApplyAccidentPenalty: one crash drops all
+    /// three skills by the band of the current overall rating. The DR
+    /// Protection card is consumed by the caller before this runs.
+    /// </summary>
+    public void ApplyAccidentPenalty() => Rating = Rating.ApplyAccidentPenalty();
+
     /// <summary>Unity ApplyRandomSkillDelta: the streak tail's one random
     /// skill point, rolled on the caller's seeded RNG.</summary>
     public void AddRandomSkill(Random rng, double delta) =>

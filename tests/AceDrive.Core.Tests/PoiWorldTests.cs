@@ -65,9 +65,11 @@ public sealed class PoiWorldTests
         var beat = new VoiceBeat(clock);
         var logger = new NullLogger();
         var saver = TestSaveState.Saver(clock, wallet, garage);
+        var glovebox = new Glovebox(RewardTable.Default, wallet);
+        var trunk = new Trunk();
         var shops = new ShopInteriors(
-            wallet, garage, new GameClock(clock, clock.UtcNow), InsuranceRules.Default,
-            cars, saver, new VisitLedger(), beat, logger);
+            wallet, garage, glovebox, trunk, new GameClock(clock, clock.UtcNow),
+            InsuranceRules.Default, cars, saver, new VisitLedger(), beat, logger);
         var onboarding = new FakeOnboardingStore();
         if (progress is not null)
         {

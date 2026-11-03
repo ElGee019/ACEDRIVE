@@ -1,3 +1,4 @@
+using System.Globalization;
 using AceDrive.Core;
 using AceDrive.Overlay.Services;
 
@@ -21,6 +22,9 @@ public sealed class DeliveryFlow
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
     private readonly IFriendshipStore _friends;
+    private readonly DriverWallet _wallet;
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     private readonly DrivenDistanceMeter _meter;
     private readonly TripBreakdowns _breakdowns;
     private readonly IClock _clock;
@@ -45,13 +49,17 @@ public sealed class DeliveryFlow
 
     public DeliveryFlow(
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
-        IFriendshipStore friends, DrivenDistanceMeter meter, TripBreakdowns breakdowns,
+        IFriendshipStore friends, DriverWallet wallet, Glovebox glovebox, Trunk trunk,
+        DrivenDistanceMeter meter, TripBreakdowns breakdowns,
         IClock clock, VoiceBeat beat, ILog log)
     {
         _board = board;
         _career = career;
         _city = city;
         _friends = friends;
+        _wallet = wallet;
+        _glovebox = glovebox;
+        _trunk = trunk;
         _meter = meter;
         _breakdowns = breakdowns;
         _clock = clock;
@@ -109,13 +117,30 @@ public sealed class DeliveryFlow
 
         if (_breakdowns.Roll(BreakdownKind.Delivery) is { } breakdown)
         {
+            // Delivery Insurance Shield refunds the goods money the run had
+            // already paid; the friendship penalty still lands (Unity's
+            // BreakdownFlow consumes only the insurance card — its loyalty
+            // shield is reserved for accidents). The refund rides the
+            // breakdown page as a note.
+            var notes = new List<HudPromptNote>(1);
+            bool insured = run.PaidForGoods > 0.0
+                && _glovebox.TryConsume(RewardCardEffect.DeliveryInsurance, _trunk);
+            if (insured)
+            {
+                _wallet.AddSale(run.PaidForGoods);
+                notes.Add(new HudPromptNote(
+                    "RewardDeliveryInsuranceNote",
+                    [run.PaidForGoods.ToString("0.00", CultureInfo.CurrentCulture)]));
+            }
             foreach (string owner in SourceOwners(run))
             {
                 _friends.AddFamiliarity(owner, -1);
             }
-            _log.LogInfo($"delivery cut by breakdown: {run.StoreKeys.Count} stores lost");
+            _log.LogInfo(
+                $"delivery cut by breakdown: {run.StoreKeys.Count} stores lost, " +
+                $"insurance {(insured ? "refunded" : "none")}, friendship -1 per hub owner");
             _host.RevealPage(_breakdowns.Interrupt(
-                breakdown, new RelayCommand(() => _host.ShowPage(_host.ControlPage()))));
+                breakdown, new RelayCommand(() => _host.ShowPage(_host.ControlPage())), notes));
             return;
         }
 
@@ -166,28 +191,35 @@ public sealed class DeliveryFlow
 
     /// <summary>
     /// The crash that ends a run (Unity's delivery accident): the cargo is
-    /// lost — the goods were paid at DELIVER, so nothing is refunded — every
-    /// producing hub's owner loses one familiarity, and the run is dropped
-    /// without a receipt. Returns false when no run was live.
+    /// lost — the goods were paid at DELIVER, so only a Delivery Insurance
+    /// Shield refunds them — every producing hub's owner loses one familiarity
+    /// unless an Accident Loyalty Shield was consumed, and the run is dropped
+    /// without a receipt. Returns the CR invested in the goods (null when no
+    /// run was live) so the caller can price the insurance refund.
     /// </summary>
-    public bool FailForAccident()
+    public double? FailForAccident(bool shielded = false)
     {
         if (_job is not { IsComplete: false } run)
         {
-            return false;
+            return null;
         }
 
-        foreach (string owner in SourceOwners(run.Run))
+        if (!shielded)
         {
-            _friends.AddFamiliarity(owner, -1);
+            foreach (string owner in SourceOwners(run.Run))
+            {
+                _friends.AddFamiliarity(owner, -1);
+            }
         }
 
+        double invested = run.Run.PaidForGoods;
         _log.LogWarning($"delivery run ended by accident: {run.Run.StoreKeys.Count} stores lost, " +
-            $"€{run.Run.PaidForGoods:0.00} cargo, friendship -1 per hub owner");
+            $"€{invested:0.00} cargo, " +
+            $"friendship {(shielded ? "kept (shield)" : "-1 per hub owner")}");
         // Stop drops the run and the companion's leg; the shells' saves follow
         // in the caller, like the breakdown path.
         Stop();
-        return true;
+        return invested;
     }
 
     /// <summary>

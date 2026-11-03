@@ -73,9 +73,13 @@ public sealed class TripBreakdowns
     /// <summary>
     /// The mechanic tows the car in: the pickup fee is charged, the driver save
     /// banks it, and the returned page reports the interrupted trip. BACK
-    /// belongs to the caller's own page flow, so it arrives as a command.
+    /// belongs to the caller's own page flow, so it arrives as a command. The
+    /// caller may attach reward-card notes (a Delivery Insurance refund, an
+    /// Accident Loyalty shield) that the page prints under the message.
     /// </summary>
-    public BreakdownScreenViewModel Interrupt(BreakdownOutcome breakdown, ICommand backCommand)
+    public BreakdownScreenViewModel Interrupt(
+        BreakdownOutcome breakdown, ICommand backCommand,
+        IReadOnlyList<HudPromptNote>? notes = null)
     {
         double fee = _wallet.ChargeUnavoidable(breakdown.PickupFee);
         _saver.SaveDriver(_rivals.LastResult);
@@ -83,6 +87,6 @@ public sealed class TripBreakdowns
             $"[Breakdown] {breakdown.Kind}" +
             $"{(breakdown.EngineFailure ? " engine failure" : $" at {breakdown.Fraction:0.00} of the route")}," +
             $" tow fee {fee:0.00} CR (cash {_wallet.Cash:0.00})");
-        return new BreakdownScreenViewModel(breakdown, _beat, backCommand);
+        return new BreakdownScreenViewModel(breakdown, _beat, backCommand, notes);
     }
 }

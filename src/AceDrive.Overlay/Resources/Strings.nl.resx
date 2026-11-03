@@ -59,6 +59,7 @@
   <data name="HudTouristenDeliverAction" xml:space="preserve"><value>BEZORGEN</value></data>
   <data name="HudPoliceWarning" xml:space="preserve"><value>Politiecontrole vooruit, limiet {0} km/u</value></data>
   <data name="HudPoliceFine" xml:space="preserve"><value>Snelheidsboete: €{0:0}</value></data>
+  <data name="HudPoliceFineWaived" xml:space="preserve"><value>BOETE KWIJGESCHOLDEN (beloningskaart)</value></data>
   <data name="HudSpeedChallengeLeft" xml:space="preserve"><value>Snelheidsuitdaging: {0}</value></data>
   <data name="HudHurryLeft" xml:space="preserve"><value>Haast: {0}</value></data>
   <data name="HudDeadlineLate" xml:space="preserve"><value>TE LAAT - GEEN FOOI</value></data>
@@ -332,10 +333,13 @@ Deze klus aannemen?</value></data>
   <data name="ReceiptBrandBonus" xml:space="preserve"><value>{0}-sponsoring: {1:0.00}% voor {2:0.00} km in hun auto's.</value></data>
   <data name="ReceiptStarterBonus" xml:space="preserve"><value>Startersbonus voor je bedrijf {0:0.0}%</value></data>
   <data name="ReceiptTip" xml:space="preserve"><value>Fooi</value></data>
+  <data name="ReceiptTipDouble" xml:space="preserve"><value>Fooi (dubbele tip toegepast)</value></data>
   <data name="ReceiptFine" xml:space="preserve"><value>Snelheidsboete</value></data>
   <data name="ReceiptTotal" xml:space="preserve"><value>Totaal verdiend</value></data>
   <data name="ReceiptAmount" xml:space="preserve"><value>€{0:0.00}</value></data>
   <data name="ReceiptFineAmount" xml:space="preserve"><value>−€{0:0.00}</value></data>
+  <data name="ReceiptFineWaivedOne" xml:space="preserve"><value>Next Fine Waived-kaart dekte de snelheidsboete</value></data>
+  <data name="ReceiptFineWaivedMany" xml:space="preserve"><value>Next Fine Waived-kaart dekte {0} snelheidsboetes</value></data>
   <data name="ReceiptWallet" xml:space="preserve"><value>Portemonnee: €{0:0.00}</value></data>
   <data name="ReceiptShift" xml:space="preserve"><value>Dienst: {0} ritten · €{1:0.00}</value></data>
   <data name="ReceiptXp" xml:space="preserve"><value>XP verdiend: {0:0.00}</value></data>
@@ -501,6 +505,7 @@ Deze klus aannemen?</value></data>
   <data name="DelReceiptDistance" xml:space="preserve"><value>Totale afstand: {0:0.0} km</value></data>
   <data name="DelReceiptPaid" xml:space="preserve"><value>Betaald voor goederen</value></data>
   <data name="DelReceiptReceived" xml:space="preserve"><value>Ontvangen voor goederen</value></data>
+  <data name="DelReceiptProfitBoost" xml:space="preserve"><value>Delivery Profit Boost toegepast (+{0:0}% goederenopbrengst)</value></data>
   <data name="DelReceiptFare" xml:space="preserve"><value>Ritprijs</value></data>
   <data name="DelReceiptTotalCr" xml:space="preserve"><value>Totaal CR: €{0:0.00}</value></data>
   <data name="DelReceiptCredPEarned" xml:space="preserve"><value>Credibility Points verdiend: {0}</value></data>
@@ -566,6 +571,8 @@ Deze klus aannemen?</value></data>
   <data name="MechanicRepairEngine" xml:space="preserve"><value>MOTOR REPAREREN</value></data>
   <data name="MechanicNewEngine" xml:space="preserve"><value>NIEUWE MOTOR KOPEN</value></data>
   <data name="MechanicBodyDamage" xml:space="preserve"><value>Carrosserieschade: {0:0.0}% — reparatie CR{1:0.00}</value></data>
+  <data name="MechanicBodyDamageFree" xml:space="preserve"><value>Carrosserieschade: {0:0.0}% — gratis reparatie beschikbaar</value></data>
+  <data name="MechanicBodyDamageHalf" xml:space="preserve"><value>Carrosserieschade: {0:0.0}% — CR{1:0.00} (Half Damage Reduction toegepast)</value></data>
   <data name="MechanicRepairBody" xml:space="preserve"><value>CARROSSERIE REPAREREN</value></data>
   <data name="MechanicPartOilChange" xml:space="preserve"><value>Olie-efficiëntie</value></data>
   <data name="MechanicPartWipers" xml:space="preserve"><value>Ruitenwissers</value></data>
@@ -632,10 +639,12 @@ Deze klus aannemen?</value></data>
   <data name="TrunkHunger" xml:space="preserve"><value>HONGER {0}/{1}</value></data>
   <data name="TrunkEmpty" xml:space="preserve"><value>Je kofferbak is leeg. Rijd naar een Pizzeria, Supermarkt of Koffiebar om eten te kopen.</value></data>
   <data name="TrunkQuantityLine" xml:space="preserve"><value>x{0}</value></data>
+  <data name="TrunkUsesLine" xml:space="preserve"><value>{0}/{1}</value></data>
   <data name="TrunkHungerLine" xml:space="preserve"><value>-{0}</value></data>
   <data name="TrunkEat" xml:space="preserve"><value>ETEN</value></data>
   <data name="TrunkGloveTitle" xml:space="preserve"><value>HANDSCHOENENKASTJE</value></data>
   <data name="TrunkGloveEmpty" xml:space="preserve"><value>Je handschoenenkastje is leeg.</value></data>
+  <data name="TrunkGloveCount" xml:space="preserve"><value>Handschoenenkastje: {0}/{1} kaarten</value></data>
   <data name="TrunkBack" xml:space="preserve"><value>TERUG</value></data>
   <!-- Menu-metertegels (PORTPLAN 26/33): een tik wisselt de getekende accu
        voor de stand. {0} is een heel percentage; het teken staat direct op
@@ -698,9 +707,8 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="ValuationNoticeLoss" xml:space="preserve"><value>Je verloor zojuist een marktwaarderingsronde van {0} (+{1:0.00} XP).</value></data>
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>Terwijl je weg was won je {0} marktwaarderingsrondes en kreeg je {1:0.000} XP</value></data>
 
-  <!-- Wekelijkse vermiste-persoonrit (ToWhereIsWilly.md §3.5). -->
-  <data name="EventWillyCompleted" xml:space="preserve"><value>Waar is Willy (Voltooid)</value></data>
-  <data name="ControlGateWillyDone" xml:space="preserve"><value>TOT VOLGENDE WOENSDAG</value></data>
+  <!-- Wekelijkse vermiste-persoonrit (ToWhereIsWilly.md §3.5): de rij houdt in
+       elke toestand het gewone EventWilly-label; dit is de carrièrehint. -->
   <data name="ControlGateWillyCareer" xml:space="preserve"><value>START EERST EEN KOFFIEBONEN-BEZORGCARRIÈRE</value></data>
 
   <!-- De speurpagina (de kaartvervanger): titel, de twee Unity-taken, de hint
@@ -719,7 +727,15 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="HudAccidentRideLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de rit is voorbij. 1 vriendschap verloren met {1}. Repareer de auto om verder te kunnen. Reparatiekosten: CR{2}.</value></data>
   <data name="HudAccidentCargoLost" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de lading is verloren. 1 vriendschap verloren met de hubeigenaar. Repareer de auto om verder te kunnen. Reparatiekosten: CR{1}.</value></data>
   <data name="HudAccidentSolo" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — repareer de auto om verder te kunnen. Reparatiekosten: CR{1}.</value></data>
+  <data name="HudAccidentRideLostShield" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de rit is voorbij. Dankzij je Accident Loyalty Shield heb je geen vriendschap verloren met {1}. Repareer de auto om verder te kunnen. Reparatiekosten: CR{2}.</value></data>
+  <data name="HudAccidentCargoLostShield" xml:space="preserve"><value>Ongeluk! Impact bij {0} km/u — de lading is verloren. Dankzij je Accident Loyalty Shield heb je geen vriendschap verloren met de hubeigenaar. Repareer de auto om verder te kunnen. Reparatiekosten: CR{1}.</value></data>
   <data name="HudAccidentRepair" xml:space="preserve"><value>REPAREER DE AUTO</value></data>
+  <data name="RewardAccidentLoyaltyCustomerNote" xml:space="preserve"><value>Dankzij je Accident Loyalty Shield heb je geen vriendschap verloren met {0}.</value></data>
+  <data name="RewardAccidentLoyaltyHubNote" xml:space="preserve"><value>Dankzij je Accident Loyalty Shield heb je geen vriendschap verloren met de hubeigenaar.</value></data>
+  <data name="RewardDeliveryInsuranceNote" xml:space="preserve"><value>Je Delivery Insurance Shield heeft de CR {0} die je investeerde terugbetaald.</value></data>
+  <data name="RewardDrProtectionNote" xml:space="preserve"><value>Je DR Protection-kaart heeft je coureurrating intact gehouden.</value></data>
+  <data name="RewardFreeRepairNote" xml:space="preserve"><value>Je Free Car Repair-kaart dekt deze reparatie.</value></data>
+  <data name="RewardHalfDamageNote" xml:space="preserve"><value>Je Half Damage Reduction-kaart halveert deze rekening.</value></data>
   <data name="HudWillyHomeDrive" xml:space="preserve"><value>Breng {0} naar huis, naar {1} nr. {2} in {3}</value></data>
   <data name="HudWillyDropOff" xml:space="preserve"><value>AFZETTEN</value></data>
   <data name="HudWillyWrongAddress" xml:space="preserve"><value>Dit is niet het huisadres van {0}. {0} is nog steeds ergens daarbuiten...</value></data>
@@ -745,6 +761,8 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="RoadTestStart" xml:space="preserve"><value>0-60</value></data>
   <data name="RoadTestBrakeStart" xml:space="preserve"><value>100-0</value></data>
   <data name="RoadTestPhoto" xml:space="preserve"><value>FOTOMISSIE</value></data>
+  <data name="RoadTestRetake" xml:space="preserve"><value>HERKANSING</value></data>
+  <data name="RoadTestRetakeHint" xml:space="preserve"><value>Journalist Test Retake: nog één poging voor deze etappe.</value></data>
   <data name="RoadTestAccelIntro" xml:space="preserve"><value>Zet een 0-60 tijd neer die we in ons magazine kunnen publiceren. Laat de auto vanuit stilstand vertrekken. Je ziet de afteltimer in het minivenster.</value></data>
   <data name="RoadTestBrakeIntro" xml:space="preserve"><value>Doe een 100-0 remtest. Breng de auto naar 100, let op de afteltimer en rem.</value></data>
   <data name="RoadTestPhotoIntro" xml:space="preserve"><value>Rijd overal over de kaart zodat de fotograaf zijn foto's kan maken. Een andere locatie dan onze vorige shoot houdt het interessant voor onze lezers.</value></data>

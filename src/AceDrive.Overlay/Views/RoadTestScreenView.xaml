@@ -175,6 +175,24 @@
              so the player can swap cars and still take the tests. Teal is the
              shared voice-ack highlight, one flash per button. -->
         <StackPanel Grid.Row="3">
+            <!-- The Journalist Test Retake card: one more attempt at the leg
+                 just driven, offered on the result view only while carried. -->
+            <Button Content="{Binding RetakeLabel}" Command="{Binding RetakeCommand}"
+                    Padding="4" Margin="0,0,0,4" HorizontalAlignment="Stretch"
+                    Visibility="{Binding HasRetake, Converter={StaticResource BoolToVis}}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RetakeFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+            <TextBlock Text="{Binding RetakeText}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,6"
+                       Visibility="{Binding HasRetake, Converter={StaticResource BoolToVis}}"/>
             <Button Content="{Binding ContinueLabel}" Command="{Binding ContinueCommand}"
                     Padding="4" Margin="0,0,0,6" HorizontalAlignment="Stretch"
                     Visibility="{Binding IsResults, Converter={StaticResource BoolToVis}}">

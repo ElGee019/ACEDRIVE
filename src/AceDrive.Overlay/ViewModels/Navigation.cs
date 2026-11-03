@@ -42,6 +42,7 @@ public sealed class Navigation
     // a fresh result on construct (never polls).
     private readonly IZoneStandings _zoneStandings;
     private readonly Trunk _trunk;
+    private readonly Glovebox _glovebox;
     private readonly Hunger _hunger;
     private readonly StoreCatalog _stores;
     private readonly PoiDirectory _directory;
@@ -92,9 +93,8 @@ public sealed class Navigation
     // The weekly missing-person run (ToWhereIsWilly.md): the calendar's
     // Wednesday row starts it, and while it is in flight the other event rows,
     // the taxi shift and the delivery career refuse — Unity's blocked job
-    // centre. The ledger rides along for the cached calendar page's label.
+    // centre.
     private readonly WhereIsWillyFlow _willy;
-    private readonly WhereIsWillyLedger _willyLedger;
 
     // The care-package run (PORTPLAN 21): the jobs page's DELIVER CARE PACKAGES
     // starts it, and while it owns the companion the other job entries refuse,
@@ -180,13 +180,13 @@ public sealed class Navigation
         RoadTestLedger roads, GameStateSaver saver,
         DriverWallet wallet, Garage garage, IRivalsService rivals,
         IZoneStandings zoneStandings,
-        Trunk trunk, Hunger hunger, StoreCatalog stores,
+        Trunk trunk, Glovebox glovebox, Hunger hunger, StoreCatalog stores,
         PoiDirectory directory, ITelemetryHud? hud,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
-        ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
+        ValuationFlow valuation, WhereIsWillyFlow willy,
         CarePackageFlow care, RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         WeeklyEventLedger weeklyEvents, CalendarGate gate,
         Func<string> carBrand, Func<string> callLabel,
@@ -205,6 +205,7 @@ public sealed class Navigation
         _rivals = rivals;
         _zoneStandings = zoneStandings;
         _trunk = trunk;
+        _glovebox = glovebox;
         _hunger = hunger;
         _stores = stores;
         _directory = directory;
@@ -224,7 +225,6 @@ public sealed class Navigation
         _cento = cento;
         _valuation = valuation;
         _willy = willy;
-        _willyLedger = willyLedger;
         _care = care;
         _weeklyEvents = weeklyEvents;
         _gate = gate;
@@ -525,7 +525,7 @@ public sealed class Navigation
         _calendar ??= new CalendarScreenViewModel(
             _beat, _game, _clock, _roads,
             CalendarStamp.Default with { Week = _day.DisplayWeek },
-            _openDay, MenuCommand, _willyLedger, _gate,
+            _openDay, MenuCommand, _gate,
             () => WhereIsWillyRules.HasCoffeeCareer(_directory, _career),
             () => WhereIsWillyRules.OwnsCoffeeCareer(_career),
             _ignoreEventGates);
@@ -910,7 +910,7 @@ public sealed class Navigation
     // moves both.
     private void OpenTrunk() =>
         ShowScreen(new TrunkScreenViewModel(
-            _trunk, _hunger, _garage, _stores,
+            _trunk, _glovebox, _hunger, _garage, _stores,
             MenuCommand,
             OnTrunkItemEaten,
             _beat));

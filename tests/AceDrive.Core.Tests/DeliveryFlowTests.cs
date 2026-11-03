@@ -38,7 +38,8 @@ public sealed class DeliveryFlowTests
 
     private static (DeliveryFlow Flow, FakeDeliveryHost Host, CityEconomy City) Build(
         DeliveryCareer career, Garage? garage = null, DriverWallet? wallet = null,
-        FakeFriendshipStore? friends = null, FakeOnboardingStore? onboarding = null)
+        FakeFriendshipStore? friends = null, FakeOnboardingStore? onboarding = null,
+        Trunk? trunk = null)
     {
         DeliveryCatalog catalog = Catalog;
         var city = new CityEconomy(catalog.Stores, CityRules.Default);
@@ -46,12 +47,14 @@ public sealed class DeliveryFlowTests
         var beat = new VoiceBeat(clock);
         Garage garageInstance = garage ?? new Garage([]);
         var walletInstance = wallet ?? new DriverWallet();
+        var carrying = trunk ?? new Trunk();
         var breakdowns = new TripBreakdowns(
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0), garageInstance,
             onboarding ?? new FakeOnboardingStore(), walletInstance, new FakeRivals(),
             TestSaveState.Saver(clock, walletInstance, garageInstance), beat, new NullLogger());
         var flow = new DeliveryFlow(
             new DeliveryBoard(catalog), career, city, friends ?? new FakeFriendshipStore(),
+            walletInstance, new Glovebox(RewardTable.Default, walletInstance), carrying,
             new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh), breakdowns, clock, beat,
             new NullLogger());
         var host = new FakeDeliveryHost();
@@ -149,6 +152,48 @@ public sealed class DeliveryFlowTests
     }
 
     [Fact]
+    public void Start_WithATriggeredBreakdown_SpendsTheInsuranceShield_ButNotTheAccidentShield()
+    {
+        // A delivery cut at the trip start is a failed delivery, not an
+        // accident: the invested goods come back (Delivery Insurance Shield)
+        // while the friendship penalty and the carried Accident Loyalty Shield
+        // both stay (Unity's BreakdownFlow consumes the insurance card only).
+        MaintenanceRules rules = MaintenanceRules.Default with
+        {
+            Parts = [new MaintenancePart("tires", 1000.0, 900.0)],
+            MaxBreakdownChance = 1.0,
+        };
+        var garage = new Garage([Car], maintenanceRules: rules);
+        garage.Add(Car, week: 1);
+        garage.Current!.Drive(1000.0);
+        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var friends = new FakeFriendshipStore();
+        var onboarding = new FakeOnboardingStore();
+        onboarding.Save(OnboardingState.Fresh with { BirthdayDone = true });
+        var trunk = new Trunk();
+        var glovebox = new Glovebox(RewardTable.Default, wallet);
+        glovebox.Claim(RewardTable.Default.Find(RewardCardEffect.AccidentLoyalty)!, trunk);
+        glovebox.Claim(RewardTable.Default.Find(RewardCardEffect.DeliveryInsurance)!, trunk);
+        var career = OwnedGroceryCareer();
+        var (flow, host, _) = Build(career, garage, wallet, friends, onboarding, trunk);
+
+        flow.Start(Cart(Post));
+
+        var (owner, delta) = Assert.Single(friends.Deltas);
+        Assert.Equal(career.OwnedFor("groceries")!.OwnerName, owner);
+        Assert.Equal(-1, delta);
+        // 1 000 CR − the 100 CR tow fee + the 28 CR goods refund.
+        Assert.Equal(928.0, wallet.Cash, 6);
+        var page = Assert.IsType<BreakdownScreenViewModel>(Assert.Single(host.Revealed));
+        Assert.True(page.NoteVisible);
+        Assert.Contains("Delivery Insurance Shield", page.NoteLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("Accident Loyalty Shield", page.NoteLine, StringComparison.Ordinal);
+        // The insurance card is spent; the accident shield is still carried.
+        TrunkItem card = Assert.Single(trunk.Items);
+        Assert.Equal("ACCIDENT LOYALTY SHIELD", card.Name);
+    }
+
+    [Fact]
     public void FailForAccident_DropsTheRunAndChargesTheHubOwner()
     {
         var friends = new FakeFriendshipStore();
@@ -156,7 +201,7 @@ public sealed class DeliveryFlowTests
         var (flow, host, _) = Build(career, friends: friends);
         flow.Start(Cart(Post, Bakery));
 
-        Assert.True(flow.FailForAccident());
+        Assert.Equal(28.0, flow.FailForAccident());
 
         Assert.False(flow.InProgress);
         Assert.Equal(1, host.Clears);
@@ -171,7 +216,7 @@ public sealed class DeliveryFlowTests
     {
         var (flow, host, _) = Build(OwnedGroceryCareer());
 
-        Assert.False(flow.FailForAccident());
+        Assert.Null(flow.FailForAccident());
 
         Assert.Equal(0, host.Clears);
     }

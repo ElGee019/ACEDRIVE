@@ -25,33 +25,51 @@
              stack shows the hunger its bite removes and its EAT tap; a glove-
              compartment stack (award, certificate) shows only its name and
              count, because CanEat is the page's food test and nothing there can
-             be eaten. -->
+             be eaten. A counter-limited reward card adds its remaining charges
+             beside the count, so the countdown is visible on the same line. -->
         <DataTemplate x:Key="CarriedRow">
             <Border BorderBrush="#33FFFFFF" BorderThickness="0,0,0,1"
                     Padding="2,3">
                 <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="{Binding Name}"
-                               Foreground="#FFF" FontSize="13"
-                               VerticalAlignment="Center"
-                               TextTrimming="CharacterEllipsis"/>
-                    <TextBlock Grid.Column="1" Text="{Binding QuantityLine}"
-                               Foreground="#FFBFC4C9" FontSize="12"
-                               Margin="8,0" VerticalAlignment="Center"/>
-                    <TextBlock Grid.Column="2" Text="{Binding HungerLine}"
-                               Foreground="#FFBFC4C9" FontSize="12"
-                               Margin="0,0,8,0" VerticalAlignment="Center"/>
-                    <Button Grid.Column="3" Content="{loc:Loc Key=TrunkEat}"
-                            Style="{StaticResource EatButton}"
-                            Command="{Binding DataContext.EatCommand,
-                                      RelativeSource={RelativeSource AncestorType=UserControl}}"
-                            CommandParameter="{Binding}"
-                            Visibility="{Binding CanEat, Converter={StaticResource BoolToVis}}"/>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                   Foreground="#FFF" FontSize="13"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Grid.Column="1" Text="{Binding QuantityLine}"
+                                   Foreground="#FFBFC4C9" FontSize="12"
+                                   Margin="8,0" VerticalAlignment="Center"/>
+                        <TextBlock Grid.Column="2" Text="{Binding UsesLine}"
+                                   Foreground="#FF97EAD2" FontSize="12"
+                                   Margin="0,0,8,0" VerticalAlignment="Center"
+                                   Visibility="{Binding HasUses, Converter={StaticResource BoolToVis}}"/>
+                        <TextBlock Grid.Column="3" Text="{Binding HungerLine}"
+                                   Foreground="#FFBFC4C9" FontSize="12"
+                                   Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <Button Grid.Column="4" Content="{loc:Loc Key=TrunkEat}"
+                                Style="{StaticResource EatButton}"
+                                Command="{Binding DataContext.EatCommand,
+                                          RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                CommandParameter="{Binding}"
+                                Visibility="{Binding CanEat, Converter={StaticResource BoolToVis}}"/>
+                    </Grid>
+                    <!-- A reward card's function text (Unity's "{Title} -
+                         {Describe}" row); collapsed for an award or a food stack. -->
+                    <TextBlock Grid.Row="1" Text="{Binding DescriptionLine}"
+                               Foreground="#FF8E959B" FontSize="11"
+                               TextWrapping="Wrap" Margin="0,1,0,0"
+                               Visibility="{Binding HasDescription, Converter={StaticResource BoolToVis}}"/>
                 </Grid>
             </Border>
         </DataTemplate>
@@ -110,6 +128,9 @@
 
             <TextBlock Style="{StaticResource PageTitle}" FontSize="20"
                        Text="{loc:Loc Key=TrunkGloveTitle}"/>
+
+            <TextBlock Text="{Binding GloveboxLine}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" Margin="0,0,0,4"/>
 
             <TextBlock Style="{StaticResource EmptyHint}" Text="{Binding CompartmentEmptyLine}"
                        Visibility="{Binding IsCompartmentEmpty, Converter={StaticResource BoolToVis}}"/>

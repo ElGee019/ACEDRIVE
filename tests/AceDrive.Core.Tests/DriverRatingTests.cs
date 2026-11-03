@@ -73,6 +73,45 @@ public sealed class DriverRatingTests
         Assert.Equal(rating, rating.AddRandomSkill(new Random(0), double.PositiveInfinity));
     }
 
+    [Theory]
+    [InlineData(95.0, 10.0)]
+    [InlineData(90.0, 7.0)]
+    [InlineData(80.0, 7.0)]
+    [InlineData(70.0, 5.0)]
+    [InlineData(55.0, 5.0)]
+    [InlineData(50.0, 3.0)]
+    [InlineData(31.0, 3.0)]
+    [InlineData(30.0, 1.0)]
+    [InlineData(20.0, 1.0)]
+    public void AccidentPenaltyForOverall_UsesUnitysBands(double overall, double penalty)
+    {
+        // Unity DriverRatingService.AccidentPenaltyForOverall: the bands are
+        // exclusive on the way down (>90, >70, >50, >30, else 1).
+        Assert.Equal(penalty, DriverRating.AccidentPenaltyForOverall(overall));
+    }
+
+    [Fact]
+    public void ApplyAccidentPenalty_DropsAllThreeSkillsByTheBand()
+    {
+        var rating = new DriverRating(80.0, 80.0, 80.0);
+
+        DriverRating crashed = rating.ApplyAccidentPenalty();
+
+        Assert.Equal(73.0, crashed.Cornering);
+        Assert.Equal(73.0, crashed.Concentration);
+        Assert.Equal(73.0, crashed.OffTheLine);
+    }
+
+    [Fact]
+    public void ApplyAccidentPenalty_ClampsAtTheFloor()
+    {
+        var rating = new DriverRating(11.5, 11.5, 11.5);
+
+        DriverRating crashed = rating.ApplyAccidentPenalty();
+
+        Assert.Equal(DriverRating.ClampStat(11.5 - 1.0), crashed.Cornering);
+    }
+
     [Fact]
     public void AddRandomSkill_LandsOnExactlyOneSkill()
     {

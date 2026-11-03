@@ -72,6 +72,11 @@
                               ContentTemplate="{StaticResource ReceiptLineTemplate}"
                               TextElement.Foreground="#FFFF9D9D" TextElement.FontSize="16"
                               Visibility="{Binding HasFine, Converter={StaticResource BoolToHiddenVis}}"/>
+            <!-- The Next Fine Waived card's row: a waived fine means no
+                 deduction, so the ordinary fine row above stays empty. -->
+            <TextBlock Text="{Binding FineWaivedLine}" Foreground="#FF97EAD2" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"
+                       Visibility="{Binding HasFineWaived, Converter={StaticResource BoolToVis}}"/>
             <ContentPresenter Content="{Binding TotalLine}"
                               ContentTemplate="{StaticResource ReceiptLineTemplate}"
                               TextElement.Foreground="#FF97EAD2" TextElement.FontSize="20"

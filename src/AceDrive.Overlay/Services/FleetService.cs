@@ -175,9 +175,12 @@ public sealed class FleetService
     /// billed, so the accumulated repair stops at the car's own price.
     /// Returns null when nothing happened, on the second sample of a settling
     /// crash, and when there is no owned car to bill (a borrowed free-roam car
-    /// has no row).
+    /// has no row). <paramref name="suppressDamage"/> is the Invincible Rides
+    /// card: the detector still observes the sample (so the next crash is not
+    /// priced off a stale baseline) but nothing is banked or billed.
     /// </summary>
-    public AccidentDamage? ObserveAccident(TelemetrySample sample, DateTime now)
+    public AccidentDamage? ObserveAccident(
+        TelemetrySample sample, DateTime now, bool suppressDamage = false)
     {
         double speed = double.IsFinite(sample.SpeedKmh)
             ? Math.Clamp(sample.SpeedKmh, 0.0, MaxTelemetrySpeedKmh)
@@ -187,7 +190,7 @@ public sealed class FleetService
             : 0.0;
 
         AccidentImpact? impact = _accidents.Observe(damage, speed, now);
-        if (impact is null)
+        if (impact is null || suppressDamage)
         {
             return null;
         }

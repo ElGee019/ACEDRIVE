@@ -29,6 +29,8 @@ public sealed class TaxiJobFlow
     private readonly FareTable _fares;
     private readonly Garage _garage;
     private readonly DriverWallet _wallet;
+    private readonly Glovebox _glovebox;
+    private readonly Trunk _trunk;
     private readonly IFriendshipStore _friends;
     private readonly FleetService _fleet;
     private readonly GameClock _game;
@@ -66,6 +68,7 @@ public sealed class TaxiJobFlow
         IReadOnlyList<CarSpec> cars, ICustomerRequestRoller? requests,
         CustomerRequestTable requestTable, PolicePatrolPlanner? police,
         TaxiRules taxiRules, FareTable fares, Garage garage, DriverWallet wallet,
+        Glovebox glovebox, Trunk trunk,
         IFriendshipStore friends, FleetService fleet, GameClock game, IClock clock,
         VoiceBeat beat, GameStateSaver saver, IRivalsService rivals,
         TripBreakdowns breakdowns, ITelemetryHud? hud, ILog log)
@@ -81,6 +84,8 @@ public sealed class TaxiJobFlow
         _fares = fares;
         _garage = garage;
         _wallet = wallet;
+        _glovebox = glovebox;
+        _trunk = trunk;
         _friends = friends;
         _fleet = fleet;
         _game = game;
@@ -327,8 +332,10 @@ public sealed class TaxiJobFlow
     /// and the job is abandoned with no fare, no tip and no receipt — it cannot
     /// be resumed. Returns the customer's name so the caller's repair prompt can
     /// say who lost the friendship, or null when no job was live.
+    /// <paramref name="shielded"/> is the Accident Loyalty Shield: the card was
+    /// consumed by the caller, so the familiarity is left untouched.
     /// </summary>
-    public string? FailForAccident()
+    public string? FailForAccident(bool shielded = false)
     {
         if (!InProgress)
         {
@@ -336,9 +343,13 @@ public sealed class TaxiJobFlow
         }
 
         string customer = _job.Customer.BaseName;
-        _friends.AddFamiliarity(customer, -1);
+        if (!shielded)
+        {
+            _friends.AddFamiliarity(customer, -1);
+        }
         _log.LogWarning($"taxi job ended by accident: {_job.Customer.Full} " +
-            $"{_job.PickupName} -> {_job.DropoffName}, friendship -1");
+            $"{_job.PickupName} -> {_job.DropoffName}, " +
+            $"friendship {(shielded ? "kept (shield)" : "-1")}");
         // AbandonJob clears the request, the challenge and the companion line;
         // the receipt never runs, so the ride pays nothing.
         AbandonJob();
@@ -572,6 +583,20 @@ public sealed class TaxiJobFlow
             return;
         }
 
+        // Heat-Free Rides: while a carrying card has rides left, Unity spawns
+        // no patrols for the job, so no warning and no fine can land. The ride
+        // still spends one charge at the settle (Glovebox.RegisterCompletedJob),
+        // exactly like the source's OnJobCompleted tick.
+        if (_glovebox.HasCharges(RewardCardEffect.HeatFreeRides, _trunk))
+        {
+            _job.Patrols = [];
+            _job.FinedPatrolIds.Clear();
+            _job.WarnedPatrolIds.Clear();
+            _speedChallengeArmed = true;
+            _log.LogInfo("speed challenge armed without patrols: HEAT-FREE RIDES active");
+            return;
+        }
+
         // Unity spawns at the pickup for every job; this loop only needs the
         // plan when the gamble is on, and once per accepted job.
         _job.Patrols = planner.Plan(
@@ -632,6 +657,21 @@ public sealed class TaxiJobFlow
 
         _job.FinedPatrolIds.Add(fine.Id);
         _job.SpeedChallengeFines++;
+        // Next Fine Waived: one card covers this fine in full — no deduction
+        // and the ordinary tip survives (Unity's CheckSpeedChallengeFine).
+        if (_glovebox.TryConsume(RewardCardEffect.FineWaived, _trunk))
+        {
+            _job.FinesWaived++;
+            _hud?.ShowNotice(
+                Strings.Get("HudPoliceFineWaived"),
+                TimeSpan.FromSeconds(_taxiRules.NoticeSeconds));
+            _log.LogInfo(
+                $"speed challenge fine waived by reward card " +
+                $"(patrol {fine.Id}, {sample.SpeedKmh:0} km/h in {fine.SpeedLimitKmh} zone, " +
+                $"{_job.FinesWaived} waived)");
+            return;
+        }
+
         // Unity's OR tip rule: the fine kills the ordinary ask tip but a
         // correct quiz tip rides its own flag through the settle.
         _job.TipEligible = false;
