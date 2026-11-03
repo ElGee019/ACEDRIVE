@@ -27,11 +27,11 @@ public sealed class DeliveryFlowTests
     private static HubCatalog Hubs => new(
         [new HubTier(1, true, [
             new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-        CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        CredPRamp.UnityDefault);
 
     private static DeliveryCareer OwnedGroceryCareer()
     {
-        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        var career = new DeliveryCareer(Hubs, startCredP: 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         return career;
     }
@@ -132,8 +132,9 @@ public sealed class DeliveryFlowTests
         var friends = new FakeFriendshipStore();
         var onboarding = new FakeOnboardingStore();
         onboarding.Save(OnboardingState.Fresh with { BirthdayDone = true });
+        var career = OwnedGroceryCareer();
         var (flow, host, _) = Build(
-            OwnedGroceryCareer(), garage, wallet, friends, onboarding);
+            career, garage, wallet, friends, onboarding);
 
         flow.Start(Cart(Post));
 
@@ -143,7 +144,7 @@ public sealed class DeliveryFlowTests
         Assert.IsType<BreakdownScreenViewModel>(Assert.Single(host.Revealed));
         Assert.Equal(900.0, wallet.Cash, 6); // the mechanic's tow-in fee
         var (owner, delta) = Assert.Single(friends.Deltas);
-        Assert.Equal("Elena Marchetti", owner);
+        Assert.Equal(career.OwnedFor("groceries")!.OwnerName, owner);
         Assert.Equal(-1, delta);
     }
 
@@ -151,7 +152,8 @@ public sealed class DeliveryFlowTests
     public void FailForAccident_DropsTheRunAndChargesTheHubOwner()
     {
         var friends = new FakeFriendshipStore();
-        var (flow, host, _) = Build(OwnedGroceryCareer(), friends: friends);
+        var career = OwnedGroceryCareer();
+        var (flow, host, _) = Build(career, friends: friends);
         flow.Start(Cart(Post, Bakery));
 
         Assert.True(flow.FailForAccident());
@@ -160,7 +162,7 @@ public sealed class DeliveryFlowTests
         Assert.Equal(1, host.Clears);
         Assert.Empty(host.Settled); // the lost cargo is never priced
         var (owner, delta) = Assert.Single(friends.Deltas);
-        Assert.Equal("Elena Marchetti", owner);
+        Assert.Equal(career.OwnedFor("groceries")!.OwnerName, owner);
         Assert.Equal(-1, delta);
     }
 

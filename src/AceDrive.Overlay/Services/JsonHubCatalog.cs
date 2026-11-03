@@ -42,8 +42,7 @@ public sealed class JsonHubCatalog
     // globally unique or ownership checks (and the CredP ramp keys) collide.
     // Enabled tiers need at least one career; every career needs an id to
     // gate stores on, a label to show and priced, named levels. The ramp
-    // arrays must be parallel (one rate + cap per level), and owner names
-    // must be non-empty and unique like the hub names they label.
+    // arrays must be parallel (one rate + cap per level).
     private static bool IsValid(HubCatalog catalog)
     {
         if (catalog.Ramp is { } ramp
@@ -53,11 +52,6 @@ public sealed class JsonHubCatalog
                 || ramp.Caps.Any(c => c <= 0)))
         {
             return false;
-        }
-        var ownerNames = new HashSet<string>();
-        foreach (string owner in catalog.OwnerNames ?? [])
-        {
-            if (owner.Length == 0 || !ownerNames.Add(owner)) return false;
         }
         var tierIds = new HashSet<int>();
         var hubNames = new HashSet<string>();

@@ -78,6 +78,9 @@ public partial class App : Application, IDisposable
             new ProceduralNameGenerator(namePools, taxiSeed),
             _log);
         var poiNames = new ProceduralNameGenerator(namePools, taxiSeed + 4);
+        // Hub owners run on their own stream: a purchase then cannot shift the
+        // POI owners' sequence, and both still replay from a known seed.
+        var hubOwners = new ProceduralNameGenerator(namePools, taxiSeed + 8);
         var content = new JsonOnboardingContent(_log);
         // WHY touch Content once at startup: the same eager first read (and
         // "content:" log line) the old Load() call gave, so a missing/corrupt
@@ -232,10 +235,11 @@ public partial class App : Application, IDisposable
         // intro visit's gift.
         var hubCatalog = new JsonHubCatalog(_log).Load();
         var deliveryCareer = savedDriver?.Career is { } savedCareer
-            ? new DeliveryCareer(hubCatalog, savedCareer)
+            ? new DeliveryCareer(hubCatalog, savedCareer, hubOwners)
             : new DeliveryCareer(hubCatalog,
                 DeliveryCareerRecovery.Recover(hubCatalog, poiDirectory.All)
-                ?? new DeliveryCareerState(introGiftClaimed ? deliveryCatalog.StartCredP : 0));
+                ?? new DeliveryCareerState(introGiftClaimed ? deliveryCatalog.StartCredP : 0),
+                hubOwners);
         // The lifetime settled-job total (PORTPLAN 24, Unity jobsCompleted):
         // the dealer and mechanic POIs gate on it, so it must survive a
         // restart beside the cash it was earned with.

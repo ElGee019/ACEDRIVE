@@ -362,7 +362,7 @@ public sealed class WhereIsWillyFlowTests
         var hud = new FakeTelemetryHud();
         TestSessionResult session = Create(
             hud, directory: new PoiDirectory(),
-            career: new DeliveryCareer(HubCatalog.Default, 0));
+            career: new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()));
 
         CalendarScreenViewModel calendar = OpenCalendar(session);
         CalendarRow willy = WillyRow(calendar);
@@ -582,9 +582,9 @@ public sealed class WhereIsWillyFlowTests
             new HubCatalog(
                 [new HubTier(1, true,
                     [new HubCareer("coffee_beans", "COFFEE BEANS", [new HubLevel("CoffeeUs", 100)])])],
-                Ramp: null,
-                OwnerNames: []),
-            1000.0);
+                Ramp: null),
+            1000.0,
+            TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         return career;
     }

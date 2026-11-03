@@ -121,8 +121,8 @@ public sealed class BreakdownFlowTests
         // against; it never credits the ramp the way RegisterDelivery does.
         var hubs = new HubCatalog([
             new HubTier(1, true, [new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])]),
-        ], OwnerNames: ["Anna Berger"]);
-        var career = new DeliveryCareer(hubs, startCredP: 100);
+        ]);
+        var career = new DeliveryCareer(hubs, startCredP: 100, TestNames.For());
 
         Assert.Equal("", career.OwnerFor("groceries")); // no hub yet
         Assert.True(career.TryOpenCareer(1, 0, 0));

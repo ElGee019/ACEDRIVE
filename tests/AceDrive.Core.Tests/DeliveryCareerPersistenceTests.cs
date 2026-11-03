@@ -13,22 +13,26 @@ public sealed class DeliveryCareerPersistenceTests
         [new HubTier(1, true, [
             new HubCareer("groceries", "GROCERIES",
                 [new HubLevel("Grocers and Sons", 100), new HubLevel("The Food Hub", 150)])])],
-        CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        CredPRamp.UnityDefault);
 
     [Fact]
     public void Snapshot_RestoresTheBalanceAndTheBoughtHubs()
     {
-        var career = new DeliveryCareer(Hubs, 300);
+        var career = new DeliveryCareer(Hubs, 300, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         career.AddCredP(25);
 
-        var resumed = new DeliveryCareer(Hubs, career.Snapshot());
+        var resumed = new DeliveryCareer(Hubs, career.Snapshot(), TestNames.For());
 
         Assert.Equal(225, resumed.CredP);
         OwnedHub hub = Assert.Single(resumed.Owned);
         Assert.Equal("Grocers and Sons", hub.Name);
         Assert.Equal("groceries_grocers_and_sons", hub.Key);
         Assert.True(resumed.OwnsCategory("groceries"));
+        // The owner drawn at purchase rides the save, so a restart keeps the
+        // same person instead of rolling a new one.
+        Assert.NotEmpty(hub.OwnerName);
+        Assert.Equal(career.Owned[0].OwnerName, hub.OwnerName);
     }
 
     [Fact]
@@ -36,7 +40,7 @@ public sealed class DeliveryCareerPersistenceTests
     {
         // The written state must not alias the live list: a purchase after the
         // bank is the throttle's bug, not the snapshot's.
-        var career = new DeliveryCareer(Hubs, 300);
+        var career = new DeliveryCareer(Hubs, 300, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         DeliveryCareerState state = career.Snapshot();
         Assert.True(career.TryOpenCareer(1, 0, 1));
@@ -48,11 +52,11 @@ public sealed class DeliveryCareerPersistenceTests
     [Fact]
     public void Resume_KeepsTheRampCounting()
     {
-        var career = new DeliveryCareer(Hubs, 100);
+        var career = new DeliveryCareer(Hubs, 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         Assert.Equal(1, career.RegisterDelivery("groceries").CredPEarned);
 
-        var resumed = new DeliveryCareer(Hubs, career.Snapshot());
+        var resumed = new DeliveryCareer(Hubs, career.Snapshot(), TestNames.For());
 
         // The first delivery after the restart is the hub's second: the ramp
         // reads the saved count, so a relaunch never rewinds the progression.
@@ -78,7 +82,7 @@ public sealed class DeliveryCareerPersistenceTests
                 ["Grocers and Sons"] = -2,
             });
 
-        var career = new DeliveryCareer(Hubs, state);
+        var career = new DeliveryCareer(Hubs, state, TestNames.For());
 
         Assert.Equal(0, career.CredP);
         OwnedHub hub = Assert.Single(career.Owned);

@@ -1,6 +1,7 @@
 <UserControl x:Class="AceDrive.Overlay.Views.MainControlScreenView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:AceDrive.Overlay.Views"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <UserControl.Resources>
         <!-- Section rule: the wallet's translucent white hairline above and
@@ -11,153 +12,169 @@
             <Setter Property="Padding" Value="0,8"/>
             <Setter Property="Margin" Value="0,8"/>
         </Style>
-        <!-- Three blank text lines between the job buttons and Sonja's rule:
-             the buttons and the to-do list need breathing room. 57 px is three
-             19 px text lines on the page's scale (the wallet's SectionSpacer
-             spends 38 px on two). -->
-        <Style x:Key="JobsTodoSpacer" TargetType="Border">
-            <Setter Property="Height" Value="57"/>
-        </Style>
-        <!-- One blank text line (19 px, same scale as JobsTodoSpacer) between
-             Sonja's rule and the completed block: the tips just finished need a
-             beat of air so the header does not weld onto the rule above it. -->
-        <Style x:Key="CompletedTodosSpacer" TargetType="Border">
-            <Setter Property="Height" Value="19"/>
-        </Style>
     </UserControl.Resources>
-    <!-- Same page skeleton as DialogueScreenView: viewport-pinned MinHeight,
-         title band on top, BACK in the bottom band. The body is one centred
-         stack of three sections, split by the wallet's white rules: the job
-         buttons (Unity JobSelectionScreen order: taxi, then delivery, then car
-         hauling, then the police placeholder), Sonja's ToDo, then the tips just
-         completed. The weekly calendar strip lives on its own page now, reached
+    <!-- Same page skeleton as the menu and the calendar: viewport-pinned
+         MinHeight, the shared clock view on top so the jobs page's clock
+         renders at exactly the menu's height, weekday and display week
+         included. Only the band under the clock differs: it is trimmed to the
+         weekday line's own line box (GameClockView.InkBandHeight) and measures
+         itself, so the page's content — the title band, then the job buttons —
+         starts one blank text line under the weekday instead of under the
+         menu's empty 942 tile band, with Sonja's ToDo and the completed block
+         following them up instead of floating in the middle of a half-empty
+         band. The three sections are the job buttons (Unity JobSelectionScreen
+         order: taxi, then delivery, then car hauling, then the police
+         placeholder), Sonja's ToDo and the tips just completed; BACK closes
+         the band. The weekly calendar strip lives on its own page now, reached
          from the menu's CALENDAR tile. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" Text="{loc:Loc Key=ControlJobs}"/>
-        <StackPanel Grid.Row="1" VerticalAlignment="Center">
-            <!-- Job buttons: the page opens on them, so Sonja's ToDo sits
-                 directly below instead of in a band of its own. The hunger and
-                 filth readings live on the menu's battery tiles (PORTPLAN items
-                 26/33), so the job entries lead here. -->
-            <StackPanel>
-                <Button Content="{Binding TaxiLabel}" Margin="0,0,0,6"
-                        Command="{Binding TaxiCommand}">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding TaxiFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <Button Content="{Binding DeliveryLabel}"
-                        Command="{Binding DeliveryCommand}" Margin="0,0,0,6">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding DeliveryFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <Button Content="{Binding HaulLabel}"
-                        Command="{Binding HaulCommand}" Margin="0,0,0,6">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding HaulFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-                <!-- The police placeholder: its own flow has not landed, so a
-                     tap only swaps the text for COMING SOON for three seconds
-                     (the view model owns the hold, the glow and the restore). -->
-                <Button Content="{Binding PoliceLabel}"
-                        Command="{Binding PoliceCommand}" Margin="0,0,0,6">
-                    <Button.Style>
-                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding PoliceFlash}" Value="True">
-                                    <Setter Property="Foreground" Value="#FF97EAD2"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Button.Style>
-                </Button>
-            </StackPanel>
-            <Border Style="{StaticResource JobsTodoSpacer}"/>
-            <!-- Sonja's ToDo: ruled top and bottom, the wallet's white hairline
-                 splitting the page's three sections. A completed tip moves to
-                 the block below (Unity's TodoFinishedPopup). -->
-            <Border Style="{StaticResource SectionRule}">
+        <!-- Same clock view as the menu: identical face, outline, scale,
+             weekday/week line and height. The trimmed band is the only
+             difference, and it ends a hair under the weekday line. -->
+        <views:GameClockView Grid.Row="0"
+                             BandHeight="{x:Static views:GameClockView.InkBandHeight}"
+                             ClockText="{Binding ClockText}"
+                             DayWeekText="{Binding DayWeekText}"/>
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+            <StackPanel Grid.Row="0" VerticalAlignment="Top">
+                <!-- One blank text line (19 px on the page's scale), no more:
+                     the trimmed clock band already ends on the weekday line, so
+                     the buttons sit where the menu's tiles sit relative to it
+                     instead of mid-band. -->
+                <Border Height="19"/>
+                <TextBlock Style="{StaticResource PageTitle}" Text="{loc:Loc Key=ControlJobs}"/>
+                <!-- Job buttons: the page opens on them, so Sonja's ToDo sits
+                     directly below instead of in a band of its own. The hunger and
+                     filth readings live on the menu's battery tiles (PORTPLAN items
+                     26/33), so the job entries lead here. -->
                 <StackPanel>
-                    <TextBlock Text="{loc:Loc Key=ControlTodo}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                    <Button Content="{Binding TaxiLabel}" Margin="0,0,0,6"
+                            Command="{Binding TaxiCommand}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding TaxiFlash}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="{Binding DeliveryLabel}"
+                            Command="{Binding DeliveryCommand}" Margin="0,0,0,6">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding DeliveryFlash}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <Button Content="{Binding HaulLabel}"
+                            Command="{Binding HaulCommand}" Margin="0,0,0,6">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HaulFlash}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                    <!-- The police placeholder: its own flow has not landed, so a
+                         tap only swaps the text for COMING SOON for three seconds
+                         (the view model owns the hold, the glow and the restore). -->
+                    <Button Content="{Binding PoliceLabel}"
+                            Command="{Binding PoliceCommand}" Margin="0,0,0,6">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PoliceFlash}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
+                </StackPanel>
+                <!-- Sonja's ToDo: ruled top and bottom, the wallet's white hairline
+                     splitting the page's three sections. A completed tip moves to
+                     the block below (Unity's TodoFinishedPopup). No spacer above
+                     the rule: its own 8 px margin and 8 px padding are the one
+                     text line this section needs, and every pixel kept out of
+                     this gap is room the completed block below gets before the
+                     page has to scroll. -->
+                <Border Style="{StaticResource SectionRule}">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Loc Key=ControlTodo}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
+                                   HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                        <ItemsControl ItemsSource="{Binding TodoLines}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Foreground="#FFF" FontSize="13" TextWrapping="Wrap" Margin="0,1"
+                                               Text="{Binding Mode=OneWay}"/>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+                <!-- The tips just completed, below Sonja's list: the care-package
+                     copy leads the block so the earned kits are explained before
+                     the tips listed. The bag button itself lives below, outside
+                     this block (see the comment there). No spacer above the
+                     header either: Sonja's rule already ends 17 px above it
+                     (8 px padding + 1 px border + 8 px margin), and the
+                     completed list gets that line of room instead of air. -->
+                <StackPanel Visibility="{Binding HasCompletedTodos, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{loc:Loc Key=TodoCompletedHeader}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
                                HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                    <ItemsControl ItemsSource="{Binding TodoLines}">
+                    <TextBlock Text="{loc:Loc Key=TodoCarePackages}" Foreground="#FFF" FontSize="13"
+                               TextWrapping="Wrap" Margin="0,0,0,6"/>
+                    <ItemsControl ItemsSource="{Binding CompletedTodoLines}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Foreground="#FFF" FontSize="13" TextWrapping="Wrap" Margin="0,1"
+                                <TextBlock Foreground="#FF97EAD2" FontSize="13" TextWrapping="Wrap" Margin="0,1"
                                            Text="{Binding Mode=OneWay}"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </StackPanel>
-            </Border>
-            <!-- The tips just completed, below Sonja's list: the care-package
-                 copy leads the block so the earned kits are explained before
-                 the tips listed. The bag button itself lives below, outside
-                 this block (see the comment there). -->
-            <StackPanel Visibility="{Binding HasCompletedTodos, Converter={StaticResource BoolToVis}}">
-                <Border Style="{StaticResource CompletedTodosSpacer}"/>
-                <TextBlock Text="{loc:Loc Key=TodoCompletedHeader}" Foreground="#FFF" FontSize="14" FontWeight="Bold"
-                           HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                <TextBlock Text="{loc:Loc Key=TodoCarePackages}" Foreground="#FFF" FontSize="13"
-                           TextWrapping="Wrap" Margin="0,0,0,6"/>
-                <ItemsControl ItemsSource="{Binding CompletedTodoLines}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <TextBlock Foreground="#FF97EAD2" FontSize="13" TextWrapping="Wrap" Margin="0,1"
-                                       Text="{Binding Mode=OneWay}"/>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                <!-- DELIVER CARE PACKAGES stays outside the completed block: the
+                     five rows behind the bag threshold are what raise it, and a run
+                     already in the car offers itself with no rows at all. -->
+                <StackPanel Margin="0,6,0,0"
+                            Visibility="{Binding ShowDeliverCarePackages, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="{Binding CarePackageCountLine}" Foreground="#FFBFC4C9" FontSize="13"
+                               TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                    <Button Content="{loc:Loc Key=TodoDeliver}" Command="{Binding DeliverCarePackagesCommand}"/>
+                </StackPanel>
             </StackPanel>
-            <!-- DELIVER CARE PACKAGES stays outside the completed block: the
-                 five rows behind the bag threshold are what raise it, and a run
-                 already in the car offers itself with no rows at all. -->
-            <StackPanel Margin="0,6,0,0"
-                        Visibility="{Binding ShowDeliverCarePackages, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="{Binding CarePackageCountLine}" Foreground="#FFBFC4C9" FontSize="13"
-                           TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,4"/>
-                <Button Content="{loc:Loc Key=TodoDeliver}" Command="{Binding DeliverCarePackagesCommand}"/>
-            </StackPanel>
-        </StackPanel>
-        <!-- Bottom band: the one way back to the menu, flush with the panel
-             edge like every page's back button. Teal is the shared voice-ack
-             highlight: the BACK the mic tapped glows for one beat before the
-             page waits it out. -->
-        <Button Grid.Row="2" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
-            <Button.Style>
-                <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding BackFlash}" Value="True">
-                            <Setter Property="Foreground" Value="#FF97EAD2"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </Button.Style>
-        </Button>
+            <!-- Bottom band: the one way back to the menu, flush with the panel
+                 edge like every page's back button. Teal is the shared voice-ack
+                 highlight: the BACK the mic tapped glows for one beat before the
+                 page waits it out. -->
+            <Button Grid.Row="1" Content="{loc:Loc Key=DeliveryBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
     </Grid>
 </UserControl>

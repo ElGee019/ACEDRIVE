@@ -39,7 +39,7 @@ public sealed class PoiWorldTests
         [new HubTier(1, true, [
             new HubCareer("groceries", "GROCERIES",
                 [new HubLevel("Grocers and Sons", 100)])])],
-        CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        CredPRamp.UnityDefault);
 
     private static OnboardingState Done =>
         OnboardingState.Fresh with { BirthdayDone = true };
@@ -76,7 +76,7 @@ public sealed class PoiWorldTests
         var zone = new OperatingZone(saved, seed: 0, map ?? AddressMap.Default);
         var jobs = new JobLedger(saved);
         var board = new DeliveryBoard(BoardCatalog);
-        var deliveryCareer = career ?? new DeliveryCareer(Hubs, BoardCatalog.StartCredP);
+        var deliveryCareer = career ?? new DeliveryCareer(Hubs, BoardCatalog.StartCredP, TestNames.For());
         var city = new CityEconomy(BoardCatalog.Stores, CityRules.Default);
         PoiDirectory doors = directory ?? new PoiDirectory();
         var store = new FakePoiDirectoryStore();
@@ -155,7 +155,7 @@ public sealed class PoiWorldTests
     {
         // The store families follow the hub purchase, not the streets: the
         // career's first store must exist when the board is shown again.
-        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        var career = new DeliveryCareer(Hubs, startCredP: 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         var fixture = Build(progress: Done, career: career);
 
@@ -207,7 +207,7 @@ public sealed class PoiWorldTests
     {
         // A newly opened grocery must be on the delivery board and in the town
         // before the caller (the expansion page) lists it.
-        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        var career = new DeliveryCareer(Hubs, startCredP: 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         var fixture = Build(progress: Done, career: career);
 
@@ -288,7 +288,7 @@ public sealed class PoiWorldTests
     [Fact]
     public void PlaceHubDoor_BanksThePickupDoorOnce()
     {
-        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        var career = new DeliveryCareer(Hubs, startCredP: 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         var fixture = Build(career: career);
         OwnedHub hub = Assert.Single(career.Owned);
@@ -308,7 +308,7 @@ public sealed class PoiWorldTests
     [Fact]
     public void StopDoor_ResolvesTheHubAndStoreDoors_AndNullWhenNeitherExists()
     {
-        var career = new DeliveryCareer(Hubs, startCredP: 100);
+        var career = new DeliveryCareer(Hubs, startCredP: 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         var fixture = Build(career: career);
         fixture.World.PlaceHubDoor(career.Owned[0]);

@@ -19,7 +19,7 @@ public sealed class MainControlScreenTests
         bool deliveryOpen = false, TaxiShift? shift = null,
         bool taxiStartsShift = false, VoiceBeat? beat = null,
         ICommand? backCommand = null, bool canDeliverCarePackages = false,
-        ICommand? deliverCarePackages = null)
+        ICommand? deliverCarePackages = null, int week = 1)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         FakeClock tick = clock ?? new FakeClock();
@@ -28,6 +28,7 @@ public sealed class MainControlScreenTests
         return new MainControlScreenViewModel(
             beat ?? new VoiceBeat(tick),
             tick,
+            new GameClock(tick, tick.UtcNow),
             board,
             shiftState,
             new ControlActions(
@@ -38,7 +39,8 @@ public sealed class MainControlScreenTests
                 new RelayCommand(() => { }),
                 deliverCarePackages ?? new RelayCommand(() => { }),
                 () => canDeliverCarePackages),
-            backCommand ?? new RelayCommand(() => { }));
+            backCommand ?? new RelayCommand(() => { }),
+            week);
     }
 
     // The real board over a fresh career: the four Unity starting tips, so the
@@ -50,7 +52,7 @@ public sealed class MainControlScreenTests
             new FakeOnboardingStore(), new DriverWallet(), new JobLedger(),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new CarePackageLedger(),
             new Random(0), () => { }, new NullLogger());
     }
 
@@ -63,7 +65,7 @@ public sealed class MainControlScreenTests
             new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new CarePackageLedger(),
             new Random(0), () => { }, new NullLogger());
     }
 
@@ -88,8 +90,30 @@ public sealed class MainControlScreenTests
             new FakeOnboardingStore(), new DriverWallet(state), new JobLedger(state),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new CarePackageLedger(),
             new Random(0), () => { }, new NullLogger());
+    }
+
+    [Fact]
+    public void Clock_ShowsTheMenusGameTimeAndDisplayWeek()
+    {
+        // The jobs page carries the same header as the menu and the calendar:
+        // the design's 24-hour game time over the abbreviated weekday and the
+        // display week, and it follows a roll like the other two.
+        var clock = new FakeClock();
+        var vm = Create(clock, week: 3);
+
+        Assert.Equal("12:00", vm.ClockText);
+        Assert.Equal("MON / WEEK 3", vm.DayWeekText);
+
+        // One game hour: 60 minutes at the game clock's real-time rate, with a
+        // second of slack for the double division (59.999 would stay 12:59).
+        clock.Advance(TimeSpan.FromSeconds((GameClock.RealSecondsPerGameMinute * 60) + 1));
+        vm.Refresh();
+        Assert.Equal("13:00", vm.ClockText);
+
+        vm.DisplayWeek = 4;
+        Assert.Equal("MON / WEEK 4", vm.DayWeekText);
     }
 
     [Fact]
@@ -234,7 +258,7 @@ public sealed class MainControlScreenTests
         var beat = new VoiceBeat(clock);
         bool fired = false;
         var vm = new MainControlScreenViewModel(
-            beat, clock, DefaultTodoBoard(),
+            beat, clock, new GameClock(clock, clock.UtcNow), DefaultTodoBoard(),
             new TaxiShift(),
             new ControlActions(
                 new RelayCommand(() => { }),
@@ -242,7 +266,8 @@ public sealed class MainControlScreenTests
                 new RelayCommand(() => { }),
                 new RelayCommand(() => { }),
                 () => false),
-            new RelayCommand(() => { }));
+            new RelayCommand(() => { }),
+            1);
 
         vm.VoiceActions["DELIVERY JOB"].Invoke();
         Assert.True(vm.DeliveryFlash);

@@ -22,7 +22,7 @@ public sealed class TodoBoardTests
         var board = new TodoBoard(
             TodoTable.Default, store, directory, onboarding, wallet, jobs,
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            visits, new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            visits, new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new CarePackageLedger(),
             new Random(0), () => { }, new NullLogger());
         return (board, store, wallet, onboarding, directory, visits, jobs);
     }
@@ -44,7 +44,7 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new CarePackageLedger(),
             new Random(0), () => { }, new NullLogger());
 
         Assert.True(resumed.HasCompleted);
@@ -84,7 +84,7 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
             new Garage(TestRoadCars.Pool), new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), care, new Random(0),
             () => saves++, new NullLogger());
 
         // The boot sync met Earn 500 CR: one kit waited at the one shop, and the
@@ -106,7 +106,7 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
             new Garage(TestRoadCars.Pool), new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), care, new Random(0),
             () => { }, new NullLogger());
 
         // The tip still completes and lists; the kit is owed, not dropped.
@@ -147,7 +147,7 @@ public sealed class TodoBoardTests
             new FakeOnboardingStore(),
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), zone, new Garage(TestRoadCars.Pool), new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), care, new Random(0),
             () => { }, new NullLogger());
 
         Assert.Equal(1, care.Total);
@@ -183,7 +183,7 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default),
             new Garage(TestRoadCars.Pool), new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), care, new Random(0),
             () => { }, new NullLogger());
 
         Assert.Equal(4, care.Total);
@@ -232,7 +232,7 @@ public sealed class TodoBoardTests
             new DriverWallet(), new JobLedger(),
             new OperatingZone(null, seed: 0, AddressMap.Default),
             new Garage(TestRoadCars.Pool), new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), care, new Random(0),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), care, new Random(0),
             () => { }, new NullLogger());
 
         Assert.Equal(5, care.Total);
@@ -252,7 +252,7 @@ public sealed class TodoBoardTests
             new DriverWallet(new DriverState(0.0, 0.0, CreditEarned: 500.0)),
             new JobLedger(), new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
             new VisitLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new CarePackageLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new CarePackageLedger(),
             new Random(0), () => { }, new NullLogger());
         int saves = store.Saves;
 
@@ -287,7 +287,7 @@ public sealed class TodoBoardTests
             new FakeOnboardingStore(), new DriverWallet(),
             new JobLedger(new DriverState(0.0, 0.0, JobsCompleted: 18)),
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0),
+            new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()),
             new CarePackageLedger(), new Random(0), () => { }, new NullLogger());
 
         Assert.True(board.HasCompleted);
@@ -308,7 +308,7 @@ public sealed class TodoBoardTests
             TodoTable.Default, new FakeTodoProgressStore(), new PoiDirectory(),
             new FakeOnboardingStore(), new DriverWallet(), jobs,
             new OperatingZone(null, seed: 0, AddressMap.Default), new Garage(TestRoadCars.Pool),
-            new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0),
+            new VisitLedger(), new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()),
             new CarePackageLedger(), new Random(0), () => { }, new NullLogger());
 
         Assert.DoesNotContain(
@@ -329,7 +329,7 @@ public sealed class TodoBoardTests
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])]);
-        var career = new DeliveryCareer(hubs, 100);
+        var career = new DeliveryCareer(hubs, 100, TestNames.For());
         var onboarding = new FakeOnboardingStore();
         onboarding.Save(OnboardingState.Fresh with { MaxDeliveryIntroSeen = true });
         var board = new TodoBoard(

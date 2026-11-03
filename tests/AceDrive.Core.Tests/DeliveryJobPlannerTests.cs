@@ -27,7 +27,7 @@ public sealed class DeliveryJobPlannerTests
 
     private static DeliveryCareer Career()
     {
-        var career = new DeliveryCareer(Hubs, 500);
+        var career = new DeliveryCareer(Hubs, 500, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0)); // groceries
         Assert.True(career.TryOpenCareer(1, 1, 0)); // coffee
         return career;
@@ -74,7 +74,7 @@ public sealed class DeliveryJobPlannerTests
     public void OpenStore_NeedsNoHubLeg()
     {
         IReadOnlyList<DeliveryStop> stops = DeliveryJobPlanner.Plan(
-            Catalog, new DeliveryCareer(Hubs, 0), ["open"]);
+            Catalog, new DeliveryCareer(Hubs, 0, TestNames.For()), ["open"]);
 
         DeliveryStop stop = Assert.Single(stops);
         Assert.Equal(DeliveryStopKind.Store, stop.Kind);
@@ -85,7 +85,7 @@ public sealed class DeliveryJobPlannerTests
     public void MissingStore_IsSkipped()
     {
         IReadOnlyList<DeliveryStop> stops = DeliveryJobPlanner.Plan(
-            Catalog, new DeliveryCareer(Hubs, 0), ["gone"]);
+            Catalog, new DeliveryCareer(Hubs, 0, TestNames.For()), ["gone"]);
 
         Assert.Empty(stops);
     }

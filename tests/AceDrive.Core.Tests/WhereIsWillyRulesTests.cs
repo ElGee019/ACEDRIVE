@@ -157,7 +157,7 @@ public sealed class WhereIsWillyRulesTests
     [Fact]
     public void HasCoffeeCareer_AcceptsAshopDoorOrAnOwnedCoffeeHub()
     {
-        var career = new DeliveryCareer(HubCatalog.Default, 0);
+        var career = new DeliveryCareer(HubCatalog.Default, 0, TestNames.For());
 
         Assert.False(WhereIsWillyRules.HasCoffeeCareer(new PoiDirectory(), career));
         Assert.True(WhereIsWillyRules.HasCoffeeCareer(
@@ -253,9 +253,9 @@ public sealed class WhereIsWillyRulesTests
             new HubCatalog(
                 [new HubTier(1, true,
                     [new HubCareer("coffee_beans", "COFFEE BEANS", [new HubLevel("CoffeeUs", 100)])])],
-                Ramp: null,
-                OwnerNames: []),
-            1000.0);
+                Ramp: null),
+            1000.0,
+            TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         return career;
     }

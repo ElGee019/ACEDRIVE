@@ -283,12 +283,12 @@ public sealed class Navigation
     public MainControlScreenViewModel ControlPage()
     {
         _control ??= new MainControlScreenViewModel(
-            _beat, _clock, _todos, _shift,
+            _beat, _clock, _game, _todos, _shift,
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
                 new RelayCommand(OpenHaul), _deliverCarePackagesCommand,
                 CareDeliveryAvailable),
-            MenuCommand);
+            MenuCommand, _day.DisplayWeek);
         return _control;
     }
 
@@ -480,6 +480,13 @@ public sealed class Navigation
         if (_menu is not null)
         {
             _menu.DisplayWeek = week;
+        }
+
+        // The jobs page carries the same clock header (its setter refreshes the
+        // repaint, like the menu's).
+        if (_control is not null)
+        {
+            _control.DisplayWeek = week;
         }
 
         // The road-test pick deliberately does NOT rotate with the week — an

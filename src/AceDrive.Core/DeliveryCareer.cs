@@ -21,11 +21,19 @@ public sealed class DeliveryCareer
     // per delivered store, never inside a tick loop.
     private readonly Dictionary<string, int> _deliveries = new(StringComparer.OrdinalIgnoreCase);
 
+    // The person behind a bought hub is drawn at purchase like every other
+    // identity in the game: the cultural pools' weights decide who owns it,
+    // not a fixed roster. The draw is stored on the hub record, so a restart
+    // keeps the same owner and the map door and the delivery friendship keep
+    // naming one person.
+    private readonly ProceduralNameGenerator _names;
+
     /// <summary>A new career with the given starting balance (0 before Max's gift).</summary>
-    public DeliveryCareer(HubCatalog hubs, double startCredP)
+    public DeliveryCareer(HubCatalog hubs, double startCredP, ProceduralNameGenerator names)
     {
         Hubs = hubs;
         CredP = startCredP;
+        _names = names;
     }
 
     /// <summary>
@@ -35,11 +43,12 @@ public sealed class DeliveryCareer
     /// identity is rebuilt from the same rule <see cref="TryOpenCareer"/> uses,
     /// and a repeated hub (a merged save) keeps the first copy only.
     /// </summary>
-    public DeliveryCareer(HubCatalog hubs, DeliveryCareerState saved)
+    public DeliveryCareer(HubCatalog hubs, DeliveryCareerState saved, ProceduralNameGenerator names)
     {
         ArgumentNullException.ThrowIfNull(saved);
         Hubs = hubs;
         CredP = Math.Max(0, saved.CredP);
+        _names = names;
         if (saved.Owned is not null)
         {
             foreach (OwnedHub hub in saved.Owned)
@@ -142,8 +151,10 @@ public sealed class DeliveryCareer
     /// clear the selection. Category-less stores stay unconnected only until
     /// a hub of their category is bought — buying never rewires other careers.
     /// The owner person is assigned here like Unity does (Unity
-    /// GetHubOwnerName at buy time), deterministically from the catalog's
-    /// pool so the freeroam map can pin its POI to the same person later.
+    /// GetHubOwnerName at buy time), but drawn from the same cultural name
+    /// pool as every other person instead of a fixed list; the draw lands in
+    /// the hub record, so the map door and the delivery friendship keep one
+    /// identity across restarts.
     /// Returns false (and changes nothing) when the pick is not buyable.</summary>
     public bool TryOpenCareer(int tierId, int careerIndex, int levelIndex)
     {
@@ -158,7 +169,7 @@ public sealed class DeliveryCareer
         // owned record share one identity.
         _owned.Add(new OwnedHub(
             level.Name, career!.Id, level.Cost, tierId, levelIndex + 1,
-            HubOwnerNames.Pick(level.Name, Hubs.OwnersInForce),
+            _names.NextPerson().BaseName,
             HubKey(career.Id, level.Name)));
         CredP -= level.Cost;
         return true;

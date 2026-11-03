@@ -28,7 +28,7 @@ public sealed class HubScreenTests
         Create(double credP = 100, FakeClock? clock = null, VoiceBeat? beat = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
-        var career = new DeliveryCareer(Hubs, credP);
+        var career = new DeliveryCareer(Hubs, credP, TestNames.For());
         var log = new TestLog();
         var fired = new bool[1];
         // Tests that assert the deferred voice BACK wait own the clock and
@@ -108,7 +108,7 @@ public sealed class HubScreenTests
         // column out stays a COMING SOON placeholder.
         var hubs = new HubCatalog([new HubTier(3, true,
             [new HubCareer("chinese_import", "CHINESE IMPORT", [new HubLevel("Yeng Hu Wholesale", 180)])])]);
-        var career = new DeliveryCareer(hubs, 200);
+        var career = new DeliveryCareer(hubs, 200, TestNames.For());
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var vm = new DeliveryHubScreenViewModel(
             career, new TestLog(), new RelayCommand(() => { }),

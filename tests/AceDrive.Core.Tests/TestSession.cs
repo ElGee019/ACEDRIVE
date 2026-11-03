@@ -47,8 +47,8 @@ internal static class TestSession
         // a session rebuilt from a banked DriverState reopens the hubs it bought.
         var deliveryCareer = options.Career
             ?? (options.SavedDriver?.Career is { } savedCareer
-                ? new DeliveryCareer(options.Hubs ?? HubCatalog.Default, savedCareer)
-                : new DeliveryCareer(options.Hubs ?? HubCatalog.Default, board.StartCredP));
+                ? new DeliveryCareer(options.Hubs ?? HubCatalog.Default, savedCareer, TestNames.For())
+                : new DeliveryCareer(options.Hubs ?? HubCatalog.Default, board.StartCredP, TestNames.For()));
         var deliveryBoard = new DeliveryBoard(board);
         CarIdentity? announced =
             options.CarKsId is null ? null : new CarIdentity(options.CarKsId, options.CarPreset);

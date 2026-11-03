@@ -124,8 +124,8 @@ public sealed class JsonDriverStoreTests
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES",
                     [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
-        var career = new DeliveryCareer(hubs, 100);
+            CredPRamp.UnityDefault);
+        var career = new DeliveryCareer(hubs, 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0));
         Assert.Equal(1, career.RegisterDelivery("groceries").CredPEarned);
 
@@ -139,7 +139,7 @@ public sealed class JsonDriverStoreTests
             DriverState? loaded = store.Load();
 
             Assert.NotNull(loaded?.Career);
-            var resumed = new DeliveryCareer(hubs, loaded.Career!);
+            var resumed = new DeliveryCareer(hubs, loaded.Career!, TestNames.For());
             Assert.Equal(career.CredP, resumed.CredP);
             OwnedHub hub = Assert.Single(resumed.Owned);
             Assert.Equal("Grocers and Sons", hub.Name);

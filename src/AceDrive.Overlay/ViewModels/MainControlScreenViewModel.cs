@@ -9,7 +9,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// taxi/delivery/car-hauling entries and the police placeholder, the career
 /// ToDo list (PORTPLAN 46) and the completed block that offers DELIVER CARE
 /// PACKAGES once five kits wait, in the same order as the Unity page. The
-/// weekly calendar strip lives on its own page
+/// header repeats the menu's game clock (time over the abbreviated weekday and
+/// display week) through <see cref="GameClock"/>, so the three cached pages
+/// draw one identical clock. The weekly calendar strip lives on its own page
 /// (<see cref="CalendarScreenViewModel"/>), opened from the menu's CALENDAR
 /// tile. The delivery entry opens the delivery career page; the car-hauling
 /// entry settles the haul flow's run and shows its receipt. Every business
@@ -83,6 +85,9 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
 
     private readonly VoiceBeat _beat;
     private readonly IClock _clock;
+    // The header reads game time, never the real clock: the menu and the
+    // calendar page mine the same GameClock, so all three headers agree.
+    private readonly GameClock _game;
     private readonly ITodoList _todos;
     private readonly TaxiShift _shift;
     private readonly ICommand _backCommand;
@@ -109,15 +114,22 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     private bool? _careDeliveryOffered;
     private int _todoVersion = -1;
     private int _carePackageCount = -1;
+    // The clock header's own guards, so a new game minute never re-formats the
+    // ToDo block (see RefreshClock).
+    private int _lastMinute = -1;
+    private int _lastWeek = -1;
+    private int _week;
 
     public MainControlScreenViewModel(
-        VoiceBeat beat, IClock clock, ITodoList todos,
-        TaxiShift shift, ControlActions actions, ICommand back)
+        VoiceBeat beat, IClock clock, GameClock game, ITodoList todos,
+        TaxiShift shift, ControlActions actions, ICommand back, int displayWeek)
     {
         _beat = beat;
         _clock = clock;
+        _game = game;
         _todos = todos;
         _shift = shift;
+        _week = displayWeek;
         _backCommand = back;
         _deliverCarePackages = actions.DeliverCarePackages;
         _canDeliverCarePackages = actions.CanDeliverCarePackages;
@@ -130,6 +142,30 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         HaulLabel = _haulName;
         PoliceLabel = _policeName;
         Refresh();
+    }
+
+    /// <summary>Design clock line, 24-hour and culture-invariant, same copy as
+    /// the menu and the calendar page ("21:45").</summary>
+    public string ClockText { get => _clockText; private set => SetField(ref _clockText, value); }
+    private string _clockText = "";
+
+    /// <summary>Weekday + week line under the clock, same copy as the menu
+    /// ("THU / WEEK 1").</summary>
+    public string DayWeekText { get => _dayWeekText; private set => SetField(ref _dayWeekText, value); }
+    private string _dayWeekText = "";
+
+    /// <summary>
+    /// Display week in the clock header. The week rolls on the Sunday-midnight
+    /// crossing (pushed by the screen controller, which owns the boundary);
+    /// starts as the week the page was built on.
+    /// </summary>
+    public int DisplayWeek
+    {
+        get => _week;
+        set
+        {
+            if (SetField(ref _week, value)) Refresh();
+        }
     }
 
     public IReadOnlyList<string> TodoLines { get => _todoLines; private set => SetField(ref _todoLines, value); }
@@ -221,15 +257,17 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         new Dictionary<string, Action>();
 
     /// <summary>
-    /// Repaints the todo lines. Called from the 10 Hz poll; the value guards
-    /// keep it allocation-free between changes (hot-path discipline), the
-    /// CanExecute check re-offers delivery once unlocked. The taxi label
-    /// follows the shift: START while closed, CONTINUE while open (Unity
-    /// JobSelectionScreen rule), so the shift state joins the guard and a
-    /// start/end repaints even inside the same game minute.
+    /// Repaints the todo lines and the clock header. Called from the 10 Hz
+    /// poll; the value guards keep it allocation-free between changes
+    /// (hot-path discipline), the CanExecute check re-offers delivery once
+    /// unlocked. The taxi label follows the shift: START while closed,
+    /// CONTINUE while open (Unity JobSelectionScreen rule), so the shift state
+    /// joins the guard and a start/end repaints even inside the same game
+    /// minute.
     /// </summary>
     public void Refresh()
     {
+        RefreshClock();
         bool deliveryOpen = DeliveryCommand.CanExecute(null);
         bool shiftStarted = _shift.IsStarted;
         int careCount = _todos.CarePackageCount;
@@ -257,6 +295,22 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
             : string.Empty;
         SyncTaxiLabel();
         RebuildVoice();
+    }
+
+    // The clock header's own repaint, guarded on the game minute and the week
+    // like the menu's: the poll calls Refresh every tick, so only a changed
+    // minute or a rolled week may allocate. Kept apart from the ToDo block
+    // above so a new game minute (2-3 real seconds) never rebuilds the tip
+    // lines for nothing.
+    private void RefreshClock()
+    {
+        DateTime now = _game.GameNow;
+        int minute = now.Hour * 60 + now.Minute;
+        if (minute == _lastMinute && _week == _lastWeek) return;
+        _lastMinute = minute;
+        _lastWeek = _week;
+        ClockText = GameClockText.Time(now);
+        DayWeekText = GameClockText.DayWeek(_game.Today, _week);
     }
 
     private static string ShiftLabel(bool started) =>

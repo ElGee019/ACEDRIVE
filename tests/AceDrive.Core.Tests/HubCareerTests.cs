@@ -20,7 +20,7 @@ public sealed class HubCareerTests
         new HubTier(4, false, [Locked]),
     ]);
 
-    private static DeliveryCareer Fresh(double credP = 100) => new(Hubs, credP);
+    private static DeliveryCareer Fresh(double credP = 100) => new(Hubs, credP, TestNames.For());
 
     private static readonly DeliveryStore Post =
         new("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries");
@@ -143,7 +143,7 @@ public sealed class HubCareerTests
     [Fact]
     public void DefaultCatalog_NothingCanBeOpened()
     {
-        var career = new DeliveryCareer(HubCatalog.Default, 100);
+        var career = new DeliveryCareer(HubCatalog.Default, 100, TestNames.For());
         Assert.False(career.TryOpenCareer(1, 0, 0));
         Assert.False(career.CanBuy(1, 0, 0));
         Assert.Equal(100, career.CredP);
@@ -183,7 +183,7 @@ public sealed class HubCareerTests
         Assert.Equal(2, career.RegisterDelivery("groceries").CredPEarned);
 
         // No hub of the category: nothing earned, no owner.
-        var none = new DeliveryCareer(HubCatalog.Default, 100);
+        var none = new DeliveryCareer(HubCatalog.Default, 100, TestNames.For());
         Assert.Equal(0, none.RegisterDelivery("groceries").CredPEarned);
         Assert.Equal("", none.RegisterDelivery("groceries").OwnerName);
     }
@@ -213,35 +213,25 @@ public sealed class HubCareerTests
         Assert.Equal(5, career.CredP);
     }
 
-    // Unity's owner pool (PORTPLAN 18): the data file carries it; the test
-    // fixture mirrors the built-in Unity names.
-    private static readonly string[] OwnerPool =
-    [
-        "Elena Marchetti", "Luca Barbieri", "Sofia Romano", "Marco Conti",
-        "Alessia Ferrari", "Matteo Bianchi", "Giulia Rossi", "Andrea Esposito",
-        "Francesca Colombo", "Antonio Ricci", "Chiara Gallo", "Paolo Moretti",
-    ];
-
+    // The hub owner (Unity GetHubOwnerName, PORTPLAN 18) is a person like any
+    // other: drawn at purchase from the shared cultural name pool, stored on
+    // the hub so the map door and the delivery friendship share one identity.
     [Fact]
-    public void Owner_ResolvesOncePerHub_StableAcrossCareers()
+    public void Owner_IsDrawnFromTheSharedPool_AndKeptOnTheHub()
     {
-        // Unity assigns the owner (GetHubOwnerName) at purchase, keyed off
-        // the hub name — the same name always carries the same person, so
-        // the freeroam map can pin its POI to them later.
-        var realized = new HubCatalog(
-            [new HubTier(1, true, [
-                new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, OwnerPool);
-        var first = new DeliveryCareer(realized, 100);
-        first.TryOpenCareer(1, 0, 0);
-        var second = new DeliveryCareer(realized, 100);
-        second.TryOpenCareer(1, 0, 0);
-        Assert.Equal(first.Owned[0].OwnerName, second.Owned[0].OwnerName);
+        var names = new ProceduralNameGenerator(
+            new NamePoolTable([new NamePool("german", 1.0, ["Anna"], ["Berger"])], [""]),
+            seed: 0);
+        var career = new DeliveryCareer(Hubs, 300, names);
+        Assert.True(career.TryOpenCareer(1, 0, 0));
 
-        // The pick comes from the catalog's pool and the delivery hands it
-        // to the receipt as the friendship owner.
-        string owner = first.RegisterDelivery("groceries").OwnerName;
-        Assert.Contains(owner, OwnerPool);
-        Assert.Equal(first.Owned[0].OwnerName, owner);
+        string owner = career.Owned[0].OwnerName;
+        Assert.Equal("Anna Berger", owner);
+
+        // The delivery hands the hub's own owner to the receipt, and the
+        // resume replays the stored draw instead of rolling a new person.
+        Assert.Equal(owner, career.RegisterDelivery("groceries").OwnerName);
+        var resumed = new DeliveryCareer(Hubs, career.Snapshot(), TestNames.For(9));
+        Assert.Equal(owner, resumed.OwnedFor("groceries")!.OwnerName);
     }
 }

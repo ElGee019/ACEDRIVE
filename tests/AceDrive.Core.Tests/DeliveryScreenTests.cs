@@ -44,7 +44,7 @@ public sealed class DeliveryScreenTests
         var fired = new bool[3];
         List<DeliveryRun> runs = [];
         var board = catalog ?? Catalog;
-        var career = new DeliveryCareer(hubs ?? HubCatalog.Default, startCredP ?? board.StartCredP);
+        var career = new DeliveryCareer(hubs ?? HubCatalog.Default, startCredP ?? board.StartCredP, TestNames.For());
         var city = new CityEconomy(board.Stores, CityRules.Default);
         // Tests that assert the deferred voice navigation own the clock and
         // the beat, so they can advance past the beat and drain it.

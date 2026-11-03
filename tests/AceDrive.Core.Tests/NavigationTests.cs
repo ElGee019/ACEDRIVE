@@ -78,7 +78,7 @@ public sealed class NavigationTests
         // The availability rule the strip and the menu tile read.
         var gate = new CalendarGate(weeklyEvents, willyLedger, valuationLedger);
         // One career instance the saver, the POI world and the navigator share.
-        var career = new DeliveryCareer(HubCatalog.Default, 0);
+        var career = new DeliveryCareer(HubCatalog.Default, 0, TestNames.For());
         // The care-package ledger the saver banks and the jobs page reads.
         var carePackages = new CarePackageLedger();
         var saver = new GameStateSaver(
@@ -585,11 +585,16 @@ public sealed class NavigationTests
         menu.CalendarCommand.Execute(null);
         var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
         Assert.Contains("WEEK 1", calendar.DayWeekText, StringComparison.Ordinal);
+        // Built before the roll: the cached jobs page's clock header must take
+        // the new number too, or the two pages would disagree on the week.
+        MainControlScreenViewModel control = nav.ControlPage();
+        Assert.Contains("WEEK 1", control.DayWeekText, StringComparison.Ordinal);
 
         nav.DisplayWeekChanged(3);
 
         Assert.Contains("WEEK 3", calendar.DayWeekText, StringComparison.Ordinal);
         Assert.Contains("WEEK 3", menu.DayWeekText, StringComparison.Ordinal);
+        Assert.Contains("WEEK 3", control.DayWeekText, StringComparison.Ordinal);
     }
 
     [Fact]

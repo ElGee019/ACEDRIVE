@@ -55,7 +55,7 @@ public sealed class DriverCatchUpTests
             new Hunger(HungerRules.Default), TestRoadCars.Ledger(), new TaxiShift(),
             new ShiftRecord(null), new JobLedger(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(),
-            new DeliveryCareer(HubCatalog.Default, 0), new WeeklyEventLedger(),
+            new DeliveryCareer(HubCatalog.Default, 0, TestNames.For()), new WeeklyEventLedger(),
             new CarePackageLedger());
         var catchUp = new DriverCatchUp(
             onboarding, garage, streak, wallet, new Random(0), saver, new FakeRivals(), log);

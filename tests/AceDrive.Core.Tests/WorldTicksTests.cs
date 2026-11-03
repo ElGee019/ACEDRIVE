@@ -59,7 +59,7 @@ public sealed class WorldTicksTests
         var driverStore = new FakeDriverStore();
         var hungerStore = new FakeHungerStore();
         var rivals = new FakeRivals();
-        var career = new DeliveryCareer(HubCatalog.Default, catalog.StartCredP);
+        var career = new DeliveryCareer(HubCatalog.Default, catalog.StartCredP, TestNames.For());
         var board = new DeliveryBoard(catalog);
         // One instance per service graph: the fleet charges the wallet the
         // assertions read, and the saver banks into the driver store they read.

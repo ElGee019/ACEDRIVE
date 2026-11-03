@@ -21,7 +21,7 @@ public sealed class OnboardingTests
 
     // Test-shell career: no hub content, just Max's gift balance.
     private static DeliveryCareer HubCareerShell() =>
-        new(HubCatalog.Default, DeliveryCatalog.Default.StartCredP);
+        new(HubCatalog.Default, DeliveryCatalog.Default.StartCredP, TestNames.For());
 
     private static MainViewModel Create(
         OnboardingState? start = null, FakeClock? clock = null,

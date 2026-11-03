@@ -15,8 +15,8 @@
     <!-- The design's clock header (ontwerpdesign.psd, top band y = 0..942):
          the game clock as a white outline in Tourney Thin, stretched to the
          PSD's 0.724 x 1.967 text transform, over the abbreviated weekday and
-         display week. The menu and the calendar share this one view so both
-         pages render the clock identically.
+         display week. The menu, the calendar and the jobs page share this one
+         view so every page renders the clock identically.
          Both margins sit the clock's ink (258..805 in the 942 band) in the
          middle of the band's free space: the reminder's last line ends at 121
          and the tiles (menu) or the strip (calendar) start at 942, so the
@@ -24,6 +24,13 @@
          buttons. The placement is one fixed offset rather than a centering
          rule because the calendar carries no reminder and must still show the
          clock at the menu's height.
+         The band's own height is a property, not a constant: 942 is where the
+         menu's tiles and the calendar's strip start, but a page whose body
+         follows the clock directly (the jobs page) trims the band to the
+         weekday line's line box (815 in this grid, 820 with a hair of air), so
+         its content sits one blank line under the weekday instead of under
+         127 px of empty band. The Viewbox scales by the page width either way,
+         so the clock's face, size and position never change with the band.
          The negative side margin reclaims MainWindow's 22 px chrome (10 px
          padding + 2 px edge + 10 px padding), so 1080 design px map to the
          whole 413.6 px panel like the backdrop; the Viewbox keeps the band on
@@ -32,7 +39,7 @@
          scaling the geometry then stroking keeps the 3 px edge even on the
          vertical and the horizontal strokes alike. -->
     <Viewbox Stretch="Uniform" VerticalAlignment="Top" Margin="-22,0,-22,0">
-        <Grid Width="1080" Height="942">
+        <Grid Width="1080" Height="{Binding BandHeight, ElementName=Root}">
             <views:OutlinedText Text="{Binding ClockText, ElementName=Root}"
                                 FontFamily="{StaticResource TourneyThin}"
                                 FontSize="333.333"

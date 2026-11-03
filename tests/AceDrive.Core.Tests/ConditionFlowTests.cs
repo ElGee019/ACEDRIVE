@@ -176,7 +176,7 @@ public sealed class ConditionFlowTests
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+            CredPRamp.UnityDefault);
         var garage = new Garage(TestRoadCars.Pool);
         OwnedCar car = garage.Add(TestRoadCars.Pool[0], week: 1);
         var hud = new FakeTelemetryHud();

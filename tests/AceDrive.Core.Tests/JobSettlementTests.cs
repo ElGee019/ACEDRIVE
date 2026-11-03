@@ -30,8 +30,8 @@ public sealed class JobSettlementTests
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
-        var career = new DeliveryCareer(hubs, startCredP: 100);
+            CredPRamp.UnityDefault);
+        var career = new DeliveryCareer(hubs, startCredP: 100, TestNames.For());
         Assert.True(career.TryOpenCareer(1, 0, 0)); // spends every CredP: the run starts empty
         return career;
     }

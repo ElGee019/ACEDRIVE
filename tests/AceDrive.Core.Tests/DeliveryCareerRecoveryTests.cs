@@ -15,7 +15,7 @@ public sealed class DeliveryCareerRecoveryTests
             new HubCareer("groceries", "GROCERIES",
                 [new HubLevel("Grocers and Sons", 100), new HubLevel("The Food Hub", 150)]),
             new HubCareer("coffee_beans", "COFFEE BEANS", [new HubLevel("CoffeeUs", 100)])])],
-        CredPRamp.UnityDefault, ["Elena Marchetti"]);
+        CredPRamp.UnityDefault);
 
     private static PointOfInterest Door(
         string id, string name, string category, string owner = "Elena Marchetti") =>
@@ -49,7 +49,7 @@ public sealed class DeliveryCareerRecoveryTests
         Assert.Equal(150, hub.Cost);
         Assert.Equal(2, hub.Level);
         // The rebuilt level drives the ramp: level 2 starts at 2 CredP.
-        var career = new DeliveryCareer(Hubs, state);
+        var career = new DeliveryCareer(Hubs, state, TestNames.For());
         Assert.Equal(2, career.RegisterDelivery("groceries").CredPEarned);
     }
 

@@ -2607,7 +2607,7 @@ public sealed class MainViewModelTests
         // Unity only hands the delivery gift over on the first visit AFTER
         // firstSceneComplete (hasSeenMaxJobIntro); the birthday errand that
         // starts the tour must leave the career at zero.
-        var career = new DeliveryCareer(HubCatalog.Default, 0);
+        var career = new DeliveryCareer(HubCatalog.Default, 0, TestNames.For());
         var onboarding = new FakeOnboardingStore();
         var hud = new FakeTelemetryHud();
         var session = Create(
@@ -2631,7 +2631,7 @@ public sealed class MainViewModelTests
         // Unity: firstSceneComplete && !hasSeenMaxJobIntro shows
         // MaxDialogueScreen; its Continue pays the 100 CredP and opens the
         // shop. The delivery page must read 0 until that visit.
-        var career = new DeliveryCareer(HubCatalog.Default, 0);
+        var career = new DeliveryCareer(HubCatalog.Default, 0, TestNames.For());
         var onboarding = new FakeOnboardingStore();
         var driverStore = new FakeDriverStore();
         var hud = new FakeTelemetryHud();
@@ -2683,7 +2683,7 @@ public sealed class MainViewModelTests
     {
         // A banked first visit restores the gift from App's career seed; the
         // entering screen must not add a second copy.
-        var career = new DeliveryCareer(HubCatalog.Default, DeliveryCatalog.Default.StartCredP);
+        var career = new DeliveryCareer(HubCatalog.Default, DeliveryCatalog.Default.StartCredP, TestNames.For());
         var onboarding = new FakeOnboardingStore();
         onboarding.Save(OnboardingState.Fresh with
         {
@@ -3788,8 +3788,7 @@ public sealed class MainViewModelTests
                 new HubTier(1, true, [
                     new HubCareer("groceries", "GROCERIES",
                         [new HubLevel("Grocers and Sons", 100)])]),
-            ],
-            OwnerNames: ["Elena Marchetti"]);
+            ]);
         var directory = new PoiDirectory();
         var poiStore = new FakePoiDirectoryStore();
         var session = Create(
@@ -3912,7 +3911,7 @@ public sealed class MainViewModelTests
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+            CredPRamp.UnityDefault);
         var wallet = EmptyWallet();
         var friends = new FakeFriendshipStore();
         var hud = new FakeTelemetryHud();
@@ -3951,10 +3950,12 @@ public sealed class MainViewModelTests
         // / 100 × 0.2 = 0.0164.
         Assert.Equal(0.0164, wallet.Xp, precision: 9);
         // The ramp paid the producing hub's block; the familiarity went to
-        // its owner, assigned at purchase (Unity GetHubOwnerName).
-        Assert.Equal(["Elena Marchetti"], friends.Names);
+        // its owner, drawn from the name pool at purchase.
+        string owner = Assert.Single(friends.Names);
         Assert.True(receipt.HasFriendship);
-        Assert.Equal("New familiarity with Elena: 1. Still a stranger though.", receipt.FriendshipLine);
+        Assert.Equal(
+            $"New familiarity with {owner.Split(' ')[0]}: 1. Still a stranger though.",
+            receipt.FriendshipLine);
         Assert.True(receipt.HasCredP);
         Assert.Equal("Credibility Points earned: 1", receipt.CredPEarnedLine);
         Assert.Equal("Total Credibility Points: 1", receipt.TotalCredPLine);
@@ -3980,7 +3981,7 @@ public sealed class MainViewModelTests
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+            CredPRamp.UnityDefault);
         var wallet = EmptyWallet();
         var rarity = new FakeCarRarity { CarCount = 3 };
         var telemetry = new FakePlayerTelemetry();
@@ -4311,7 +4312,7 @@ public sealed class MainViewModelTests
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES",
                     [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+            CredPRamp.UnityDefault);
         var saved = new DriverState(
             0.0, 0.0, StreetIds: ["home"], ExpansionJobs: 1);
         var hud = new FakeTelemetryHud();
@@ -4566,7 +4567,7 @@ public sealed class MainViewModelTests
         var hubs = new HubCatalog(
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
-            CredPRamp.UnityDefault, ["Elena Marchetti"]);
+            CredPRamp.UnityDefault);
         var garage = new Garage(TestRoadCars.Pool);
         garage.Add(TestRoadCars.Pool[0], week: 1);
         var store = new FakeGarageStore();
