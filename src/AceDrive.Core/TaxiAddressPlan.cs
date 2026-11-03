@@ -5,16 +5,19 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// Unity's address draw: filter the map's houses by the radius, the player's
-/// own door and the doors a POI already owns, group the survivors by street,
-/// then pick the customer's home and a second residence. The two legs sit on
-/// different streets whenever the map offers a second one, so the
+/// Unity's address draw: filter the map's houses by the radius and the player's
+/// own door, group the survivors by street, then pick the customer's home and a
+/// second residence. The two legs sit on different streets whenever the map
+/// offers a second one, so the
 /// phrase can say "home" at one door and "the {surname} residence" at the
 /// other. A zone that has discovered a single street falls back to a second
 /// house on that same street — the copy already reads naturally for a
 /// neighbour ("the {surname} residence" two doors down) and a one-street zone
-/// must still propose jobs (TOZONES §4.7). A banked resident's door is NOT
-/// excluded: the resident book resolves it to the same person every time, and
+/// must still propose jobs (TOZONES §4.7). A door a POI already owns stays in
+/// the pool — the house is a business, not a vacancy — and
+/// <see cref="TaxiJobProposer"/> names its owner as the occupant, so a POI
+/// owner can be a passenger too. A banked resident's door is NOT excluded
+/// either: the resident book resolves it to the same person every time, and
 /// a returning customer is the point of that table.
 /// </summary>
 public static class TaxiAddressPlan
@@ -25,13 +28,11 @@ public static class TaxiAddressPlan
     /// free house on it. The caller then keeps the page's fallback copy. Never
     /// throws for an invalid map or geometry.
     /// </summary>
-    /// <param name="taken">Doors that already have a non-resident occupant —
-    /// a POI owner. The caller passes <see cref="PoiDirectory.HasDoor"/>,
-    /// which is what keeps one citizen per house.</param>
+    /// <param name="home">The player's own door: never a customer address,
+    /// because the player already lives there.</param>
     public static bool TryDraw(
         AddressMap map, Random rng, AddressLocation? home, int radiusKm,
-        out AddressLocation customerHome, out AddressLocation secondResidence,
-        Predicate<AddressLocation>? taken = null)
+        out AddressLocation customerHome, out AddressLocation secondResidence)
     {
         customerHome = default;
         secondResidence = default;
@@ -62,11 +63,6 @@ public static class TaxiAddressPlan
                 }
 
                 if (limited && !AddressBook.WithinRadius(map, origin, address, radius))
-                {
-                    continue;
-                }
-
-                if (taken is not null && taken(address))
                 {
                     continue;
                 }

@@ -294,8 +294,8 @@ public partial class App : Application, IDisposable
         // The taxi proposal draw reads the zone's own map, never the whole
         // address file: a fictional street the zone has not discovered yet must
         // never be offered as a destination (TOZONES §4.7). Hence it is built
-        // after the zone. It also reads the directory: a door with a POI owner
-        // already has its occupant, so no resident is put there.
+        // after the zone. It also reads the directory: a door a POI owns names
+        // its owner as the passenger, so a business owner can call a taxi.
         var taxiProposals = new TaxiJobProposer(
             zone, residents, poiDirectory, taxiSeed + 1);
         // XP world standings (PORTPLAN 60): the live Firestore board when a

@@ -15,7 +15,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// a second address and a coin flip decides which leg is the pickup: the
 /// home leg is "home", the other "the {surname} residence" after its resident,
 /// and the pickup puts its address on a fresh line while the dropoff keeps the
-/// compact "door, address" form. Addresses come from the address map's real
+/// compact "door, address" form. A door a POI owns names its owner, so a
+/// business owner can ride as either the customer or the second resident.
+/// Addresses come from the address map's real
 /// streets and houses, and the optional radius filters the draw like Unity's
 /// TaxiJobGenerator (both legs within the committed km of home, 5 km floor).
 /// Residents are reused per address through the persisted resident book, so
@@ -140,7 +142,7 @@ public sealed class TaxiJobProposalViewModel : ViewModelBase, IVoiceScreen
         // dropoff keeps the compact "door, address" form.
         string homeDoor = Strings.Get("ProposalDoorHome");
         string residenceDoor = Strings.Format(
-            "ProposalDoorResidence", proposal.SecondResident.Surname);
+            "ProposalDoorResidence", proposal.SecondResident.FamilyName);
         string pickupDoor = proposal.HomeIsPickup ? homeDoor : residenceDoor;
         string dropoffDoor = proposal.HomeIsPickup ? residenceDoor : homeDoor;
         string pickupAddress = proposal.HomeIsPickup ? home : residence;

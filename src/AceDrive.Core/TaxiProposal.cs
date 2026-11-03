@@ -5,11 +5,12 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// One generated job proposal: the passenger resident, the resident of the
-/// second address (their surname names "the X residence"), the coin flip
+/// One generated job proposal: the passenger at the customer's door (a banked
+/// resident, or the business owner when a POI holds that house), the occupant
+/// of the second address (their surname names "the X residence"), the coin flip
 /// deciding whether the customer's home is the pickup or the drop-off leg
-/// (Unity's isCustomerHomePickup), and the two doors themselves. Residents
-/// are reused per address through <see cref="ResidentBook"/>, like Unity's
+/// (Unity's isCustomerHomePickup), and the two doors themselves. Occupants are
+/// reused per address through <see cref="ResidentBook"/>, like Unity's
 /// persisted resident POIs.
 /// </summary>
 public sealed record TaxiProposal(

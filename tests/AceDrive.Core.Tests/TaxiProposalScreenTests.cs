@@ -31,7 +31,7 @@ public sealed class TaxiProposalScreenTests
         Create(
             NamePoolTable? table = null, int seed = 0, AddressMap? map = null,
             AddressLocation? home = null, IResidentStore? residents = null,
-            int seats = 4)
+            int seats = 4, PoiDirectory? pois = null)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var log = new TestLog();
@@ -43,7 +43,7 @@ public sealed class TaxiProposalScreenTests
         var vm = new TaxiJobProposalViewModel(
             TaxiTestData.Proposer(
                 map: addressMap, table: table ?? SoloTable, seed: seed,
-                residents: residents),
+                residents: residents, pois: pois),
             addressMap, () => home, () => seats, log, beat,
             new RelayCommand(() => fired[0] = true),
             new ParameterizedCommand<TaxiJobState>(job =>
@@ -159,6 +159,36 @@ public sealed class TaxiProposalScreenTests
         TaxiJobState job = Assert.Single(accepted);
         Assert.Equal("Solo Sohn", job.Customer.Full);
         Assert.Empty(job.Customer.Suffix);
+    }
+
+    [Fact]
+    public void ResidenceCopy_NamesASurnameLessOwner_WithoutABlank()
+    {
+        // One street of two doors, one owned by a surname-less story friend:
+        // both legs are drawn every time, so one side of the coin puts that
+        // owner second. The residence line must still name a family home
+        // instead of leaving the {0} slot empty.
+        var map = new AddressMap(
+            "Germany", "Test", 30.0, 30.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var door = new AddressLocation("Only Street", 1, HouseSide.Right);
+        var directory = new PoiDirectory(
+        [
+            new PointOfInterest("annabellas_place", "Annabella's Place", door,
+                PoiTypes.Person, "Annabelle"),
+        ]);
+
+        bool sawTheLabel = false;
+        foreach (int seed in Enumerable.Range(0, 12))
+        {
+            var (vm, _, _, _, _, _) = Create(map: map, seed: seed, pois: directory);
+            vm.Open();
+            Assert.DoesNotContain("the  residence", vm.Phrase, StringComparison.Ordinal);
+            sawTheLabel |= vm.Phrase.Contains(
+                "the Annabelle residence", StringComparison.Ordinal);
+        }
+
+        Assert.True(sawTheLabel);
     }
 
     [Fact]

@@ -102,30 +102,6 @@ public sealed class TaxiAddressPlanTests
     }
 
     [Fact]
-    public void TakenDoors_AreNeverDrawn()
-    {
-        // Only two houses are free: every seed must land on exactly those,
-        // never on an owned door.
-        AddressLocation[] free =
-        [
-            new AddressLocation("Street 1", 33, HouseSide.Right),
-            new AddressLocation("Street 2", 33, HouseSide.Right),
-        ];
-
-        foreach (int seed in Enumerable.Range(0, 20))
-        {
-            Assert.True(TaxiAddressPlan.TryDraw(
-                Map, new Random(seed), home: null, radiusKm: 0,
-                out AddressLocation home, out AddressLocation second,
-                door => !Array.Exists(free, door.Matches)));
-
-            Assert.True(Array.Exists(free, home.Matches));
-            Assert.True(Array.Exists(free, second.Matches));
-            Assert.NotEqual(home.DoorKey, second.DoorKey);
-        }
-    }
-
-    [Fact]
     public void HomeDoor_IsNeverADestination()
     {
         var home = new AddressLocation("Street 1", 17, HouseSide.Right);

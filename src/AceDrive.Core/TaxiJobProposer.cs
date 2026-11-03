@@ -14,11 +14,12 @@ namespace AceDrive.Core;
 ///
 /// The draw reads <see cref="OperatingZone.ZoneMap"/>, never the whole map: a
 /// fictional street the zone has not discovered yet must never be offered as a
-/// destination (TOZONES §4.7). The player's own door and every door a POI
-/// already owns are skipped (<see cref="PoiDirectory.HasDoor"/>), so one citizen
-/// lives per house. A house the resident book already knows stays drawable on
-/// purpose: it resolves to the same person every time, which is what makes the
-/// town's citizens persist.
+/// destination (TOZONES §4.7). The player's own door is skipped, but a door a
+/// POI owns is not: its occupant is the business owner, so the owner can call a
+/// taxi and no resident row is created under them (one citizen per house). A
+/// house the resident book already knows stays drawable on purpose: it
+/// resolves to the same person every time, which is what makes the town's
+/// citizens persist.
 /// </summary>
 public sealed class TaxiJobProposer(
     OperatingZone zone, ResidentBook residents, PoiDirectory pois, int seed)
@@ -31,19 +32,18 @@ public sealed class TaxiJobProposer(
     {
         bool hasAddresses = TaxiAddressPlan.TryDraw(
             zone.ZoneMap, _rng, home, radiusKm,
-            out AddressLocation customerHome, out AddressLocation secondResidence,
-            _pois.HasDoor);
+            out AddressLocation customerHome, out AddressLocation secondResidence);
 
         // Unity resolves the residents before the flip, so a fixed seed sees
         // the same address/name/flip order as the source generator. The
         // data-broken fallback still names the passenger, just without doors.
         // The car decides how much of the drawn party fits on this ride; the
         // resident book still remembers the full identity at the address.
-        ProceduralName customer = (hasAddresses
-            ? residents.GetOrCreate(customerHome).Name
-            : residents.DrawName()).ForCapacity(passengerCapacity);
+        ProceduralName customer = hasAddresses
+            ? Occupant(customerHome).ForCapacity(passengerCapacity)
+            : residents.DrawName().ForCapacity(passengerCapacity);
         ProceduralName secondResident = hasAddresses
-            ? residents.GetOrCreate(secondResidence).Name
+            ? Occupant(secondResidence)
             : residents.DrawName();
 
         return new TaxiProposal(
@@ -53,4 +53,14 @@ public sealed class TaxiJobProposer(
             hasAddresses ? customerHome : null,
             hasAddresses ? secondResidence : null);
     }
+
+    // The person at a door: the business owner when a POI holds the house, a
+    // banked resident otherwise (a POI whose owner is unknown leaves the house
+    // to the resident book). The owner is never also banked as a resident, so
+    // the house still has exactly one citizen and the ride grows the same
+    // friendship key the shop's counter does.
+    private ProceduralName Occupant(AddressLocation address) =>
+        _pois.FindDoor(address) is { OwnerName.Length: > 0 } poi
+            ? ProceduralName.FromDisplayName(poi.OwnerName)
+            : residents.GetOrCreate(address).Name;
 }

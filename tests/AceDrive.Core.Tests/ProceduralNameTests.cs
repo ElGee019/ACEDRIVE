@@ -88,4 +88,41 @@ public sealed class ProceduralNameTests
         Assert.Equal(withGroup, withGroup.ForCapacity(2));
         Assert.Equal(withGroup, withGroup.ForCapacity(4));
     }
+
+    [Fact]
+    public void FromDisplayName_KeepsACompoundSurname_OnTheRoundTrip()
+    {
+        // A generated owner ("Giulia De Luca") stored as one display string:
+        // the surname is everything after the given name, so BaseName gives
+        // the stored key back and the residence copy names the family home.
+        ProceduralName owner = ProceduralName.FromDisplayName("Giulia De Luca");
+
+        Assert.Equal("Giulia", owner.FirstName);
+        Assert.Equal("De Luca", owner.Surname);
+        Assert.Equal("De Luca", owner.FamilyName);
+        Assert.Equal("Giulia De Luca", owner.BaseName);
+    }
+
+    [Fact]
+    public void FromDisplayName_KeepsASingleTokenNameWhole()
+    {
+        // The story friends are stored without a surname ("Annabelle"): the
+        // identity is still the whole person, never a name beside a blank.
+        ProceduralName friend = ProceduralName.FromDisplayName("  Annabelle ");
+
+        Assert.Equal("Annabelle", friend.FirstName);
+        Assert.Empty(friend.Surname);
+        Assert.Equal("Annabelle", friend.BaseName);
+        Assert.Equal("Annabelle", friend.Full);
+        // The residence copy asks FamilyName, so it never reads "the  residence".
+        Assert.Equal("Annabelle", friend.FamilyName);
+    }
+
+    [Fact]
+    public void FromDisplayName_Empty_NamesNobody()
+    {
+        Assert.Equal(new ProceduralName(), ProceduralName.FromDisplayName(""));
+        Assert.Equal(new ProceduralName(), ProceduralName.FromDisplayName("   "));
+        Assert.Equal(new ProceduralName(), ProceduralName.FromDisplayName(null));
+    }
 }

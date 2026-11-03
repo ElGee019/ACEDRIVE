@@ -73,23 +73,33 @@ public sealed class PoiDirectory
 
     /// <summary>
     /// True when a known place already owns this door. A POI's owner lives or
-    /// works there, so the resident draws must leave the house alone: one
-    /// citizen per house, and this one is spoken for. Read live, never cached:
-    /// the directory grows mid-session and a stale door set would hand a
-    /// citizen the shop that just opened. The scan is a cold-path cost (a
-    /// proposal or an offer, never the 10 Hz poll).
+    /// works there, so the draws that would name a second household must leave
+    /// the house alone: the car haul's customer draw filters on this. The taxi
+    /// draw asks <see cref="FindDoor"/> instead — a POI door is a destination,
+    /// and its owner is the passenger. Read live, never cached: the directory
+    /// grows mid-session and a stale door set would hand a citizen the shop
+    /// that just opened. The scan is a cold-path cost (a proposal or an offer,
+    /// never the 10 Hz poll).
     /// </summary>
-    public bool HasDoor(AddressLocation address)
+    public bool HasDoor(AddressLocation address) => FindDoor(address) is not null;
+
+    /// <summary>
+    /// The known place that owns this door, or null when the house is a plain
+    /// home. The taxi draw reads it to name the person at an owned door: that
+    /// occupant is the business owner, never a freshly drawn resident, so one
+    /// citizen still lives per house.
+    /// </summary>
+    public PointOfInterest? FindDoor(AddressLocation address)
     {
         foreach (PointOfInterest poi in _ordered)
         {
             if (poi.Address.Matches(address))
             {
-                return true;
+                return poi;
             }
         }
 
-        return false;
+        return null;
     }
 
     /// <summary>

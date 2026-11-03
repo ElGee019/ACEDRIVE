@@ -59,6 +59,22 @@ public sealed class PoiDirectoryTests
     }
 
     [Fact]
+    public void FindDoor_AnswersThePlaceThatOwnsTheHouse()
+    {
+        // The taxi draw asks for the occupant, not just a yes/no: the owner's
+        // name has to come back with the door.
+        var directory = new PoiDirectory();
+        directory.Add(new PointOfInterest(
+            "bank", "Bank", new AddressLocation("Street 1", 4, HouseSide.Right),
+            PoiTypes.Bank, "Elena Marchetti"));
+
+        PointOfInterest door = Assert.IsType<PointOfInterest>(directory.FindDoor(
+            new AddressLocation("  street 1 ", 4, HouseSide.Left)));
+        Assert.Equal("Elena Marchetti", door.OwnerName);
+        Assert.Null(directory.FindDoor(new AddressLocation("Street 1", 5, HouseSide.Right)));
+    }
+
+    [Fact]
     public void Add_RejectsUnusableRows()
     {
         var directory = new PoiDirectory();

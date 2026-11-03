@@ -182,65 +182,136 @@ public sealed class TaxiJobProposerTests
     }
 
     [Fact]
-    public void Next_NeverPutsAResidentAtTheHomeOrABusinessDoor()
+    public void Next_LeavesThePlayersOwnDoorOut()
     {
         var home = new AddressLocation("Street 1", 9, HouseSide.Right);
-        var business = new AddressLocation("Street 2", 12, HouseSide.Right);
-        var directory = new PoiDirectory(
-            [new PointOfInterest("bank", "Bank", business)]);
-        var proposer = TaxiTestData.Proposer(table: Table, seed: 7, pois: directory);
+        var proposer = TaxiTestData.Proposer(table: Table, seed: 7);
 
         foreach (int _ in Enumerable.Range(0, 40))
         {
-            TaxiProposal proposal = proposer.Next(passengerCapacity: 4, home, radiusKm: 0);
-            AddressLocation customer = proposal.CustomerHome!.Value;
-            AddressLocation second = proposal.SecondResidence!.Value;
+            TaxiProposal proposal = proposer.Next(
+                passengerCapacity: 4, home, radiusKm: 0);
 
-            // One citizen per house: a door with a business owner, and the
-            // player's own door, never gain a second household.
-            Assert.False(customer.Matches(home));
-            Assert.False(customer.Matches(business));
-            Assert.False(second.Matches(home));
-            Assert.False(second.Matches(business));
+            // The player already lives there: no customer can be sent home.
+            Assert.False(proposal.CustomerHome!.Value.Matches(home));
+            Assert.False(proposal.SecondResidence!.Value.Matches(home));
         }
     }
 
     [Fact]
-    public void Next_OnlyUsesTheFreeDoorsLeftWhenTheBusinessesOwnTheRest()
+    public void PoiDoor_IsDrawn_AndItsOwnerIsThePassenger()
     {
-        // Every door but one per street belongs to a business: the proposal
-        // must find the two survivors instead of failing or reusing an owned
-        // door.
-        AddressLocation[] free =
+        // One street of three doors, the middle one a business: the draw must
+        // reach it (no exclusion) and name its owner as the occupant instead
+        // of banking a second citizen in the shop.
+        var map = new AddressMap(
+            "Germany", "Test", 60.0, 30.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var business = new AddressLocation("Only Street", 2, HouseSide.Left);
+        var store = new FakeResidentStore();
+        var directory = new PoiDirectory(
         [
-            new AddressLocation("Street 1", 33, HouseSide.Right),
-            new AddressLocation("Street 2", 33, HouseSide.Right),
-        ];
-        var directory = new PoiDirectory();
-        int id = 0;
-        foreach (AddressStreet street in AddressMap.Default.Streets)
-        {
-            int count = HouseNumberPlan.Count(street, AddressMap.Default);
-            for (int number = 1; number <= count; number++)
-            {
-                var door = new AddressLocation(
-                    street.Name, number, HouseNumberPlan.SideOf(number));
-                if (Array.Exists(free, door.Matches))
-                {
-                    continue;
-                }
+            new PointOfInterest(
+                "grocery", "Max's Grocery Store", business,
+                PoiTypes.Grocery, "Giulia De Luca"),
+        ]);
+        var proposer = TaxiTestData.Proposer(
+            map: map, table: Table, seed: 3, residents: store, pois: directory);
 
-                id++;
-                directory.Add(new PointOfInterest($"place-{id}", $"Place {id}", door));
+        bool sawTheShop = false;
+        foreach (int _ in Enumerable.Range(0, 40))
+        {
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4);
+
+            if (proposal.CustomerHome!.Value.Matches(business))
+            {
+                sawTheShop = true;
+                Assert.Equal("Giulia", proposal.Customer.FirstName);
+                Assert.Equal("De Luca", proposal.Customer.Surname);
+            }
+
+            if (proposal.SecondResidence!.Value.Matches(business))
+            {
+                sawTheShop = true;
+                Assert.Equal("Giulia", proposal.SecondResident.FirstName);
+                Assert.Equal("De Luca", proposal.SecondResident.Surname);
             }
         }
 
+        Assert.True(sawTheShop);
+        // One citizen per house: the owner is the shop's occupant, so the
+        // resident book never gains a row at that door.
+        Assert.NotEmpty(store.Residents);
+        Assert.DoesNotContain(store.Residents, resident => resident.Address.Matches(business));
+    }
+
+    [Fact]
+    public void PoiOwnerWithoutASurname_IsStillAWholePassenger()
+    {
+        // A fixed story friend owns their door with a single-token name; the
+        // passenger must be that person, not a name plus an empty surname.
+        var map = new AddressMap(
+            "Germany", "Test", 60.0, 30.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var door = new AddressLocation("Only Street", 1, HouseSide.Right);
+        var directory = new PoiDirectory(
+        [
+            new PointOfInterest("annabellas_place", "Annabella's Place", door,
+                PoiTypes.Person, "Annabelle"),
+        ]);
+        var proposer = TaxiTestData.Proposer(
+            map: map, table: Table, seed: 3, pois: directory);
+
+        bool sawTheDoor = false;
+        foreach (int _ in Enumerable.Range(0, 40))
+        {
+            TaxiProposal proposal = proposer.Next(passengerCapacity: 4);
+            if (!proposal.CustomerHome!.Value.Matches(door)
+                && !proposal.SecondResidence!.Value.Matches(door))
+            {
+                continue;
+            }
+
+            sawTheDoor = true;
+            ProceduralName owner = proposal.CustomerHome!.Value.Matches(door)
+                ? proposal.Customer
+                : proposal.SecondResident;
+            Assert.Equal("Annabelle", owner.Full);
+            Assert.Equal("Annabelle", owner.FamilyName);
+        }
+
+        Assert.True(sawTheDoor);
+    }
+
+    [Fact]
+    public void BusinessDoors_StayInThePool()
+    {
+        // Every door of the street belongs to a business: the draw must still
+        // resolve both legs (an exclusion would have left no door at all).
+        var map = new AddressMap(
+            "Germany", "Test", 60.0, 30.0,
+            [new AddressStreet("only", "Only Street", 0.0, 1.0)]);
+        var directory = new PoiDirectory();
+        int houses = HouseNumberPlan.Count(map.Streets[0], map);
+        for (int number = 1; number <= houses; number++)
+        {
+            directory.Add(new PointOfInterest(
+                $"place-{number}", $"Place {number}",
+                new AddressLocation("Only Street", number, HouseNumberPlan.SideOf(number)),
+                PoiTypes.Grocery, $"Owner {number}"));
+        }
+
+        var store = new FakeResidentStore();
         TaxiProposal proposal = TaxiTestData
-            .Proposer(table: Table, seed: 5, pois: directory)
+            .Proposer(map: map, table: Table, seed: 5, residents: store, pois: directory)
             .Next(passengerCapacity: 4);
 
-        Assert.True(Array.Exists(free, proposal.CustomerHome!.Value.Matches));
-        Assert.True(Array.Exists(free, proposal.SecondResidence!.Value.Matches));
+        Assert.NotNull(proposal.CustomerHome);
+        Assert.NotNull(proposal.SecondResidence);
+        // Both occupants are owners, so no resident is invented behind them.
+        Assert.Empty(store.Residents);
+        Assert.StartsWith("Owner ", proposal.Customer.BaseName);
+        Assert.StartsWith("Owner ", proposal.SecondResident.BaseName);
     }
 
     [Fact]
