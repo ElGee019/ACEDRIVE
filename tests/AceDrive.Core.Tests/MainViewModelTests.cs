@@ -3049,9 +3049,9 @@ public sealed class MainViewModelTests
 
         Assert.Equal("max-grocery", hud.Destination?.Id);
         Assert.Equal(PoiTypes.Grocery, hud.Destination?.Type);
-        // The errand keeps the generic drive line but its own maple arrival,
-        // so it cannot leak onto any other shop's arrival.
-        Assert.Equal("HudDestination", hud.HintKey);
+        // The errand names the maple syrup on both of its task lines, so the
+        // intro's first sentence says why, and neither replaces another shop's.
+        Assert.Equal("HudErrandDrive", hud.HintKey);
         Assert.Equal("HudArrivedErrand", hud.Copy?.ArrivedKey);
     }
 

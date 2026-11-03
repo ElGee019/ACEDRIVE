@@ -216,9 +216,9 @@ public partial class App : Application, IDisposable
         // the kits in the car resume with the driver, so a restart after a
         // pickup still owes the community centre the bags it is carrying.
         var carePackages = new CarePackageLedger(savedDriver?.CarePackages);
-        // The care-package rewards (PORTPLAN 61): the cards the picker offers,
-        // the glovebox's starting capacity and the cash a bonus pays, read once
-        // at startup like the fares so no page touches a file. The glovebox
+        // The care-package rewards (PORTPLAN 61): the cards the delivered page
+        // offers, the glovebox's starting capacity and the cash a bonus pays, read
+        // once at startup like the fares so no page touches a file. The glovebox
         // heals a save written before the cards existed from that same capacity,
         // and writes the healed count back through the driver file.
         RewardTable rewardTable = new JsonRewardCardStore(_log).Load();
@@ -546,7 +546,7 @@ public partial class App : Application, IDisposable
         // The delivery run from DELIVER to receipt, with its own board page.
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, meter, breakdowns,
-            beat, _log);
+            wall, beat, _log);
         // The Cento Miglia entry (PORTPLAN 49): the drive to the start, the
         // registration check and the race to the finish, in its own collaborator
         // so neither job flow grows a third phase machine. Its settle prices the
@@ -618,12 +618,13 @@ public partial class App : Application, IDisposable
             () => saver.SaveDriver(rivals.LastResult), _log);
         // The care-package run (PORTPLAN 21): DELIVER CARE PACKAGES on the jobs
         // page starts it, the companion carries every pickup and the community
-        // centre drop-off, and its receipt page closes the run. The receipt's
-        // CONTINUE opens the run's reward picker (PORTPLAN 61), whose claim
-        // banks through the same driver save.
+        // centre drop-off, and its delivered page closes the run. That page
+        // carries the run's two reward cards (PORTPLAN 61), whose claim banks
+        // through the same driver save.
         var careReward = new CarePackageReward(
             rewardTable, glovebox, trunk, driver,
-            // The picker's own seeded stream, offset from the other launch draws.
+            // The reward draw's own seeded stream, offset from the other launch
+            // draws.
             new Random(taxiSeed + 15),
             () => saver.SaveDriver(rivals.LastResult), _log);
         var careFlow = new CarePackageFlow(

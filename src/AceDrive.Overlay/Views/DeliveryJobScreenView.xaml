@@ -108,6 +108,23 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            <!-- Fully-stocked refusal: a tap on a store that needs no restock
+                 names that store here for three real seconds, so the refused
+                 click is answered instead of silent. Collapsed at every other
+                 moment, which is why it sits under the list and never shifts
+                 the rows while it shows. -->
+            <TextBlock Text="{Binding StockedNoticeLine}" Foreground="#FF97EAD2"
+                       FontSize="13" TextWrapping="Wrap" Margin="4,0,4,10">
+                <TextBlock.Style>
+                    <Style TargetType="TextBlock">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StockedNoticeLine}" Value="">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </TextBlock.Style>
+            </TextBlock>
             <TextBlock Text="{loc:Loc Key=DeliveryEmpty}" Foreground="#FFF" FontSize="13"
                        TextWrapping="Wrap" Margin="4,0,4,10">
                 <TextBlock.Style>

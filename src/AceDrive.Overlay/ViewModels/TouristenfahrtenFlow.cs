@@ -282,8 +282,8 @@ public sealed class TouristenfahrtenFlow
 
     // The corner leg: the share on board and where it goes, over the corner's
     // own address. The DELIVER button and its arrival line are the run's own,
-    // so the delivery career's "DELIVER ITEMS" wording never leaks onto a
-    // corner where the player unloads a customer's takeaway.
+    // so the delivery career's store copy never leaks onto a corner where the
+    // player unloads a customer's takeaway.
     private void PinDropoff(TouristenRun run)
     {
         if (run.Current is not { } dropoff)

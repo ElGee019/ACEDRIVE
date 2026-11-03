@@ -119,7 +119,7 @@ public sealed class NavigationTests
                 garageInstance, poolCars, game, wallet, InsuranceRules.Default, log,
                 brands, new FakeContentSource(TestSession.EmptyContent)),
             game, clock, beat, saver, rivals, breakdowns, null, log);
-        var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, beat, log);
+        var delivery = new DeliveryFlow(board, career, city, friends, meter, breakdowns, clock, beat, log);
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(
@@ -147,7 +147,7 @@ public sealed class NavigationTests
             new VisitLedger(), career, carePackages, new Random(0),
             () => saver.SaveDriver(rivals.LastResult), log);
         // The care-package run the jobs page's DELIVER button starts, with the
-        // reward picker its receipt hands over to (PORTPLAN 61).
+        // reward cards its delivered page offers (PORTPLAN 61).
         var careReward = new CarePackageReward(
             RewardTable.Default, new Glovebox(RewardTable.Default, wallet), trunk, wallet,
             new Random(15), () => saver.SaveDriver(rivals.LastResult), log);

@@ -595,7 +595,7 @@ public sealed class HudViewModelTests
     {
         var vm = Create();
         vm.SetDestination(Errand(), new HudDestinationCopy(
-            "HudDestination", "HudArrivedErrand"));
+            "HudErrandDrive", "HudArrivedErrand"));
 
         // 0.25 resolves to Street 1 No. 17: the errand's own house.
         vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
@@ -606,6 +606,23 @@ public sealed class HudViewModelTests
             "You have arrived at Max's Grocery Store, enter to buy maple syrup for grandma.",
             vm.DestinationText);
         Assert.Equal("ENTER", vm.EnterText);
+    }
+
+    [Fact]
+    public void ErrandDriveLine_NamesTheMapleSyrupBeforeArrival()
+    {
+        var vm = Create();
+        vm.SetDestination(Errand(), new HudDestinationCopy(
+            "HudErrandDrive", "HudArrivedErrand"));
+
+        vm.Update(Sample(position: 0.25f, speedKmh: 25f), 10.0, gameRunning: true);
+
+        // The intro's first task says why Max's store: the generic drive line
+        // alone left the errand's purpose to the arrival, after the drive.
+        Assert.False(vm.AtDestination);
+        Assert.Equal(
+            "Drive to Max's Grocery Store, Street 1 No. 17 in Brands and buy maple syrup for grandma",
+            vm.DestinationText);
     }
 
     [Fact]
@@ -955,7 +972,7 @@ public sealed class HudViewModelTests
         Assert.Equal(
             "You have arrived at Brünnchen. Press DELIVER ITEMS to unload.",
             vm.DestinationText);
-        Assert.Equal("DELIVER ITEMS", vm.EnterText);
+        Assert.Equal("DELIVER", vm.EnterText);
     }
 
     [Fact]
@@ -1090,7 +1107,7 @@ public sealed class HudViewModelTests
             "HudDeliveryHubAction", 25.0));
 
         Assert.StartsWith("Drive to Grocers and Sons", vm.DestinationText, StringComparison.Ordinal);
-        Assert.Equal("PICK UP THE GOODS", vm.EnterText);
+        Assert.Equal("PICK UP", vm.EnterText);
         Assert.Contains("pick up", vm.EnterKeywords);
         Assert.DoesNotContain("deliver", vm.EnterKeywords);
 
@@ -1100,7 +1117,7 @@ public sealed class HudViewModelTests
             "HudDeliveryStoreAction", 25.0));
 
         Assert.StartsWith("Deliver to Adenau Post", vm.DestinationText, StringComparison.Ordinal);
-        Assert.Equal("DELIVER ITEMS", vm.EnterText);
+        Assert.Equal("DELIVER", vm.EnterText);
         Assert.Contains("deliver", vm.EnterKeywords);
         Assert.Contains("deliver items", vm.EnterKeywords);
         Assert.DoesNotContain("pick up", vm.EnterKeywords);
@@ -1125,7 +1142,7 @@ public sealed class HudViewModelTests
             "Care kit run: drive to Max's Grocery Store at Street 1 No. 17 in Brands " +
             "to pick up the care packages (1 of 2).",
             vm.DestinationText);
-        Assert.Equal("PICK UP THE CARE PACKAGES", vm.EnterText);
+        Assert.Equal("PICK UP", vm.EnterText);
         Assert.Contains("pick up", vm.EnterKeywords);
 
         // Parked on the shop's own house: the arrival line and the same action.
@@ -1149,7 +1166,7 @@ public sealed class HudViewModelTests
             "All care packages collected. Drive to the Community Centre at " +
             "Street 2 No. 1 in Brands to drop them off.",
             vm.DestinationText);
-        Assert.Equal("DELIVER THE CARE PACKAGES", vm.EnterText);
+        Assert.Equal("DELIVER", vm.EnterText);
         Assert.Contains("deliver", vm.EnterKeywords);
     }
 

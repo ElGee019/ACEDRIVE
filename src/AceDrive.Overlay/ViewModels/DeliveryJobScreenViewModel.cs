@@ -10,8 +10,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// DeliveryJobScreen + StoreListView): stats header, the restockable store
 /// list and the phase-flipping main button. A row tap confirms a
 /// full-restock order into the pickup cart and flips the page between
-/// OPEN NEW CAREER and DELIVER; the back button becomes CANCEL ORDER while
-/// the cart holds orders, mirroring the Unity screen. Only stores whose
+/// OPEN NEW CAREER and DELIVER; a tap on a store that is already full is
+/// refused with a three-second notice naming it. The back button becomes
+/// CANCEL ORDER while the cart holds orders, mirroring the Unity screen. Only stores whose
 /// wholesale career has been opened show on the board (Unity's
 /// HasHubForCategory eligibility), so the board starts empty and the hub
 /// page fills it. Per-item quantities arrive with the order screen (item
@@ -25,11 +26,17 @@ namespace AceDrive.Overlay.ViewModels;
 /// </summary>
 public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
 {
+    // Unity order-screen rule: a fully stocked store takes no order. The
+    // refusal names the store for three real seconds, like the control page's
+    // COMING SOON hold, so the tap is never silent.
+    private const double StockedNoticeSeconds = 3;
+
     private DeliveryCatalog _catalog;
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
     private readonly DeliveryCart _cart = new();
     private readonly ILog _log;
+    private readonly IClock _clock;
     private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
     private readonly ParameterizedCommand<DeliveryRun> _runCommand;
@@ -38,12 +45,13 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
     public DeliveryJobScreenViewModel(
         DeliveryCatalog catalog, DeliveryCareer career, CityEconomy city, ILog log,
         ICommand backCommand, ParameterizedCommand<DeliveryRun> runCommand, ICommand hubCommand,
-        VoiceBeat beat)
+        IClock clock, VoiceBeat beat)
     {
         _catalog = catalog;
         _career = career;
         _city = city;
         _log = log;
+        _clock = clock;
         _beat = beat;
         _backCommand = backCommand;
         _runCommand = runCommand;
@@ -94,6 +102,15 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
     private bool _backFlash;
 
+    /// <summary>Copy naming the store whose fully-stocked refusal is showing;
+    /// empty the rest of the time, so the view collapses the line.</summary>
+    public string StockedNoticeLine { get => _stockedNoticeLine; private set => SetField(ref _stockedNoticeLine, value); }
+    private string _stockedNoticeLine = string.Empty;
+
+    // The refusal hold's deadline. Latest tap wins (a second full store
+    // restarts it), like the control page's COMING SOON hold.
+    private DateTime _stockedNoticeUntil;
+
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
 
@@ -121,9 +138,15 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
         if (row.Store.UnitsNeeded == 0)
         {
             // Unity order-screen rule: a fully stocked store takes no order.
+            // The refused tap is answered, not just logged: the page names
+            // the store for three seconds.
+            ShowStockedNotice(row.Store.Name);
             _log.LogInfo($"order skipped, fully stocked: {row.Store.Name}");
             return;
         }
+        // A tap that stages or drops an order is the player moving on, so an
+        // older refusal must not linger beside it.
+        ClearStockedNotice();
         string key = row.Store.Key;
         bool confirmed = !_cart.Contains(key);
         if (confirmed) _cart.Confirm(key);
@@ -181,6 +204,9 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
     private void OnBack()
     {
         ClearVoiceFlash();
+        // A cached page must not re-open mid-hold: the way out drops the
+        // refusal copy, like the control page's COMING SOON label.
+        ClearStockedNotice();
         if (!_cart.IsEmpty)
         {
             // Unity: leaving with a pending cart is CANCEL ORDER, which
@@ -209,6 +235,30 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
         MainFlash = false;
         BackFlash = false;
     }
+
+    /// <summary>
+    /// Clears the expired fully-stocked notice. Called from the 10 Hz poll (a
+    /// refresh guard would swallow a same-second expiry): one length check per
+    /// tick while idle, one DateTime compare while it shows, allocations only
+    /// on the edge.
+    /// </summary>
+    public void UpdateNotice()
+    {
+        if (StockedNoticeLine.Length > 0 && _clock.UtcNow >= _stockedNoticeUntil)
+        {
+            ClearStockedNotice();
+        }
+    }
+
+    // The refusal slot: the store's own name in the resx sentence, shown for
+    // three real seconds. The deadline is stamped once; the poll only compares.
+    private void ShowStockedNotice(string storeName)
+    {
+        StockedNoticeLine = Strings.Format("DeliveryFullyStocked", storeName);
+        _stockedNoticeUntil = _clock.UtcNow + TimeSpan.FromSeconds(StockedNoticeSeconds);
+    }
+
+    private void ClearStockedNotice() => StockedNoticeLine = string.Empty;
 
     // Confirmed rows first (cart order, like Unity's staged list), then the
     // rest by stock percentage ascending: emptiest stores need help most.

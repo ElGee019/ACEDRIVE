@@ -431,9 +431,10 @@ public sealed class Navigation
         ShowScreen(_delivery.Board ?? (object)ControlPage());
 
     /// <summary>
-    /// The poll's page maintenance: the flash edges and the minute-guarded
-    /// refreshes of the three cached pages. Warm path only — each page does one
-    /// int compare per tick at worst (hot-path discipline).
+    /// The poll's page maintenance: the flash edges, the board's timed refusal
+    /// and the minute-guarded refreshes of the three cached pages. Warm path
+    /// only — each page does one int compare per tick at worst (hot-path
+    /// discipline).
     /// </summary>
     public void Tick()
     {
@@ -444,6 +445,9 @@ public sealed class Navigation
         _menu?.UpdateFlash();
         _menu?.UpdateReveal();
         _menu?.Refresh();
+        // The cached board's three-second refusal outlives its own page, so
+        // it clears here whether or not the board is the shown screen.
+        _delivery.UpdateNotice();
     }
 
     /// <summary>

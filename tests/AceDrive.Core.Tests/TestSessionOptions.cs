@@ -66,7 +66,7 @@ internal sealed class TestSessionOptions
     // The care-package grant's own draw stream: a suite that pins which store
     // holds the kits hands its seeded instance in.
     public Random? CareRng { get; init; }
-    // The care-package reward catalogue and the picker's own draw stream
+    // The care-package reward catalogue and the reward draw's own stream
     // (PORTPLAN 61): a suite that pins the two cards on offer hands both in.
     public RewardTable? Rewards { get; init; }
     public Random? RewardRng { get; init; }

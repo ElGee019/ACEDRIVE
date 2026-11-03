@@ -8,8 +8,8 @@ namespace AceDrive.Overlay.Services;
 /// Loads the care-package reward catalogue from Data/reward_cards.json next to
 /// the exe (PORTPLAN item 61). Missing or invalid files degrade to
 /// <see cref="RewardTable.Default"/> with a warning — the overlay must never
-/// fail to start over a data file, and the picker must still be able to fill a
-/// page.
+/// fail to start over a data file, and the delivered page must still be able to
+/// fill its two cards.
 /// </summary>
 public sealed class JsonRewardCardStore
 {
@@ -60,11 +60,12 @@ public sealed class JsonRewardCardStore
         return table;
     }
 
-    // The picker needs two distinct rewards to fill a page, a glovebox needs at
-    // least one slot and a title is what a carried card is matched by, so a
-    // blank or duplicated title would make one card unclaimable. WHY the file's
-    // own shape is checked first: a catalogue with no Cards block deserializes
-    // to a null list, which must degrade to the defaults rather than throw.
+    // The delivered page needs two distinct rewards to fill its cards, a
+    // glovebox needs at least one slot and a title is what a carried card is
+    // matched by, so a blank or duplicated title would make one card
+    // unclaimable. WHY the file's own shape is checked first: a catalogue with
+    // no Cards block deserializes to a null list, which must degrade to the
+    // defaults rather than throw.
     private static bool IsValid(RewardTable table)
     {
         if (table.Cards is not { Count: >= 2 } cards

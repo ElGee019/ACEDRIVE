@@ -228,7 +228,7 @@ internal static class TestSession
             () => saver.SaveDriver(rivalsInstance.LastResult), logger);
         // The care-package run: the same directory, ledger and HUD the jobs page
         // and the companion use, with its host attached by the coordinator. Its
-        // reward picker (PORTPLAN 61) rides here too: the shipped catalogue
+        // reward pair (PORTPLAN 61) rides here too: the shipped catalogue
         // shape, the glovebox over the same wallet and trunk the assertions
         // read, and its own seeded stream so a suite can pin the offer.
         RewardTable rewardTable = options.Rewards ?? RewardTable.Default;
@@ -249,7 +249,7 @@ internal static class TestSession
             breakdownsInstance, options.Hud, logger);
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, meter,
-            breakdownsInstance, beat, logger);
+            breakdownsInstance, clock, beat, logger);
         // The Cento Miglia entry (PORTPLAN 49): its own flow and settle, on the
         // same wallet, garage and trunk the assertions read.
         var cento = new CentoRaceFlow(walletInstance, garageInstance, beat, logger);

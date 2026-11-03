@@ -5,13 +5,14 @@ using AceDrive.Overlay.ViewModels;
 namespace AceDrive.Core.Tests;
 
 /// <summary>
-/// The care-package reward picker (PORTPLAN 61, Unity CANVASREWARDS): the two
-/// rewards on offer, one claim that lands in the glove compartment, a full
-/// glovebox that keeps the choice open, and CONTINUE's shared voice beat. The
-/// page is driven the way the flow builds it, over the reward desk that owns the
-/// draw and the bank.
+/// The care-package delivered page (PORTPLAN items 21 and 61, Unity's completion
+/// edge): the receipt numbers plus the two-reward choice the community centre
+/// offers, one claim that lands in the glove compartment, a full glovebox that
+/// keeps the choice open, and CONTINUE's shared voice beat. The page is driven
+/// the way the flow builds it, over the reward desk that owns the draw and the
+/// bank.
 /// </summary>
-public sealed class RewardPickerScreenViewModelTests
+public sealed class CarePackageReceiptScreenViewModelTests
 {
     private const string TipCard = "DOUBLE NEXT TIP";
     private const string FineCard = "NEXT FINE WAIVED";
@@ -19,7 +20,7 @@ public sealed class RewardPickerScreenViewModelTests
     private const string CashCard = "+500CR BONUS";
 
     // The two stored-card rewards: the catalogue a suite that does not care
-    // about the slot or cash branches pins, so both buttons are plain cards.
+    // about the slot or cash branches pins, so both cards are plain cards.
     private static readonly RewardCard[] StoredCards =
     [
         new RewardCard(TipCard, "Your next customer tip will be doubled"),
@@ -27,16 +28,16 @@ public sealed class RewardPickerScreenViewModelTests
     ];
 
     // The page copy follows the UI culture; tests pin en-US.
-    public RewardPickerScreenViewModelTests() =>
+    public CarePackageReceiptScreenViewModelTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
     private sealed record Page(
-        RewardPickerScreenViewModel Vm, CarePackageReward Rewards, DriverWallet Wallet,
+        CarePackageReceiptScreenViewModel Vm, CarePackageReward Rewards, DriverWallet Wallet,
         Trunk Trunk, VoiceBeat Beat, FakeClock Clock, List<string> Events);
 
     private static Page Create(
         int capacity = 2, IReadOnlyList<TrunkItem>? carried = null,
-        IReadOnlyList<RewardCard>? cards = null)
+        IReadOnlyList<RewardCard>? cards = null, bool withReward = true)
     {
         var wallet = new DriverWallet(DriverState.Fresh with { GloveboxSlots = capacity });
         var trunk = new Trunk(carried ?? []);
@@ -50,23 +51,46 @@ public sealed class RewardPickerScreenViewModelTests
             table, glovebox, trunk, wallet, new Random(1),
             () => events.Add("saved"), new NullLogger());
         var offer = Assert.IsType<RewardOffer>(rewards.Offer());
-        var vm = new RewardPickerScreenViewModel(
-            offer, rewards, beat, new RelayCommand(() => events.Add("continue")));
+        var receipt = new CarePackageReceipt(5, 0, ["Max's Grocery Store"]);
+        var vm = new CarePackageReceiptScreenViewModel(
+            receipt,
+            withReward ? new RewardChooser(offer, rewards) : null,
+            beat, new RelayCommand(() => events.Add("continue")));
         return new Page(vm, rewards, wallet, trunk, beat, clock, events);
     }
 
     [Fact]
-    public void Open_OffersBothCardsAndTheGloveboxReading()
+    public void DeliveredPage_PrintsTheRunAndOffersBothCards()
     {
         Page page = Create();
 
-        Assert.True(page.Vm.OfferOpen);
-        Assert.Equal(2, page.Vm.Cards.Count);
-        Assert.NotEqual(page.Vm.First.Title, page.Vm.Second.Title);
+        Assert.Contains("5", page.Vm.DeliveredLine, StringComparison.Ordinal);
+        Assert.True(page.Vm.HasStores);
+        Assert.Contains("Max's Grocery Store", page.Vm.StoresLine, StringComparison.Ordinal);
+        Assert.Equal("Every care kit in town has been delivered.", page.Vm.RemainingLine);
+
+        Assert.True(page.Vm.HasReward);
+        Assert.True(page.Vm.RewardOpen);
+        Assert.Equal(2, page.Vm.RewardCards.Count);
+        Assert.NotEqual(page.Vm.RewardCards[0].Title, page.Vm.RewardCards[1].Title);
         Assert.Contains("0/2", page.Vm.GloveboxLine, StringComparison.Ordinal);
-        Assert.False(page.Vm.HasNotice);
+        Assert.False(page.Vm.HasRewardNotice);
         Assert.True(page.Vm.VoiceActions.ContainsKey(TipCard));
         Assert.True(page.Vm.VoiceActions.ContainsKey(FineCard));
+        Assert.True(page.Vm.VoiceActions.ContainsKey("CONTINUE"));
+    }
+
+    [Fact]
+    public void DeliveredPage_WithoutACataloguePair_PrintsTheReceiptOnly()
+    {
+        Page page = Create(withReward: false);
+
+        Assert.False(page.Vm.HasReward);
+        Assert.False(page.Vm.RewardOpen);
+        Assert.Empty(page.Vm.RewardCards);
+        Assert.Empty(page.Vm.GloveboxLine);
+        Assert.False(page.Vm.HasRewardNotice);
+        Assert.Single(page.Vm.VoiceActions);
         Assert.True(page.Vm.VoiceActions.ContainsKey("CONTINUE"));
     }
 
@@ -75,12 +99,12 @@ public sealed class RewardPickerScreenViewModelTests
     {
         Page page = Create();
 
-        page.Vm.ClaimCommand.Execute(page.Vm.First);
+        page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[0]);
 
-        Assert.False(page.Vm.OfferOpen);
-        Assert.True(page.Vm.HasNotice);
-        Assert.Contains(page.Vm.First.Title, page.Vm.Notice, StringComparison.Ordinal);
-        Assert.True(page.Trunk.Contains(page.Vm.First.Title));
+        Assert.False(page.Vm.RewardOpen);
+        Assert.True(page.Vm.HasRewardNotice);
+        Assert.Contains(page.Vm.RewardCards[0].Title, page.Vm.RewardNotice, StringComparison.Ordinal);
+        Assert.True(page.Trunk.Contains(page.Vm.RewardCards[0].Title));
         Assert.Equal(["saved"], page.Events);
         // A claimed page can only hear CONTINUE: the rewards are gone.
         Assert.Single(page.Vm.VoiceActions);
@@ -93,8 +117,8 @@ public sealed class RewardPickerScreenViewModelTests
     {
         Page page = Create();
 
-        page.Vm.ClaimCommand.Execute(page.Vm.First);
-        page.Vm.ClaimCommand.Execute(page.Vm.Second);
+        page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[0]);
+        page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[1]);
 
         Assert.Equal(1, page.Rewards.CardCount);
         Assert.Single(page.Events);
@@ -107,10 +131,10 @@ public sealed class RewardPickerScreenViewModelTests
         Page page = Create(
             capacity: 1, carried: [new TrunkItem(TipCard, 0.0) { Quantity = 1 }]);
 
-        page.Vm.ClaimCommand.Execute(page.Vm.First);
+        page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[0]);
 
-        Assert.True(page.Vm.OfferOpen);
-        Assert.Contains("full", page.Vm.Notice, StringComparison.OrdinalIgnoreCase);
+        Assert.True(page.Vm.RewardOpen);
+        Assert.Contains("full", page.Vm.RewardNotice, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, page.Rewards.CardCount);
         Assert.Empty(page.Events);
         // Both rewards still answer: the player can take the other one.
@@ -127,12 +151,12 @@ public sealed class RewardPickerScreenViewModelTests
             new RewardCard(TipCard, "Your next customer tip will be doubled"),
         ]);
 
-        page.Vm.ClaimCommand.Execute(page.Vm.First);
+        page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[0]);
 
-        Assert.False(page.Vm.OfferOpen);
+        Assert.False(page.Vm.RewardOpen);
         Assert.False(page.Trunk.Contains(SlotCard));
         Assert.Equal(3, page.Rewards.Slots);
-        Assert.Contains("3", page.Vm.Notice, StringComparison.Ordinal);
+        Assert.Contains("3", page.Vm.RewardNotice, StringComparison.Ordinal);
         Assert.Contains("0/3", page.Vm.GloveboxLine, StringComparison.Ordinal);
     }
 
@@ -145,13 +169,13 @@ public sealed class RewardPickerScreenViewModelTests
             new RewardCard(TipCard, "Your next customer tip will be doubled"),
         ]);
 
-        page.Vm.ClaimCommand.Execute(page.Vm.First);
+        page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[0]);
 
-        Assert.False(page.Vm.OfferOpen);
+        Assert.False(page.Vm.RewardOpen);
         // Unity's bonus lands in the spendable balance, never as a stored card.
         Assert.Equal(500.0, page.Wallet.Cash);
         Assert.False(page.Trunk.Contains(CashCard));
-        Assert.Contains("500", page.Vm.Notice, StringComparison.Ordinal);
+        Assert.Contains("500", page.Vm.RewardNotice, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -159,10 +183,10 @@ public sealed class RewardPickerScreenViewModelTests
     {
         Page page = Create();
 
-        page.Vm.VoiceActions[page.Vm.Second.Title].Invoke();
+        page.Vm.VoiceActions[page.Vm.RewardCards[1].Title].Invoke();
 
-        Assert.False(page.Vm.OfferOpen);
-        Assert.True(page.Trunk.Contains(page.Vm.Second.Title));
+        Assert.False(page.Vm.RewardOpen);
+        Assert.True(page.Trunk.Contains(page.Vm.RewardCards[1].Title));
     }
 
     [Fact]

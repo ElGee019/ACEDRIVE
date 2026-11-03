@@ -98,12 +98,12 @@ public sealed class OnboardingFlow : IScreenController
     private static readonly HudDestinationCopy CommunityCentreCopy = new(
         "HudHintCommunityCentre", "HudArrivedCommunityCentre", "HudEnter");
 
-    // The birthday errand keeps the generic drive line but its own arrival:
-    // "enter to buy maple syrup" is the intro's one-time task, so it rides on
-    // this leg's copy and never on the HUD's default shop arrival (an
-    // insurance broker or a delivery store is not grandma's errand).
+    // The birthday errand's own task lines: the drive-in line names the syrup
+    // so the intro's first task says why the player is sent there, and the
+    // arrival repeats it for the ENTER step. The generic drive/arrival copy
+    // stays plain (an insurance broker or a delivery store is not the errand).
     private static readonly HudDestinationCopy ErrandCopy = new(
-        "HudDestination", "HudArrivedErrand");
+        "HudErrandDrive", "HudArrivedErrand");
 
     public OnboardingFlow(
         IOnboardingStore onboarding, IContentSource content,

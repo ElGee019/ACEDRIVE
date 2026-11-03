@@ -566,10 +566,10 @@ public sealed class MainViewModel
     void IWhereIsWillyHost.ShowCalendar() => _nav.ShowCalendarPage();
 
     // The host slice the care-package run sees: the flow owns the route, the
-    // pickups and the drop-off; the shell owns the panel, the pages a finished
-    // run opens (receipt, then the reward picker) and the return to the jobs
-    // page. The control page is refreshed before it is shown so the bag button
-    // reflects the kits the run just delivered.
+    // pickups and the drop-off; the shell owns the panel, the delivered page a
+    // finished run opens (receipt with its reward cards) and the return to the
+    // jobs page. The control page is refreshed before it is shown so the bag
+    // button reflects the kits the run just delivered.
     void ICarePackageHost.PresentPage(object page) => _panel.PresentJob(page);
     void ICarePackageHost.HidePanel() => _panel.Hide();
     void ICarePackageHost.ShowControl()

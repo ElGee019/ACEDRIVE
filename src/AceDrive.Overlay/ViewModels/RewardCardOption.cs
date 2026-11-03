@@ -1,6 +1,6 @@
-// One reward as the care-package picker shows it (PORTPLAN item 61): the card's
-// own title and function text, so the row never carries a second copy of the
-// content the reward table already owns.
+// One reward as the delivered care-package page shows it (PORTPLAN item 61): the
+// card's own title and function text, so the card never carries a second copy of
+// the content the reward table already owns.
 using AceDrive.Core;
 
 namespace AceDrive.Overlay.ViewModels;

@@ -1,11 +1,11 @@
 // Pure gameplay logic. No WPF / Windows / telemetry / backend references.
-// The draw behind the care-package picker (PORTPLAN item 61, port of Unity
-// TodoRewardsScreenController.RandomizeButtons).
+// The draw behind the care-package delivered page's reward pair (PORTPLAN item
+// 61, port of Unity TodoRewardsScreenController.RandomizeButtons).
 namespace AceDrive.Core;
 
 /// <summary>
-/// Draws the two rewards a picker page offers. Pure over a seeded stream, so a
-/// test can pin the offer the way the other launch draws are pinned.
+/// Draws the two rewards a delivered page offers. Pure over a seeded stream, so
+/// a test can pin the offer the way the other launch draws are pinned.
 /// </summary>
 public static class RewardDraw
 {

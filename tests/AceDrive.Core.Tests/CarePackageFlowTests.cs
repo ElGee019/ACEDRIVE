@@ -6,7 +6,8 @@ namespace AceDrive.Core.Tests;
 /// <summary>
 /// The care-package run end to end (PORTPLAN item 21): the jobs page's bag
 /// button pins the first store, each ENTER picks up and repins the next door,
-/// the last pickup pins the community centre, and DELIVER opens the receipt.
+/// the last pickup pins the community centre, and DELIVER opens the delivered
+/// page with the receipt numbers and the run's two reward cards.
 /// The run is driven over the headless session, so the HUD, the ledger and the
 /// panel are the same collaborators production wires.
 /// </summary>
@@ -54,33 +55,34 @@ public sealed class CarePackageFlowTests
         Assert.Equal("HudCareDropoffDrive", hud.Copy?.DriveKey);
         Assert.Equal(5, session.CarePackages.Carried);
 
-        // DELIVER at the community centre: the receipt opens and the leftover
-        // kit stays on its shelf for a later run.
+        // DELIVER at the community centre: the delivered page opens with the
+        // receipt numbers and the run's two reward cards, and the leftover kit
+        // stays on its shelf for a later run.
         hud.RaiseEnter();
-        var receipt = Assert.IsType<CarePackageReceiptScreenViewModel>(session.Vm.CurrentScreen);
+        var page = Assert.IsType<CarePackageReceiptScreenViewModel>(session.Vm.CurrentScreen);
         Assert.Null(hud.Destination);
         Assert.Equal(0, session.CarePackages.Carried);
         Assert.Equal(1, session.CarePackages.Total);
-        Assert.Contains("5", receipt.DeliveredLine, StringComparison.Ordinal);
-        Assert.Contains("1", receipt.RemainingLine, StringComparison.Ordinal);
-        Assert.True(receipt.HasStores);
-        Assert.Contains("Max's Grocery Store", receipt.StoresLine, StringComparison.Ordinal);
+        Assert.Contains("5", page.DeliveredLine, StringComparison.Ordinal);
+        Assert.Contains("1", page.RemainingLine, StringComparison.Ordinal);
+        Assert.True(page.HasStores);
+        Assert.Contains("Max's Grocery Store", page.StoresLine, StringComparison.Ordinal);
 
-        receipt.ContinueCommand.Execute(null);
+        // The pair rides the same page (PORTPLAN 61), exactly Unity's
+        // CANVASREWARDS on the completion edge: two cards, one claim. Claiming
+        // stores the card in the glove compartment and banks it, then CONTINUE
+        // lands back on the jobs page.
+        Assert.True(page.HasReward);
+        Assert.True(page.RewardOpen);
+        Assert.Equal(2, page.RewardCards.Count);
+        Assert.Contains("0/2", page.GloveboxLine, StringComparison.Ordinal);
 
-        // The receipt's CONTINUE opens the run's reward picker (PORTPLAN 61):
-        // two cards, one claim. Claiming stores the card in the glove
-        // compartment and banks it, then CONTINUE lands back on the jobs page.
-        var picker = Assert.IsType<RewardPickerScreenViewModel>(session.Vm.CurrentScreen);
-        Assert.True(picker.OfferOpen);
-        Assert.Contains("0/2", picker.GloveboxLine, StringComparison.Ordinal);
-
-        picker.ClaimCommand.Execute(picker.First);
-        Assert.False(picker.OfferOpen);
-        Assert.True(session.Trunk.Contains(picker.First.Title));
+        page.ClaimCommand.Execute(page.RewardCards[0]);
+        Assert.False(page.RewardOpen);
+        Assert.True(session.Trunk.Contains(page.RewardCards[0].Title));
         Assert.Equal(1, session.Glovebox.Count(session.Trunk));
 
-        picker.ContinueCommand.Execute(null);
+        page.ContinueCommand.Execute(null);
         var back = Assert.IsType<MainControlScreenViewModel>(session.Vm.CurrentScreen);
         Assert.False(back.ShowDeliverCarePackages);
     }
@@ -139,13 +141,13 @@ public sealed class CarePackageFlowTests
             PoiDirectory = Directory(),
             // No starter tips: the only kits are the ones the test seeds.
             Todos = new TodoTable([]),
-            // Two stored-card rewards: every picker test then claims a real card
-            // instead of landing on the slot or cash branch by chance.
+            // Two stored-card rewards: every delivered-page test then claims a
+            // real card instead of landing on the slot or cash branch by chance.
             Rewards = RewardCards,
             RewardRng = new Random(0),
         });
 
-    // The picker's pinned catalogue: both rewards are glovebox cards.
+    // The delivered page's pinned catalogue: both rewards are glovebox cards.
     private static readonly RewardTable RewardCards = new(
     [
         new RewardCard("DOUBLE NEXT TIP", "Your next customer tip will be doubled"),

@@ -52,7 +52,8 @@ public sealed class DeliveryFlowTests
             TestSaveState.Saver(clock, walletInstance, garageInstance), beat, new NullLogger());
         var flow = new DeliveryFlow(
             new DeliveryBoard(catalog), career, city, friends ?? new FakeFriendshipStore(),
-            new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh), breakdowns, beat, new NullLogger());
+            new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh), breakdowns, clock, beat,
+            new NullLogger());
         var host = new FakeDeliveryHost();
         flow.Attach(host);
         return (flow, host, city);

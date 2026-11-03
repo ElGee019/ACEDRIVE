@@ -4,7 +4,7 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// What one claim did: where the reward went, the cash a bonus card hands the
-/// wallet and the capacity a slot card leaves behind. The picker page prints
+/// wallet and the capacity a slot card leaves behind. The delivered page prints
 /// the readings; the reward desk applies them.
 /// </summary>
 public sealed record RewardClaim(

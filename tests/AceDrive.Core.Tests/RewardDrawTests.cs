@@ -3,10 +3,10 @@ using AceDrive.Core;
 namespace AceDrive.Core.Tests;
 
 /// <summary>
-/// The care-package picker's draw (PORTPLAN 61, Unity
+/// The care-package delivered page's reward draw (PORTPLAN 61, Unity
 /// TodoRewardsScreenController.RandomizeButtons' two distinct rewards): two
 /// different cards from the catalogue, deterministic for a seeded stream, and no
-/// page at all when the catalogue cannot fill one.
+/// pair at all when the catalogue cannot fill one.
 /// </summary>
 public sealed class RewardDrawTests
 {

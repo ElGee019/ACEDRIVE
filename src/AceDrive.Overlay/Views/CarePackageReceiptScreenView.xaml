@@ -2,10 +2,12 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
-    <!-- Care-package receipt (PORTPLAN item 21): the kits the community centre
-         took, the stores they came from and what is left for a later run. The
-         flow delivered and banked before this page opened, so nothing here is
-         interactive except CONTINUE. -->
+    <!-- Care-package delivered page (PORTPLAN items 21 and 61): the kits the
+         community centre took, the stores they came from, what is left for a
+         later run, and the two rewards the run offers — Unity's CANVASREWARDS
+         pair on the same completion edge. A claimed reward hides the cards and
+         leaves its outcome line; a full glovebox keeps them up so the other
+         pick can be taken. CONTINUE is the only navigation. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -23,6 +25,46 @@
             <Border Style="{StaticResource SectionDivider}"/>
             <TextBlock Text="{Binding RemainingLine}" Foreground="#FFF" FontSize="14"
                        TextAlignment="Center" TextWrapping="Wrap"/>
+
+            <TextBlock Text="{Binding RewardHint}" Foreground="#FFBFC4C9" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,14,0,8"
+                       Visibility="{Binding RewardOpen, Converter={StaticResource BoolToVis}}"/>
+
+            <!-- Two cards is the catalogue's whole page (Unity's ButtonCount), so
+                 a two-cell UniformGrid beats an ItemsControl's panel plumbing. -->
+            <ItemsControl ItemsSource="{Binding RewardCards}"
+                          Visibility="{Binding RewardOpen, Converter={StaticResource BoolToVis}}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <UniformGrid Rows="1"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Margin="2,0" Padding="10,8" MinHeight="92"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                Command="{Binding DataContext.ClaimCommand,
+                                                  RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                CommandParameter="{Binding}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Title}" Foreground="#FF97EAD2"
+                                           FontSize="15" FontWeight="Bold" TextAlignment="Center"
+                                           TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding Description}" Foreground="#FFBFC4C9"
+                                           FontSize="12" TextAlignment="Center" TextWrapping="Wrap"
+                                           Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <TextBlock Text="{Binding RewardNotice}" Foreground="#FFF" FontSize="13"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0"
+                       Visibility="{Binding HasRewardNotice, Converter={StaticResource BoolToVis}}"/>
+            <TextBlock Text="{Binding GloveboxLine}" Foreground="#FFBFC4C9" FontSize="12"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,10,0,0"
+                       Visibility="{Binding HasReward, Converter={StaticResource BoolToVis}}"/>
         </StackPanel>
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>

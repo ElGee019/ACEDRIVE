@@ -31,10 +31,11 @@
   <data name="HudHintHome" xml:space="preserve"><value>Head back to {0}, {1} No. {2} in {3}. She's probably waiting on that maple syrup by now.</value></data>
   <data name="HudHintCommunityCentre" xml:space="preserve"><value>Drive to the {0}, {1} No. {2} in {3}. They're handing out free taxi licenses today.</value></data>
   <data name="HudArrived" xml:space="preserve"><value>You have arrived at {0}.</value></data>
-  <!-- The birthday errand's own arrival line: only Max's store during the
-       intro sells the maple syrup, so the errand leg carries this key and the
-       generic shop arrival (an insurance broker, a delivery store) stays a
-       plain arrival. -->
+  <!-- The birthday errand's own task lines: only Max's store during the intro
+       sells the maple syrup, so the errand leg carries these keys while the
+       generic drive/arrival copy (an insurance broker, a delivery store)
+       stays plain. -->
+  <data name="HudErrandDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3} and buy maple syrup for grandma</value></data>
   <data name="HudArrivedErrand" xml:space="preserve"><value>You have arrived at {0}, enter to buy maple syrup for grandma.</value></data>
   <data name="HudArrivedPerson" xml:space="preserve"><value>You have arrived at {0}.</value></data>
   <data name="HudArrivedHome" xml:space="preserve"><value>You have arrived at grandma's house.</value></data>
@@ -64,10 +65,10 @@
        that store's shelves. Same placeholders as the taxi lines. -->
   <data name="HudDeliveryHubDrive" xml:space="preserve"><value>Drive to {0} for the pickup at {1} No. {2} in {3}</value></data>
   <data name="HudDeliveryHubArrived" xml:space="preserve"><value>You are at {0}. Press PICK UP THE GOODS to load the freight.</value></data>
-  <data name="HudDeliveryHubAction" xml:space="preserve"><value>PICK UP THE GOODS</value></data>
+  <data name="HudDeliveryHubAction" xml:space="preserve"><value>PICK UP</value></data>
   <data name="HudDeliveryStoreDrive" xml:space="preserve"><value>Deliver to {0} at {1} No. {2} in {3}</value></data>
   <data name="HudDeliveryStoreArrived" xml:space="preserve"><value>You have arrived at {0}. Press DELIVER ITEMS to unload.</value></data>
-  <data name="HudDeliveryStoreAction" xml:space="preserve"><value>DELIVER ITEMS</value></data>
+  <data name="HudDeliveryStoreAction" xml:space="preserve"><value>DELIVER</value></data>
   <!-- Touristenfahrten's two legs: the shop leg names the address to reach and
        the dropoff list, the corner leg names the loaded order over the corner's
        address. The shared four placeholders come first ({0} name, {1} street,
@@ -299,25 +300,24 @@ For instance "{0}".</value></data>
   <data name="TodoCarePackageCount" xml:space="preserve"><value>Care kits ready to deliver: {0}</value></data>
   <data name="HudCarePickupDrive" xml:space="preserve"><value>Care kit run: drive to {0} at {1} No. {2} in {3} to pick up the care packages ({4} of {5}).</value></data>
   <data name="HudCarePickupArrived" xml:space="preserve"><value>You have arrived at {0}. Press PICK UP to collect the care packages.</value></data>
-  <data name="HudCarePickupAction" xml:space="preserve"><value>PICK UP THE CARE PACKAGES</value></data>
+  <data name="HudCarePickupAction" xml:space="preserve"><value>PICK UP</value></data>
   <data name="HudCareDropoffDrive" xml:space="preserve"><value>All care packages collected. Drive to the {0} at {1} No. {2} in {3} to drop them off.</value></data>
   <data name="HudCareDropoffArrived" xml:space="preserve"><value>You have arrived at the {0}. Press DELIVER to drop off the care packages.</value></data>
-  <data name="HudCareDropoffAction" xml:space="preserve"><value>DELIVER THE CARE PACKAGES</value></data>
+  <data name="HudCareDropoffAction" xml:space="preserve"><value>DELIVER</value></data>
   <data name="CareReceiptTitle" xml:space="preserve"><value>CARE PACKAGES RECEIPT</value></data>
   <data name="CareReceiptDelivered" xml:space="preserve"><value>The neighborhood thanks you for delivering {0} care kits.</value></data>
   <data name="CareReceiptStores" xml:space="preserve"><value>Picked up at: {0}</value></data>
   <data name="CareReceiptRemaining" xml:space="preserve"><value>Care kits still waiting for a run: {0}</value></data>
   <data name="CareReceiptAllDelivered" xml:space="preserve"><value>Every care kit in town has been delivered.</value></data>
-  <!-- The care-package reward picker (PORTPLAN 61): one card per reward, the
-       glovebox reading under them and the claim's outcome. -->
-  <data name="RewardPickerTitle" xml:space="preserve"><value>CARE PACKAGE REWARDS</value></data>
+  <!-- The reward cards the delivered care-package page offers (PORTPLAN 61):
+       one card per reward, the glovebox reading under them and the claim's
+       outcome, exactly Unity's CANVASREWARDS block. -->
   <data name="RewardPickerHint" xml:space="preserve"><value>The community centre thanks you for the run. Choose one reward.</value></data>
   <data name="RewardPickerGlovebox" xml:space="preserve"><value>Glove compartment cards: {0}/{1}</value></data>
   <data name="RewardPickerStored" xml:space="preserve"><value>{0} is now in your glove compartment.</value></data>
   <data name="RewardPickerSlotAdded" xml:space="preserve"><value>One more glove compartment slot: {0} cards fit now.</value></data>
   <data name="RewardPickerCash" xml:space="preserve"><value>The bonus is in your cash: {0:0} CR.</value></data>
   <data name="RewardPickerFull" xml:space="preserve"><value>Your glove compartment is full. Take the other reward, or continue.</value></data>
-  <data name="RewardPickerContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Credibility Points: {0}</value></data>
   <data name="DeliveryGrowthUp" xml:space="preserve"><value>City growth: ▲ +{0} / hr</value></data>
@@ -338,6 +338,9 @@ For instance "{0}".</value></data>
   <data name="DeliveryEmpty" xml:space="preserve"><value>No stores available for delivery yet. Use your Credibility Points to start your first delivery career by clicking OPEN NEW CAREER below.</value></data>
   <data name="DeliveryNeedCredP" xml:space="preserve"><value>You need credibility points to start a delivery career. Try visiting Max's Grocery Store.</value></data>
   <data name="DeliverySelectHint" xml:space="preserve"><value>Select any store(s) to start a delivery job for them.</value></data>
+  <!-- The refusal shown for three seconds when a store needs no restock;
+       {0} is the store's name, so a translation may reorder it. -->
+  <data name="DeliveryFullyStocked" xml:space="preserve"><value>{0} is still fully stocked.</value></data>
   <!-- Row number buttons (delivery page): spoken/written words so voice and
        sight share one label. Keys are positional (1 = top row); rows past
        the last key fall back to plain digits in the ViewModel. -->

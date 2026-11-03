@@ -4,11 +4,11 @@ namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
 /// The thank-you a finished care-package run earns (PORTPLAN item 61, port of
-/// Unity's TodoRewardsScreenController): it draws the two rewards the picker
-/// offers, applies the one the player picks, banks it with the run's own save
-/// and names the outcome on the log.
+/// Unity's TodoRewardsScreenController): it draws the two rewards the delivered
+/// page offers, applies the one the player picks, banks it with the run's own
+/// save and names the outcome on the log.
 /// The draw is session state, exactly like Unity's canvas: the run itself was
-/// banked at the drop-off, so a restart on the picker page loses the offer
+/// banked at the drop-off, so a restart after the delivered page loses the offer
 /// rather than re-offering a second reward for the same run.
 /// </summary>
 public sealed class CarePackageReward

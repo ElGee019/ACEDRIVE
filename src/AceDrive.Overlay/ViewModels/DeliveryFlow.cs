@@ -23,6 +23,7 @@ public sealed class DeliveryFlow
     private readonly IFriendshipStore _friends;
     private readonly TaxiDriveMeter _meter;
     private readonly TripBreakdowns _breakdowns;
+    private readonly IClock _clock;
     private readonly VoiceBeat _beat;
     private readonly ILog _log;
 
@@ -45,7 +46,7 @@ public sealed class DeliveryFlow
     public DeliveryFlow(
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         IFriendshipStore friends, TaxiDriveMeter meter, TripBreakdowns breakdowns,
-        VoiceBeat beat, ILog log)
+        IClock clock, VoiceBeat beat, ILog log)
     {
         _board = board;
         _career = career;
@@ -53,6 +54,7 @@ public sealed class DeliveryFlow
         _friends = friends;
         _meter = meter;
         _breakdowns = breakdowns;
+        _clock = clock;
         _beat = beat;
         _log = log;
     }
@@ -77,13 +79,20 @@ public sealed class DeliveryFlow
             new RelayCommand(() => _host.ShowPage(_host.ControlPage())),
             new ParameterizedCommand<DeliveryRun>(Start),
             new RelayCommand(() => _host.OpenHub()),
-            _beat);
+            _clock, _beat);
         _boardPage.Refresh(_board.Catalog);
         return _boardPage;
     }
 
     /// <summary>Re-reads the board: a door opened or a hub was bought since the last paint.</summary>
     public void RefreshBoard() => _boardPage?.Refresh(_board.Catalog);
+
+    /// <summary>
+    /// The board's timed notice edge: the 10 Hz poll clears an expired
+    /// fully-stocked refusal even while another page is shown, so the cached
+    /// board never re-opens mid-hold.
+    /// </summary>
+    public void UpdateNotice() => _boardPage?.UpdateNotice();
 
     /// <summary>
     /// DELIVER: rolls the trip start, plans the stops in cart order, resets the

@@ -11,9 +11,9 @@ namespace AceDrive.Overlay.ViewModels;
 /// there hands the kits over and opens the receipt page. A run serves at most
 /// <see cref="CarePackageLedger.MaxBagsPerRun"/> kits; leftovers wait for the
 /// next run, exactly like Unity's 5-bag budget.
-/// The receipt's CONTINUE opens the run's reward picker (PORTPLAN 61): two cards
-/// the community centre offers, one claim, then back to the jobs page — Unity's
-/// rewards canvas on the same completion edge.
+/// The delivered page carries the run's reward pair (PORTPLAN 61): two cards
+/// the community centre offers, one claim, then CONTINUE back to the jobs page —
+/// Unity's rewards canvas on the same completion edge.
 ///
 /// The route is session state, re-derived from the ledger on the next tap; the
 /// ledger itself is persisted, so a restart after a pickup resumes at the
@@ -159,23 +159,8 @@ public sealed class CarePackageFlow
         }
     }
 
-    // The receipt's CONTINUE: the run is over, so the thank-you comes next. A
-    // catalogue that cannot fill a page closes the run instead of showing an
-    // empty one.
-    private void ShowPicker()
-    {
-        if (_rewards.Offer() is not { } offer)
-        {
-            _log.LogWarning("reward picker skipped: the catalogue cannot offer two cards");
-            _host.ShowControl();
-            return;
-        }
-
-        _host.PresentPage(new RewardPickerScreenViewModel(
-            offer, _rewards, _beat, new RelayCommand(Finish)));
-    }
-
-    // The picker's CONTINUE: back to the jobs page the run was started from.
+    // The delivered page's CONTINUE: the run is over, so back to the jobs page
+    // it was started from.
     private void Finish() => _host.ShowControl();
 
     private void PickupCurrent()
@@ -243,8 +228,20 @@ public sealed class CarePackageFlow
         _log.LogInfo(
             $"care packages delivered: {delivered} kit(s), " +
             $"{receipt.Remaining} left for a later run");
+        // The reward pair rides the same completion edge as the receipt (Unity's
+        // AllCarePackagesDeliveredRequested) and is drawn once, here, so a page
+        // rebuild can never re-roll the offer. A catalogue too thin to fill a
+        // page closes the run with the receipt alone.
+        RewardChooser? reward = _rewards.Offer() is { } offer
+            ? new RewardChooser(offer, _rewards)
+            : null;
+        if (reward is null)
+        {
+            _log.LogWarning("reward cards skipped: the catalogue cannot offer two cards");
+        }
+
         _host.PresentPage(new CarePackageReceiptScreenViewModel(
-            receipt, _beat, new RelayCommand(ShowPicker)));
+            receipt, reward, _beat, new RelayCommand(Finish)));
     }
 
     // Only the stores the directory can still name join the route; the draw's

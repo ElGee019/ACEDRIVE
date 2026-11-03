@@ -55,7 +55,7 @@ public sealed class DeliveryScreenTests
             new RelayCommand(() => fired[0] = true),
             new ParameterizedCommand<DeliveryRun>(r => { fired[1] = true; runs.Add(r!); }),
             new RelayCommand(() => fired[2] = true),
-            beat);
+            clock, beat);
         return (vm, log, fired, career, runs);
     }
 
@@ -143,6 +143,53 @@ public sealed class DeliveryScreenTests
         Assert.False(Row(vm, "full-market").IsConfirmed);
         Assert.Equal(0.0, vm.CartTotal);
         Assert.Contains("fully stocked: Full Market", string.Join("|", log.Infos), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TapFullyStocked_NamesTheStoreForThreeSeconds()
+    {
+        var clock = new FakeClock();
+        var (vm, _, _, _, _) = Create(clock: clock);
+        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+
+        vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
+        Assert.Equal("Full Market is still fully stocked.", vm.StockedNoticeLine);
+        Assert.False(Row(vm, "full-market").IsConfirmed);
+
+        // Two seconds in the refusal still shows; the third second clears it.
+        clock.Advance(TimeSpan.FromSeconds(2));
+        vm.UpdateNotice();
+        Assert.Equal("Full Market is still fully stocked.", vm.StockedNoticeLine);
+
+        clock.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(1));
+        vm.UpdateNotice();
+        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+    }
+
+    [Fact]
+    public void TapFullyStocked_ThenAnOrder_DropsTheRefusal()
+    {
+        var (vm, _, _, _, _) = Create();
+        vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
+        Assert.NotEqual(string.Empty, vm.StockedNoticeLine);
+
+        // Staging a real order is the player moving on: the old refusal goes.
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+        Assert.True(Row(vm, "adenau-post").IsConfirmed);
+    }
+
+    [Fact]
+    public void Back_DropsTheFullyStockedNotice()
+    {
+        var (vm, _, _, _, _) = Create();
+        vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
+        Assert.NotEqual(string.Empty, vm.StockedNoticeLine);
+
+        // The page is cached across navigation, so the way out clears the
+        // hold instead of leaving a stale refusal for the next visit.
+        vm.BackCommand.Execute(null);
+        Assert.Equal(string.Empty, vm.StockedNoticeLine);
     }
 
     [Fact]
