@@ -23,8 +23,10 @@
                        FontWeight="Bold" TextAlignment="Center" Margin="0,0,0,4"/>
             <TextBlock Text="{Binding EarningsLine}" Foreground="#FFF" FontSize="15"
                        TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"/>
+            <!-- WHY the top gap: the reputation sentence opens its own block one
+                 blank line under the purse (18 + the 2 above = a 15 px line). -->
             <TextBlock Text="{Binding ReputationLine}" Foreground="#FFF" FontSize="15"
-                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,2"/>
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,18,0,2"/>
             <TextBlock Text="{Binding CalculationLine}" Foreground="#FFBFC4C9" FontSize="13"
                        TextAlignment="Center" TextWrapping="Wrap"/>
             <Border Style="{StaticResource SectionDivider}"/>
