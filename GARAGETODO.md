@@ -24,11 +24,13 @@ Confirmed decisions (2026-10-18):
   port's HOME tile does); the car dealer floor remains a **temporary
   control-page entry** (CAR DEALER + voice keyword) until the marker network
   (items 24/59) gives it a place in the world — the BANK button precedent.
-- Deferred, with the reason: no selling/trade-in/depreciation (do not exist in
-  the mother game), dealer familiarity bump (needs the POI owner — the bank's
-  decision), garage job actions (car sharing/employee/zone expansion = items
-  22/23/58), cargo cover (item 61 reward catalog), the concentration half of
-  the dirty-taxi refusal (item 06).
+- Deferred, with the reason: no depreciation (does not exist in the mother
+  game). Selling is the one ACEDRIVE addition: the dealer's trade-in pays
+  `price × (1 − engine broken %) × leaderboard ranking` and always leaves one
+  car in the garage. Still deferred: dealer familiarity bump (needs the POI
+  owner — the bank's decision), garage job actions (car sharing/employee/zone
+  expansion = items 22/23/58), cargo cover (item 61 reward catalog), the
+  concentration half of the dirty-taxi refusal (item 06).
 
 Unity source: `C:\Users\gouwy\Documents\BS\BS\LATESTDRIVEBS2\Assets\Scripts`.
 
@@ -90,8 +92,9 @@ Port to ACEDRIVE:
       car it picked (every pre-garage save).
 - [x] Screens: `GarageScreenViewModel`/`View` (rows with specs + value, CURRENT
       marker, tap to switch, BACK), `DealerScreenViewModel`/`View` (week floor,
-      picked car's specs, live saldo, BUY IT / CAN'T AFFORD, but never a spend
-      without the cash), `BoughtFirstCarScreenViewModel`/`View` (DRIVE IT /
+      picked car's specs, live saldo, BUY / CAN'T AFFORD THIS CAR, the SELL
+      trade-in with its only-car gate, but never a spend without the cash),
+      `BoughtFirstCarScreenViewModel`/`View` (DRIVE IT /
       KEEP CURRENT, summary on the second car).
 - [x] Wiring: GARAGE + CAR DEALER control-page entries with voice keywords,
       resx en+nl, DataTemplates, `Garage`/`JsonGarageStore` built in

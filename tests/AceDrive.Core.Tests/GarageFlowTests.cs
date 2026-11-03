@@ -239,6 +239,44 @@ public sealed class GarageFlowTests
     }
 
     [Fact]
+    public void DealerSell_BanksTheCashAndTheGarage()
+    {
+        // The trade-in stays on the dealer page, so the page itself reports the
+        // sale: the host still has to bank both owners — the wallet and the
+        // garage file — or a restart would return the sold car and lose the cash.
+        var garage = new Garage(Pool, new GarageState(
+            Junior.Key,
+            [new OwnedCarState(Junior.Key, 1, 0.0, false),
+             new OwnedCarState(Mx5.Key, 2, 0.0, false)]));
+        var garageStore = new FakeGarageStore();
+        var driverStore = new FakeDriverStore();
+        var wallet = new DriverWallet(new DriverState(500.0, 0.0));
+        var hud = new FakeTelemetryHud();
+        var (vm, _, _, _) = MainViewModelTests.Create(
+            cars: Pool, garage: garage, garageStore: garageStore, wallet: wallet,
+            driverStore: driverStore, content: Content(),
+            progress: OnboardingState.Fresh with { BirthdayDone = true }, hud: hud,
+            savedDriver: new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12"));
+
+        var dealer = MainViewModelTests.OpenPoi<DealerScreenViewModel>(vm, hud, "Car Dealer");
+        Assert.Equal("SELL", dealer.SellLabel);
+        dealer.SellCommand.Execute(null); // open the garage
+        dealer.SelectCommand.Execute(Assert.Single(dealer.Rows, r => r.Key == Mx5.Key));
+        dealer.SellCommand.Execute(null); // confirm
+
+        Assert.False(garage.Owns(Mx5.Key));
+        Assert.Equal(12500.0, wallet.Cash);
+        Assert.Equal(1, garageStore.Saves);
+        Assert.Equal(Junior.Key, garageStore.Load()!.CurrentKey);
+        Assert.Contains(driverStore.Saved, state => state.Cash == 12500.0);
+        // One car left: the page stays open in sell mode so the next SELL can
+        // explain the only-car gate, and BUY is still there to go back.
+        Assert.True(dealer.IsSelling);
+        Assert.Single(dealer.Rows);
+        Assert.Same(dealer, vm.CurrentScreen);
+    }
+
+    [Fact]
     public void JobsPage_HasNoGarageDoor_HomePageDoes()
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");

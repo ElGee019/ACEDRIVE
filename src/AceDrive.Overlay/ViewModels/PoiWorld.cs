@@ -243,8 +243,8 @@ public sealed class PoiWorld
         handlers.Add(new DelegatePoiHandler(
             PoiTypes.Bank, (_, back, changed) => _shops.Bank(back, changed)));
         handlers.Add(new DelegatePoiHandler(
-            PoiTypes.Dealer, (_, back, _) =>
-                _shops.Dealer(back, _day.DisplayWeek, _host.CarBought)));
+            PoiTypes.Dealer, (_, back, changed) =>
+                _shops.Dealer(back, changed, _day.DisplayWeek, _host.CarBought)));
         handlers.Add(new DelegatePoiHandler(
             PoiTypes.CarWash, (_, back, changed) => _shops.CarWash(back, changed)));
         handlers.Add(new DelegatePoiHandler(

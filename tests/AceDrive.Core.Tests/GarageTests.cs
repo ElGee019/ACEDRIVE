@@ -74,6 +74,42 @@ public sealed class GarageTests
     }
 
     [Fact]
+    public void Remove_LastCar_IsRejected()
+    {
+        // The dealer's trade-in may never empty the garage: a player always
+        // keeps one car, so the only row cannot be sold.
+        var garage = New();
+        garage.Add(Mx5, week: 1);
+        Assert.False(garage.Remove(Mx5.Key));
+        Assert.True(garage.Owns(Mx5.Key));
+        Assert.Equal(Mx5.Key, garage.CurrentKey);
+    }
+
+    [Fact]
+    public void Remove_CurrentCar_HandsTheKeysToTheNextCar()
+    {
+        var garage = New();
+        garage.Add(Mx5, week: 1); // current
+        garage.Add(Junior, week: 2);
+        Assert.True(garage.Remove(Mx5.Key));
+        Assert.False(garage.Owns(Mx5.Key));
+        Assert.Equal(Junior.Key, garage.CurrentKey);
+        Assert.Equal([Junior.Key], garage.Cars.Select(c => c.Key));
+    }
+
+    [Fact]
+    public void Remove_ParkedCar_LeavesTheCurrentCarAlone()
+    {
+        var garage = New();
+        garage.Add(Mx5, week: 1);
+        garage.Add(Junior, week: 2);
+        Assert.True(garage.SetCurrent(Junior.Key));
+        Assert.True(garage.Remove(Mx5.Key));
+        Assert.Equal(Junior.Key, garage.CurrentKey);
+        Assert.False(garage.Remove("ks_never_bought"));
+    }
+
+    [Fact]
     public void Cars_AreOrderedByKey()
     {
         var garage = New();

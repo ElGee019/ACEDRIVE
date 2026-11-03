@@ -630,8 +630,17 @@ Accept this job?</value></data>
   <data name="DealerPick" xml:space="preserve"><value>Pick a car</value></data>
   <data name="DealerCarSpecs" xml:space="preserve"><value>class {0} · {1} seats · trunk {2} L · {3} hp · {4} km/h</value></data>
   <data name="DealerPrice" xml:space="preserve"><value>CR{0:0}</value></data>
-  <data name="DealerBuy" xml:space="preserve"><value>BUY IT</value></data>
-  <data name="DealerCantAfford" xml:space="preserve"><value>CAN'T AFFORD</value></data>
+  <data name="DealerBuy" xml:space="preserve"><value>BUY</value></data>
+  <data name="DealerCantAfford" xml:space="preserve"><value>CAN'T AFFORD THIS CAR</value></data>
+  <!-- The trade-in half: SELL opens the garage, SELL again takes the picked car;
+       BUY returns to the floor while the sell list is up. A failed click writes
+       the reason on the button itself, so neither verb is pre-disabled;
+       {0:0.00} = the dealer's offer. -->
+  <data name="DealerSell" xml:space="preserve"><value>SELL</value></data>
+  <data name="DealerSellOnlyCar" xml:space="preserve"><value>CAN'T SELL YOUR ONLY CAR</value></data>
+  <data name="DealerSellNoCars" xml:space="preserve"><value>NO CARS TO SELL</value></data>
+  <data name="DealerSellPick" xml:space="preserve"><value>Pick the car you want to sell</value></data>
+  <data name="DealerSellPrice" xml:space="preserve"><value>Sell price: CR{0:0.00}</value></data>
   <data name="BoughtTitle" xml:space="preserve"><value>NEW CAR</value></data>
   <data name="BoughtBody" xml:space="preserve"><value>The keys are yours. Drive it now or keep your current car?</value></data>
   <data name="BoughtDrive" xml:space="preserve"><value>DRIVE IT</value></data>

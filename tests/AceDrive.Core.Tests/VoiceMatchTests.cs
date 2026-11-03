@@ -380,13 +380,14 @@ public sealed class VoiceMatchTests
     // landed as "my", "boy" x3 and "why" — never the word — while BACK four
     // seconds later matched first try, so the page's voice pass was live and
     // the three-letter label simply had no door. The 2026-10-21 shop visit
-    // failed the same way ("by" x2). BUY is a ONE-word label, so the table row
-    // is what makes these readings reach it; the exact hearing is untouched.
-    // Accepted consequence: the swap is phrase-wide, so an ambient sentence
-    // carrying "my"/"why" while the shop page is up also resolves to "buy".
-    // The spend is one grocery line and only with a shelf row already picked
-    // (BUY hidden otherwise), while the dealer's "BUY IT" needs the second
-    // word too — that is why the risk stops at the shop receipt.
+    // failed the same way ("by" x2). BUY is a ONE-word label on both the shop
+    // and the dealer page, so the table row is what makes these readings reach
+    // it; the exact hearing is untouched. Accepted consequence: the swap is
+    // phrase-wide, so an ambient sentence carrying "my"/"why" while either page
+    // is up also resolves to "buy". The spend is one grocery line and only with
+    // a shelf row already picked (BUY hidden otherwise), or a car behind the
+    // dealer's own pick and cash gates — the risk stops at those voluntary
+    // purchases.
     [Theory]
     [InlineData("my", "BUY")]
     [InlineData("boy", "BUY")]

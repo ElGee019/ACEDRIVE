@@ -56,6 +56,20 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
+    public void AddSale_MovesCashWithoutCountingItAsEarned()
+    {
+        // The dealer's trade-in returns capital the player already spent, so it
+        // must not credit the lifetime-earned reading the "earn CR" ToDo reads.
+        var wallet = new DriverWallet(new DriverState(100.0, 0.0));
+        wallet.AddSale(250.0);
+        Assert.Equal(350.0, wallet.Cash);
+        Assert.Equal(0.0, wallet.CreditEarned);
+        wallet.AddSale(double.NaN);
+        wallet.AddSale(-5.0);
+        Assert.Equal(350.0, wallet.Cash);
+    }
+
+    [Fact]
     public void TrySpend_MovesCashOrRefuses()
     {
         // Unity's buy gate (CarDealerScreen.OnBuyClicked): a short wallet

@@ -24,9 +24,10 @@
         </Style>
     </UserControl.Resources>
     <!-- Car dealer page (PORTPLAN 29, Unity CarDealerScreen): the week's floor on
-         top, the picked car's specs and price underneath, BUY and BACK at the
-         bottom. Every row is a button whose text is the car name; the price shows
-         below once a car is picked. -->
+         top, the picked car's specs and price underneath, SELL CAR / BUY and BACK
+         at the bottom. Every row is a button whose text is the car name; the price
+         shows below once a car is picked. SELL CAR swaps the list for the player's
+         garage (BUY CARS swaps back), so one page owns both halves of the trade. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -59,24 +60,21 @@
             <TextBlock Text="{Binding SpecsLine}" Foreground="#FFBFC4C9" FontSize="12"
                        TextAlignment="Center"/>
         </StackPanel>
-        <!-- Button bar: buy on top, back flush with the panel edge below, the
-             bank page's stack. The buy button's own label carries the reason it
-             cannot be used. Teal is the shared voice-ack highlight: the button
-             the mic tapped glows for one beat before the page waits it out. -->
+        <!-- Button bar: SELL on top, BUY below, back flush with the panel edge
+             last. Both verbs stay visible and pressable; a click that fails
+             replaces its own label with the reason (CAN'T SELL YOUR ONLY CAR /
+             CAN'T AFFORD THIS CAR), so the gate explains itself without disabling
+             the button. Teal is the shared voice-ack highlight: the button the
+             mic tapped glows for one beat before the page waits it out. -->
         <StackPanel Grid.Row="2">
+            <Button Content="{Binding SellLabel}" Command="{Binding SellCommand}"
+                    Margin="0,0,0,6"/>
             <Button Content="{Binding BuyLabel}" Command="{Binding BuyCommand}" Margin="0,0,0,6">
                 <Button.Style>
                     <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding BuyFlash}" Value="True">
                                 <Setter Property="Foreground" Value="#FF97EAD2"/>
-                            </DataTrigger>
-                            <!-- CAN'T AFFORD: nothing to tap, so the note drops
-                                 the outline and reads as plain text. The border
-                                 stays transparent (not zero) so the text keeps
-                                 its place in the bar. -->
-                            <DataTrigger Binding="{Binding CantAfford}" Value="True">
-                                <Setter Property="BorderBrush" Value="Transparent"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

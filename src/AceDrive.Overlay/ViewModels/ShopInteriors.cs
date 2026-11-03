@@ -59,14 +59,25 @@ public sealed class ShopInteriors
     // The dealer's weekly floor (PORTPLAN 29, Unity CarDealerScreen). The week
     // rides in from the display week, so the floor turns over with the calendar
     // and a re-opened page inside one week shows the same cars (DealerStock).
-    // The bought-car choice is the host's page (onBought).
+    // The bought-car choice is the host's page (onBought); a trade-in stays on
+    // the page, so the host banks the cash (onChanged) and the garage here.
     public DealerScreenViewModel Dealer(
-        ICommand back, int displayWeek, Action<CarSpec> onBought)
+        ICommand back, Action onChanged, int displayWeek, Action<CarSpec> onBought)
     {
         // The visit itself is the ToDo subject's requirement; the flag rides
         // the driver save the story host runs on POI entry.
         _visits.MarkCarDealer();
-        return new(_cars, _garage, _wallet, displayWeek, back, onBought, _beat);
+        return new(
+            _cars, _garage, _wallet, displayWeek, back, onBought,
+            (car, paid) =>
+            {
+                onChanged();
+                _saver.SaveGarage();
+                _log.LogInfo($"[Dealer] sold {car.Key}: {CarTitles.Of(car)} " +
+                    $"for {paid:0.00} CR (cash {_wallet.Cash:0.00}, " +
+                    $"{_garage.Cars.Count} cars owned)");
+            },
+            _beat);
     }
 
     // The car wash (PORTPLAN 33, Unity CarWashScreen): a fresh page per visit,

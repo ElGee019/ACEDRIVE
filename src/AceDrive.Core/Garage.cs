@@ -1,9 +1,10 @@
 // The multi-car garage (PORTPLAN item 30, port of Unity GarageScreen +
 // PlayerData.ownedCars/grandmaCar). Owns the owned cars, the current car and the
 // catalogue lookups the garage page, the dealer and the odometer feed need. Unity
-// parity: no slot cap, no selling, no depreciation — the list only grows, and the
-// current car is whatever the player last picked. Mutable state holder like
-// DriverWallet; every mutation is a cold path (a purchase, a car switch, a load).
+// parity: no slot cap and no depreciation — the list only grows except for the
+// dealer's trade-in, and the current car is whatever the player last picked.
+// Mutable state holder like DriverWallet; every mutation is a cold path (a
+// purchase, a sale, a car switch, a load).
 namespace AceDrive.Core;
 
 public sealed class Garage
@@ -114,6 +115,35 @@ public sealed class Garage
             return false;
         }
         CurrentKey = key;
+        return true;
+    }
+
+    /// <summary>
+    /// Sells a car out of the garage (the dealer's trade-in). False when the key
+    /// is unknown or when it is the only car left: a player must always keep one
+    /// car, so the last row can never be removed. Selling the current car hands
+    /// the keys to the next car in display order, so the garage never comes back
+    /// with a current key no car backs.
+    /// </summary>
+    public bool Remove(string key)
+    {
+        if (_cars.Count <= 1 || !_keys.Contains(key))
+        {
+            return false;
+        }
+
+        int at = _cars.FindIndex(car => string.Equals(car.Key, key, StringComparison.Ordinal));
+        if (at < 0)
+        {
+            return false;
+        }
+
+        _cars.RemoveAt(at);
+        _keys.Remove(key);
+        if (string.Equals(CurrentKey, key, StringComparison.Ordinal) || CurrentKey is null)
+        {
+            CurrentKey = _cars[0].Key;
+        }
         return true;
     }
 

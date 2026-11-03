@@ -284,6 +284,20 @@ public sealed class DriverWallet
     /// </summary>
     public void AddGift(double amount) => ApplyCash(amount);
 
+    /// <summary>
+    /// A dealer trade-in: the money returns capital already spent on the car, so
+    /// it moves cash but deliberately not the lifetime-earned reading (a resale
+    /// is not job income; the "earn CR" ToDo must not be farmed by flipping
+    /// cars). Non-positive and non-finite amounts are ignored.
+    /// </summary>
+    public void AddSale(double amount)
+    {
+        if (amount > 0.0 && double.IsFinite(amount))
+        {
+            ApplyCash(amount);
+        }
+    }
+
     public void AddReceipt(TaxiReceipt receipt)
     {
         ApplyCash(receipt.Total);

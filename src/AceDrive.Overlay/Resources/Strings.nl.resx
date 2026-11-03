@@ -467,7 +467,12 @@ Deze klus aannemen?</value></data>
   <data name="DealerCarSpecs" xml:space="preserve"><value>klasse {0} · {1} zitplaatsen · kofferbak {2} L · {3} pk · {4} km/u</value></data>
   <data name="DealerPrice" xml:space="preserve"><value>CR{0:0}</value></data>
   <data name="DealerBuy" xml:space="preserve"><value>KOPEN</value></data>
-  <data name="DealerCantAfford" xml:space="preserve"><value>NIET BETAALBAAR</value></data>
+  <data name="DealerCantAfford" xml:space="preserve"><value>DEZE AUTO NIET BETAALBAAR</value></data>
+  <data name="DealerSell" xml:space="preserve"><value>VERKOPEN</value></data>
+  <data name="DealerSellOnlyCar" xml:space="preserve"><value>JE ENIGE AUTO KAN NIET WEG</value></data>
+  <data name="DealerSellNoCars" xml:space="preserve"><value>GEEN AUTO'S TE KOOP</value></data>
+  <data name="DealerSellPick" xml:space="preserve"><value>Kies de auto die je wilt verkopen</value></data>
+  <data name="DealerSellPrice" xml:space="preserve"><value>Verkoopprijs: CR{0:0.00}</value></data>
   <data name="BoughtTitle" xml:space="preserve"><value>NIEUWE AUTO</value></data>
   <data name="BoughtBody" xml:space="preserve"><value>De sleutels zijn van jou. Rijd er nu in of houd je huidige auto?</value></data>
   <data name="BoughtDrive" xml:space="preserve"><value>RIJD ERIN</value></data>
