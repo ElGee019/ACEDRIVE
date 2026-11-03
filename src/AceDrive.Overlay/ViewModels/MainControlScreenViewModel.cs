@@ -145,14 +145,15 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     public bool HasCompletedTodos { get => _hasCompletedTodos; private set => SetField(ref _hasCompletedTodos, value); }
     private bool _hasCompletedTodos;
 
-    /// <summary>True when the flow offers a run: five kits wait (Unity's bag
-    /// threshold) or the car still carries kits from a previous session.</summary>
+    /// <summary>True when the flow offers a run: the completed block lists five
+    /// tips (Unity's bag threshold) or the car still carries kits from a
+    /// previous session.</summary>
     public bool ShowDeliverCarePackages { get => _showDeliverCarePackages; private set => SetField(ref _showDeliverCarePackages, value); }
     private bool _showDeliverCarePackages;
 
     /// <summary>"Care kits ready to deliver: 6" — the count beside the button,
-    /// so a player whose completed block was already cleared still sees how
-    /// many kits the next run would carry.</summary>
+    /// so a resumed run whose completed block is gone still shows how many kits
+    /// the next run would carry.</summary>
     public string CarePackageCountLine { get => _carePackageCountLine; private set => SetField(ref _carePackageCountLine, value); }
     private string _carePackageCountLine = string.Empty;
 

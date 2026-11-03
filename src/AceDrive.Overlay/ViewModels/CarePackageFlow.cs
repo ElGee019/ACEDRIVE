@@ -26,6 +26,9 @@ public sealed class CarePackageFlow
 {
     private readonly PoiDirectory _directory;
     private readonly CarePackageLedger _ledger;
+    // The completed block is the player's evidence that Sonja arranged the
+    // kits; the run is only offered once it lists the bag threshold.
+    private readonly ITodoList _todos;
     private readonly CarePackageReward _rewards;
     private readonly AddressMap _map;
     private readonly ITelemetryHud? _hud;
@@ -47,11 +50,13 @@ public sealed class CarePackageFlow
     private PointOfInterest? _centre;
 
     public CarePackageFlow(
-        PoiDirectory directory, CarePackageLedger ledger, CarePackageReward rewards,
-        AddressMap map, ITelemetryHud? hud, Action saveDriver, VoiceBeat beat, ILog log)
+        PoiDirectory directory, CarePackageLedger ledger, ITodoList todos,
+        CarePackageReward rewards, AddressMap map, ITelemetryHud? hud,
+        Action saveDriver, VoiceBeat beat, ILog log)
     {
         ArgumentNullException.ThrowIfNull(directory);
         ArgumentNullException.ThrowIfNull(ledger);
+        ArgumentNullException.ThrowIfNull(todos);
         ArgumentNullException.ThrowIfNull(rewards);
         ArgumentNullException.ThrowIfNull(map);
         ArgumentNullException.ThrowIfNull(saveDriver);
@@ -59,6 +64,7 @@ public sealed class CarePackageFlow
         ArgumentNullException.ThrowIfNull(log);
         _directory = directory;
         _ledger = ledger;
+        _todos = todos;
         _rewards = rewards;
         _map = map;
         _hud = hud;
@@ -71,25 +77,36 @@ public sealed class CarePackageFlow
     public bool InFlight => _phase != CarePackagePhase.Idle;
 
     /// <summary>
-    /// True when the jobs page should offer DELIVER CARE PACKAGES: five kits
-    /// wait (Unity's bag threshold) or a previous session already put kits in
-    /// the car, which must stay deliverable even when the total it left is
-    /// below five.
+    /// True when the jobs page should offer DELIVER CARE PACKAGES: the
+    /// completed block lists the five tips Sonja arranged kits for (Unity's bag
+    /// threshold) and the town holds those kits, or a previous session already
+    /// put kits in the car, which must stay deliverable even when no tip row
+    /// remains.
     /// </summary>
+    /// <remarks>
+    /// WHY the completed rows and not the kit total: a run carries at most
+    /// <see cref="CarePackageLedger.MaxBagsPerRun"/> kits, so a run that served
+    /// five of six leaves one on its shelf. Counting kits re-raised the button
+    /// at four completed tips — a fifth kit the player never saw complete — so
+    /// the block the page prints is what unlocks the run, and the leftover
+    /// waits for the next five tips.
+    /// </remarks>
     public bool CanOffer =>
         !InFlight
         && _directory.Find(StoryCommunityCentre.Definition.Id) is not null
-        && (_ledger.HasBagsInCar || _ledger.Total >= CarePackageLedger.BagThreshold);
+        && (_ledger.HasBagsInCar
+            || (_todos.CompletedCount >= CarePackageLedger.BagThreshold
+                && _ledger.Total >= CarePackageLedger.BagThreshold));
 
     /// <summary>Attaches the coordinator that owns the panel, the receipt and the way back.</summary>
     public void Attach(ICarePackageHost host) => _host = host;
 
     /// <summary>
-    /// The control page's DELIVER CARE PACKAGES tap. False when there is no run
-    /// to start (too few kits, no store door, no community centre) so the page
-    /// can leave the tip block and its button alone. A car already carrying
-    /// kits from a previous session resumes at the drop-off instead of drawing
-    /// a second route.
+    /// The control page's DELIVER CARE PACKAGES tap. False when the page did not
+    /// offer the run (see <see cref="CanOffer"/>) or there is no store door to
+    /// start at, so the page can leave the tip block and its button alone. A car
+    /// already carrying kits from a previous session resumes at the drop-off
+    /// instead of drawing a second route.
     /// </summary>
     public bool Begin()
     {
@@ -105,6 +122,19 @@ public sealed class CarePackageFlow
             return false;
         }
 
+        // The button and the tap share one rule: a command invoked behind a
+        // hidden button must not start a run the page never offered.
+        if (!CanOffer)
+        {
+            // The refusal leaves no half-started run behind, so the centre the
+            // check just found must not linger into the idle state.
+            _centre = null;
+            _log.LogInfo(
+                $"care packages not started: {_todos.CompletedCount} completed tip(s) and " +
+                $"{_ledger.Total} kit(s); {CarePackageLedger.BagThreshold} of each needed");
+            return false;
+        }
+
         if (_ledger.HasBagsInCar)
         {
             _pickedUpAt.Clear();
@@ -112,14 +142,6 @@ public sealed class CarePackageFlow
             EnterDropoff();
             _log.LogInfo($"care packages resumed: {_ledger.Carried} kit(s) already in the car");
             return true;
-        }
-
-        if (_ledger.Total < CarePackageLedger.BagThreshold)
-        {
-            _log.LogInfo(
-                $"care packages not started: {_ledger.Total} kit(s), " +
-                $"{CarePackageLedger.BagThreshold} needed");
-            return false;
         }
 
         _legs = AllocateLegs();

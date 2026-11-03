@@ -2,14 +2,14 @@ using AceDrive.Core;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>The fare meter's integration guard: only sane passenger-leg ticks
-/// count, the speed is clamped and reset clears the ride.</summary>
-public sealed class TaxiDriveMeterTests
+/// <summary>The driven-leg meter's integration guard: only sane leg ticks
+/// count, the speed is clamped and reset clears the leg.</summary>
+public sealed class DrivenDistanceMeterTests
 {
     [Fact]
     public void Add_IntegratesSpeedOverTime()
     {
-        var meter = new TaxiDriveMeter(400.0);
+        var meter = new DrivenDistanceMeter(400.0);
         Run(meter, 50f, seconds: 36.0);
 
         Assert.Equal(0.5, meter.DistanceKm, 6);
@@ -18,7 +18,7 @@ public sealed class TaxiDriveMeterTests
     [Fact]
     public void Add_CountsReverseMotionAsDistance()
     {
-        var meter = new TaxiDriveMeter(400.0);
+        var meter = new DrivenDistanceMeter(400.0);
         Run(meter, -50f, seconds: 36.0);
 
         Assert.Equal(0.5, meter.DistanceKm, 6);
@@ -27,7 +27,7 @@ public sealed class TaxiDriveMeterTests
     [Fact]
     public void Add_ClampsAGlitchedSpeed()
     {
-        var meter = new TaxiDriveMeter(100.0);
+        var meter = new DrivenDistanceMeter(100.0);
         Run(meter, 1000f, seconds: 3.6);
 
         // 100 km/h for 3.6 s = 0.1 km, not 1 km.
@@ -37,7 +37,7 @@ public sealed class TaxiDriveMeterTests
     [Fact]
     public void Add_IgnoresStalledOrInvalidTicks()
     {
-        var meter = new TaxiDriveMeter(400.0);
+        var meter = new DrivenDistanceMeter(400.0);
         meter.Add(50f, 0.0);
         meter.Add(50f, 1.0);
         meter.Add(50f, -0.1);
@@ -51,7 +51,7 @@ public sealed class TaxiDriveMeterTests
     [Fact]
     public void Reset_ClearsTheRide()
     {
-        var meter = new TaxiDriveMeter(400.0);
+        var meter = new DrivenDistanceMeter(400.0);
         Run(meter, 50f, seconds: 36.0);
         meter.Reset();
 
@@ -61,7 +61,7 @@ public sealed class TaxiDriveMeterTests
     [Fact]
     public void InvalidCap_UsesTheTaxiRuleDefault()
     {
-        var meter = new TaxiDriveMeter(double.NaN);
+        var meter = new DrivenDistanceMeter(double.NaN);
         Run(meter, 1000f, seconds: 3.6);
 
         // The fallback clamp is 400 km/h: 0.4 km in 3.6 s.
@@ -71,7 +71,7 @@ public sealed class TaxiDriveMeterTests
     // WHY 0.1 s ticks: the meter deliberately ignores dt >= 1 s (the poll's
     // stalled-frame guard), so a long run is simulated the way the 10 Hz poll
     // feeds it.
-    private static void Run(TaxiDriveMeter meter, float speedKmh, double seconds)
+    private static void Run(DrivenDistanceMeter meter, float speedKmh, double seconds)
     {
         const double tick = 0.1;
         int ticks = (int)Math.Round(seconds / tick);

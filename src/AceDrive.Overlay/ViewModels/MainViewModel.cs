@@ -469,7 +469,6 @@ public sealed class MainViewModel
     void IJobSettlementHost.GoToMenuPage() => _nav.ShowMenuPage();
     void IJobSettlementHost.RefreshDeliveryBoard() => _delivery.RefreshBoard();
     void IJobSettlementHost.ClearDeliveryRun() => _delivery.Stop();
-    void IJobSettlementHost.GoToDeliveryBoard() => ContinueAfterSettle(_nav.ShowDeliveryBoard);
 
     // The receipt's CONTINUE is where a settle's expansion page appears: the
     // report waits here (Unity's zoneExpanded || poiAdded guard, minus the

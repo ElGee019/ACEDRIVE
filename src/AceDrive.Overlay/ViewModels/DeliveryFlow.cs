@@ -21,7 +21,7 @@ public sealed class DeliveryFlow
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
     private readonly IFriendshipStore _friends;
-    private readonly TaxiDriveMeter _meter;
+    private readonly DrivenDistanceMeter _meter;
     private readonly TripBreakdowns _breakdowns;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
@@ -45,7 +45,7 @@ public sealed class DeliveryFlow
 
     public DeliveryFlow(
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
-        IFriendshipStore friends, TaxiDriveMeter meter, TripBreakdowns breakdowns,
+        IFriendshipStore friends, DrivenDistanceMeter meter, TripBreakdowns breakdowns,
         IClock clock, VoiceBeat beat, ILog log)
     {
         _board = board;
@@ -131,8 +131,8 @@ public sealed class DeliveryFlow
     }
 
     /// <summary>
-    /// The store legs' distance: the meter is shared with the taxi leg and the
-    /// two jobs cannot overlap, so the poll feeds whichever one is live.
+    /// The store legs' distance: the meter is shared with the touristen corner
+    /// legs and those runs cannot overlap, so the poll feeds whichever is live.
     /// </summary>
     public void Advance(TelemetrySample sample, double dt) =>
         _meter.Add(sample.SpeedKmh, dt);

@@ -127,7 +127,7 @@ public sealed class FleetService
     /// <summary>
     /// The odometer feed (PORTPLAN items 31/32, Unity DrivingManager's speed
     /// integration): bank this tick's distance into the car driven now, then run
-    /// the engine inspections. The same dt guard as the fare meter keeps a
+    /// the engine inspections. The same dt guard as the leg meter keeps a
     /// stalled, torn or teleported poll out of the ledger; the speed clamp keeps
     /// a one-frame glitch out of it too. <paramref name="onboardingDone"/> is a
     /// parameter rather than a dependency because the intro gate belongs to the
@@ -148,7 +148,7 @@ public sealed class FleetService
             return;
         }
         // Only a sane tick banks distance; a stalled or lagged poll skips the
-        // add (the guard the fare meter uses) but still lets the inspections
+        // add (the guard the leg meter uses) but still lets the inspections
         // run, so a long frame never delays a due engine check.
         if (dt is > 0 and < 1)
         {

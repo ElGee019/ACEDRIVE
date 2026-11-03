@@ -108,7 +108,7 @@ public sealed class MainControlScreenTests
     public void CompletedTodo_ListsTheKitButWithholdsDeliverWithoutFiveKits()
     {
         // One earned target is a listed kit, not a delivery: the explanation
-        // shows, but DELIVER CARE PACKAGES waits for the five-kit threshold.
+        // shows, but DELIVER CARE PACKAGES waits for the five-tip threshold.
         var vm = Create(todos: Board(new DriverState(0.0, 0.0, CreditEarned: 500.0)));
 
         Assert.True(vm.HasCompletedTodos);

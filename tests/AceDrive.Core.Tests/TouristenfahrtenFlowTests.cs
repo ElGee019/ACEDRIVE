@@ -275,7 +275,7 @@ public sealed class TouristenfahrtenFlowTests
         var hud = new FakeTelemetryHud();
         var settlement = new FakeTouristenSettlement();
         var host = new FakeTouristenHost();
-        var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);
+        var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
         var flow = new TouristenfahrtenFlow(
@@ -329,7 +329,7 @@ public sealed class TouristenfahrtenFlowTests
 
     // The meter only accepts poll-sized ticks (0..1 s), so a test leg is a
     // run of 0.1 s samples like the 10 Hz loop would feed it.
-    private static void Drive(TaxiDriveMeter meter, float speedKmh, double seconds)
+    private static void Drive(DrivenDistanceMeter meter, float speedKmh, double seconds)
     {
         while (seconds > 0.0)
         {
@@ -342,5 +342,5 @@ public sealed class TouristenfahrtenFlowTests
     private sealed record Harness(
         TouristenfahrtenFlow Flow, FakeTelemetryHud Hud, FakeTouristenHost Host,
         FakeTouristenSettlement Settlement, FakeTouristenDoors Doors,
-        TaxiDriveMeter Meter, FakeClock Clock, VoiceBeat Beat);
+        DrivenDistanceMeter Meter, FakeClock Clock, VoiceBeat Beat);
 }

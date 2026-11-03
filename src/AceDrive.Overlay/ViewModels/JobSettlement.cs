@@ -42,7 +42,7 @@ public sealed class JobSettlement
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
     private readonly DeliveryFareTable _deliveryFares;
-    private readonly TaxiDriveMeter _meter;
+    private readonly DrivenDistanceMeter _meter;
     private readonly FareTable _fares;
     private readonly TaxiRules _taxiRules;
     private readonly VoiceBeat _beat;
@@ -55,7 +55,7 @@ public sealed class JobSettlement
         FleetService fleet, ICarRaritySource rarity, IFriendshipStore friends,
         IBrandMileageStore brands, IPlayerTelemetry online, IRivalsService rivals,
         DeliveryBoard deliveryBoard, DeliveryCareer career, CityEconomy city,
-        DeliveryFareTable deliveryFares, TaxiDriveMeter meter,
+        DeliveryFareTable deliveryFares, DrivenDistanceMeter meter,
         FareTable fares, TaxiRules taxiRules,
         VoiceBeat beat, ITelemetryHud? hud, ILog log)
     {
@@ -329,7 +329,7 @@ public sealed class JobSettlement
             $"wallet={_wallet.Cash:0.00}");
         host.ShowReceipt(new DeliveryReceiptScreenViewModel(
             receipt, _wallet, _beat,
-            new RelayCommand(host.GoToDeliveryBoard), _rivals));
+            new RelayCommand(host.GoToControlPage), _rivals));
     }
 
     // The class × rarity pair the receipts' XP formula reads for the car

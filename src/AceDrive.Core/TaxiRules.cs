@@ -1,6 +1,6 @@
-// Driving-slice balance (PORTPLAN item 11): the door radius, the fare meter's
-// speed clamp, the HUD distance step, a transient notice duration and the
-// customer request's read-in delay. Shipped values are the test-shell
+// Driving-slice balance (PORTPLAN item 11): the door radius, the driven-leg
+// meter's speed clamp, the HUD distance step, a transient notice duration and
+// the customer request's read-in delay. Shipped values are the test-shell
 // fallback; Data/taxi_rules.json is the source of truth, loaded by
 // JsonTaxiRulesStore at startup.
 namespace AceDrive.Core;

@@ -157,7 +157,7 @@ Port to ACEDRIVE:
       curve, cc redKm bands, the DateTime schedule (weekly 7 / annual 364-371,
       seeded RNG), `RunAnnual`/`Repair`/`ReplaceEngine`.
 - [x] Odometer feed: `Poll` integrates telemetry speed × dt into the current car
-      (the fare meter's dt guard + a 500 km/h clamp), runs the engine inspections
+      (the leg meter's dt guard + a 500 km/h clamp), runs the engine inspections
       while driving past onboarding, and banks garage.json on a 60 s throttle
       beside the clock save.
 - [x] `CarFilth` (Core) + the `+1` hooks at the two settle sites + the wash

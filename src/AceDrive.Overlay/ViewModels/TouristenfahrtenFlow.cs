@@ -15,7 +15,7 @@ namespace AceDrive.Overlay.ViewModels;
 ///
 /// The receipt's CONTINUE is what moves the run on: it pins the next dropoff
 /// and hides the panel again, or lands back on the calendar after the last one.
-/// The shared drive meter prices each corner leg (reset when the goods load and
+/// The shared leg meter prices each corner leg (reset when the goods load and
 /// at every CONTINUE, so the pickup drive is not charged), exactly like the
 /// career delivery run. While a real-world event runs at the Nürburgring (the
 /// calendar the briefing's title reads), the shops pay double for the goods, so
@@ -29,7 +29,7 @@ public sealed class TouristenfahrtenFlow
     private readonly ITouristenDoors _doors;
     private readonly ITelemetryHud? _hud;
     private readonly ITouristenSettlement _settlement;
-    private readonly TaxiDriveMeter _meter;
+    private readonly DrivenDistanceMeter _meter;
     private readonly VoiceBeat _beat;
     private readonly IClock _clock;
     private readonly TouristenRaceCalendar _weekends;
@@ -50,7 +50,7 @@ public sealed class TouristenfahrtenFlow
 
     public TouristenfahrtenFlow(
         TouristenMenu menu, ITouristenDoors doors, ITelemetryHud? hud,
-        ITouristenSettlement settlement, TaxiDriveMeter meter, TaxiRules taxiRules,
+        ITouristenSettlement settlement, DrivenDistanceMeter meter, TaxiRules taxiRules,
         VoiceBeat beat, IClock clock, TouristenRaceCalendar weekends,
         Random rng, ILog log)
     {

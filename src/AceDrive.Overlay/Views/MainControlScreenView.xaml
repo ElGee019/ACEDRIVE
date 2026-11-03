@@ -134,9 +134,9 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </StackPanel>
-            <!-- DELIVER CARE PACKAGES lives outside the completed block: the
-                 tips may already be cleared while the kits still wait, so the
-                 bag threshold alone decides whether the button is up. -->
+            <!-- DELIVER CARE PACKAGES stays outside the completed block: the
+                 five rows behind the bag threshold are what raise it, and a run
+                 already in the car offers itself with no rows at all. -->
             <StackPanel Margin="0,6,0,0"
                         Visibility="{Binding ShowDeliverCarePackages, Converter={StaticResource BoolToVis}}">
                 <TextBlock Text="{Binding CarePackageCountLine}" Foreground="#FFBFC4C9" FontSize="13"

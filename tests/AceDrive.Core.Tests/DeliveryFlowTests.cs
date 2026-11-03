@@ -52,7 +52,7 @@ public sealed class DeliveryFlowTests
             TestSaveState.Saver(clock, walletInstance, garageInstance), beat, new NullLogger());
         var flow = new DeliveryFlow(
             new DeliveryBoard(catalog), career, city, friends ?? new FakeFriendshipStore(),
-            new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh), breakdowns, clock, beat,
+            new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh), breakdowns, clock, beat,
             new NullLogger());
         var host = new FakeDeliveryHost();
         flow.Attach(host);
@@ -185,6 +185,6 @@ public sealed class DeliveryFlowTests
 
         Assert.False(flow.InProgress);
         Assert.Equal(1, host.Clears);
-        Assert.Same(board, flow.Board); // CONTINUE still lands on the staged board
+        Assert.Same(board, flow.Board); // the staged board survives the dropped run
     }
 }

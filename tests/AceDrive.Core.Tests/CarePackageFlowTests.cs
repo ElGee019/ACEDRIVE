@@ -23,7 +23,7 @@ public sealed class CarePackageFlowTests
     public void Deliver_ServesEachStoreThenTheCommunityCentreAndShowsTheReceipt()
     {
         var hud = new FakeTelemetryHud();
-        TestSessionResult session = Create(hud, TwoStoreRun);
+        TestSessionResult session = Create(hud, TwoStoreRun, completedTips: 5);
         MainControlScreenViewModel control = OpenControl(session);
 
         Assert.True(control.ShowDeliverCarePackages);
@@ -118,14 +118,18 @@ public sealed class CarePackageFlowTests
     }
 
     [Fact]
-    public void Deliver_WithFewerThanFiveKits_IsNotOfferedAndStartsNothing()
+    public void Deliver_WithFiveTipsButNoStoreDoor_IsNotOfferedAndStartsNothing()
     {
+        // The completions are there but the town has no shop to hold a kit, so
+        // nothing is deliverable: the second half of the rule ("five kits to
+        // hand over") keeps a dead button off the page.
         var hud = new FakeTelemetryHud();
         TestSessionResult session = Create(
-            hud,
-            new CarePackageState([new CarePackagePlacement("groceries_store", 4)]));
+            hud, new CarePackageState(), completedTips: 5,
+            directory: new PoiDirectory([Centre()]));
         MainControlScreenViewModel control = OpenControl(session);
 
+        Assert.Equal(0, session.CarePackages.Total);
         Assert.False(control.ShowDeliverCarePackages);
         control.DeliverCarePackagesCommand.Execute(null);
 
@@ -133,19 +137,108 @@ public sealed class CarePackageFlowTests
         Assert.True(session.Vm.IsShown);
     }
 
-    private static TestSessionResult Create(FakeTelemetryHud hud, CarePackageState care) =>
+    [Fact]
+    public void Deliver_NotOfferedAtFourCompletedTipsDespiteALeftoverKit()
+    {
+        // The reported bug (and the state a run that served five of six leaves
+        // behind): five kits wait, but the completed block lists four tips. The
+        // button belongs to the five-tip threshold, not to the kit count, so a
+        // leftover kit cannot raise it — the tap refuses too.
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(
+            hud,
+            new CarePackageState(
+                [new CarePackagePlacement("groceries_store", 4),
+                 new CarePackagePlacement("coffee_shop", 1)]),
+            completedTips: 4);
+        MainControlScreenViewModel control = OpenControl(session);
+
+        Assert.Equal(5, session.CarePackages.Total);
+        Assert.Equal(4, control.CompletedTodoLines.Count);
+        Assert.False(control.ShowDeliverCarePackages);
+        Assert.DoesNotContain("DELIVER CARE PACKAGES", control.VoiceActions.Keys);
+
+        control.DeliverCarePackagesCommand.Execute(null);
+
+        Assert.Null(hud.Destination);
+        Assert.True(session.Vm.IsShown);
+        Assert.Equal(5, session.CarePackages.Total);
+    }
+
+    [Fact]
+    public void Deliver_OfferedOnceTheBlockListsFiveTips()
+    {
+        var hud = new FakeTelemetryHud();
+        TestSessionResult session = Create(
+            hud,
+            new CarePackageState([new CarePackagePlacement("groceries_store", 5)]),
+            completedTips: 5);
+        MainControlScreenViewModel control = OpenControl(session);
+
+        Assert.Equal(5, control.CompletedTodoLines.Count);
+        Assert.True(control.ShowDeliverCarePackages);
+        Assert.Contains("5", control.CarePackageCountLine, StringComparison.Ordinal);
+
+        control.DeliverCarePackagesCommand.Execute(null);
+
+        Assert.Equal("groceries_store", hud.Destination?.Id);
+    }
+
+    private static TestSessionResult Create(
+        FakeTelemetryHud hud, CarePackageState care, int completedTips = 0,
+        PoiDirectory? directory = null) =>
         TestSession.Create(new TestSessionOptions
         {
             Hud = hud,
             SavedDriver = DriverState.Fresh with { CarePackages = care },
-            PoiDirectory = Directory(),
-            // No starter tips: the only kits are the ones the test seeds.
+            PoiDirectory = directory ?? Directory(),
+            // No starter tips: the visible tips and the completed block come
+            // from the test's own file, exactly as a returning career's does.
             Todos = new TodoTable([]),
+            TodoStore = new FakeTodoProgressStore(Tips(completedTips)),
             // Two stored-card rewards: every delivered-page test then claims a
             // real card instead of landing on the slot or cash branch by chance.
             Rewards = RewardCards,
             RewardRng = new Random(0),
         });
+
+    // The four visible slots the page always shows, in Unity's enum order.
+    private static readonly IReadOnlyList<string> VisibleSubjects =
+    [
+        TodoSubject.CrEarnings,
+        TodoSubject.XpEarnings,
+        TodoSubject.BankStandings,
+        TodoSubject.TaxiJobs,
+    ];
+
+    // The completed block's rows, in Unity's enum order: the four visible
+    // subjects first so a completion never has to be invented.
+    private static readonly IReadOnlyList<string> CompletedSubjects =
+    [
+        .. VisibleSubjects,
+        TodoSubject.SetDestinationsManually,
+        TodoSubject.OperatingZone,
+        TodoSubject.OwnCars,
+    ];
+
+    // A saved career whose completed block lists exactly the given tips: the
+    // jobs page reads it as "Sonja arranged that many kits".
+    private static TodoLedgerState Tips(int completed)
+    {
+        var slots = new List<TodoSlotState>(VisibleSubjects.Count);
+        foreach (string subject in VisibleSubjects)
+        {
+            slots.Add(new TodoSlotState(subject, 0));
+        }
+
+        List<string> awaiting = [.. CompletedSubjects.Take(completed)];
+        return new TodoLedgerState(
+            slots, [], new Dictionary<string, double>(StringComparer.Ordinal),
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            new Dictionary<string, int>(StringComparer.Ordinal),
+            awaiting, [], [.. TodoSubject.All],
+            new Dictionary<string, TodoTipSnapshot>(StringComparer.Ordinal));
+    }
 
     // The delivered page's pinned catalogue: both rewards are glovebox cards.
     private static readonly RewardTable RewardCards = new(
@@ -174,9 +267,12 @@ public sealed class CarePackageFlowTests
                 "coffee_shop", "Coffee Shop",
                 new AddressLocation("Street 1", 4, HouseNumberPlan.SideOf(4)),
                 PoiTypes.CoffeeShop),
-            new PointOfInterest(
-                StoryCommunityCentre.Definition.Id, StoryCommunityCentre.Definition.Name,
-                new AddressLocation("Street 1", 5, HouseNumberPlan.SideOf(5)),
-                PoiTypes.CommunityCentre),
+            Centre(),
         ]);
+
+    private static PointOfInterest Centre() =>
+        new(
+            StoryCommunityCentre.Definition.Id, StoryCommunityCentre.Definition.Name,
+            new AddressLocation("Street 1", 5, HouseNumberPlan.SideOf(5)),
+            PoiTypes.CommunityCentre);
 }

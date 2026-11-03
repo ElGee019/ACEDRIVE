@@ -106,7 +106,7 @@ public sealed class DeliveryReceiptScreenTests
     }
 
     [Fact]
-    public void Continue_HandsBackToTheDeliveryBoard()
+    public void Continue_ExecutesTheHostCommand()
     {
         var (vm, continued, _) = Create();
         vm.ContinueCommand.Execute(null);

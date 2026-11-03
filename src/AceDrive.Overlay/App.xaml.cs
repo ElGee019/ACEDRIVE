@@ -435,7 +435,7 @@ public partial class App : Application, IDisposable
         // instances from here (AGENTS.md: this is the only composition point).
         var fleet = new FleetService(
             garage, cars, game, driver, insuranceRules, _log, carBrands, content);
-        var meter = new TaxiDriveMeter(taxiRules.MaxMeterSpeedKmh);
+        var meter = new DrivenDistanceMeter(taxiRules.MaxMeterSpeedKmh);
         // The live board (a shop that connects while the overlay runs appends a
         // row) and the one instance the board page, the run planner and the
         // settle all read.
@@ -628,7 +628,7 @@ public partial class App : Application, IDisposable
             new Random(taxiSeed + 15),
             () => saver.SaveDriver(rivals.LastResult), _log);
         var careFlow = new CarePackageFlow(
-            poiDirectory, carePackages, careReward, addressMap, hud,
+            poiDirectory, carePackages, todoBoard, careReward, addressMap, hud,
             () => saver.SaveDriver(rivals.LastResult), beat, _log);
         var callInput = new CallInput(_log, wall);
         callInput.Arm(preferences.Call);

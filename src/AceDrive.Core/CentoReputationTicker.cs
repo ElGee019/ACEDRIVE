@@ -3,13 +3,13 @@
 // the distance each poll covers and charges one multiplication per 0.01 km
 // (CentoReputation.TickKilometres). Standing still, a paused game or a stalled
 // poll adds nothing, which is what stops the race from building a club
-// reputation for a car that never moves. Pure, like the fare meter it mirrors.
+// reputation for a car that never moves. Pure, like the leg meter it mirrors.
 namespace AceDrive.Core;
 
 /// <summary>
 /// Accumulates the race's driven distance and reports the live club
 /// reputation it is worth. One <see cref="Add"/> per telemetry poll; the same
-/// 0..1 s dt guard and speed clamp as the odometer and the taxi fare meter keep
+/// 0..1 s dt guard and speed clamp as the odometer and the driven-leg meter keep
 /// a stalled, torn or teleported read out of the race.
 /// </summary>
 public sealed class CentoReputationTicker

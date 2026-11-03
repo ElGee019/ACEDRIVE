@@ -9,6 +9,6 @@ public enum JobPhase
     None,
     Proposed,   // offered, waiting for accept
     ToPickup,   // accepted, driving to the customer
-    EnRoute,    // passenger aboard, meter running
+    EnRoute,    // passenger aboard, the paid leg (the fare is already fixed)
     Complete,   // dropped off, receipt shown
 }

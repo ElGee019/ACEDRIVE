@@ -106,7 +106,7 @@ public sealed class NavigationTests
                 wallet, garageInstance, game, InsuranceRules.Default, poolCars,
                 saver, new VisitLedger(), beat, log),
             day, log);
-        var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);
+        var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
         var breakdowns = new TripBreakdowns(
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             garageInstance, onboarding, wallet, rivals, saver, beat, log);
@@ -152,7 +152,7 @@ public sealed class NavigationTests
             RewardTable.Default, new Glovebox(RewardTable.Default, wallet), trunk, wallet,
             new Random(15), () => saver.SaveDriver(rivals.LastResult), log);
         var care = new CarePackageFlow(
-            directory, carePackages, careReward, AddressMap.Default, null,
+            directory, carePackages, todoBoard, careReward, AddressMap.Default, null,
             () => saver.SaveDriver(rivals.LastResult), beat, log);
         // The weekly missing-person run: the calendar's Wednesday tap starts it,
         // so the navigator needs the real flow (its resident table is the one

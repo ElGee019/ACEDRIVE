@@ -10,7 +10,6 @@ namespace AceDrive.Core.Tests;
 internal sealed class FakeJobSettlementHost : IJobSettlementHost
 {
     private readonly object _controlPage = new();
-    private readonly object _deliveryBoardPage = new();
 
     public List<object> Receipts { get; } = [];
     public List<RivalsResult?> DriverSaves { get; } = [];
@@ -28,7 +27,6 @@ internal sealed class FakeJobSettlementHost : IJobSettlementHost
     public int DeliveryRunsCleared { get; private set; }
     public int ControlPages { get; private set; }
     public int MenuPages { get; private set; }
-    public int DeliveryBoardPages { get; private set; }
 
     public void ShowReceipt(object screen) => Receipts.Add(screen);
 
@@ -58,11 +56,6 @@ internal sealed class FakeJobSettlementHost : IJobSettlementHost
 
     public void ClearDeliveryRun() => DeliveryRunsCleared++;
 
-    public void GoToDeliveryBoard() => DeliveryBoardPages++;
-
-    /// <summary>The control page the receipts' BACK hands back to.</summary>
+    /// <summary>The control page the receipts' CONTINUE hands back to.</summary>
     public object ControlPage => _controlPage;
-
-    /// <summary>The board page CONTINUE lands on.</summary>
-    public object DeliveryBoardPage => _deliveryBoardPage;
 }

@@ -85,7 +85,7 @@ public sealed class JobSettlementTests
 
     // 8.2 km at 360 km/h in half-second polls: the meter ignores a stalled tick
     // (dt ≥ 1 s), so the drive is fed the way the 10 Hz poll would.
-    private static void Drive(TaxiDriveMeter meter)
+    private static void Drive(DrivenDistanceMeter meter)
     {
         for (int i = 0; i < 164; i++)
         {
@@ -95,7 +95,7 @@ public sealed class JobSettlementTests
 
     private static (
         JobSettlement Settlement, DriverWallet Wallet, Garage Garage, JobLedger Jobs,
-        OperatingZone Zone, FakePlayerTelemetry Online, TaxiDriveMeter Meter,
+        OperatingZone Zone, FakePlayerTelemetry Online, DrivenDistanceMeter Meter,
         FakeJobSettlementHost Host)
         Build(DeliveryCareer career, string? liveCar = null)
     {
@@ -116,7 +116,7 @@ public sealed class JobSettlementTests
         var zone = new OperatingZone(null, seed: 0, AddressMap.Default);
         var jobs = new JobLedger();
         var online = new FakePlayerTelemetry();
-        var meter = new TaxiDriveMeter(TaxiRules.Default.MaxMeterSpeedKmh);
+        var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
         var settlement = new JobSettlement(
             wallet, garage, new TaxiShift(), zone, jobs, new DailyStreak(clock, null), clock,
             fleet, new FakeCarRarity(), new FakeFriendshipStore(), new FakeBrandMileageStore(),

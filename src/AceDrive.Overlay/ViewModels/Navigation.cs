@@ -292,10 +292,10 @@ public sealed class Navigation
         return _control;
     }
 
-    // The bag threshold is the ledger's (Unity TipsCompletedScreen): the kits,
-    // not the completed tip rows, decide whether the run is offered, so a
-    // cleared block with leftovers can still deliver. The flow also offers the
-    // run when a previous session left kits in the car below the threshold.
+    // The bag threshold is the flow's (Unity TipsCompletedScreen): the completed
+    // block must list five tips, and the town must hold the kits, before the run
+    // is offered — a leftover kit from an earlier run cannot raise the button on
+    // its own. A previous session's kits already in the car still offer the run.
     private bool CareDeliveryAvailable() => _care.CanOffer;
 
     // DELIVER CARE PACKAGES: the flow starts the run (or resumes the drop-off)
@@ -430,7 +430,7 @@ public sealed class Navigation
 
     /// <summary>
     /// The board itself, for the paths that come back to it from elsewhere (the
-    /// delivery receipt's CONTINUE).
+    /// hub page's BACK after a purchase).
     /// </summary>
     public void ShowDeliveryBoard() =>
         ShowScreen(_delivery.Board ?? (object)ControlPage());

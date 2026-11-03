@@ -154,7 +154,7 @@ The DAG, top to bottom; each row may only use rows above it.
 
 ```
 stores + saved state
-  └ FleetService (watcher, content)      TaxiDriveMeter (taxiRules)
+  └ FleetService (watcher, content)      DrivenDistanceMeter (taxiRules)
   └ GameStateSaver                        OverlayShell
   └ DeliveryBoard (the live catalogue)    TelemetryReadouts (no dependencies)
   └ TripBreakdowns (breakdowns, garage, onboarding progress, wallet, saver)
@@ -205,7 +205,7 @@ hands it the paid leg.
 page's `TaxiShiftCommand` no longer needs the coordinator's job, and six
 constructor parameters left with the flow.
 *Deviation:* no `TripMeter` wrapper — it would have had no behaviour of its own,
-so both flows take `TaxiDriveMeter` directly.
+so both flows take `DrivenDistanceMeter` directly.
 
 **S2 — `DeliveryFlow`** ✅ (~150 lines incl. `SourceOwners`). Owns the run, the
 meter edge and the board page; `Start` rolls the breakdown, `Stop` drops the run
@@ -304,7 +304,7 @@ root-assembled), and the constructor lost the story's 20-odd parameters
 (`IOnboardingStore`, `IContentSource`, profiles, name registry, `PoiGenerator`,
 directory + store, `PoiArrivalRouter`, `Trunk`, preference store + preferences,
 culture, `FareTable`, `InsuranceRules`, `IFriendshipStore`, delivery fares,
-`TaxiDriveMeter`, `ShopInteriors`).
+`DrivenDistanceMeter`, `ShopInteriors`).
 *Deviations:*
 - A `PanelPresenter` owns the call gate, the first-show rule and
   `Present`/`Hide`; the story flow and the voice router both need them before

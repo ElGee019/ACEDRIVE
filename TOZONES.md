@@ -74,7 +74,8 @@ on its own.
    new street name, street count, previous / new area, jobs to the next
    expansion, the businesses that just opened (type label + name), the world
    standings block, CONTINUE and FIND STREET. CONTINUE then lands on the page
-   the receipt would have opened (control page or delivery board).
+   the receipt would have opened (the control page for both the taxi and the
+   delivery receipt).
 4. FIND STREET opens the addresses page — the port's map stand-in — with its
    BACK returning to the same continuation, so the button keeps Unity's
    contract without a map.

@@ -14,7 +14,7 @@ public static class RoadTestBrake
 {
     /// <summary>
     /// Adds one poll's distance, in metres. <paramref name="seconds"/> is the
-    /// tick's dt; the same 0..1 s guard the taxi meter and the odometer use
+    /// tick's dt; the same 0..1 s guard the leg meter and the odometer use
     /// keeps a stalled or lagged frame out of the run.
     /// </summary>
     public static double AddDistance(

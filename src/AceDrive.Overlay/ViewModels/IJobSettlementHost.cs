@@ -41,7 +41,11 @@ public interface IJobSettlementHost
     /// <summary>Refreshes and pushes the standings, banking the driver file with them.</summary>
     RivalsResult? RefreshStandings();
 
-    /// <summary>CONTINUE on a taxi receipt lands on the control page.</summary>
+    /// <summary>
+    /// CONTINUE on a taxi or delivery receipt lands on the control page: a
+    /// finished job hands the main page back instead of the job list it ran
+    /// from.
+    /// </summary>
     void GoToControlPage();
 
     /// <summary>
@@ -56,7 +60,4 @@ public interface IJobSettlementHost
 
     /// <summary>Drops the finished run and clears the HUD guidance before the receipt.</summary>
     void ClearDeliveryRun();
-
-    /// <summary>CONTINUE on a delivery receipt lands back on the board it came from.</summary>
-    void GoToDeliveryBoard();
 }

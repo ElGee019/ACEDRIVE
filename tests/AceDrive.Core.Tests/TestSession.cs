@@ -152,7 +152,7 @@ internal static class TestSession
         var rivalsInstance = options.Rivals ?? new FakeRivals();
         var brandMileageInstance = options.BrandMileage ?? new FakeBrandMileageStore();
         var telemetryInstance = options.Telemetry ?? new FakePlayerTelemetry();
-        var meter = new TaxiDriveMeter(taxiRulesInstance.MaxMeterSpeedKmh);
+        var meter = new DrivenDistanceMeter(taxiRulesInstance.MaxMeterSpeedKmh);
         var breakdownsInstance = new TripBreakdowns(
             options.Breakdowns ?? new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             garageInstance, onboardingStore, walletInstance, rivalsInstance, saver, beat, logger);
@@ -238,7 +238,7 @@ internal static class TestSession
             options.RewardRng ?? new Random(15),
             () => saver.SaveDriver(rivalsInstance.LastResult), logger);
         var careFlow = new CarePackageFlow(
-            directory, carePackagesInstance, careReward, map, options.Hud,
+            directory, carePackagesInstance, todoBoard, careReward, map, options.Hud,
             () => saver.SaveDriver(rivalsInstance.LastResult), beat, logger);
         var proposalsInstance = TaxiTestData.Proposer(zone: zoneInstance, seed: 0);
         var taxi = new TaxiJobFlow(

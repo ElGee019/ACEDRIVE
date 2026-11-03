@@ -14,8 +14,8 @@ namespace AceDrive.Overlay.ViewModels;
 /// standings pair. Skipped until their systems land (Unity hides them too
 /// or the port defers them): fines, auto fuel, starter bonus, profit-boost
 /// card. Money lines are computed once and never change; the standings
-/// block follows the backend's live updates. CONTINUE navigates back, so a
-/// voice tap flashes teal first and waits out the shared beat.
+/// block follows the backend's live updates. CONTINUE hands the main page
+/// back, so a voice tap flashes teal first and waits out the shared beat.
 /// </summary>
 public sealed class DeliveryReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {

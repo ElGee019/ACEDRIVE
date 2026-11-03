@@ -3959,9 +3959,10 @@ public sealed class MainViewModelTests
         Assert.Equal("Credibility Points earned: 1", receipt.CredPEarnedLine);
         Assert.Equal("Total Credibility Points: 1", receipt.TotalCredPLine);
 
-        // CONTINUE returns to the board, cart emptied by the settle.
+        // CONTINUE hands the main page back (not the delivery board), with the
+        // cached board's cart already emptied by the settle.
         receipt.ContinueCommand.Execute(null);
-        Assert.Same(board, vm.CurrentScreen);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         Assert.Equal("OPEN NEW CAREER", board.MainButtonLabel);
     }
 
@@ -4342,7 +4343,7 @@ public sealed class MainViewModelTests
         page.ContinueCommand.Execute(null);
         var hunger = Assert.IsType<HungerIntroScreenViewModel>(vm.CurrentScreen);
         hunger.ContinueCommand.Execute(null);
-        Assert.Same(board, vm.CurrentScreen);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
