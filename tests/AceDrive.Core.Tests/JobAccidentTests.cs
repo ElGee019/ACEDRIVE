@@ -366,4 +366,34 @@ public sealed class JobAccidentTests
         Assert.Same(page, rig.Vm.CurrentScreen);
         Assert.True(rig.Vm.IsShown);
     }
+
+    [Fact]
+    public void FreeRoamCrashOverAnOpenWalletPage_RepaintsTheCashTheRepairTook()
+    {
+        // The interrupted page is handed back as the same instance, so its
+        // figures have to be re-read first: the repair behind the broker page
+        // paid the bill, and the CR line the player left cannot come back with
+        // the pre-repair saldo.
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet(new DriverState(50000.0, 0.0));
+        var directory = new PoiDirectory();
+        TestSessionResult rig = New(
+            GarageWith(insured: false), hud, new FakeFriendshipStore(), wallet,
+            directory);
+        rig.Story.FinishDialogue();
+        rig.Vm.Show();
+        var menu = Assert.IsType<MenuScreenViewModel>(rig.Vm.CurrentScreen);
+        menu.WalletCommand.Execute(null);
+        var page = Assert.IsType<WalletScreenViewModel>(rig.Vm.CurrentScreen);
+        Assert.Equal("CR50000.00", page.CashAmount);
+
+        Crash(rig.Vm, rig.Clock, rig.Tel); // 120 of 240 km/h on a 40 000 CR car
+        hud.RaiseTaskAction();
+        var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
+
+        intro.ContinueCommand.Execute(null);
+
+        Assert.Same(page, rig.Vm.CurrentScreen);
+        Assert.Equal("CR48000.00", page.CashAmount);
+    }
 }

@@ -84,7 +84,11 @@ fixer passes (one once removed a needed using via an IDE0005 false positive).
 
 Say **"hey {brand}"** of the car you are driving ("hey datsun", "hey nissan")
 while the overlay is hidden to open it; `Ctrl+Shift+C` does the same without a
-mic. `Data/brand_aliases.json` lists the mishearings the English model already
+mic. The chord is only the default: the setup page's **CHANGE CALL MAIN
+SHORTCUT** button assigns any key, wheel button or pad button instead, and the
+main page then names that input. The call only observes its input — the game
+still receives the key or button, so nothing is taken away from driving.
+`Data/brand_aliases.json` lists the mishearings the English model already
 produced ("hey dotson", "hey nissan"), so a brand it cannot spell still wakes.
 
 Two decoders share the model: the full vocabulary answers command words while

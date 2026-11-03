@@ -94,12 +94,13 @@ uniformly over every house on both streets. Mark the real discovery with a
      `valuationEventsCompleted++`;
    - clear the marker/alarm, deselect the POI;
    - **open `ValuationScreen` immediately** (no ENTER).
-   - **ACEDRIVE deviation (2026-10-27):** parking alone only raises the
+   - **ACEDRIVE deviation (2026-10-29):** parking alone only raises the
      companion's ENTER button; the showcase opens when the player taps it (or
-     says "enter"). The arrival line is deliberately empty: once the car stands
-     on the venue's house, "park here to enter your vehicle" is dead copy. The
-     venue stays pinned and `valuationDriving` stays true until that ENTER, so
-     the button survives parking, driving off and a relaunch.
+     says "enter"). The arrival line is the jury's framing
+     (`HudValuationArrived`, "Let's see what the jury has to say"), so the task
+     text is still readable at the door instead of going empty above the button.
+     The venue stays pinned and `valuationDriving` stays true until that ENTER,
+     so the button survives parking, driving off and a relaunch.
 5. Offline arrival (app killed after DRIVE): on next boot the marker is back
    and the button reads **ENTER**, which opens the showcase without re-driving;
    the same ENTER runs the consume/bookkeeping if the live arrival never ran.
@@ -257,9 +258,9 @@ Owns all timing/state transitions; no UI copy, no direct `new` of services.
   snapshots, drain draw/catch-up tasks, show queued 4 s notices.
 - `EnterVenue(poi)` — the venue's POI handler (`ValuationPoiHandler`): when
   driving, consume the venue, `valuationEventsCompleted++`, clear the HUD
-  destination, build and return the showcase page. Parking itself does nothing;
-  the HUD's ENTER (voice "enter") is the only way in, so the arrival copy is
-  never a dead sentence. Driven by the HUD's `EnterRequested` through
+  destination, build and return the showcase page. Parking itself does nothing
+  but raise the button; the arrival copy is the jury line, and the HUD's ENTER
+  (voice "enter") is the only way in. Driven by the HUD's `EnterRequested` through
   `OnboardingFlow.EnterPoi` → `PoiArrivalRouter`, the same path a shop door
   takes.
 - `Enter(carKey)` — score from garage + per-car jobs + engine state; persist
@@ -355,6 +356,7 @@ ValuationTopSpeed          {0} km/h
 ValuationAcceleration      {0:0.#}s
 ValuationClass             {0}
 HudValuationDrive          Drive to {0}: {1} {2}, {3} to enter your vehicle into the weekly tier-ranking showcase.
+HudValuationArrived        Let's see what the jury has to say
 ValuationNoticeWin         You won a Valuation event against {0} and received {1:0.000}XP
 ValuationNoticeLoss        You just lost a Valuation Event against {0}.
 ValuationOfflineSummary    While you were away you won {0} Valuation events and gained {1:0.000} XP
@@ -364,9 +366,9 @@ ValuationOfflineSummary    While you were away you won {0} Valuation events and 
 `{2}` number, `{3}` city so a translator can reorder them.)
 
 The venue's action button reuses the generic `HudEnter` copy ("ENTER" /
-"BINNENGAAN") and therefore its voice keyword "enter"; its copy carries an
-empty `ArrivedKey`, which tells the HUD to leave the arrival sentence down
-(`HudDestinationCopy`). The old `HudValuationArrived` key is gone.
+"BINNENGAAN") and therefore its voice keyword "enter". Its arrival line is
+`HudValuationArrived`, so parking at the venue keeps a task text up (the jury
+line) instead of painting ENTER over nothing.
 
 ---
 
@@ -392,8 +394,9 @@ Services:
 Flow/integration (`TestSession`):
 - Monday 08:00 start → `vm.Poll()` draws a venue; the calendar row opens
   `ValuationBriefingScreenViewModel` (nothing pinned, panel up); its START pins
-  the HUD and hides the panel; the pin carries the `HudEnter` action and no
-  arrival copy; its BACK lands on the calendar with no drive started. Fake HUD
+  the HUD and hides the panel; the pin carries the `HudEnter` action and the
+  `HudValuationArrived` jury line; its BACK lands on the calendar with no drive
+  started. Fake HUD
   parked → the button is up and the showcase is **not** open;
   the fake HUD's `RaiseEnter` (the same event the button and the mic raise)
   opens `ValuationScreenViewModel` and consumes the venue.

@@ -127,6 +127,9 @@ public sealed class Navigation
     // The brand the wake word listens for: the menu's reminder reads it live,
     // so the cached menu never names the car the player already sold.
     private readonly Func<string> _carBrand;
+    // The call the setup page assigned, read live by the cached menu's "you
+    // can also press …" reminder.
+    private readonly Func<string> _callLabel;
 
     // The pages' banks: the garage file, the road-test pick, the shift start and
     // the trunk's driver save all go through the one saver the root built.
@@ -186,7 +189,8 @@ public sealed class Navigation
         ValuationFlow valuation, WhereIsWillyFlow willy, WhereIsWillyLedger willyLedger,
         CarePackageFlow care, RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         WeeklyEventLedger weeklyEvents, CalendarGate gate,
-        Func<string> carBrand, Random rng, ILog log, bool ignoreEventGates = false)
+        Func<string> carBrand, Func<string> callLabel,
+        Random rng, ILog log, bool ignoreEventGates = false)
     {
         _shell = shell;
         _beat = beat;
@@ -227,6 +231,7 @@ public sealed class Navigation
         _roadTest = roadTest;
         _touristen = touristen;
         _carBrand = carBrand;
+        _callLabel = callLabel;
         _rng = rng;
         _log = log;
         _deliverCarePackagesCommand = new RelayCommand(DeliverCarePackages);
@@ -766,7 +771,7 @@ public sealed class Navigation
             new RelayCommand(OpenTrunk),
             new RelayCommand(_host.ShowSettings),
             new RelayCommand(OpenHome),
-            _hunger, _garage, _carBrand,
+            _hunger, _garage, _carBrand, _callLabel,
             _beat,
             _game,
             _clock,

@@ -83,6 +83,11 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     // The brand the mic listens for, read live: the menu is cached for the
     // session, so a car switch has to repaint the wake reminder.
     private readonly Func<string> _carBrand;
+    // The input assigned on the setup page, read live for the same reason: a
+    // rebind happens on a page the cached menu is not, so the reminder has to
+    // re-read it instead of holding the chord it was built with.
+    private readonly Func<string> _callLabel;
+    private string? _lastCallLabel;
     private int _week;
     private int _lastMinute = -1;
     private int _lastWeek = -1;
@@ -106,7 +111,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     public MenuScreenViewModel(
         ICommand wallet, ICommand jobs, ICommand calendar, ICommand trunk, ICommand settings,
         ICommand home,
-        Hunger hunger, Garage garage, Func<string> carBrand,
+        Hunger hunger, Garage garage, Func<string> carBrand, Func<string> callLabel,
         VoiceBeat beat, GameClock game, IClock clock, int displayWeek)
     {
         _beat = beat;
@@ -115,6 +120,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         _hunger = hunger;
         _garage = garage;
         _carBrand = carBrand;
+        _callLabel = callLabel;
         _week = displayWeek;
         // The tile commands wrap the injected ones so a click is newer input
         // than a pending voice tap: it drops the deferred navigation instead
@@ -151,7 +157,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         actions[HungerTile] = () => VoiceReveal(HungerTile);
         actions[FilthTile] = () => VoiceReveal(FilthTile);
         VoiceActions = actions;
-        VoiceHotkeyText = Strings.Get(HotkeyKey);
+        VoiceHotkeyText = string.Empty;
         Refresh();
     }
 
@@ -234,8 +240,10 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     public string VoiceWakeText { get => _voiceWakeText; private set => SetField(ref _voiceWakeText, value); }
     private string _voiceWakeText = "";
 
-    /// <summary>Hotkey line above the clock: the second way to call the panel.</summary>
-    public string VoiceHotkeyText { get; }
+    /// <summary>Hotkey line above the clock: the second way to call the panel,
+    /// naming the input the setup page assigned (re-read on <see cref="Refresh"/>).</summary>
+    public string VoiceHotkeyText { get => _voiceHotkeyText; private set => SetField(ref _voiceHotkeyText, value); }
+    private string _voiceHotkeyText = "";
 
     /// <summary>Hunger steps filled on the HUNGER tile: 0 (empty) .. 1 (all
     /// 36 steps lit). The tile masks its gradient to this fraction, so the
@@ -334,6 +342,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     /// </summary>
     public void Refresh()
     {
+        RefreshCallLabel();
         DateTime now = _game.GameNow;
         int minute = now.Hour * 60 + now.Minute;
         int hunger = _hunger.Value;
@@ -377,6 +386,17 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         string.IsNullOrWhiteSpace(brand)
             ? ""
             : Strings.Format(WakeKey, brand.ToUpperInvariant());
+
+    // Repaints the reminder only when the assigned input changed: the sentence
+    // is assembled once per binding, not once per tick (the poll calls
+    // Refresh ten times a second).
+    private void RefreshCallLabel()
+    {
+        string label = _callLabel();
+        if (string.Equals(label, _lastCallLabel, StringComparison.Ordinal)) return;
+        _lastCallLabel = label;
+        VoiceHotkeyText = Strings.Format(HotkeyKey, label);
+    }
 
     // Voice taps glow first and wait out the shared beat, so the
     // acknowledgment is visible before the page flips.

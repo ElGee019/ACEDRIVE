@@ -112,4 +112,9 @@ internal sealed class TestSessionOptions
     // TEMPORARY (testing): opens every calendar event's gates, so a suite can
     // drive an off-day or replayed event. Shipping sessions keep the gates.
     public bool IgnoreEventGates { get; init; }
+
+    // The call input the setup page assigns through and the preferences write
+    // re-arms. A suite that drives the assignment hands its fake in and keeps
+    // the reference to assert on.
+    public FakeCallInput? CallInput { get; init; }
 }

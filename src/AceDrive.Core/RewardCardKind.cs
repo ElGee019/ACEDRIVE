@@ -12,6 +12,6 @@ public enum RewardCardKind
     /// <summary>One more glove compartment slot; consumed on claim, never stored.</summary>
     GloveboxSlot,
 
-    /// <summary>Cash banked on claim; consumed on claim, never stored.</summary>
+    /// <summary>CR credited to the bank saldo on claim; consumed on claim, never stored.</summary>
     CashBonus,
 }

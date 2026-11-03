@@ -52,9 +52,9 @@ public sealed class CarePackageReward
     public RewardOffer? Offer() => RewardDraw.Offer(_table, _rng);
 
     /// <summary>
-    /// Applies the pick and banks it: cash, the glove compartment's cards and its
-    /// capacity all ride the driver file, so the claim survives a restart. A
-    /// rejected claim (no free slot) saves nothing — nothing moved.
+    /// Applies the pick and banks it: the bonus CR, the glove compartment's
+    /// cards and its capacity all ride the driver file, so the claim survives a
+    /// restart. A rejected claim (no free slot) saves nothing — nothing moved.
     /// </summary>
     public RewardClaim Claim(RewardCard card)
     {
@@ -69,9 +69,12 @@ public sealed class CarePackageReward
             return claim;
         }
 
-        if (claim.Status == RewardClaimStatus.CashCredited)
+        // The money reward is a bank transfer, not cash in hand (Unity's
+        // bankAmount += 500): the player draws it out at the bank, above the
+        // saldo floor, like any other deposit.
+        if (claim.Status == RewardClaimStatus.BonusCredited)
         {
-            _wallet.AddGift(claim.Cash);
+            _wallet.AddBankGift(claim.Bonus);
         }
 
         _saveDriver();

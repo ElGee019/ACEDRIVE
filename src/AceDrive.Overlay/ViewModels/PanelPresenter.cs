@@ -154,6 +154,14 @@ public sealed class PanelPresenter
         RecordActivity();
         if (_interruptedScreen is { } screen)
         {
+            // The page was painted before the interruption, and the repair above
+            // it may have moved the wallet or the dents since: re-read it so the
+            // figures the player left are not the ones they get back.
+            if (screen is IRefreshableScreen refreshable)
+            {
+                refreshable.Refresh();
+            }
+
             _nav.ShowScreen(screen);
             return;
         }

@@ -54,11 +54,11 @@ public sealed class Glovebox
     public bool HasRoom(Trunk trunk) => Count(trunk) < Slots;
 
     /// <summary>
-    /// Applies one claim. A slot reward raises the capacity, a cash reward
-    /// answers the amount the caller banks (money stays the wallet's business),
-    /// and a card lands in the trunk's keepsakes — unless the glovebox is full,
-    /// in which case nothing moves so the page can offer the other reward
-    /// instead, exactly why Unity keeps both buttons up.
+    /// Applies one claim. A slot reward raises the capacity, a money reward
+    /// answers the CR the caller banks into the saldo (money stays the wallet's
+    /// business), and a card lands in the trunk's keepsakes — unless the
+    /// glovebox is full, in which case nothing moves so the page can offer the
+    /// other reward instead, exactly why Unity keeps both buttons up.
     /// </summary>
     public RewardClaim Claim(RewardCard card, Trunk trunk)
     {
@@ -73,7 +73,7 @@ public sealed class Glovebox
 
             case RewardCardKind.CashBonus:
                 return new RewardClaim(
-                    RewardClaimStatus.CashCredited, Cash: _table.CashBonus, GloveboxSlots: Slots);
+                    RewardClaimStatus.BonusCredited, Bonus: _table.CashBonus, GloveboxSlots: Slots);
 
             case RewardCardKind.Card:
                 if (!HasRoom(trunk))

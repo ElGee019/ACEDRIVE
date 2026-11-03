@@ -70,7 +70,7 @@ public sealed class RewardChooser
         Notice = claim.Status switch
         {
             RewardClaimStatus.SlotAdded => Strings.Format("RewardPickerSlotAdded", claim.GloveboxSlots),
-            RewardClaimStatus.CashCredited => Strings.Format("RewardPickerCash", claim.Cash),
+            RewardClaimStatus.BonusCredited => Strings.Format("RewardPickerBank", claim.Bonus),
             _ => Strings.Format("RewardPickerStored", option.Title),
         };
         return true;

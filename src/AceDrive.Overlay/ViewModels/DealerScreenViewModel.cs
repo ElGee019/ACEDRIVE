@@ -25,7 +25,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// SELL and the mode switch stay on the page so they act at once, and BACK glows
 /// and navigates.
 /// </summary>
-public sealed class DealerScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen
+public sealed class DealerScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen, IRefreshableScreen
 {
     private readonly IReadOnlyList<CarSpec> _catalog;
     private readonly Garage _garage;
@@ -133,6 +133,12 @@ public sealed class DealerScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScr
     public string EmptyLine { get; } = Strings.Get("DealerEmpty");
 
     public string PickLine { get; } = Strings.Get("DealerPick");
+
+    /// <summary>
+    /// A crash repair can spend the cash this floor quotes against while the
+    /// page is interrupted, so the hand-back repaints the saldo.
+    /// </summary>
+    public void Refresh() => Reload();
 
     // Unity OnCarSelected: rows repaint (the selected one highlights), the preview
     // follows the pick, and both action labels go back to their verbs.

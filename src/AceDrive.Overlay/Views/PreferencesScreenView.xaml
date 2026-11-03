@@ -49,12 +49,24 @@
                 </ComboBox>
             </Grid>
 
+            <!-- The call: one tap puts the page in listening mode, and the next
+                 key, wheel button or pad button becomes the input that brings
+                 the panel back. It sits right under the language picker so the
+                 setup page answers every choice in one place. The 6 px bottom
+                 margin is the home page's button pitch (HomeScreenView), so the
+                 call and QUIT sit as close as two buttons do there. -->
+            <Button Content="{Binding CallLabel}"
+                    Command="{Binding AssignCallCommand}"
+                    Margin="0,20,0,6"
+                    Focusable="False"
+                    Visibility="{Binding CanAssignCall, Converter={StaticResource BoolToVis}}"/>
+
             <!-- Settings entry only: a first run has no session to leave, so
                  QUIT stays collapsed there. It runs the window's own close
-                 path (wired in App), which banks the session on the way out. -->
+                 path (wired in App), which banks the session on the way out.
+                 No top margin: the call button's own 6 px is the gap. -->
             <Button Content="{Binding QuitLabel}"
                     Command="{Binding QuitCommand}"
-                    Margin="0,28,0,0"
                     Visibility="{Binding CanQuit, Converter={StaticResource BoolToVis}}"/>
 
             <!-- Settings entry only: a first run has no career to wipe, so the

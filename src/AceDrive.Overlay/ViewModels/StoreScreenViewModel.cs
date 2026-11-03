@@ -16,7 +16,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// from data; all copy lives in the resx files.
 /// </summary>
 public sealed class StoreScreenViewModel :
-    ViewModelBase, IPoiScreen, IVoiceScreen
+    ViewModelBase, IPoiScreen, IVoiceScreen, IRefreshableScreen
 {
     // Same bands as Unity's MaxsScreen friendship notification. The index
     // is FriendshipLevels.GetTier, so the copy and the receipt tiers cannot
@@ -226,6 +226,17 @@ public sealed class StoreScreenViewModel :
 
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
+
+    /// <summary>
+    /// A crash repair can spend the cash this shelf quotes against while the
+    /// page is interrupted, so the hand-back re-reads the saldo and the price
+    /// warnings instead of keeping the ones the page was opened with.
+    /// </summary>
+    public void Refresh()
+    {
+        ReloadCash();
+        RepaintSelection();
+    }
 
     private void Select(StoreItemRowViewModel row)
     {

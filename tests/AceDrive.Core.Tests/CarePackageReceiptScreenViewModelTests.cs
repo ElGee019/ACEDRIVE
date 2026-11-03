@@ -161,21 +161,24 @@ public sealed class CarePackageReceiptScreenViewModelTests
     }
 
     [Fact]
-    public void CashClaim_PaysTheGiftIntoTheWallet()
+    public void CashClaim_BanksTheBonusAndLeavesTheCashAlone()
     {
         Page page = Create(cards:
         [
-            new RewardCard(CashCard, "500 CR added to your cash", RewardCardKind.CashBonus),
+            new RewardCard(CashCard, "500 CR added to your bank account", RewardCardKind.CashBonus),
             new RewardCard(TipCard, "Your next customer tip will be doubled"),
         ]);
 
         page.Vm.ClaimCommand.Execute(page.Vm.RewardCards[0]);
 
         Assert.False(page.Vm.RewardOpen);
-        // Unity's bonus lands in the spendable balance, never as a stored card.
-        Assert.Equal(500.0, page.Wallet.Cash);
+        // Unity's bonus is a bank transfer (bankAmount += 500), never cash in
+        // hand and never a stored card.
+        Assert.Equal(1500.0, page.Wallet.BankBalance);
+        Assert.Equal(0.0, page.Wallet.Cash);
         Assert.False(page.Trunk.Contains(CashCard));
         Assert.Contains("500", page.Vm.RewardNotice, StringComparison.Ordinal);
+        Assert.Contains("bank account", page.Vm.RewardNotice, StringComparison.Ordinal);
     }
 
     [Fact]

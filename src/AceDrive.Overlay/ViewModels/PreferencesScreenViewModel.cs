@@ -20,6 +20,8 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
 {
     private const string ContinueLabelKey = "PreferencesContinue";
     private const string QuitLabelKey = "SettingsQuit";
+    private const string CallLabelKey = "PreferencesCall";
+    private const string CallPromptKey = "PreferencesCallPrompt";
     private const string ResetLabelKey = "SettingsResetGame";
     private const string ResetConfirmLabelKey = "SettingsResetConfirm";
     private const string ResetWarningKey = "SettingsResetWarning";
@@ -30,6 +32,7 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
 
     private readonly Action<PlayerPreferences> _changed;
     private readonly Action _done;
+    private readonly ICallBinder? _callBinder;
     private readonly string _doneLabelKey;
     // Null on the first run: the walk has no session to quit and CONTINUE
     // already advances it.
@@ -39,6 +42,9 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
 
     private PreferenceOption<MileageUnit> _unit;
     private PreferenceOption<UiLanguage> _language;
+    // Null until the player assigns their own input: the shipped chord is then
+    // what both this button and the menu read.
+    private CallBinding? _call;
 
     // Bindable copy, not {loc:Loc}: this page IS the language selector, so
     // its own labels must re-read the moment the choice changes.
@@ -47,9 +53,11 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     private string _languageLabel = Strings.Get("PreferencesLanguage");
     private string _continueLabel = Strings.Get(ContinueLabelKey);
     private string _quitLabel = Strings.Get(QuitLabelKey);
+    private string _callLabel = string.Empty;
     private string _resetLabel = Strings.Get(ResetLabelKey);
     private string _resetWarning = Strings.Get(ResetWarningKey);
     private string _resetStatus = string.Empty;
+    private bool _assigningCall;
     private bool _confirmingReset;
     // The last failure, kept so a language change can re-read the same
     // sentence in the new language instead of dropping or freezing it.
@@ -62,14 +70,18 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         string doneLabelKey = ContinueLabelKey,
         string? voiceDoneLabel = null,
         Func<GameResetFailure>? resetGame = null,
-        Action? quit = null)
+        Action? quit = null,
+        ICallBinder? callBinder = null)
     {
         _changed = changed;
         _done = done;
         _doneLabelKey = doneLabelKey;
         _quit = quit;
         _resetGame = resetGame;
+        _callBinder = callBinder;
+        _call = current.Call;
         _continueLabel = Strings.Get(doneLabelKey);
+        _callLabel = CallText();
         var voice = new Dictionary<string, Action>(StringComparer.Ordinal);
         if (voiceDoneLabel is not null)
         {
@@ -95,9 +107,10 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         ];
         _unit = UnitOptions.FirstOrDefault(o => o.Value == current.Units) ?? UnitOptions[0];
         _language = LanguageOptions.FirstOrDefault(o => o.Value == current.Language) ?? LanguageOptions[0];
-        ContinueCommand = new RelayCommand(() => _done());
-        QuitCommand = new RelayCommand(Quit);
+        ContinueCommand = new RelayCommand(LeaveToDone);
+        QuitCommand = new RelayCommand(LeaveToQuit);
         ResetCommand = new RelayCommand(RequestReset);
+        AssignCallCommand = new RelayCommand(AssignCall);
     }
 
     // Page copy as bindable text, not {loc:Loc}: this page IS the language
@@ -166,6 +179,23 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     public ICommand ResetCommand { get; }
 
     /// <summary>
+    /// ASSIGN CALL: puts the platform in listening mode for the next input. A
+    /// second tap cancels instead, so a page that is not seeing the player's
+    /// wheel can be backed out of without leaving the listener running.
+    /// </summary>
+    public ICommand AssignCallCommand { get; }
+
+    /// <summary>The assigned call as the button prints it, or the listening prompt.</summary>
+    public string CallLabel { get => _callLabel; private set => SetField(ref _callLabel, value); }
+
+    /// <summary>True while the page waits for an input to assign.</summary>
+    public bool IsAssigningCall { get => _assigningCall; private set => SetField(ref _assigningCall, value); }
+
+    /// <summary>A listener exists: the first-run page has one too, and only a
+    /// headless test page passes none, where the row stays hidden.</summary>
+    public bool CanAssignCall => _callBinder is not null;
+
+    /// <summary>
     /// Spoken label -&gt; action: only the settings reuse registers anything (the
     /// BACK passed in, and the English "quit"); the first-run page is mouse-only,
     /// and RESET GAME never answers the mic.
@@ -176,12 +206,13 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
     {
         // Push first: MainViewModel applies the UI culture, so the labels
         // re-read below already answer in the newly picked language.
-        _changed(new PlayerPreferences(_unit.Value, _language.Value));
+        PushPreferences();
         Title = Strings.Get("PreferencesTitle");
         UnitsLabel = Strings.Get("PreferencesUnits");
         LanguageLabel = Strings.Get("PreferencesLanguage");
         ContinueLabel = Strings.Get(_doneLabelKey);
         QuitLabel = Strings.Get(QuitLabelKey);
+        CallLabel = IsAssigningCall ? Strings.Get(CallPromptKey) : CallText();
         ResetLabel = Strings.Get(
             IsConfirmingReset ? ResetConfirmLabelKey : ResetLabelKey);
         ResetWarning = Strings.Get(ResetWarningKey);
@@ -189,6 +220,66 @@ public sealed class PreferencesScreenViewModel : ViewModelBase, IVoiceScreen
         {
             ResetStatus = DescribeReset(_resetFailure);
         }
+    }
+
+    // The call rides along on every write: a unit or language change must not
+    // drop the input the player assigned on this very page.
+    private void PushPreferences() =>
+        _changed(new PlayerPreferences(_unit.Value, _language.Value) { Call = _call });
+
+    // The button names its job, not the current binding: the assigned input is
+    // read back on the menu page ("you can also press …"), which is the line
+    // the player sees from the driver's seat. While listening, the prompt
+    // replaces it so the page says what it is waiting for.
+    private static string CallText() => Strings.Get(CallLabelKey);
+
+    private void AssignCall()
+    {
+        if (_callBinder is null)
+        {
+            return;
+        }
+
+        if (IsAssigningCall)
+        {
+            _callBinder.CancelCapture();
+            return;
+        }
+
+        IsAssigningCall = true;
+        CallLabel = Strings.Get(CallPromptKey);
+        _callBinder.BeginCapture(OnCallCaptured);
+    }
+
+    // Escape and a second tap answer null: the button goes back to the input
+    // that is still armed instead of keeping the prompt up for good.
+    private void OnCallCaptured(CallBinding? binding)
+    {
+        IsAssigningCall = false;
+        if (binding is null)
+        {
+            CallLabel = CallText();
+            return;
+        }
+
+        _call = binding;
+        CallLabel = CallText();
+        PushPreferences();
+    }
+
+    // Leaving the page while it waits for an input would leave the call
+    // listener disarmed (BeginCapture drops the armed hotkey), so both ways out
+    // cancel first.
+    private void LeaveToDone()
+    {
+        _callBinder?.CancelCapture();
+        _done();
+    }
+
+    private void LeaveToQuit()
+    {
+        _callBinder?.CancelCapture();
+        Quit();
     }
 
     // QUIT closes the panel, which is the app's one exit path: the window's

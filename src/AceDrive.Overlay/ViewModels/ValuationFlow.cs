@@ -410,13 +410,12 @@ public sealed class ValuationFlow
         PointOfInterest poi = new(
             "valuation", Strings.Get("EventValuation"), venue.Location,
             PoiTypes.Valuation);
-        // The arrival is the button: parked at the venue the companion invites
-        // ENTER (and the same word by voice) instead of telling the player to
-        // park at a house the car is already standing on.
+        // Parked at the venue the companion hands the showcase its jury line and
+        // invites ENTER (and the same word by voice): keeping the arrival copy
+        // down would leave a button over an empty task text.
         _hud?.SetDestination(
             poi,
-            new HudDestinationCopy(
-                "HudValuationDrive", ArrivedKey: string.Empty, ActionKey: "HudEnter"));
+            new HudDestinationCopy("HudValuationDrive", "HudValuationArrived", "HudEnter"));
         _hud?.ShowTaskText();
     }
 

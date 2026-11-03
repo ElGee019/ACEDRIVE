@@ -207,7 +207,7 @@ public sealed class NavigationTests
             directory, null, board, career, city, taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
             valuation, willy, willyLedger, care, roadTest, touristen, weeklyEvents, gate,
-            () => "mazda", new Random(0), log, ignoreEventGates);
+            () => "mazda", () => CallBinding.Default.Label, new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);
         // The day cycle's own host: a menu reveal re-reads the calendar gate

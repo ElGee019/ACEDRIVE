@@ -102,6 +102,8 @@
   <data name="PreferencesTitle" xml:space="preserve"><value>ACEDRIVE INSTELLEN</value></data>
   <data name="PreferencesUnits" xml:space="preserve"><value>AFSTANDSEENHEID</value></data>
   <data name="PreferencesLanguage" xml:space="preserve"><value>TAAL</value></data>
+  <data name="PreferencesCall" xml:space="preserve"><value>WIJZIG OPROEP-SNELTOETS</value></data>
+  <data name="PreferencesCallPrompt" xml:space="preserve"><value>DRUK OP EEN TOETS OF KNOP</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="PreferencesBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="SettingsQuit" xml:space="preserve"><value>STOPPEN</value></data>
@@ -251,7 +253,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="RewardPickerGlovebox" xml:space="preserve"><value>Kaarten in je handschoenenkastje: {0}/{1}</value></data>
   <data name="RewardPickerStored" xml:space="preserve"><value>{0} zit nu in je handschoenenkastje.</value></data>
   <data name="RewardPickerSlotAdded" xml:space="preserve"><value>Eén plek extra in je handschoenenkastje: er passen nu {0} kaarten.</value></data>
-  <data name="RewardPickerCash" xml:space="preserve"><value>De bonus staat op je rekening: {0:0} CR.</value></data>
+  <data name="RewardPickerBank" xml:space="preserve"><value>De bonus staat op je bankrekening: {0:0} CR.</value></data>
   <data name="RewardPickerFull" xml:space="preserve"><value>Je handschoenenkastje is vol. Neem de andere beloning, of ga verder.</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>BEZORGKLUS</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Vertrouwenspunten: {0}</value></data>
@@ -644,7 +646,7 @@ Deze klus aannemen?</value></data>
        {{BRAND}} blijft een letterlijk token zodat de speler het patroon ziet,
        niet één auto. -->
   <data name="MenuVoiceWake" xml:space="preserve"><value>Zeg "Hey {{BRAND}}" om dit scherm tijdens het rijden op te roepen. Bijvoorbeeld "Hey {0}".</value></data>
-  <data name="MenuVoiceHotkey" xml:space="preserve"><value>Je kunt ook CTRL+Shift+C indrukken.</value></data>
+  <data name="MenuVoiceHotkey" xml:space="preserve"><value>Je kunt ook {0} indrukken.</value></data>
   <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
   <!-- Wekelijkse marktwaardering (PORTPLAN 49, Unity ValuationScreen +
        ValuationPopScreen). De locatie-, score- en jurylijnen, de twee live
@@ -691,6 +693,7 @@ De waardering hangt af van Prijs, Topsnelheid, Vermogen, Afgeronde klussen, Moto
   <data name="ValuationClass" xml:space="preserve"><value>{0}</value></data>
   <data name="ValuationLeaderboard" xml:space="preserve"><value>{0:0.##}</value></data>
   <data name="HudValuationDrive" xml:space="preserve"><value>Rijd naar {0}: {1} {2}, {3} om je auto in te zetten voor de wekelijkse klassenranglijst.</value></data>
+  <data name="HudValuationArrived" xml:space="preserve"><value>Eens kijken wat de jury te zeggen heeft</value></data>
   <data name="ValuationNoticeWin" xml:space="preserve"><value>Je won een marktwaarderingsronde van {0} en ontving {1:0.000}XP</value></data>
   <data name="ValuationNoticeLoss" xml:space="preserve"><value>Je verloor zojuist een marktwaarderingsronde van {0} (+{1:0.00} XP).</value></data>
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>Terwijl je weg was won je {0} marktwaarderingsrondes en kreeg je {1:0.000} XP</value></data>

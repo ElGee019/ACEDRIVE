@@ -12,8 +12,8 @@ public enum RewardClaimStatus
     /// <summary>The glove compartment holds one more card.</summary>
     SlotAdded,
 
-    /// <summary>The cash bonus is ready to bank (the wallet owns the money).</summary>
-    CashCredited,
+    /// <summary>The money bonus is credited to the bank saldo (the wallet owns the money).</summary>
+    BonusCredited,
 
     /// <summary>No free slot, so nothing moved and the other reward stays offered.</summary>
     GloveboxFull,

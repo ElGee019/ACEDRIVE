@@ -47,6 +47,11 @@ public sealed class OnboardingFlow : IScreenController
     // listener itself.
     private readonly Action _startVoice;
     private readonly Action _stopVoice;
+    // The call input: the preferences page listens for the next key/button
+    // through the binder, and the same preferences write re-arms the listener
+    // through the armer. Both are optional so a headless walk needs neither.
+    private readonly ICallBinder? _callBinder;
+    private readonly ICallArmer? _callArmer;
     // Story destinations that are not shop interiors: the friend pickups,
     // grandma's pancakes and the community centre. Registering the action here
     // keeps a new leg out of EnterPoi's branching.
@@ -116,7 +121,8 @@ public sealed class OnboardingFlow : IScreenController
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
         Garage garage, Func<int> displayWeek, Action saveGarage,
         Func<string> carBrand, ILog log, IStoryHost host,
-        Action startVoice, Action stopVoice)
+        Action startVoice, Action stopVoice,
+        ICallBinder? callBinder = null, ICallArmer? callArmer = null)
     {
         _onboarding = onboarding;
         _content = content;
@@ -145,6 +151,8 @@ public sealed class OnboardingFlow : IScreenController
         _host = host;
         _startVoice = startVoice;
         _stopVoice = stopVoice;
+        _callBinder = callBinder;
+        _callArmer = callArmer;
         _storyArrivals = new Dictionary<string, Action<PointOfInterest>>(StringComparer.Ordinal)
         {
             [PoiTypes.Person] = PickUpFriend,
@@ -256,7 +264,7 @@ public sealed class OnboardingFlow : IScreenController
     }
 
     private PreferencesScreenViewModel PreferencesPage() =>
-        new(_preferences, OnPreferencesChanged, ShowOpening);
+        new(_preferences, OnPreferencesChanged, ShowOpening, callBinder: _callBinder);
 
     /// <summary>
     /// Builds the preferences form for the settings entry: the same unit +
@@ -271,7 +279,7 @@ public sealed class OnboardingFlow : IScreenController
     public PreferencesScreenViewModel CreateSettingsPage(
         Action done, Func<GameResetFailure>? resetGame = null, Action? quit = null) =>
         new(_preferences, OnPreferencesChanged, done,
-            SettingsDoneLabelKey, SettingsVoiceBackLabel, resetGame, quit);
+            SettingsDoneLabelKey, SettingsVoiceBackLabel, resetGame, quit, _callBinder);
 
     private object? OpeningPage()
     {
@@ -1322,6 +1330,10 @@ public sealed class OnboardingFlow : IScreenController
         _preferencesStore.Save(preferences);
         _culture.Apply(preferences.Language);
         _hud?.ApplyPreferences(preferences);
+        // The one preferences write is also what arms the call: assigning a
+        // key or a wheel button on this page must take effect before the
+        // player leaves it.
+        _callArmer?.Arm(preferences.Call);
     }
 
     // Opening screen CONFIRM: the name + address is progress the player just

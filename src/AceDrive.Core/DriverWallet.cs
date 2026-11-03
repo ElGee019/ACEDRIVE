@@ -277,12 +277,20 @@ public sealed class DriverWallet
     }
 
     /// <summary>
-    /// A cash gift the player did not work for (PORTPLAN 61, Unity's "+500CR
-    /// Bonus" reward card: <c>bankAmount += 500</c>). It lands in cash and
-    /// deliberately not in the lifetime-earned reading, so a gift never credits
-    /// the "earn CR" ToDo subject the way a settled job does.
+    /// A cash gift banked for the player (PORTPLAN 61, Unity's "+500CR Bonus"
+    /// reward card: <c>bankAmount += 500</c> — the savings saldo, not the cash
+    /// on hand, so the bonus can only reach the player through a withdrawal
+    /// above the saldo floor). It deliberately does not touch the
+    /// lifetime-earned reading, so a gift never credits the "earn CR" ToDo
+    /// subject the way a settled job does.
     /// </summary>
-    public void AddGift(double amount) => ApplyCash(amount);
+    public void AddBankGift(double amount)
+    {
+        if (amount > 0.0 && double.IsFinite(amount))
+        {
+            BankBalance = Math.Round(BankBalance + amount, 2, MidpointRounding.AwayFromZero);
+        }
+    }
 
     /// <summary>
     /// A dealer trade-in: the money returns capital already spent on the car, so

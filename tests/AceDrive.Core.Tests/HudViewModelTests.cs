@@ -471,25 +471,52 @@ public sealed class HudViewModelTests
     public void DestinationWithoutAnArrivalLine_LeavesOnlyTheActionButton()
     {
         var vm = Create();
+        var door = new PointOfInterest(
+            "willy-home", "Luis",
+            new AddressLocation("Street 1", 17, HouseSide.Right), PoiTypes.Willy);
+
+        // ToWhereIsWilly.md §3.4: the elder's home leg is nothing but its verb.
+        vm.SetDestination(door, new HudDestinationCopy(
+            "HudWillyHomeDrive", ArrivedKey: string.Empty, ActionKey: "HudWillyDropOff"));
+
+        // En route the leg still reads as the one drive-to sentence.
+        Assert.StartsWith("Drive Luis home", vm.BannerText, StringComparison.Ordinal);
+        Assert.False(vm.ShowEnterButton);
+
+        // 0.25 resolves to Street 1 No. 17, the door the leg pinned.
+        vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
+
+        // Parked, the arrival sentence stays down and the button is the whole
+        // invitation; "drop off" is what the mic answers.
+        Assert.True(vm.AtDestination);
+        Assert.True(vm.ShowEnterButton);
+        Assert.Equal(string.Empty, vm.DestinationText);
+        Assert.Equal("DROP OFF", vm.EnterText);
+    }
+
+    [Fact]
+    public void ValuationDestination_ShowsTheJuryLineAtTheVenue()
+    {
+        var vm = Create();
         var venue = new PointOfInterest(
             "valuation", "Market valuation",
             new AddressLocation("Street 1", 17, HouseSide.Right), PoiTypes.Valuation);
 
         vm.SetDestination(venue, new HudDestinationCopy(
-            "HudValuationDrive", ArrivedKey: string.Empty, ActionKey: "HudEnter"));
+            "HudValuationDrive", "HudValuationArrived", "HudEnter"));
 
-        // En route the leg still reads as the one drive-to sentence.
+        // En route the companion still speaks the drive-to sentence.
         Assert.Contains("Drive to", vm.BannerText, StringComparison.Ordinal);
-        Assert.False(vm.ShowEnterButton);
+        Assert.Contains("Drive to", vm.DestinationText, StringComparison.Ordinal);
 
-        // 0.25 resolves to Street 1 No. 17, the venue's door.
         vm.Update(Sample(position: 0.25f, speedKmh: 0f), 10.0, gameRunning: true);
 
-        // Parked, the arrival sentence stays down and the button is the whole
-        // invitation; "enter" is what the mic answers.
+        // Parked on the venue's house, the arrival line is the jury's framing and
+        // ENTER stays the one verb.
         Assert.True(vm.AtDestination);
+        Assert.True(vm.HasTaskText);
         Assert.True(vm.ShowEnterButton);
-        Assert.Equal(string.Empty, vm.DestinationText);
+        Assert.Equal("Let's see what the jury has to say", vm.DestinationText);
         Assert.Equal("ENTER", vm.EnterText);
         Assert.Contains("enter", vm.EnterKeywords);
     }

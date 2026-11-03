@@ -19,7 +19,7 @@ public sealed class GloveboxTests
             new RewardCard(CardA, "Your next customer tip will be doubled"),
             new RewardCard(CardB, "Your next fine will be waived"),
             new RewardCard("+1 GLOVEBOX SLOT", "1 extra card fits", RewardCardKind.GloveboxSlot),
-            new RewardCard("+500CR BONUS", "500 CR added to your cash", RewardCardKind.CashBonus),
+            new RewardCard("+500CR BONUS", "500 CR added to your bank account", RewardCardKind.CashBonus),
         ],
         DefaultCapacity: 2,
         CashBonus: 500.0);
@@ -87,8 +87,8 @@ public sealed class GloveboxTests
 
         RewardClaim claim = glovebox.Claim(Table.Cards[3], trunk);
 
-        Assert.Equal(RewardClaimStatus.CashCredited, claim.Status);
-        Assert.Equal(500.0, claim.Cash);
+        Assert.Equal(RewardClaimStatus.BonusCredited, claim.Status);
+        Assert.Equal(500.0, claim.Bonus);
         Assert.Empty(trunk.Items);
     }
 

@@ -5,7 +5,7 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Every reward the community centre may offer, the glovebox slots a driver
-/// starts with and the cash a bonus card pays. Loaded from
+/// starts with and the CR a bonus card banks. Loaded from
 /// Data/reward_cards.json at startup; this Default is the test-shell fallback
 /// (and the fixture the tests pin), not the source of truth.
 /// </summary>
@@ -22,7 +22,7 @@ public sealed record RewardTable(
                 "CUSTOMER FORGIVENESS PASS",
                 "Do not lose friendship with a customer following selection of a wrong address"),
             new RewardCard(
-                "+500CR BONUS", "500 CR added to your cash", RewardCardKind.CashBonus),
+                "+500CR BONUS", "500 CR added to your bank account", RewardCardKind.CashBonus),
             new RewardCard(
                 "+1 GLOVEBOX SLOT", "1 extra card fits in the glovebox",
                 RewardCardKind.GloveboxSlot),

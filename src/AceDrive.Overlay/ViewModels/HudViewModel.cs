@@ -922,7 +922,7 @@ public sealed class HudViewModel : ViewModelBase, ITelemetryHud
         {
             bool person = poi.Type == PoiTypes.Person;
             // An empty key is the story saying the arrival is only its button:
-            // the valuation venue asks to enter the showcase, not to park at it.
+            // the missing-person drop-off has nothing to read but DROP OFF.
             string arrivedKey = _copy?.ArrivedKey
                 ?? (person ? "HudArrivedPerson" : "HudArrived");
             DestinationText = AtDestination

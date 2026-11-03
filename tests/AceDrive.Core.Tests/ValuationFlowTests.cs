@@ -159,7 +159,7 @@ public sealed class ValuationFlowTests
         var briefing = Assert.IsType<ValuationBriefingScreenViewModel>(session.Vm.CurrentScreen);
         briefing.StartCommand.Execute(null);
         Assert.Equal("HudEnter", hud.Copy?.ActionKey);
-        Assert.Equal(string.Empty, hud.Copy?.ArrivedKey);
+        Assert.Equal("HudValuationArrived", hud.Copy?.ArrivedKey);
 
         hud.AtDestination = true;
         session.Vm.Poll();

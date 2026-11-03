@@ -97,7 +97,8 @@ public sealed class MainViewModelTests
         FakeClock? clock = null, FakeCarBrandSource? carBrands = null,
         FakeTelemetry? physics = null,
         IReadOnlyList<CentoTier>? centoTiers = null,
-        TouristenRaceCalendar? touristenWeekends = null) =>
+        TouristenRaceCalendar? touristenWeekends = null,
+        FakeCallInput? callInput = null) =>
         TestSession.Create(new TestSessionOptions
         {
             SpeedKmh = speedKmh,
@@ -166,6 +167,7 @@ public sealed class MainViewModelTests
             Physics = physics,
             CentoTiers = centoTiers,
             TouristenWeekends = touristenWeekends,
+            CallInput = callInput,
         });
 
     // The production way into a business: HOME → ADDRESSES, pin the row, then
@@ -279,6 +281,34 @@ public sealed class MainViewModelTests
 
         Assert.False(
             Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen).CanReset);
+    }
+
+    [Fact]
+    public void SettingsPage_AssigningACall_ArmsItAndTheCachedMenuNamesIt()
+    {
+        // The whole round trip: the settings page listens, the platform answers
+        // with a wheel button, the preferences write arms that input, and the
+        // menu already cached names it instead of the shipped chord.
+        var callInput = new FakeCallInput();
+        var (vm, _, _, _) = Create(
+            progress: OnboardingState.Fresh with { BirthdayDone = true },
+            callInput: callInput);
+        var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.Contains("CTRL+Shift+C", menu.VoiceHotkeyText, StringComparison.Ordinal);
+
+        menu.SettingsCommand.Execute(null);
+        var settings = Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
+        settings.AssignCallCommand.Execute(null);
+        var wheelButton = new CallBinding(
+            CallBindingKind.HidButton, 3, CallModifiers.None, "Button 3", "VID_046D&PID_C24F");
+        callInput.Deliver(wheelButton);
+
+        Assert.Equal(wheelButton, callInput.Armed[^1]);
+        settings.ContinueCommand.Execute(null);
+        vm.Poll();
+
+        Assert.Contains("Button 3", menu.VoiceHotkeyText, StringComparison.Ordinal);
+        Assert.DoesNotContain("CTRL+Shift+C", menu.VoiceHotkeyText, StringComparison.Ordinal);
     }
 
     [Fact]

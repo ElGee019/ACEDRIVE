@@ -21,7 +21,7 @@ namespace AceDrive.Overlay.ViewModels;
 /// once like a click; BACK navigates, so its voice tap glows teal first and
 /// waits out the shared beat.
 /// </summary>
-public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen
+public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiScreen, IRefreshableScreen
 {
     private readonly Garage _garage;
     private readonly DriverWallet _wallet;
@@ -138,6 +138,13 @@ public sealed class MechanicScreenViewModel : ViewModelBase, IVoiceScreen, IPoiS
     /// <summary>Teal-glow acknowledgment for the navigating BACK tap.</summary>
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
     private bool _backFlash;
+
+    /// <summary>
+    /// The crash repair charges the wallet and clears the dents while this page
+    /// is interrupted, so the hand-back repaints the saldo and the body bill
+    /// rather than restoring the figures the page was opened with.
+    /// </summary>
+    public void Refresh() => Reload();
 
     // Unity OnAddToggleClicked: adds the part to the queue; the button is gone
     // afterwards (the queue cannot be reversed). Nothing is spent until REPAIR.

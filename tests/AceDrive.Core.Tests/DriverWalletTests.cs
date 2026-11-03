@@ -70,6 +70,23 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
+    public void AddBankGift_MovesTheSaldoWithoutTouchingCashOrEarnings()
+    {
+        // Unity's "+500CR Bonus" is a bank transfer: the player draws it out at
+        // the bank (above the 1000 saldo floor), and a gift is not job income.
+        var wallet = new DriverWallet(new DriverState(100.0, 0.0));
+
+        wallet.AddBankGift(500.0);
+
+        Assert.Equal(1500.0, wallet.BankBalance);
+        Assert.Equal(100.0, wallet.Cash);
+        Assert.Equal(0.0, wallet.CreditEarned);
+        wallet.AddBankGift(double.NaN);
+        wallet.AddBankGift(-5.0);
+        Assert.Equal(1500.0, wallet.BankBalance);
+    }
+
+    [Fact]
     public void TrySpend_MovesCashOrRefuses()
     {
         // Unity's buy gate (CarDealerScreen.OnBuyClicked): a short wallet

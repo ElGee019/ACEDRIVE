@@ -61,6 +61,26 @@ public sealed class WalletScreenViewModelTests
     }
 
     [Fact]
+    public void Refresh_RepaintsTheFiguresTheWalletMovedWhileThePageWasAway()
+    {
+        // The panel hands a crash-interrupted page back as the same instance,
+        // so the page re-reads the wallet: the repair behind the broker page
+        // charged the bill, and the CR line cannot keep the saldo it opened on.
+        var wallet = new DriverWallet(new DriverState(300.0, 12.0, Bank: 1500.0));
+        var vm = NewViewModel(wallet);
+        Assert.Equal("CR300.00", vm.CashAmount);
+
+        wallet.ChargeInFull(250.0);
+        wallet.AddXp(3.0);
+
+        vm.Refresh();
+
+        Assert.Equal("CR50.00", vm.CashAmount);
+        Assert.Equal("XP15.00", vm.XpAmount);
+        Assert.Equal("CR1500.00", vm.BankAmount); // untouched by the charge
+    }
+
+    [Fact]
     public void BackCommand_RunsTheInjectedOne_AndStopsFollowingTheBoard()
     {
         var rivals = new FakeRivals();

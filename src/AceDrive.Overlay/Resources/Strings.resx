@@ -135,6 +135,8 @@
   <data name="PreferencesTitle" xml:space="preserve"><value>SET UP ACEDRIVE</value></data>
   <data name="PreferencesUnits" xml:space="preserve"><value>DISTANCE UNIT</value></data>
   <data name="PreferencesLanguage" xml:space="preserve"><value>LANGUAGE</value></data>
+  <data name="PreferencesCall" xml:space="preserve"><value>CHANGE CALL MAIN SHORTCUT</value></data>
+  <data name="PreferencesCallPrompt" xml:space="preserve"><value>PRESS A KEY OR BUTTON</value></data>
   <data name="PreferencesContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="PreferencesBack" xml:space="preserve"><value>BACK</value></data>
   <!-- Settings entry only: leaves the overlay (the window's own close path). -->
@@ -316,7 +318,7 @@ For instance "{0}".</value></data>
   <data name="RewardPickerGlovebox" xml:space="preserve"><value>Glove compartment cards: {0}/{1}</value></data>
   <data name="RewardPickerStored" xml:space="preserve"><value>{0} is now in your glove compartment.</value></data>
   <data name="RewardPickerSlotAdded" xml:space="preserve"><value>One more glove compartment slot: {0} cards fit now.</value></data>
-  <data name="RewardPickerCash" xml:space="preserve"><value>The bonus is in your cash: {0:0} CR.</value></data>
+  <data name="RewardPickerBank" xml:space="preserve"><value>The bonus is in your bank account: {0:0} CR.</value></data>
   <data name="RewardPickerFull" xml:space="preserve"><value>Your glove compartment is full. Take the other reward, or continue.</value></data>
   <data name="DeliveryTitle" xml:space="preserve"><value>DELIVERY JOB</value></data>
   <data name="DeliveryCredP" xml:space="preserve"><value>Credibility Points: {0}</value></data>
@@ -835,7 +837,7 @@ Accept this job?</value></data>
        brand the mic listens for, in caps; {{BRAND}} stays a literal token so
        the player sees the pattern, not one car only. -->
   <data name="MenuVoiceWake" xml:space="preserve"><value>To call this screen while driving say "Hey {{BRAND}}". For instance "Hey {0}".</value></data>
-  <data name="MenuVoiceHotkey" xml:space="preserve"><value>You can also press CTRL+Shift+C.</value></data>
+  <data name="MenuVoiceHotkey" xml:space="preserve"><value>You can also press {0}.</value></data>
   <data name="MenuMeterPercent" xml:space="preserve"><value>{0}%</value></data>
   <!-- Cento Miglia start-line registration check (PORTPLAN 49, Unity
        RegisterScreen). The prompt, the selected-number line and the two refusal
@@ -936,6 +938,9 @@ Valuation depends on Price, Top speed, Power, Finished jobs, Engine health and L
   <data name="ValuationClass" xml:space="preserve"><value>{0}</value></data>
   <data name="ValuationLeaderboard" xml:space="preserve"><value>{0:0.##}</value></data>
   <data name="HudValuationDrive" xml:space="preserve"><value>Drive to {0}: {1} {2}, {3} to enter your vehicle into the weekly tier-ranking showcase.</value></data>
+  <!-- The venue's arrival line: parked on the house, the companion invites the
+       showcase with the jury's own framing before the ENTER button. -->
+  <data name="HudValuationArrived" xml:space="preserve"><value>Let's see what the jury has to say</value></data>
   <data name="ValuationNoticeWin" xml:space="preserve"><value>You won a Valuation event against {0} and received {1:0.000}XP</value></data>
   <data name="ValuationNoticeLoss" xml:space="preserve"><value>You just lost a Valuation Event against {0} (+{1:0.00} XP).</value></data>
   <data name="ValuationOfflineSummary" xml:space="preserve"><value>While you were away you won {0} Valuation events and gained {1:0.000} XP</value></data>

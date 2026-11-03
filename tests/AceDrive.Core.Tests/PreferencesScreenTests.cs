@@ -1,5 +1,6 @@
 using System.Globalization;
 using AceDrive.Core;
+using AceDrive.Overlay.Localization;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
@@ -11,9 +12,10 @@ public sealed class PreferencesScreenTests
         List<PlayerPreferences> changed, Action done,
         PlayerPreferences? current = null,
         string doneLabelKey = "PreferencesContinue",
-        string? voiceDoneLabel = null) =>
+        string? voiceDoneLabel = null,
+        ICallBinder? callBinder = null) =>
         new(current ?? PlayerPreferences.Default, changed.Add, done,
-            doneLabelKey, voiceDoneLabel);
+            doneLabelKey, voiceDoneLabel, callBinder: callBinder);
 
     [Fact]
     public void Defaults_AreKilometresAndEnglish()
@@ -72,6 +74,103 @@ public sealed class PreferencesScreenTests
         vm.ContinueCommand.Execute(null);
 
         Assert.True(done);
+    }
+
+    [Fact]
+    public void CallButton_WithoutAListener_StaysHidden()
+    {
+        // A headless page (no platform input) must not offer an assignment that
+        // could never answer.
+        var vm = Create([], () => { });
+
+        Assert.False(vm.CanAssignCall);
+    }
+
+    [Fact]
+    public void AssigningACall_ListensAndThenSavesTheCapturedInput()
+    {
+        var fake = new FakeCallInput();
+        var changed = new List<PlayerPreferences>();
+        var vm = Create(changed, () => { }, callBinder: fake);
+
+        Assert.Equal(Strings.Get("PreferencesCall"), vm.CallLabel);
+        vm.AssignCallCommand.Execute(null);
+
+        Assert.True(fake.Capturing);
+        Assert.Equal(Strings.Get("PreferencesCallPrompt"), vm.CallLabel);
+        Assert.True(vm.IsAssigningCall);
+
+        var button = new CallBinding(
+            CallBindingKind.HidButton, 3, CallModifiers.None, "Button 3", "VID_046D&PID_C24F");
+        fake.Deliver(button);
+
+        Assert.False(fake.Capturing);
+        Assert.False(vm.IsAssigningCall);
+        // The button names its job; the menu line is what names the input.
+        Assert.Equal(Strings.Get("PreferencesCall"), vm.CallLabel);
+        Assert.Equal(
+            new PlayerPreferences(MileageUnit.Kilometres, UiLanguage.English) { Call = button },
+            Assert.Single(changed));
+    }
+
+    [Fact]
+    public void CancellingTheAssignment_PutsTheArmedCallBackAndKeepsIt()
+    {
+        var fake = new FakeCallInput();
+        var changed = new List<PlayerPreferences>();
+        var vm = Create(changed, () => { }, callBinder: fake);
+
+        vm.AssignCallCommand.Execute(null);
+        fake.Deliver(null);
+
+        Assert.False(vm.IsAssigningCall);
+        Assert.Equal(Strings.Get("PreferencesCall"), vm.CallLabel);
+        Assert.Empty(changed);
+    }
+
+    [Fact]
+    public void SecondTap_CancelsTheListeningInsteadOfRestartingIt()
+    {
+        var fake = new FakeCallInput();
+        var vm = Create([], () => { }, callBinder: fake);
+
+        vm.AssignCallCommand.Execute(null);
+        vm.AssignCallCommand.Execute(null);
+
+        Assert.False(fake.Capturing);
+        Assert.False(vm.IsAssigningCall);
+    }
+
+    [Fact]
+    public void LanguageChange_KeepsTheAssignedCall()
+    {
+        // The call rides on every preferences write: picking another language
+        // after assigning a wheel button must not drop the binding.
+        var fake = new FakeCallInput();
+        var changed = new List<PlayerPreferences>();
+        var vm = Create(changed, () => { }, callBinder: fake);
+        var pad = new CallBinding(
+            CallBindingKind.PadButton, 13, CallModifiers.None, "A", null);
+        vm.AssignCallCommand.Execute(null);
+        fake.Deliver(pad);
+
+        vm.SelectedLanguage = vm.LanguageOptions[1];
+
+        Assert.Equal(pad, changed[^1].Call);
+        Assert.Equal(UiLanguage.Dutch, changed[^1].Language);
+    }
+
+    [Fact]
+    public void LeavingThePage_StopsListening()
+    {
+        // A page left mid-capture would keep the global call disarmed.
+        var fake = new FakeCallInput();
+        var vm = Create([], () => { }, callBinder: fake);
+
+        vm.AssignCallCommand.Execute(null);
+        vm.ContinueCommand.Execute(null);
+
+        Assert.False(fake.Capturing);
     }
 
     [Fact]

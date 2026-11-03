@@ -41,6 +41,17 @@ public sealed class JsonPreferencesStore : IPreferencesStore
             return PlayerPreferences.Default;
         }
 
+        // WHY the binding guard: a call the listener cannot arm (no code, no
+        // label, an unknown kind) would leave the panel unreachable by input,
+        // so that one field falls back to the shipped chord while the answered
+        // units and language are kept.
+        if (preferences.Call is { } call && !call.IsUsable)
+        {
+            _log.LogWarning(
+                $"preferences.json carries an unusable call binding at {_file}; using the default chord");
+            return preferences with { Call = null };
+        }
+
         return preferences;
     }
 

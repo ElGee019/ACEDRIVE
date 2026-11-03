@@ -327,7 +327,10 @@ internal static class TestSession
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
             willyFlow, willyLedgerInstance, careFlow, roadTestFlow, touristenFlow,
             weeklyEventsInstance, calendarGate,
-            () => brands.Brand, new Random(6), logger, options.IgnoreEventGates);
+            () => brands.Brand,
+            () => options.CallInput?.Label ?? CallBinding.Default.Label,
+            new Random(6), logger,
+            options.IgnoreEventGates);
         // The panel policy and the two hosts the coordinator used to assemble:
         // the production root builds them in this same order.
         var panel = new PanelPresenter(
@@ -344,7 +347,8 @@ internal static class TestSession
             options.Culture ?? new FakeCultureService(), beat, options.Hud, garageInstance,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => brands.Brand,
             logger, new StoryHost(panel, navigation, saver, rivalsInstance, todoBoard),
-            voiceInstance.StartListening, voiceInstance.StopListening);
+            voiceInstance.StartListening, voiceInstance.StopListening,
+            options.CallInput, options.CallInput);
         var voiceRouter = new VoiceRouter(
             panel, brands, contentSource, clock, logger, options.Hud);
         var vm = new MainViewModel(

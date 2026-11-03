@@ -30,6 +30,9 @@ public partial class MainWindow : Window
 
     private readonly MainViewModel _vm;
     private readonly ILog _log;
+    // The call input: this window owns the HWND and its messages, the service
+    // owns the hotkey, the raw devices and the assignment listener.
+    private readonly IWindowInput _callInput;
     // The placement gate: a finished introduction may restore its saved window
     // size. It is the story flow's fact, read by the root at construction, so
     // the VM does not forward it.
@@ -42,11 +45,12 @@ public partial class MainWindow : Window
     private int _hideTicks;
     private EventHandler? _hideTick;
 
-    public MainWindow(MainViewModel vm, ILog log, bool introDone)
+    public MainWindow(MainViewModel vm, ILog log, bool introDone, IWindowInput callInput)
     {
         _vm = vm;
         _log = log;
         _introDone = introDone;
+        _callInput = callInput;
         DataContext = vm;
         InitializeComponent();
         TryApplyBackdrop(log);
@@ -71,21 +75,17 @@ public partial class MainWindow : Window
         }
 
 
-        // Hotkey must be wired BEFORE anything can create the handle:
+        // The call input must be wired BEFORE anything can create the handle:
         // SourceInitialized fires exactly once, when the HwndSource is born.
         // ApplyShown() further down (and App.Show() after this ctor) creates
         // it immediately on voice-less starts — subscribing any later means
-        // the event already fired and RegisterHotKey never runs at all, not
-        // even to fail and log. Hidden starts are covered by EnsureHandle().
+        // the event already fired and the hotkey never gets registered at all,
+        // not even to fail and log. Hidden starts are covered by EnsureHandle().
         SourceInitialized += (_, _) =>
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
-            if (!Native.RegisterHotKey(hwnd, Native.HOTKEY_ID,
-                Native.MOD_CONTROL | Native.MOD_SHIFT, Native.VK_C))
-            {
-                _log.LogWarning("hotkey Ctrl+Shift+C not registered; use the wake word");
-            }
+            _callInput.Attach(hwnd, () => _vm.ToggleShowCommand.Execute(null));
         };
         // WHY: App only calls Show() when the VM wants the window visible at
         // boot, and a hidden WPF window has no HwndSource — so a wake-word
@@ -119,17 +119,7 @@ public partial class MainWindow : Window
         Closed += (_, _) =>
         {
             DetachHideTick();
-            try
-            {
-                var hwnd = new WindowInteropHelper(this).Handle;
-                Native.UnregisterHotKey(hwnd, Native.HOTKEY_ID);
-            }
-            catch (InvalidOperationException)
-            {
-                // WHY: the HWND may already be gone at Closed; WPF then
-                // refuses the Handle lookup. The hotkey dies with the
-                // process anyway — placement save below must still run.
-            }
+            _callInput.Detach();
             _vm.SavePlacement(new WindowBounds(
                 Left, Top, Width, Height, WindowBounds.CurrentVersion));
             // A reset already deleted the save files and is starting a fresh
@@ -323,9 +313,10 @@ public partial class MainWindow : Window
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
-        if (msg == Native.WM_HOTKEY && wParam.ToInt32() == Native.HOTKEY_ID)
+        // The call input: raw reports only. They are never marked handled, so
+        // the press still reaches the game and DefWindowProc alike.
+        if (_callInput.HandleWindowMessage(msg, wParam, lParam))
         {
-            _vm.ToggleShowCommand.Execute(null);
             handled = true;
         }
         else if (msg == Native.WM_ENTERSIZEMOVE)

@@ -185,7 +185,7 @@ public sealed class MenuScreenViewModelTests
             new RelayCommand(() => { }),
             new RelayCommand(() => { }),
             new Hunger(HungerRules.Default), new Garage([]),
-            () => MazdaBrand,
+            () => MazdaBrand, () => CallBinding.Default.Label,
             new VoiceBeat(clock),
             new GameClock(clock, clock.UtcNow),
             clock,
@@ -239,6 +239,24 @@ public sealed class MenuScreenViewModelTests
         var (vm, _, _) = NewViewModel(brand: () => "");
 
         Assert.Equal("", vm.VoiceWakeText);
+    }
+
+    [Fact]
+    public void CallReminder_NamesTheInputTheSetupPageAssigned()
+    {
+        // The menu is cached, so a rebind made on the setup page has to reach
+        // the reminder through the poll instead of freezing the shipped chord.
+        string call = CallBinding.Default.Label;
+        var (vm, _, _) = NewViewModel(call: () => call);
+        List<string?> raised = [];
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        call = "Button 3";
+        vm.Refresh();
+
+        Assert.Contains("Button 3", vm.VoiceHotkeyText, StringComparison.Ordinal);
+        Assert.DoesNotContain("CTRL+Shift+C", vm.VoiceHotkeyText, StringComparison.Ordinal);
+        Assert.Contains(nameof(MenuScreenViewModel.VoiceHotkeyText), raised);
     }
 
     [Fact]
@@ -446,7 +464,8 @@ public sealed class MenuScreenViewModelTests
     private static (MenuScreenViewModel Vm, FakeClock Clock, VoiceBeat Beat) NewViewModel(
         Action? wallet = null, Action? jobs = null, Action? calendar = null, Action? trunk = null,
         Action? settings = null, Action? home = null,
-        Hunger? hunger = null, Garage? garage = null, Func<string>? brand = null)
+        Hunger? hunger = null, Garage? garage = null, Func<string>? brand = null,
+        Func<string>? call = null)
     {
         var clock = new FakeClock();
         var beat = new VoiceBeat(clock);
@@ -460,6 +479,7 @@ public sealed class MenuScreenViewModelTests
             hunger ?? new Hunger(HungerRules.Default),
             garage ?? new Garage([]),
             brand ?? (() => MazdaBrand),
+            call ?? (() => CallBinding.Default.Label),
             beat,
             new GameClock(clock, clock.UtcNow),
             clock,

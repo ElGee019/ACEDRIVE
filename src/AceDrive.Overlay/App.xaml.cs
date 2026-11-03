@@ -630,6 +630,8 @@ public partial class App : Application, IDisposable
         var careFlow = new CarePackageFlow(
             poiDirectory, carePackages, careReward, addressMap, hud,
             () => saver.SaveDriver(rivals.LastResult), beat, _log);
+        var callInput = new CallInput(_log, wall);
+        callInput.Arm(preferences.Call);
         var navigation = new Navigation(
             shell, beat, game, wall, shift, todoBoard, roadTests, saver,
             driver, garage, rivals, zoneStandings, trunk, hunger, storeCatalog,
@@ -639,8 +641,11 @@ public partial class App : Application, IDisposable
             valuationFlow, willyFlow, willyLedger, careFlow, roadTestFlow, touristen,
             weeklyEvents, calendarGate,
             // The Cento Miglia registration draw: a page-local number, seeded
-            // off the same launch seed the other draws use.
-            () => carBrands.Brand, new Random(taxiSeed + 6), _log);
+            // off the same launch seed the other draws use. The menu's call
+            // line reads the armed input live, so a rebind on the setup page
+            // reaches the cached menu without building it again.
+            () => carBrands.Brand, () => callInput.Binding.Label,
+            new Random(taxiSeed + 6), _log);
         // The mic is built by the root and handed to both sides that need it:
         // the coordinator owns its session lifecycle, the story flow only gets
         // the two verbs the consent page's answer needs, and the panel hands it
@@ -665,7 +670,10 @@ public partial class App : Application, IDisposable
             preferencesStore, preferences, culture, beat, hud, garage,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => carBrands.Brand,
             _log, new StoryHost(panel, navigation, saver, rivals, todoBoard),
-            voice.StartListening, voice.StopListening);
+            voice.StartListening, voice.StopListening,
+            // The setup page listens for the call through the binder, and its
+            // preferences write re-arms the same service through the armer.
+            callBinder: callInput, callArmer: callInput);
         // Voice dispatch: the wake word and the button taps, on the same panel
         // and content tables the screens use.
         var voiceRouter = new VoiceRouter(panel, carBrands, content, wall, _log, hud);
@@ -697,7 +705,7 @@ public partial class App : Application, IDisposable
             hud,
             saveResets, restarter, quit);
 
-        MainWindow = new MainWindow(vm, _log, story.Done);
+        MainWindow = new MainWindow(vm, _log, story.Done, callInput);
         // The 200 px companion: own placement file, width follows the main
         // panel, and it outlives the main window's hide/show because it is a
         // separate top-level window. Its VM keeps it hidden through the
