@@ -1,0 +1,10 @@
+{
+  "StartPricePerLitre": 1.65,
+  "DailyChangeMin": -0.15,
+  "DailyChangeMax": 0.15,
+  "MinPricePerLitre": 1.40,
+  "MaxPricePerLitre": 2.20,
+  "MinFillLitres": 0.5,
+  "SettleSeconds": 1.5,
+  "OwnerName": "Rolf Brenner"
+}

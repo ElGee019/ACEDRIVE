@@ -425,14 +425,24 @@ public sealed class WhereIsWillyFlowTests
     {
         var hud = new FakeTelemetryHud();
         TestSessionResult session = Create(hud);
-        WhereIsWillyScreenViewModel search = Begin(session, hud);
+        // Finish the walk the normal way, then visit the career page before the
+        // run starts: a call now resumes the page it left, so the panel cannot
+        // be used to slip past the quest.
+        session.Story.FinishDialogue();
+        MainControlScreenViewModel control = OpenControl(session);
+        control.BackCommand.Execute(null); // the menu the calendar is opened from
+        hud.AtDestination = false;
+        OpenCalendar(session, finishIntro: false).DayCommand.Execute(4);
+        var search = Assert.IsType<WhereIsWillyScreenViewModel>(session.Vm.CurrentScreen);
 
-        // A pinned shop hides the panel and keeps the run live, so the call
-        // opens the menu; the career entry reads the same lock the shift does.
+        // A pinned shop hides the panel and keeps the run live; the career
+        // entry reads the same lock the shift does.
         search.SelectShopCommand.Execute(search.Shops[0]);
-        OpenControl(session).DeliveryCommand.Execute(null);
+        Assert.False(session.Vm.IsShown);
+        control.DeliveryCommand.Execute(null);
 
-        Assert.IsType<MainControlScreenViewModel>(session.Vm.CurrentScreen);
+        // The refusal leaves the quest page up and the run live: no career board.
+        Assert.Same(search, session.Vm.CurrentScreen);
         Assert.True(session.Willy.InFlight);
     }
 

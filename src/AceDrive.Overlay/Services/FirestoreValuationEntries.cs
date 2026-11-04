@@ -10,6 +10,10 @@ namespace AceDrive.Overlay.Services;
 /// </summary>
 public sealed class FirestoreValuationEntries
 {
+    // Stored as an invariant ISO-8601 string (FirebaseOptions.Timestamp), which
+    // is why the watcher's range read can compare it as text.
+    private const string EnteredAtField = "enteredAt";
+
     private readonly IFirestoreDatabase _db;
     private readonly Func<CancellationToken, Task<string?>> _uidAsync;
     private readonly IClock _clock;
@@ -28,6 +32,33 @@ public sealed class FirestoreValuationEntries
     public Task<IReadOnlyList<FirestoreDocument>?> ListAsync(
         CancellationToken cancellationToken = default) =>
         _db.ListAsync(FirestoreCollections.Valuation, cancellationToken);
+
+    /// <summary>
+    /// The entries that landed after the stamp, one bounded range read. This is
+    /// the watcher's read: an idle list answers no documents, and Firestore
+    /// bills per document returned, so polling nothing costs nothing.
+    /// WHY the stamp is compared as text: the push writes it as an invariant
+    /// ISO-8601 string, which sorts chronologically. A legacy doc carrying a
+    /// real timestamp field instead would not match this filter; the entry draw
+    /// and the restart catch-up still read it, so such a rival is paid late
+    /// rather than never.
+    /// </summary>
+    public Task<IReadOnlyList<FirestoreDocument>?> ListSinceAsync(
+        DateTime sinceUtc, CancellationToken cancellationToken = default) =>
+        _db.QueryTextAfterAsync(
+            FirestoreCollections.Valuation, EnteredAtField,
+            FirebaseOptions.Timestamp(sinceUtc), cancellationToken);
+
+    /// <summary>
+    /// Whether this player's entry is still on the list. Null means the read
+    /// could not be answered, so a network blip is never read as "gone".
+    /// </summary>
+    public Task<bool?> OwnEntryExistsAsync(
+        string uid, CancellationToken cancellationToken = default) =>
+        string.IsNullOrEmpty(uid)
+            ? Task.FromResult<bool?>(false)
+            : _db.ExistsAsync(
+                FirestoreCollections.Valuation + "/" + uid, cancellationToken);
 
     public async Task<bool> PushEntryAsync(
         string playerName, string carKey, int jobsWithCar,
@@ -117,7 +148,7 @@ public sealed class FirestoreValuationEntries
             ["jobsWithCar"] = Math.Max(0, jobsWithCar),
             ["engineBrokenPercent"] = Math.Clamp(engineBrokenPercent, 0.0, 1.0),
             ["score"] = Math.Max(0.0, score),
-            ["enteredAt"] = FirebaseOptions.Timestamp(now),
+            [EnteredAtField] = FirebaseOptions.Timestamp(now),
             ["expiresAt"] = ValuationRules.ComputeExpiryUtc(now),
         };
     }

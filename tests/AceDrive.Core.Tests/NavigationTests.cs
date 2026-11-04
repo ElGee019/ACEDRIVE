@@ -203,11 +203,32 @@ public sealed class NavigationTests
                 new FakeCarRarity(), rivals, beat, log),
             meter, TaxiRules.Default, beat, clock, TouristenRaceCalendar.None,
             new Random(0), log);
+        var employeeRoster = new EmployeeRoster(
+            new FakeEmployeeStore(), new Random(1));
+        var employeeJobs = new EmployeeJobBoard();
+        var employeeAssignments = new EmployeeAssignments(new FakeEmployeeJobStore());
+        var carShareJobs = new CarShareJobs(employeeAssignments, game);
+        var employeeRides = new EmployeeRides(
+            employeeAssignments, game, zoneInstance, new Random(0));
+        var employeeDeliveries = new EmployeeDeliveries(
+            employeeAssignments, game,
+            () => city.Live(board.Catalog.Stores), new Random(0));
+        var employeeDeliveryPayout = new EmployeeDeliveryPayout(
+            city, () => board.Catalog, glovebox, trunk);
+        var carShareRequests = new CarShareRequestPlanner(
+            zoneInstance,
+            new ResidentBook(
+                new FakeResidentStore(),
+                new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), log),
+            friends.GetLevel);
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
             trunk, glovebox, hunger, StoreCatalog.Default,
-            directory, null, board, career, city, taxi, delivery, haul, world, day,
+            directory, null, board, career, city, employeeRoster, employeeJobs,
+            employeeAssignments, carShareJobs, carShareRequests,
+            employeeRides, employeeDeliveries, employeeDeliveryPayout,
+            taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
             valuation, willy, care, roadTest, touristen, weeklyEvents, gate,
             () => "mazda", () => CallBinding.Default.Label, new Random(0), log, ignoreEventGates);
@@ -245,6 +266,22 @@ public sealed class NavigationTests
         menu.HomeCommand.Execute(null);
         var second = Assert.IsType<HomeScreenViewModel>(shell.CurrentScreen);
         Assert.NotSame(first, second);
+    }
+
+    [Fact]
+    public void EmployeesTile_OpensTheEmployeesPageAndBackReturnsToTheMenu()
+    {
+        var (nav, shell, _, _, _, _, _, _, _, _, _, _) = Create();
+
+        nav.ShowMenuPage();
+        var menu = Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen);
+
+        menu.EmployeesCommand.Execute(null);
+        var page = Assert.IsType<EmployeesScreenViewModel>(shell.CurrentScreen);
+        Assert.False(page.HasEmployees);
+
+        page.BackCommand.Execute(null);
+        Assert.Same(menu, shell.CurrentScreen);
     }
 
     [Fact]

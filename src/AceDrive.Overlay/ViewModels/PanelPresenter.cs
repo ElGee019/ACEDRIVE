@@ -4,7 +4,7 @@ using AceDrive.Overlay.Services;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The overlay panel's reveal policy: what a call opens, what revealing a POI,
+/// The overlay panel's reveal policy: what a call resumes, what revealing a POI,
 /// a job page or an interrupting page does to the panel, how an interruption
 /// hands the player back, what hiding means, and what the mic should listen
 /// for (a shown page hears its command words, a hidden one also feeds the wake
@@ -13,7 +13,7 @@ namespace AceDrive.Overlay.ViewModels;
 ///
 /// WHY it is not the coordinator's: the story flow and the voice router both
 /// reveal pages, and both are built by the root before the coordinator exists.
-/// One owner keeps the first-show rule, the mid-job call gate and the log lines
+/// One owner keeps the resume rule, the mid-job call gate and the log lines
 /// in a single place instead of spreading them over three hosts.
 /// </summary>
 public sealed class PanelPresenter
@@ -72,7 +72,8 @@ public sealed class PanelPresenter
     /// The single "the app was called" seam: the Ctrl+Shift+C hotkey and the
     /// wake word both land here. WHY the job gate: from ACCEPT to the receipt
     /// the HUD owns the screen and the mic, so a call mid-job would let the
-    /// player start a second job over the ride.
+    /// player start a second job over the ride. A call resumes the page the
+    /// player left: hiding pauses the overlay, it does not reset it.
     /// </summary>
     public void Show()
     {
@@ -88,20 +89,23 @@ public sealed class PanelPresenter
             return;
         }
 
-        bool firstShow = !_shell.HasBeenShown;
         _shell.SetShown(true);
         // The mic follows the panel: a shown page hears commands, a hidden one
         // only a wake word (see IVoiceListener.WakeListening).
         _voice.WakeListening = false;
-        // The first show of a hidden start reveals the page already built in
-        // the constructor (the resumed walk page, or the menu past the
-        // introduction); every later show opens the menu (Jobs leads to the
-        // control page) instead of resuming whatever page was last open. It
-        // rides the hidden -> shown edge only: a reveal while already visible
-        // must not yank the player off the page they are using.
-        if (firstShow && _shell.CurrentScreen is not null)
+
+        // A call hands back the page that was up when the overlay was hidden,
+        // refreshing it first: the wallet, the dents or a stock level may have
+        // moved while the player was driving. Only a session with no page yet
+        // opens the menu, so a call can never land on an empty panel.
+        if (_shell.CurrentScreen is { } screen)
         {
-            _log.LogInfo("overlay shown (first page)");
+            if (screen is IRefreshableScreen refreshable)
+            {
+                refreshable.Refresh();
+            }
+
+            _log.LogInfo("overlay shown (last page)");
             return;
         }
 
@@ -111,7 +115,8 @@ public sealed class PanelPresenter
 
     /// <summary>
     /// Reveals the panel on a POI page (entering a shop or a story dialogue).
-    /// The caller sets the page because Show() would open the menu instead.
+    /// The caller sets the page because Show() would resume whatever page was
+    /// up instead.
     /// </summary>
     public void Present(object screen) => Reveal(screen, "overlay shown (POI)");
 
@@ -147,6 +152,11 @@ public sealed class PanelPresenter
     {
         if (!_interruptedShown)
         {
+            // The panel stays down (the timeout caught the player driving), but
+            // the page underneath goes back to the one the report covered: a
+            // call resumes the page that was up when the panel was hidden, so
+            // the spent report must not stay as the way back in.
+            _nav.ShowScreen(_interruptedScreen);
             Hide();
             return;
         }
@@ -166,15 +176,16 @@ public sealed class PanelPresenter
             return;
         }
 
-        // Nothing was up (the panel's very first page): the menu is the page
-        // every later call opens, so that is where the player would have been.
+        // Nothing was up (the panel's very first page): the menu is the page a
+        // call opens when there is nothing to resume, so that is where the
+        // player would have been.
         _nav.ShowMenuPage();
     }
 
     /// <summary>
-    /// Shows the menu the finished introduction hands over to. It is the one
-    /// page a call also opens, so the tour ends on the page every later call
-    /// returns to.
+    /// Shows the menu the finished introduction hands over to: the page a call
+    /// opens when no other page was ever built, so the tour ends where the
+    /// player's first empty call would land.
     /// </summary>
     public void ShowMenu()
     {

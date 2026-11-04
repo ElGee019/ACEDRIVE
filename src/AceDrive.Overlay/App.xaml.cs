@@ -412,6 +412,12 @@ public partial class App : Application, IDisposable
         // Familiarity (PORTPLAN 45): one persisted level per resident, so a
         // restart reopens the same friendships instead of resetting them.
         var friendships = new JsonFriendshipStore(_log);
+        // The assign page's daily car-sharing batch (PORTPLAN 22): one seeded
+        // draw per game day over the resident table and the zone's doors, with
+        // the friendship levels the XP rule reads. The page only reads the
+        // plan, so the root owns the one instance.
+        var carShareRequests = new CarShareRequestPlanner(
+            zone, residents, friendships.GetLevel);
         // Brand mileage (PORTPLAN 35): lifetime km per driven brand behind
         // the receipt's sponsorship rate, resumed across sessions.
         var brands = new JsonBrandMileageStore(_log);
@@ -480,6 +486,30 @@ public partial class App : Application, IDisposable
         // flow declines the tap from then on.
         var employeeRoster = new EmployeeRoster(
             new JsonEmployeeStore(_log), new Random(taxiSeed + 16));
+        // The employees page's finished-job marks: session state until the
+        // employee job flows land and can settle real work into it.
+        var employeeJobs = new EmployeeJobBoard();
+        // The employees page's on-job marks: which employee is on which work
+        // family, banked in its own file so a restart reopens the crew at work.
+        // The roster owns employees.json, so this one may not share that file.
+        var employeeAssignments =
+            new EmployeeAssignments(new JsonEmployeeJobStore(_log));
+        // The crew's car-sharing work: the day's batch shapes the shift when the
+        // town booked rides, and a quiet day leaves the employee waiting for the
+        // next nightly schedule instead of arriving for work nobody did.
+        var carShareJobs = new CarShareJobs(employeeAssignments, game);
+        // The crew's work outside car sharing (Unity EmployeeService): a taxi
+        // job is a house-to-house ride timed by its drive plus the handling
+        // block and paid by distance, while a delivery is a 24-hour store
+        // refill paid per unit it adds. Each service gets its own seeded stream
+        // so these draws never reshuffle the town's other ones.
+        var employeeRides = new EmployeeRides(
+            employeeAssignments, game, zone, new Random(taxiSeed + 17));
+        var employeeDeliveries = new EmployeeDeliveries(
+            employeeAssignments, game,
+            () => city.Live(deliveryBoard.Catalog.Stores), new Random(taxiSeed + 18));
+        var employeeDeliveryPayout = new EmployeeDeliveryPayout(
+            city, () => deliveryBoard.Catalog, glovebox, trunk);
         var communityCentre = new CommunityCentreInteriors(
             employeeRoster, residents, poiDirectory, zone, poiGenerator,
             friendships, () => dayCycle.DisplayWeek, beat, _log);
@@ -562,6 +592,16 @@ public partial class App : Application, IDisposable
         var breakdowns = new TripBreakdowns(
             new BreakdownStrategy(maintenanceRules, Environment.TickCount),
             garage, onboardingStore, driver, rivals, saver, beat, _log);
+        // The fuel receipt (PORTPLAN item 37): EVO's own pump moves the tank, so
+        // the overlay only prices the fill — Unity's CR/L, its midnight drift
+        // (own seeded stream, offset from the other launch draws) and the
+        // persisted price, so a restart continues the same curve.
+        FuelRules fuelRules = new JsonFuelRules(_log).Load();
+        var fuelPrices = new JsonFuelPriceStore(_log);
+        var fuel = new FuelFlow(
+            new FuelMarket(fuelRules, fuelPrices.Load(), game.GameDay, taxiSeed + 19),
+            new FuelFillTracker(fuelRules), fuelRules, game, garage, onboardingStore,
+            friendships, driver, glovebox, trunk, saver, rivals, fuelPrices, beat, _log);
         // The taxi job from proposal to receipt; the shell attaches itself as
         // its host right after construction.
         var taxi = new TaxiJobFlow(
@@ -661,6 +701,9 @@ public partial class App : Application, IDisposable
             shell, beat, game, wall, shift, todoBoard, roadTests, saver,
             driver, garage, rivals, zoneStandings, trunk, glovebox, hunger, storeCatalog,
             poiDirectory, hud, deliveryBoard, deliveryCareer, city,
+            employeeRoster, employeeJobs, employeeAssignments,
+            carShareJobs, carShareRequests,
+            employeeRides, employeeDeliveries, employeeDeliveryPayout,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
             valuationFlow, willyFlow, careFlow, roadTestFlow, touristen,
@@ -724,7 +767,7 @@ public partial class App : Application, IDisposable
             trunk,
             rivals,
             garage,
-            catchUp, zoneGrowth, saver, fleet, settlement, shell, panel, story, voiceRouter,
+            catchUp, zoneGrowth, saver, fleet, fuel, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             careFlow, roadTestFlow, touristen,
             navigation, readouts, dayCycle,

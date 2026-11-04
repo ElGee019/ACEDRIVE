@@ -28,10 +28,15 @@ internal sealed class FakeValuationBoard : IValuationBoard
 
     public bool Watching { get; private set; }
 
+    /// <summary>The stamp the flow started the watcher from.</summary>
+    public DateTime? WatchedSince { get; private set; }
+
     public List<(string PlayerName, string CarKey, int Jobs, double Broken, double Score)> Pushes
     { get; } = [];
 
     public event Action<IReadOnlyList<ValuationEntry>>? Changed;
+
+    public event Action? OwnEntryMissing;
 
     public Task<IReadOnlyList<ValuationEntry>?> ListAsync(
         CancellationToken cancellationToken = default)
@@ -55,14 +60,18 @@ internal sealed class FakeValuationBoard : IValuationBoard
         return Task.FromResult(true);
     }
 
-    public void StartWatching() => Watching = true;
+    public void StartWatching(DateTime sinceUtc)
+    {
+        WatchedSince = sinceUtc;
+        Watching = true;
+    }
 
     public void StopWatching() => Watching = false;
 
-    /// <summary>Lands a snapshot the way the background watcher does.</summary>
-    public void RaiseChanged(IReadOnlyList<ValuationEntry> entries)
-    {
-        Entries = entries;
+    /// <summary>Lands a batch of newcomers the way the background watcher does.</summary>
+    public void RaiseChanged(IReadOnlyList<ValuationEntry> entries) =>
         Changed?.Invoke(entries);
-    }
+
+    /// <summary>The backend reported the own doc gone from the list.</summary>
+    public void RaiseOwnEntryMissing() => OwnEntryMissing?.Invoke();
 }

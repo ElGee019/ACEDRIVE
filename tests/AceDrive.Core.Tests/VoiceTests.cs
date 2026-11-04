@@ -106,12 +106,16 @@ public sealed class VoiceTests
         return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
-    // A call lands on the menu page; its Calendar tile opens the cached
-    // calendar page, the same tap the player makes.
+    // A call resumes the page it left; only a menu under it needs the tile.
     private static CalendarScreenViewModel ShowCalendar(MainViewModel vm)
     {
         vm.Show();
         Assert.True(vm.IsShown);
+        if (vm.CurrentScreen is CalendarScreenViewModel open)
+        {
+            return open;
+        }
+
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         menu.CalendarCommand.Execute(null);
         return Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
@@ -328,9 +332,9 @@ public sealed class VoiceTests
     [Fact]
     public void IntroWalk_IgnoresTheIdleCountdown()
     {
-        // Hiding a walk page would skip the introduction (the next call opens
-        // the menu, not that page), so the countdown never starts before the
-        // birthday hand-over.
+        // Hiding a walk page must not end the introduction: the countdown never
+        // starts before the birthday hand-over, so the page the player answers
+        // stays up until they do.
         var (vm, clock, _, _) = Create(voice: false);
         Assert.IsType<PreferencesScreenViewModel>(vm.CurrentScreen);
 
@@ -396,7 +400,7 @@ public sealed class VoiceTests
         // Voice control is user input: a fired command restarts the 15 s
         // auto-hide window, exactly like a click.
         var (vm, clock, mic, _) = CreateIntroduced();
-        ShowControl(vm); // a call lands on the menu, Jobs on the career page
+        ShowControl(vm); // the menu is up; Jobs opens the career page
 
         clock.Advance(TimeSpan.FromSeconds(14));
         mic.Fire("start taxi shift"); // control-page voice button fires -> activity at t=14
@@ -882,9 +886,10 @@ public sealed class VoiceTests
     {
         // Calling the app with the wake word opens the intro the first time;
         // the birthday hand-over closes the panel for the guided tour, and
-        // the next wake opens the menu page. The tour is still the
-        // introduction, so that page waits there instead of counting itself
-        // away; the wake after the player hides it returns on the same page.
+        // the next wake resumes the menu page already built under it. The tour
+        // is still the introduction, so that page waits there instead of
+        // counting itself away; the wake after the player hides it returns on
+        // the same page.
         var session = Create();
         var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
@@ -924,8 +929,10 @@ public sealed class VoiceTests
         var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
         var control = ToControlPage(session);
+        control.BackCommand.Execute(null); // the menu the call resumes
+        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         vm.ToggleShowCommand.Execute(null); // hide
-        vm.ToggleShowCommand.Execute(null); // call it back: the menu page
+        vm.ToggleShowCommand.Execute(null); // call it back: the same menu
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         mic.Fire("jobs");
@@ -945,9 +952,9 @@ public sealed class VoiceTests
         var session = Create();
         var (vm, clock, mic, _) = session;
         mic.Fire("hey mazda");
-        ToControlPage(session);
+        ToControlPage(session).BackCommand.Execute(null); // the menu
         vm.ToggleShowCommand.Execute(null); // hide
-        vm.ToggleShowCommand.Execute(null); // call it back: the menu page
+        vm.ToggleShowCommand.Execute(null); // call it back: the same menu
         Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         mic.Fire("settings");
@@ -1015,7 +1022,7 @@ public sealed class VoiceTests
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
-        ShowCalendar(vm); // a call lands on the menu; open the calendar again
+        ShowCalendar(vm); // a call resumes the calendar that was up
         mic.Fire("where is willie");
         // Willy is DayOfWeek 4: a Wednesday.
         CalendarRow willyDay = Assert.Single(calendar.Days, d => d.DayLabel == "Wednesday");
@@ -1023,7 +1030,7 @@ public sealed class VoiceTests
 
         clock.Advance(TimeSpan.FromMinutes(212)); // ~4 more game days: Sunday
         vm.Poll();
-        ShowCalendar(vm); // a call lands on the menu; open the calendar again
+        ShowCalendar(vm); // a call resumes the calendar that was up
         mic.Fire("chant amelia");
         CalendarRow sunday = Assert.Single(calendar.Days, d => d.DayLabel == "Sunday");
         Assert.True(sunday.Flash);
@@ -1167,7 +1174,7 @@ public sealed class VoiceTests
 
         clock.Advance(TimeSpan.FromMinutes(106)); // ~2 game days: Wednesday
         vm.Poll();
-        ShowCalendar(vm); // a call lands on the menu; open the calendar again
+        ShowCalendar(vm); // a call resumes the calendar that was up
         mic.Fire("where is"); // partial: alias fires
         mic.Fire("where is willy", isFinal: true); // final: same tap, muted
 

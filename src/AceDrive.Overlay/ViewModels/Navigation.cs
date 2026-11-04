@@ -50,6 +50,17 @@ public sealed class Navigation
     private readonly DeliveryBoard _board;
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
+    // The hired crew and the finished-job flags the employees page paints.
+    // The crew is the same roster the community centre hires into, so a hire
+    // shows up on both pages without a second copy.
+    private readonly EmployeeRoster _employeeRoster;
+    private readonly EmployeeJobBoard _employeeJobs;
+    private readonly EmployeeAssignments _employeeAssignments;
+    private readonly CarShareJobs _carShareJobs;
+    private readonly CarShareRequestPlanner _carShareRequests;
+    private readonly EmployeeRides _employeeRides;
+    private readonly EmployeeDeliveries _employeeDeliveries;
+    private readonly EmployeeDeliveryPayout _employeeDeliveryPayout;
 
     // The collaborators these pages belong to: the proposal page and the board
     // are theirs, the doors behind a delivery stop are the world's, and the
@@ -183,6 +194,11 @@ public sealed class Navigation
         Trunk trunk, Glovebox glovebox, Hunger hunger, StoreCatalog stores,
         PoiDirectory directory, ITelemetryHud? hud,
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
+        EmployeeRoster employeeRoster, EmployeeJobBoard employeeJobs,
+        EmployeeAssignments employeeAssignments, CarShareJobs carShareJobs,
+        CarShareRequestPlanner carShareRequests,
+        EmployeeRides employeeRides, EmployeeDeliveries employeeDeliveries,
+        EmployeeDeliveryPayout employeeDeliveryPayout,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
@@ -213,6 +229,14 @@ public sealed class Navigation
         _board = board;
         _career = career;
         _city = city;
+        _employeeRoster = employeeRoster;
+        _employeeJobs = employeeJobs;
+        _employeeAssignments = employeeAssignments;
+        _carShareJobs = carShareJobs;
+        _carShareRequests = carShareRequests;
+        _employeeRides = employeeRides;
+        _employeeDeliveries = employeeDeliveries;
+        _employeeDeliveryPayout = employeeDeliveryPayout;
         _taxi = taxi;
         _delivery = delivery;
         _haul = haul;
@@ -776,6 +800,7 @@ public sealed class Navigation
             ControlCommand,
             new RelayCommand(OpenCalendar),
             new RelayCommand(OpenTrunk),
+            new RelayCommand(OpenEmployees),
             new RelayCommand(_host.ShowSettings),
             new RelayCommand(OpenHome),
             _hunger, _garage, _carBrand, _callLabel,
@@ -787,6 +812,72 @@ public sealed class Navigation
         _menu.IsCalendarEventPlayable = _day.EventPlayable;
         return _menu;
     }
+
+    // The employees page (PORTPLAN 23, the menu's EMPLOYEES tile): the hired
+    // crew only. Each row's NOT ON JOB button opens the assign page for that
+    // employee; ON JOB text shows while they are on one, and ARRIVED once a
+    // timed job's due minute passed. The player's own car and every running job
+    // take a car, so an idle row only offers the button while the garage has an
+    // unused one. A fresh page per visit, so a hire and an assignment are both
+    // live. The page arms a car-sharing row that is still waiting for work from
+    // the day's batch, so it needs the planner's batch.
+    private void OpenEmployees()
+    {
+        ShowScreen(new EmployeesScreenViewModel(
+            _employeeRoster, _garage, _employeeAssignments, _carShareJobs,
+            _employeeDeliveryPayout,
+            CarShareRequestsToday, _game, _clock, BankEmployeeXp, BankEmployeeCr,
+            new ParameterizedCommand<string>(OpenAssignJob),
+            MenuCommand, _beat,
+            // TEMP: car gate off while the assign flow is tested on a one-car
+            // save. Drop this argument to restore the rule.
+            enforceUnusedCars: false));
+    }
+
+    // The assign-a-job page a NOT ON JOB button opens: three work-family buttons
+    // plus BACK. A fresh page per employee, carrying that employee's name so a
+    // pick assigns the right one. BACK (with or without a pick) returns to a
+    // fresh employees page, where the row now reads ON JOB after an assignment.
+    private void OpenAssignJob(string? employeeName)
+    {
+        if (string.IsNullOrWhiteSpace(employeeName))
+        {
+            return;
+        }
+
+        ShowScreen(new AssignJobScreenViewModel(
+            employeeName, _employeeRides, _employeeDeliveries, _carShareJobs,
+            _employeeJobs, CarShareRequestsToday(),
+            new RelayCommand(OpenEmployees), _beat));
+    }
+
+    // The employees page's ARRIVED tap banks the job's XP into the driver file
+    // through the same saver the other settles use, so a restart keeps it.
+    private void BankEmployeeXp(double xp)
+    {
+        _wallet.AddXp(xp);
+        _saver.SaveDriver(_rivals.LastResult);
+    }
+
+    // The flat-pay families (taxi, delivery) return CR: the wallet books it as
+    // earned income, so the "earn CR" reading counts it the way a settled job
+    // does, and the driver file saves it on the same tap.
+    private void BankEmployeeCr(double cr)
+    {
+        _wallet.AddBonus(cr);
+        _saver.SaveDriver(_rivals.LastResult);
+    }
+
+    // The day's car-sharing batch the assign page shows above the CAR SHARING
+    // button. The planner owns the draw; this site only supplies the town's
+    // live facts (population, the car being driven, the driver's XP), so the
+    // page never reaches for another service.
+    private IReadOnlyList<CarShareRequest> CarShareRequestsToday() =>
+        _carShareRequests.ForDay(
+            _game.GameDay,
+            _city.TotalCitizens(_board.Catalog.Stores),
+            CurrentCarClass(),
+            _wallet.Xp);
 
     // The home page (Unity YouScreen): the player's own doors, starting with
     // the garage. A fresh page per visit like the wallet, so nothing stale

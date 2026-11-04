@@ -134,9 +134,12 @@ internal static class JsonFile
     /// <see cref="BackupSuffix"/>. Creates the directory. Returns false when the
     /// write failed (locked file, no permission) with the exception type in
     /// <paramref name="error"/>; never throws, because a failed bank must not
-    /// break gameplay or shutdown.
+    /// break gameplay or shutdown. <paramref name="options"/> mirrors the read
+    /// overload: a store that names its enums has to write them the same way.
     /// </summary>
-    internal static bool TryWrite<T>(string file, T value, out string? error)
+    internal static bool TryWrite<T>(
+        string file, T value, out string? error,
+        JsonSerializerOptions? options = null)
     {
         error = null;
         string temp = file + TempSuffix;
@@ -150,7 +153,8 @@ internal static class JsonFile
 
             // Serialise into the temp file first: a crash or a full disk then
             // leaves the previous save intact instead of a truncated one.
-            File.WriteAllText(temp, JsonSerializer.Serialize(value, Options));
+            File.WriteAllText(
+                temp, JsonSerializer.Serialize(value, options ?? Options));
             Commit(temp, file);
             return true;
         }

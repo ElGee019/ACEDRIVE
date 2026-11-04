@@ -46,4 +46,17 @@ public sealed class GameClockTests
         Assert.Equal(new DateTime(2026, 10, 10, 8, 0, 0, DateTimeKind.Utc), game.GameNow);
         Assert.Equal(7, game.Today);
     }
+
+    [Fact]
+    public void GameDayAndMinuteOfDay_SplitTheAbsoluteGameMinute()
+    {
+        var clock = new FakeClock();
+        var game = new GameClock(clock, new DateTime(2026, 10, 10, 8, 0, 0, DateTimeKind.Utc));
+
+        Assert.Equal(8 * 60, game.GameMinuteOfDay);
+        Assert.Equal(game.GameDay * (24 * 60) + game.GameMinuteOfDay, game.GameMinute);
+
+        clock.Advance(TimeSpan.FromSeconds(GameClock.RealSecondsPerGameMinute));
+        Assert.Equal((8 * 60) + 1, game.GameMinuteOfDay);
+    }
 }

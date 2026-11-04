@@ -14,18 +14,18 @@ namespace AceDrive.Core;
 /// WHY the card title is not the switch: a title is a saved identity, so a
 /// rename must not silently turn an effect off; the enum is the contract, and
 /// Data/reward_cards.json declares which card carries which effect.
-/// Three effects have no source in the port yet and stay carried until their
-/// systems land: <see cref="FreeTankRefill"/> (fuel sim declined, PORTPLAN 37),
-/// <see cref="WorkerBonus"/> (employee deliveries unbuilt, item 23) and
-/// <see cref="CustomerForgiveness"/> (taxi wrong-address cancellation unbuilt,
-/// item 11).
+/// <see cref="FreeTankRefill"/> fires on a fill the fuel receipt prices
+/// (PORTPLAN 37). One effect still has no source and stays carried until its
+/// system lands: <see cref="CustomerForgiveness"/> (taxi wrong-address
+/// cancellation unbuilt, item 11). <see cref="WorkerBonus"/> fires on an
+/// employee delivery (item 23).
 /// </summary>
 public enum RewardCardEffect
 {
     /// <summary>No effect: a slot or cash reward that is consumed on claim.</summary>
     None,
 
-    /// <summary>One free tank refill (dormant: no fuel sim).</summary>
+    /// <summary>One free tank refill (covers the next fill the receipt prices).</summary>
     FreeTankRefill,
 
     /// <summary>One repair bill covered in full (the accident body repair).</summary>

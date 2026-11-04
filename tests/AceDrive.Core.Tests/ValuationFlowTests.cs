@@ -291,12 +291,14 @@ public sealed class ValuationFlowTests
         session.Vm.Poll();
 
         double own = session.Ledger.OwnScore;
-        ValuationEntry ownDoc = Entry("me", "Me", own);
-        ValuationEntry winner = Entry("winner", "Winner", own - 100.0);
-        ValuationEntry loser = Entry("loser", "Loser", own + 100.0);
+        ValuationEntry winner = Entry("winner", "Winner", own - 100.0, FakeStart);
+        ValuationEntry loser = Entry("loser", "Loser", own + 100.0, FakeStart);
         double before = wallet.Xp;
 
-        board.RaiseChanged([ownDoc, winner, loser]);
+        // The watcher publishes a batch of newcomers, never the own doc: the
+        // cursor starts at the entry's own stamp.
+        Assert.Equal(FakeStart, board.WatchedSince);
+        board.RaiseChanged([winner, loser]);
         session.Vm.Poll();
 
         // Unity's listener pays a win the gap/500 and a loss the flat
@@ -313,13 +315,42 @@ public sealed class ValuationFlowTests
             wallet.Xp, 6);
         Assert.Contains("loser", session.Ledger.SeenUids);
 
-        // The same snapshot again is already settled: no notice, no XP.
+        // The same batch again is already settled: no notice, no XP.
         double after = wallet.Xp;
-        board.RaiseChanged([ownDoc, winner, loser]);
+        board.RaiseChanged([winner, loser]);
         session.Vm.Poll();
         session.Clock.Advance(TimeSpan.FromSeconds(4.1));
         session.Vm.Poll();
         Assert.Equal(after, wallet.Xp, 6);
+    }
+
+    [Fact]
+    public void OwnEntryGoneFromTheList_StopsComparingAndForgetsTheEntry()
+    {
+        var board = new FakeValuationBoard { OwnUid = "me", Entries = [] };
+        var hud = new FakeTelemetryHud();
+        var wallet = new DriverWallet();
+        TestSessionResult session = Create(
+            board: board, hud: hud, wallet: wallet, garage: GarageWithTestCar());
+        ValuationScreenViewModel page = OpenShowcase(session, hud);
+        page.EnterCommand.Execute(null);
+        session.Vm.Poll();
+        int week = CurrentWeekAtStart();
+        double before = wallet.Xp;
+
+        // The push never landed, or the TTL/wipe took the doc: the watcher
+        // reports the own doc gone instead of publishing the batch, so a
+        // newcomer who turned up meanwhile pays nothing.
+        board.RaiseOwnEntryMissing();
+        board.RaiseChanged([Entry("winner", "Winner", 0.0, FakeStart)]);
+        session.Vm.Poll();
+        session.Clock.Advance(TimeSpan.FromSeconds(4.1));
+        session.Vm.Poll();
+
+        Assert.Equal(before, wallet.Xp, 6);
+        Assert.False(session.Ledger.HasEntry(week));
+        Assert.Null(session.Ledger.EntryCarKey);
+        Assert.False(board.Watching);
     }
 
     [Fact]
@@ -443,10 +474,9 @@ public sealed class ValuationFlowTests
         // A live session already paid its comparisons: no settlement read.
         Assert.Equal(reads, board.ListCalls);
 
-        // A snapshot still in flight from the watcher pays nothing.
+        // A batch still in flight from the watcher pays nothing.
         double before = wallet.Xp;
-        board.RaiseChanged(
-            [Entry("me", "Me", 100.0, entered), Entry("winner", "Winner", 0.0)]);
+        board.RaiseChanged([Entry("winner", "Winner", 0.0, entered)]);
         session.Vm.Poll();
         session.Clock.Advance(TimeSpan.FromSeconds(4.1));
         session.Vm.Poll();

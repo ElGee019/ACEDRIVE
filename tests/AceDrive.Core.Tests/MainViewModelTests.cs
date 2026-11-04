@@ -98,7 +98,9 @@ public sealed class MainViewModelTests
         FakeTelemetry? physics = null,
         IReadOnlyList<CentoTier>? centoTiers = null,
         TouristenRaceCalendar? touristenWeekends = null,
-        FakeCallInput? callInput = null) =>
+        FakeCallInput? callInput = null,
+        FuelRules? fuelRules = null,
+        IFuelPriceStore? fuelPrices = null) =>
         TestSession.Create(new TestSessionOptions
         {
             SpeedKmh = speedKmh,
@@ -168,6 +170,8 @@ public sealed class MainViewModelTests
             CentoTiers = centoTiers,
             TouristenWeekends = touristenWeekends,
             CallInput = callInput,
+            FuelRules = fuelRules,
+            FuelPrices = fuelPrices,
         });
 
     // The production way into a business: HOME → ADDRESSES, pin the row, then
@@ -1661,11 +1665,11 @@ public sealed class MainViewModelTests
         page.ContinueCommand.Execute(null);
 
         Assert.False(vm.IsShown);
-        // Back in the hidden state a later call resolves to the menu, so the
-        // panel did not keep the summary page as its way back in.
+        // The summary leaves the page the interruption covered underneath, so
+        // a later call resumes it instead of the spent report.
         vm.ToggleShowCommand.Execute(null);
         Assert.True(vm.IsShown);
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
     [Fact]
@@ -2281,20 +2285,30 @@ public sealed class MainViewModelTests
         return ShowControl(session.Vm);
     }
 
-    // A call opens the menu; its Jobs tile is the door into the career page.
+    // A call resumes whichever page it left, so the helper only navigates when
+    // the menu is under it.
     private static MainControlScreenViewModel ShowControl(MainViewModel vm)
     {
         vm.Show();
+        if (vm.CurrentScreen is MainControlScreenViewModel open)
+        {
+            return open;
+        }
+
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         menu.JobsCommand.Execute(null);
         return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
-    // A call lands on the menu; its Calendar tile opens the page whose week
-    // strip these tests read.
+    // A call resumes the page it left; only a menu under it needs the tile.
     private static CalendarScreenViewModel ShowCalendar(MainViewModel vm)
     {
         vm.Show();
+        if (vm.CurrentScreen is CalendarScreenViewModel open)
+        {
+            return open;
+        }
+
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
         menu.CalendarCommand.Execute(null);
         return Assert.IsType<CalendarScreenViewModel>(vm.CurrentScreen);
@@ -2349,33 +2363,51 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public void Show_BeforeAJobIsAccepted_StillOpensTheMenu()
+    public void Show_AfterHidingOnAPage_ResumesThatSamePage()
     {
-        // The gate covers the accepted job, not the shift: a running shift
-        // with no customer must still reach the job centre to pick one.
+        // Hiding is a pause, not a reset: the call hands back the page the
+        // player left instead of rebuilding the menu over it.
+        var (vm, _, _, _) = Create(progress: FinishedTour());
+        var calendar = ShowCalendar(vm);
+
+        vm.ToggleShowCommand.Execute(null);
+        Assert.False(vm.IsShown);
+        vm.ToggleShowCommand.Execute(null);
+
+        Assert.True(vm.IsShown);
+        Assert.Same(calendar, vm.CurrentScreen);
+    }
+
+    [Fact]
+    public void Show_BeforeAJobIsAccepted_ResumesTheProposalPage()
+    {
+        // The gate covers the accepted job, not the shift: a call with no
+        // customer aboard returns to the proposal that was up, not the menu.
         var (vm, _, _, _) = Create(speedKmh: 0f);
         vm.TaxiShiftCommand.Execute(null);
+        var proposal = Assert.IsType<TaxiJobProposalViewModel>(vm.CurrentScreen);
         vm.ToggleShowCommand.Execute(null);
         Assert.False(vm.IsShown);
 
         vm.Show();
 
         Assert.True(vm.IsShown);
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.Same(proposal, vm.CurrentScreen);
     }
 
     [Fact]
-    public void Show_AfterTheJobSettles_OpensTheMenu()
+    public void Show_AfterTheJobSettles_ResumesTheReceiptPage()
     {
         var (vm, clock, tel, _) = Create(speedKmh: 0f);
         TaxiFlow.AcceptAndDrive(vm, clock, tel);
+        var receipt = Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen);
         vm.ToggleShowCommand.Execute(null); // back to driving with the job done
         Assert.False(vm.IsShown);
 
         vm.Show();
 
         Assert.True(vm.IsShown);
-        Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
+        Assert.Same(receipt, vm.CurrentScreen);
     }
 
     [Fact]
@@ -3433,9 +3465,17 @@ public sealed class MainViewModelTests
         Assert.IsType<CommunityCentreScreenViewModel>(session.Vm.CurrentScreen);
 
         // BACK leaves the interior for the main page, exactly like a shop the
-        // player called up: the menu is what a call would have opened.
+        // player called up: the menu is what a call would have opened. A POI
+        // page suspends idle-hide, so the player may have read past 15 s; the
+        // hand-back must restart the activity clock, or the next poll hides the
+        // menu the tap just opened.
+        session.Clock.Advance(TimeSpan.FromSeconds(20));
+        Assert.True(session.Vm.IsShown);
         screen.BackCommand.Execute(null);
         Assert.IsType<MenuScreenViewModel>(session.Vm.CurrentScreen);
+        Assert.True(session.Vm.IsShown);
+        session.Vm.Poll();
+        Assert.True(session.Vm.IsShown);
     }
 
     [Fact]

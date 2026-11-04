@@ -14,6 +14,8 @@ public sealed class GameClock
     // so the calendar strip turns over at a readable pace on the overlay.
     public const double RealSecondsPerGameMinute = 2.2;
 
+    private const int MinutesPerDay = 24 * 60;
+
     private readonly IClock _clock;
     private readonly DateTime _realStart;
     private readonly DateTime _gameStart;
@@ -40,4 +42,18 @@ public sealed class GameClock
     /// cannot inflate a haul.
     /// </summary>
     public long GameMinute => (long)(GameNow - DateTime.MinValue).TotalMinutes;
+
+    /// <summary>
+    /// Whole game days since the calendar's zero point. The daily schedules key
+    /// on this (the car-sharing batch is one per day), so two moments on the
+    /// same day share one plan and a rollover starts the next.
+    /// </summary>
+    public int GameDay => (int)(GameMinute / MinutesPerDay);
+
+    /// <summary>
+    /// Minute of the current game day (00:00 = 0, 23:59 = 1439). A daily
+    /// schedule is authored in these minutes, so a page converting one to an
+    /// absolute <see cref="GameMinute"/> needs this reading.
+    /// </summary>
+    public int GameMinuteOfDay => (int)(GameNow.TimeOfDay.TotalMinutes);
 }

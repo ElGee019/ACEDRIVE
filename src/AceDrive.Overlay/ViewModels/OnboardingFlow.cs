@@ -603,8 +603,7 @@ public sealed class OnboardingFlow : IScreenController
     private void CloseCommunityCentrePage()
     {
         // The tour is over: this is the first time the main panel opens on the
-        // menu of its own accord. Leave it up so the player lands on the page
-        // every later call returns to.
+        // menu of its own accord. Leave it up so the player lands there.
         _introClosed = true;
         _host.ShowMenu();
     }
@@ -825,8 +824,11 @@ public sealed class OnboardingFlow : IScreenController
     private void LeavePoi(PointOfInterest poi)
     {
         // The live leg can hold a different instance than the directory row a
-        // relaunch rebuilt, so the stable id identifies the errand too.
-        bool errand = _poi is { } live
+        // relaunch rebuilt, so the stable id identifies the errand too. Once the
+        // tour is banked no errand can still be live, even if a stale pin were
+        // left behind: BACK must then always be plain navigation to the main
+        // page, never the errand branch that hides the panel.
+        bool errand = !_progress.CommunityCentreDone && _poi is { } live
             && (ReferenceEquals(live, poi)
                 || string.Equals(live.Id, poi.Id, StringComparison.Ordinal));
         bool purchased = errand && BoughtErrandItems(poi);
@@ -856,10 +858,13 @@ public sealed class OnboardingFlow : IScreenController
 
         // A plain visit lands on the main page the overlay opens on, not on the
         // jobs page: BACK from a shop the player called up is the way out of
-        // the overlay, so it hands back what a call would have shown (the
-        // repair hand-back ends the same way) instead of a job list they never
-        // opened.
-        _host.ShowScreen(_host.MenuScreen());
+        // the overlay, so it hands back the main page (the repair hand-back
+        // ends the same way) instead of a job list they never opened.
+        // ShowMenu (not a bare page swap) reveals the panel and stamps
+        // the activity, so a long POI read cannot hand a stale idle clock a menu
+        // the next poll hides at once.
+        _log.LogInfo($"left {poi.Name}: returning to the main page");
+        _host.ShowMenu();
     }
 
     // WHY quantities, not presence: driver.json keeps the trunk between runs,

@@ -5,13 +5,15 @@ using AceDrive.Overlay.Localization;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The menu page: the entry a call (hotkey or wake word) opens now. The Jobs
-/// tile leads into the career — the main control page with every job door —
+/// The menu page: the entry a call (hotkey or wake word) lands on when no
+/// other page is up. The Jobs tile leads into the career — the main control
+/// page with every job door —
 /// the Wallet tile the account summary, the Calendar tile opens the weekly
-/// strip, the Trunk tile the carried-goods page, the Home tile the player's own
+/// strip, the Trunk tile the carried-goods page, the Employees tile the hired
+/// crew and their work families, the Home tile the player's own
 /// doors (the garage and the addresses page), and the Settings tile the first-run
-/// preferences form, by click or by voice. Every tile carries a voice entry; the features still to
-/// land acknowledge the tap and stay put. Voice taps glow the tile teal for the
+/// preferences form, by click or by voice. Every tile carries a voice entry;
+/// the meter tiles read out and stay put. Voice taps glow the tile teal for the
 /// shared <see cref="VoiceBeat"/>; the navigating ones wait out that beat
 /// before the flip, so the acknowledgment is visible, while mouse clicks act
 /// at once like every other page. Marked as a jobs-side screen so the
@@ -109,8 +111,8 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     private DateTime _revealUntil;
 
     public MenuScreenViewModel(
-        ICommand wallet, ICommand jobs, ICommand calendar, ICommand trunk, ICommand settings,
-        ICommand home,
+        ICommand wallet, ICommand jobs, ICommand calendar, ICommand trunk, ICommand employees,
+        ICommand settings, ICommand home,
         Hunger hunger, Garage garage, Func<string> carBrand, Func<string> callLabel,
         VoiceBeat beat, GameClock game, IClock clock, int displayWeek)
     {
@@ -129,6 +131,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         JobsCommand = new RelayCommand(() => Tap(jobs));
         CalendarCommand = new RelayCommand(() => Tap(calendar));
         TrunkCommand = new RelayCommand(() => Tap(trunk));
+        EmployeesCommand = new RelayCommand(() => Tap(employees));
         HomeCommand = new RelayCommand(() => Tap(home));
         SettingsCommand = new RelayCommand(() => Tap(settings));
         // The meter tiles have no page to open: a tap reads them out instead.
@@ -137,10 +140,9 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         var actions = new Dictionary<string, Action>();
         foreach (string label in TileLabels)
         {
-            // Every tile answers its drawn label. The six navigating ones
-            // are rebound below; the tiles whose features still have to land
-            // (and the two meter tiles, rebound to their read-out) acknowledge
-            // the voice tap with the teal glow and stay on the page.
+            // Every tile answers its drawn label. The navigating tiles are
+            // rebound below; the two meter tiles (rebound to their read-out)
+            // acknowledge the voice tap with the teal glow and stay on the page.
             actions[label] = () => Flash(label);
         }
         foreach (string keyword in JobsKeywords)
@@ -150,6 +152,7 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
         actions[WalletTile] = OpenWallet;
         actions[CalendarTile] = OpenCalendar;
         actions[TrunkTile] = OpenTrunk;
+        actions[EmployeesTile] = OpenEmployees;
         actions[HomeTile] = OpenHome;
         actions[SettingsTile] = OpenSettings;
         // A spoken label selects a meter tile exactly like a click, so the
@@ -172,6 +175,9 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
 
     /// <summary>Opens the trunk page (carried goods + appetite, PORTPLAN 26).</summary>
     public ICommand TrunkCommand { get; }
+
+    /// <summary>Opens the employees page (the hired crew and their work families).</summary>
+    public ICommand EmployeesCommand { get; }
 
     /// <summary>Opens the home page (the player's own doors, starting with the
     /// garage — Unity's YouScreen).</summary>
@@ -407,6 +413,8 @@ public sealed class MenuScreenViewModel : ViewModelBase, IVoiceScreen
     private void OpenCalendar() => FireVoice(CalendarTile, CalendarCommand);
 
     private void OpenTrunk() => FireVoice(TrunkTile, TrunkCommand);
+
+    private void OpenEmployees() => FireVoice(EmployeesTile, EmployeesCommand);
 
     private void OpenHome() => FireVoice(HomeTile, HomeCommand);
 

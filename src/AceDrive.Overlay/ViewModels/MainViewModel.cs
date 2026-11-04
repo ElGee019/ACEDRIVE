@@ -21,7 +21,7 @@ public sealed class MainViewModel
       ICarHaulHost,
       ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost,
       IValuationHost, IWhereIsWillyHost, ICarePackageHost, IRoadTestHost,
-      ITouristenfahrtenHost, IDisposable
+      ITouristenfahrtenHost, IFuelHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
     private readonly IClock _clock;
@@ -38,8 +38,8 @@ public sealed class MainViewModel
     private readonly JobSettlement _settlement;
     // The panel, the page it shows and the activity stamp.
     private readonly OverlayShell _shell;
-    // What a call and a reveal do to that panel: one owner for the first-show
-    // rule and the mid-job gate (the story flow and the voice router use it).
+    // What a call and a reveal do to that panel: one owner for the resume
+    // policy and the mid-job gate (the story flow and the voice router use it).
     private readonly PanelPresenter _panel;
     // The taxi job from proposal to receipt: owns the job, the request and the
     // patrols; the shell's half arrives through ITaxiJobHost.
@@ -92,6 +92,10 @@ public sealed class MainViewModel
     // The fleet's condition (odometer, inspections, filth, insurance): every
     // path that wears an owned car goes through it.
     private readonly FleetService _fleet;
+    // The fuel receipt (PORTPLAN 37): the daily market drift and the fill
+    // EVO's own pump made, priced off the level it reports. It owns the
+    // session detection and reaches back only through IFuelHost.
+    private readonly FuelFlow _fuel;
     private readonly TaxiShift _shift;
     private readonly ISettingsStore _store;
     // The settings page's RESET GAME: the save wipe plus the replacement
@@ -225,7 +229,7 @@ public sealed class MainViewModel
         IRivalsService rivals,
         Garage garage,
         DriverCatchUp catchUp, ZoneGrowth zoneGrowth,
-        GameStateSaver saver, FleetService fleet, JobSettlement settlement,
+        GameStateSaver saver, FleetService fleet, FuelFlow fuel, JobSettlement settlement,
         OverlayShell shell, PanelPresenter panel, OnboardingFlow story,
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld poiWorld,
@@ -277,6 +281,7 @@ public sealed class MainViewModel
         _saver = saver;
         _settlement = settlement;
         _fleet = fleet;
+        _fuel = fuel;
         _shell = shell;
         _panel = panel;
         _taxi = taxi;
@@ -323,6 +328,7 @@ public sealed class MainViewModel
         _taxi.Attach(this);
         _delivery.Attach(this);
         _haul.Attach(this);
+        _fuel.Attach(this);
         _cento.Attach(this);
         _valuation.Attach(this);
         _willy.Attach(this);
@@ -544,6 +550,12 @@ public sealed class MainViewModel
     void ICarHaulHost.ShowNotice(string text) =>
         _hud?.ShowNotice(text, TimeSpan.FromSeconds(HaulNoticeSec));
     void ICarHaulHost.ShowHaulGate(string text) => _nav.ShowHaulGate(text);
+    // The host slice the fuel receipt sees (PORTPLAN 37): a fill is an event the
+    // player did not start, so it interrupts the page that was up and CONTINUE
+    // hands it back — the insurance broker page's policy, not a job receipt's.
+    void IFuelHost.ShowFuelReceipt(object page) =>
+        _panel.PresentInterruption(page, "fuel receipt");
+    void IFuelHost.ResumeAfterFuelReceipt() => _panel.ResumeInterrupted();
     // The host slice the Cento Miglia entry sees: the flow owns the phases, the
     // registration check and the reputation ticker; the shell owns the panel,
     // the companion's line and the settle that prices the receipt.
@@ -737,8 +749,8 @@ public sealed class MainViewModel
         // so they opt out like a POI page.
         bool keepOpen = CurrentScreen is IKeepPanelOpen;
         // The introduction owns the panel until its closing page is dismissed:
-        // hiding a walk page would skip the introduction (a later call opens
-        // the menu, not the page), so its 15 s countdown never starts.
+        // the walk is a sequence of pages the player answers in order, so its
+        // 15 s countdown never starts while the tour is still running.
         bool introOpen = _story.IntroInProgress;
         if (IsShown && !introOpen && !_resizing && !dialogueOpen && !poiOpen && !keepOpen
             && (now - _shell.LastActivity).TotalSeconds >= IdleHideSec)
@@ -768,6 +780,12 @@ public sealed class MainViewModel
         // accepted job must not idle the shift out mid-ride, and a live leg
         // repaints the readouts by itself.
         _day.Tick(now, JobInProgress, _taxi.LegActive);
+
+        // The pump's daily drift (PORTPLAN 37, Unity's midnight roll): one int
+        // compare per tick and one file write on the day flip. It runs whether
+        // or not EVO is attached, so a closed game keeps the market moving and
+        // the next refuel pays the price the day actually reached.
+        _fuel.Tick();
 
         // The weekly market valuation (PORTPLAN 49): the Monday reset, the 6am
         // venue draw, the saved-week catch-up and the queued result notices.
@@ -830,6 +848,11 @@ public sealed class MainViewModel
         // the drive. The garage file is banked on the same wall-time throttle
         // as the clock, so a kill costs at most the window.
         _fleet.IntegrateOdometer(s, dt, _story.Done);
+        // The fuel feed (PORTPLAN 37): EVO's own pump moves the tank, so a
+        // settled rise is one fill — priced, banked and reported while the car
+        // sits at the station. The tracker re-primes on a session change, so a
+        // reload that starts full is never billed.
+        _fuel.Observe(s, now);
         // The accident feed rides the same tick: a jump in EVO's collision
         // damage is one crash, priced off the speed the car carried into it.
         // Invincible Rides stops the billing (the detector still observes, so

@@ -99,10 +99,13 @@ Live wiring:
 - weekly market valuation (PORTPLAN 49, `FirestoreValuationBoard`): the Monday
   jump-out pushes one entry per player, the ongoing comparison reads the list,
   and the Monday 00:00 reset deletes the player's own doc. The live comparison
-  is a 30 s background re-read (`Changed` event), not a Firestore snapshot
-  listener, and it runs on its own task so the 10 Hz gameplay poll only drains
-  the list it published. Offline, the same page compares against the local
-  house entry.
+  is a 60 s background "everything since my cursor" read (an `enteredAt` range
+  query raising `Changed`), not a Firestore snapshot listener, and it runs on
+  its own task so the 10 Hz gameplay poll only drains the list it published.
+  A poll that finds nothing returns no documents, so it costs no reads; the
+  full-list read happens only at entry (the competitor draw) and at the
+  restart catch-up. Offline, the same page compares against the local house
+  entry.
 
 Backend-only today (no ACEDRIVE screen/caller yet, compiled and tested):
 road-test time/brake boards, cloud car sprites.

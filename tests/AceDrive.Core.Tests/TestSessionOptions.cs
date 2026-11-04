@@ -41,6 +41,10 @@ internal sealed class TestSessionOptions
     public Garage? Garage { get; init; }
     public IGarageStore? GarageStore { get; init; }
     public BreakdownStrategy? Breakdowns { get; init; }
+    // The pump's balance table and its persisted price (PORTPLAN 37): a suite
+    // that pins the CR/L or reads the daily drift hands its own in.
+    public FuelRules? FuelRules { get; init; }
+    public IFuelPriceStore? FuelPrices { get; init; }
     public Random? Rng { get; init; }
     public OnboardingContent? Content { get; init; }
     public PlayerProfile? Profile { get; init; }
@@ -59,6 +63,15 @@ internal sealed class TestSessionOptions
     // The community centre's hired crew and weekly hire roster (PORTPLAN 54):
     // a suite that pins the roster hands its fake in instead of starting empty.
     public IEmployeeStore? EmployeeStore { get; init; }
+    // The employees page's finished-job flags: a suite that pins a teal button
+    // hands its board in and marks the family before opening the page.
+    public EmployeeJobBoard? EmployeeJobs { get; init; }
+    // The employees page's on-job marks: a suite that pins an employee on a job
+    // hands its assignments in before opening the page.
+    public EmployeeAssignments? EmployeeAssignments { get; init; }
+    // The crew's car-sharing work: a suite that pins a waiting subscription
+    // hands the service over so its own assignments instance is the one used.
+    public CarShareJobs? CarShareJobs { get; init; }
     public PoiDirectory? PoiDirectory { get; init; }
     public IPoiDirectoryStore? PoiStore { get; init; }
     public PoiSpawner? PoiSpawner { get; init; }

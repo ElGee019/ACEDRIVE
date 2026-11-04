@@ -16,6 +16,15 @@ public interface IFirestoreDatabase
     Task<FirestoreDocument?> GetAsync(
         string documentPath, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Whether the document exists: false when the read answered "missing",
+    /// null when it could not be answered at all. The third state exists so a
+    /// caller can tell "gone" from "the network blinked" and never deletes on a
+    /// failed read.
+    /// </summary>
+    Task<bool?> ExistsAsync(
+        string documentPath, CancellationToken cancellationToken);
+
     /// <summary>Merges the given fields into the document (creating it if needed).</summary>
     Task<bool> SetFieldsAsync(
         string documentPath,
@@ -40,6 +49,17 @@ public interface IFirestoreDatabase
 
     /// <summary>Documents whose string field equals the value.</summary>
     Task<IReadOnlyList<FirestoreDocument>?> QueryEqualsAsync(
+        string collection, string field, string value,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Documents whose string field sorts after the value, used for
+    /// "everything since" reads: invariant ISO-8601 timestamps sort
+    /// chronologically as text. A document without the field never matches, and
+    /// an empty result costs no document reads, which is what makes a poll that
+    /// finds nothing free.
+    /// </summary>
+    Task<IReadOnlyList<FirestoreDocument>?> QueryTextAfterAsync(
         string collection, string field, string value,
         CancellationToken cancellationToken);
 

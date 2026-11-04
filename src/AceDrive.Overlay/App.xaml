@@ -5,6 +5,7 @@
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <views:InverseBoolToVisConverter x:Key="InverseBoolToVis"/>
         <views:BoolToHiddenConverter x:Key="BoolToHiddenVis"/>
         <!-- One shared thumbnail loader for every car image: the startup
              assigns its Source once, so the converter (a view helper) never

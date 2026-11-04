@@ -195,6 +195,7 @@
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonTrunk.webp"/>
                 </Button>
                 <Button Canvas.Left="400" Canvas.Top="383" Style="{StaticResource MenuTile}"
+                        Command="{Binding EmployeesCommand}"
                         Effect="{Binding EmployeesFlash, Converter={StaticResource VoiceGlow}}">
                     <Image Style="{StaticResource MenuArt}"
                            Tag="pack://application:,,,/AceDrive.Overlay;component/Assets/Buttons/ButtonEmployees.webp"/>

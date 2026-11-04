@@ -17,6 +17,8 @@ public sealed class FakeFirestoreDatabase : IFirestoreDatabase
     public List<FakeIncrementCall> Increments { get; } = [];
     public List<List<string>> Deleted { get; } = [];
     public List<string> Queries { get; } = [];
+    // The "everything since" reads the services asked for, in call order.
+    public List<(string Collection, string Field, string After)> TextAfterQueries { get; } = [];
     public bool ListFails { get; set; }
     public bool WritesSucceed { get; set; } = true;
     public FirestoreCreateResult NextCreateResult { get; set; } = FirestoreCreateResult.Created;
@@ -39,6 +41,16 @@ public sealed class FakeFirestoreDatabase : IFirestoreDatabase
     public Task<FirestoreDocument?> GetAsync(
         string documentPath, CancellationToken cancellationToken) =>
         Task.FromResult(ByPath.GetValueOrDefault(documentPath));
+
+    public Task<bool?> ExistsAsync(
+        string documentPath, CancellationToken cancellationToken)
+    {
+        if (ListFails)
+        {
+            return Task.FromResult<bool?>(null);
+        }
+        return Task.FromResult<bool?>(ByPath.ContainsKey(documentPath));
+    }
 
     public Task<bool> SetFieldsAsync(
         string documentPath,
@@ -81,6 +93,22 @@ public sealed class FakeFirestoreDatabase : IFirestoreDatabase
             ? QueryRows
             : Collections.TryGetValue(collection, out List<FirestoreDocument>? docs)
                 ? docs
+                : [];
+        return Task.FromResult<IReadOnlyList<FirestoreDocument>?>(rows);
+    }
+
+    public Task<IReadOnlyList<FirestoreDocument>?> QueryTextAfterAsync(
+        string collection, string field, string value,
+        CancellationToken cancellationToken)
+    {
+        if (ListFails)
+        {
+            return Task.FromResult<IReadOnlyList<FirestoreDocument>?>(null);
+        }
+        TextAfterQueries.Add((collection, field, value));
+        IReadOnlyList<FirestoreDocument> rows =
+            Collections.TryGetValue(collection, out List<FirestoreDocument>? docs)
+                ? [.. docs.Where(doc => string.CompareOrdinal(doc.Text(field), value) > 0)]
                 : [];
         return Task.FromResult<IReadOnlyList<FirestoreDocument>?>(rows);
     }

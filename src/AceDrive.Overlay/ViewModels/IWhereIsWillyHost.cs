@@ -15,9 +15,9 @@ public interface IWhereIsWillyHost
     void HidePanel();
 
     /// <summary>
-    /// Shows the menu page — the page a call opens — once the receipt closes:
-    /// the weekly run is an event, not a job, so the player lands on the main
-    /// page instead of the jobs page the search was started from.
+    /// Shows the menu page once the receipt closes: the weekly run is an event,
+    /// not a job, so the player lands on the main page instead of the jobs page
+    /// the search was started from.
     /// </summary>
     void ShowMenu();
 

@@ -20,6 +20,7 @@ internal sealed class ShmReader : ITelemetrySource
     private const int OffPacketId = 0;
     private const int OffGas = 4;
     private const int OffBrake = 8;
+    private const int OffFuel = 12;   // litres, AC1-compatible fuel field
     private const int OffGear = 16;   // 0=R, 1=N, 2..N=forward
     private const int OffRpms = 20;
     private const int OffSteer = 24;  // rad, -=left
@@ -437,6 +438,7 @@ internal sealed class ShmReader : ITelemetrySource
         float steer = view.ReadSingle(OffSteer);
         float speed = view.ReadSingle(OffSpeedKmh);
         float damage = ReadCarDamage(view);
+        float fuel = view.ReadSingle(OffFuel);
 
         if (packet != view.ReadInt32(OffPacketId))
         {
@@ -450,6 +452,7 @@ internal sealed class ShmReader : ITelemetrySource
             steer = view.ReadSingle(OffSteer);
             speed = view.ReadSingle(OffSpeedKmh);
             damage = ReadCarDamage(view);
+            fuel = view.ReadSingle(OffFuel);
 
             if (packet != view.ReadInt32(OffPacketId))
             {
@@ -467,7 +470,8 @@ internal sealed class ShmReader : ITelemetrySource
         }
 
         return new TelemetrySample(
-            packet, gas, brake, gear, rpm, steer, speed, normalizedPosition, track, damage);
+            packet, gas, brake, gear, rpm, steer, speed, normalizedPosition, track, damage,
+            fuel);
     }
 
     // Sum of the five damage zones: EVO writes absolute units per zone, and the

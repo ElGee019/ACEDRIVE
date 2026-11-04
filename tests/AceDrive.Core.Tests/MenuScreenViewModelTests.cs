@@ -6,8 +6,8 @@ namespace AceDrive.Core.Tests;
 
 /// <summary>
 /// The menu page: every tile is voice-detectable and flashes the shared teal
-/// for the voice beat, Jobs, Calendar, Trunk, Home and Settings then navigate,
-/// the rest stay put.
+/// for the voice beat; Jobs, Calendar, Trunk, Employees, Home and Settings then
+/// navigate, while the meter tiles stay put and read out.
 /// </summary>
 public sealed class MenuScreenViewModelTests
 {
@@ -80,6 +80,20 @@ public sealed class MenuScreenViewModelTests
         vm.VoiceActions["WALLET"].Invoke();
 
         Assert.True(vm.WalletFlash);
+        Assert.False(opened);
+        Drain(clock, beat);
+        Assert.True(opened);
+    }
+
+    [Fact]
+    public void VoiceEmployees_GlowsThenOpensEmployeesPage()
+    {
+        bool opened = false;
+        var (vm, clock, beat) = NewViewModel(employees: () => opened = true);
+
+        vm.VoiceActions["EMPLOYEES"].Invoke();
+
+        Assert.True(vm.EmployeesFlash);
         Assert.False(opened);
         Drain(clock, beat);
         Assert.True(opened);
@@ -178,6 +192,7 @@ public sealed class MenuScreenViewModelTests
     {
         var clock = new FakeClock();
         var vm = new MenuScreenViewModel(
+            new RelayCommand(() => { }),
             new RelayCommand(() => { }),
             new RelayCommand(() => { }),
             new RelayCommand(() => { }),
@@ -463,7 +478,7 @@ public sealed class MenuScreenViewModelTests
 
     private static (MenuScreenViewModel Vm, FakeClock Clock, VoiceBeat Beat) NewViewModel(
         Action? wallet = null, Action? jobs = null, Action? calendar = null, Action? trunk = null,
-        Action? settings = null, Action? home = null,
+        Action? employees = null, Action? settings = null, Action? home = null,
         Hunger? hunger = null, Garage? garage = null, Func<string>? brand = null,
         Func<string>? call = null)
     {
@@ -474,6 +489,7 @@ public sealed class MenuScreenViewModelTests
             new RelayCommand(jobs ?? (() => { })),
             new RelayCommand(calendar ?? (() => { })),
             new RelayCommand(trunk ?? (() => { })),
+            new RelayCommand(employees ?? (() => { })),
             new RelayCommand(settings ?? (() => { })),
             new RelayCommand(home ?? (() => { })),
             hunger ?? new Hunger(HungerRules.Default),

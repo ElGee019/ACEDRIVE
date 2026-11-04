@@ -156,6 +156,16 @@ internal static class TestSession
         var deliveryFaresInstance = options.DeliveryFares ?? DeliveryFareTable.Default;
         var rarityInstance = options.Rarity ?? new FakeCarRarity();
         var rivalsInstance = options.Rivals ?? new FakeRivals();
+        // The fuel receipt (PORTPLAN 37), composed like the root: the rules and
+        // the persisted price in, one market and one fill tracker out. The
+        // market's own seeded stream keeps the drift assertable.
+        FuelRules fuelRulesInstance = options.FuelRules ?? FuelRules.Default;
+        var fuelPricesInstance = options.FuelPrices ?? new FakeFuelPriceStore();
+        var fuel = new FuelFlow(
+            new FuelMarket(fuelRulesInstance, fuelPricesInstance.Load(), game.GameDay, seed: 21),
+            new FuelFillTracker(fuelRulesInstance), fuelRulesInstance, game,
+            garageInstance, onboardingStore, friendsInstance, walletInstance,
+            glovebox, trunkInstance, saver, rivalsInstance, fuelPricesInstance, beat, logger);
         var brandMileageInstance = options.BrandMileage ?? new FakeBrandMileageStore();
         var telemetryInstance = options.Telemetry ?? new FakePlayerTelemetry();
         var meter = new DrivenDistanceMeter(taxiRulesInstance.MaxMeterSpeedKmh);
@@ -315,6 +325,21 @@ internal static class TestSession
         // with the crew's fake store and its own seeded stream.
         var employeeRoster = new EmployeeRoster(
             options.EmployeeStore ?? new FakeEmployeeStore(), new Random(16));
+        var employeeJobs = options.EmployeeJobs ?? new EmployeeJobBoard();
+        var employeeAssignments = options.EmployeeAssignments
+            ?? new EmployeeAssignments(new FakeEmployeeJobStore());
+        // The crew's car-sharing work reads the day's batch, so the harness
+        // hands it the same planner the assign page shows.
+        var carShareJobs = options.CarShareJobs ?? new CarShareJobs(employeeAssignments, game);
+        var employeeRides = new EmployeeRides(
+            employeeAssignments, game, zoneInstance, new Random(0));
+        var employeeDeliveries = new EmployeeDeliveries(
+            employeeAssignments, game,
+            () => cityInstance.Live(deliveryBoard.Catalog.Stores), new Random(0));
+        var employeeDeliveryPayout = new EmployeeDeliveryPayout(
+            cityInstance, () => deliveryBoard.Catalog, glovebox, trunkInstance);
+        var carShareRequests = new CarShareRequestPlanner(
+            zoneInstance, residentsInstance, friendsInstance.GetLevel);
         var communityCentre = new CommunityCentreInteriors(
             employeeRoster, residentsInstance, directory, zoneInstance,
             new PoiGenerator(map, PoiCatalog.Default, seed: 13),
@@ -340,7 +365,10 @@ internal static class TestSession
             saver, walletInstance, garageInstance, rivalsInstance, zoneBoard,
             trunkInstance, glovebox,
             hungerInstance, storeCatalogInstance, directory, options.Hud, deliveryBoard,
-            deliveryCareer, cityInstance, taxi, delivery, haul, poiWorld, dayCycle,
+            deliveryCareer, cityInstance, employeeRoster, employeeJobs,
+            employeeAssignments, carShareJobs, carShareRequests,
+            employeeRides, employeeDeliveries, employeeDeliveryPayout,
+            taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
             willyFlow, careFlow, roadTestFlow, touristenFlow,
@@ -377,7 +405,7 @@ internal static class TestSession
             glovebox, trunkInstance,
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
-            saver, fleet, settlement, shell, panel, story, voiceRouter,
+            saver, fleet, fuel, settlement, shell, panel, story, voiceRouter,
             taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
             careFlow, roadTestFlow, touristenFlow,
             navigation, readouts, dayCycle,

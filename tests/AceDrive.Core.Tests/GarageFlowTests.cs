@@ -132,9 +132,12 @@ public sealed class GarageFlowTests
                          new OwnedCarState(Mx5.Key, 2, 0.0, false)]));
         var store = new FakeGarageStore();
         var (vm, _, _, _) = MainViewModelTests.Create(
-            cars: Pool, garage: garage, garageStore: store, content: Content());
-        vm.ToggleShowCommand.Execute(null); // hide
-        vm.ToggleShowCommand.Execute(null); // call it back: the menu page
+            cars: Pool, garage: garage, garageStore: store, content: Content(),
+            progress: OnboardingState.Fresh with
+            {
+                BirthdayDone = true,
+                CommunityCentreDone = true,
+            });
         var menu = Assert.IsType<MenuScreenViewModel>(vm.CurrentScreen);
 
         // Unity's You menu owns the garage: the HOME tile, then GARAGE.

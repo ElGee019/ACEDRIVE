@@ -50,6 +50,12 @@
         <DataTemplate DataType="{x:Type vm:CommunityCentreScreenViewModel}">
             <views:CommunityCentreScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:EmployeesScreenViewModel}">
+            <views:EmployeesScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:AssignJobScreenViewModel}">
+            <views:AssignJobScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:SuggestCarModScreenViewModel}">
             <views:SuggestCarModScreenView/>
         </DataTemplate>
@@ -160,6 +166,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:CarePackageReceiptScreenViewModel}">
             <views:CarePackageReceiptScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FuelReceiptScreenViewModel}">
+            <views:FuelReceiptScreenView/>
         </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes

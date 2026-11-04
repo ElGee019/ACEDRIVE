@@ -96,6 +96,20 @@ public sealed class FirestoreClient : IFirestoreDatabase
         return FirestoreJson.ReadDocument(response.Body.RootElement);
     }
 
+    public async Task<bool?> ExistsAsync(
+        string documentPath, CancellationToken cancellationToken)
+    {
+        using FirestoreResponse? response = await SendAsync(
+            HttpMethod.Get, DocUrl(documentPath), null, cancellationToken)
+            .ConfigureAwait(false);
+        return response?.Status switch
+        {
+            HttpStatusCode.OK => true,
+            HttpStatusCode.NotFound => false,
+            _ => null,
+        };
+    }
+
     public async Task<bool> SetFieldsAsync(
         string documentPath,
         IReadOnlyDictionary<string, object?> fields,
@@ -198,8 +212,21 @@ public sealed class FirestoreClient : IFirestoreDatabase
         };
     }
 
-    public async Task<IReadOnlyList<FirestoreDocument>?> QueryEqualsAsync(
+    public Task<IReadOnlyList<FirestoreDocument>?> QueryEqualsAsync(
         string collection, string field, string value,
+        CancellationToken cancellationToken) =>
+        RunQueryAsync(collection, field, "EQUAL", TextValue(value), cancellationToken);
+
+    public Task<IReadOnlyList<FirestoreDocument>?> QueryTextAfterAsync(
+        string collection, string field, string value,
+        CancellationToken cancellationToken) =>
+        RunQueryAsync(collection, field, "GREATER_THAN", TextValue(value), cancellationToken);
+
+    private static JsonObject TextValue(string value) =>
+        new() { ["stringValue"] = value };
+
+    private async Task<IReadOnlyList<FirestoreDocument>?> RunQueryAsync(
+        string collection, string field, string op, JsonObject value,
         CancellationToken cancellationToken)
     {
         JsonObject body = new()
@@ -215,8 +242,8 @@ public sealed class FirestoreClient : IFirestoreDatabase
                     ["fieldFilter"] = new JsonObject
                     {
                         ["field"] = new JsonObject { ["fieldPath"] = field },
-                        ["op"] = "EQUAL",
-                        ["value"] = new JsonObject { ["stringValue"] = value },
+                        ["op"] = op,
+                        ["value"] = value,
                     },
                 },
             },

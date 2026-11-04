@@ -71,6 +71,10 @@ public sealed class ValuationFlow
     private bool _catchingUpExpiry;
     private DateTime _nextCatchUpAt = DateTime.MinValue;
     private readonly ConcurrentQueue<IReadOnlyList<ValuationEntry>> _snapshots = new();
+    // The board raises "own entry gone" from its watcher thread; the flag only
+    // crosses to the poll, which owns every flow mutation — the same rule the
+    // snapshot queue follows.
+    private volatile bool _ownEntryMissing;
     private readonly Queue<PendingResult> _results = new();
     private DateTime _nextResultAt = DateTime.MinValue;
     private ValuationEntry? _houseEntry;
@@ -124,6 +128,7 @@ public sealed class ValuationFlow
         _log = log;
         _ignoreEventGates = ignoreEventGates;
         _board.Changed += OnBoardChanged;
+        _board.OwnEntryMissing += OnOwnEntryMissing;
     }
 
     /// <summary>Attaches the coordinator that owns the panel and the page policy.</summary>
@@ -269,6 +274,7 @@ public sealed class ValuationFlow
         {
             TryCatchUp(now, week);
         }
+        DrainOwnEntryMissing();
         DrainSnapshots();
         DrainDraw();
         DrainCatchUp(now);
@@ -326,8 +332,9 @@ public sealed class ValuationFlow
         double ranking = owned?.LeaderboardRanking ?? 0.0;
         double score = ValuationRules.Score(spec, jobs, broken, ranking);
         int week = ValuationRules.WeekKey(_game.GameNow);
+        DateTime enteredAt = _clock.UtcNow;
         string name = PlayerName();
-        _ledger.MarkEntry(carKey, score, week, _clock.UtcNow);
+        _ledger.MarkEntry(carKey, score, week, enteredAt);
         _catchUpDone = true;
         _saver.SaveDriver(_rivals.LastResult);
         _screen.ShowWaiting(name, carKey, score);
@@ -335,7 +342,7 @@ public sealed class ValuationFlow
             _board.PushEntryAsync(name, carKey, jobs, broken, score),
             _log, "valuation entry push");
         _drawTask = _board.ListAsync();
-        _board.StartWatching();
+        _board.StartWatching(enteredAt);
         _log.LogInfo(
             $"market valuation entered: {carKey}, score {score:0.00}, " +
             $"{jobs} job(s), engine {broken:P0} broken, " +
@@ -531,57 +538,74 @@ public sealed class ValuationFlow
         }
     }
 
-    // A live snapshot from the watcher: every newcomer pays a win or a
-    // consolation, exactly like Unity's listener. A missing own entry means the
-    // player is not on this week's list any more (wipe/TTL), so the flow
-    // re-seeds silently and stops comparing. A closed window pays nothing: the
-    // snapshot may still be in flight from the watcher when the cap lands.
+    // A live batch from the watcher: every entry that landed since the last
+    // read pays a win or a consolation, exactly like Unity's listener. Only
+    // the newcomers arrive — the board holds the cursor and refuses to publish
+    // while the own entry is gone — so the own score comes from the ledger, the
+    // one place the entry is recorded. A closed window pays nothing: the batch
+    // may still be in flight from the watcher when the cap lands.
     private void ProcessSnapshot(IReadOnlyList<ValuationEntry> entries)
     {
-        string? ownUid = _board.OwnUid;
-        if (string.IsNullOrEmpty(ownUid) || _ledger.EntryWeek != ValuationRules.WeekKey(_game.GameNow)
+        if (_ledger.EntryWeek != ValuationRules.WeekKey(_game.GameNow)
             || _ledger.IsExpired(_clock.UtcNow))
         {
             return;
         }
 
-        ValuationEntry? own = FindOwn(entries, ownUid);
-        if (own is null)
-        {
-            _ledger.RecordSeen(Uids(entries));
-            _ledger.ClearEntry();
-            _board.StopWatching();
-            _catchUpDone = true;
-            _saver.SaveDriver(_rivals.LastResult);
-            _log.LogInfo("market valuation entry missing from the weekly list; settled set reseeded");
-            return;
-        }
-
+        double ownScore = _ledger.OwnScore;
+        // The board overlaps its cursor to survive clock drift, so a batch can
+        // carry an entry it already delivered: the settled set is the filter
+        // that keeps one newcomer from paying twice.
         IReadOnlyList<ValuationEntry> newcomers =
-            ValuationRules.FindUnseen(_ledger.SeenUids, entries, ownUid);
+            ValuationRules.FindUnseen(_ledger.SeenUids, entries, _board.OwnUid);
+        int compared = 0;
         foreach (ValuationEntry entry in newcomers)
         {
             // Ties are Unity's ignored case — no popup, no payout — even
             // though the showcase page reads a tie as a win.
-            if (entry.Score == own.Score)
+            if (entry.Score == ownScore)
             {
                 continue;
             }
             // One rule for every payout: the page, this listener and the
             // restart catch-up all read ValuationRules.Verdict, so a win can
             // never pay a different amount depending on where it landed.
-            ValuationVerdict verdict = ValuationRules.Verdict(own.Score, entry.Score);
+            ValuationVerdict verdict = ValuationRules.Verdict(ownScore, entry.Score);
             _results.Enqueue(new PendingResult(
                 entry.PlayerName, verdict.Xp, verdict.Won, Offline: false, WinCount: 1));
+            compared++;
         }
 
         _ledger.RecordSeen(Uids(entries));
         _saver.SaveDriver(_rivals.LastResult);
-        if (newcomers.Count > 0)
+        if (compared > 0)
         {
-            _log.LogInfo($"market valuation: {newcomers.Count} newcomer(s) compared");
+            _log.LogInfo($"market valuation: {compared} newcomer(s) compared");
         }
     }
+
+    // The board could not find the own doc on the list (wipe/TTL, or a push
+    // that never landed): nothing can be compared any more, so the entry goes
+    // the same way the restart catch-up forgets a vanished one. It runs before
+    // the snapshots are drained, so a batch that landed while the doc was gone
+    // cannot pay.
+    private void DrainOwnEntryMissing()
+    {
+        if (!_ownEntryMissing)
+        {
+            return;
+        }
+
+        _ownEntryMissing = false;
+        _board.StopWatching();
+        _ledger.ClearEntry();
+        _catchUpDone = true;
+        _saver.SaveDriver(_rivals.LastResult);
+        _log.LogInfo("market valuation entry missing from the weekly list; comparison stopped");
+    }
+
+    // Watcher thread: set the flag only, never touch flow state.
+    private void OnOwnEntryMissing() => _ownEntryMissing = true;
 
     // The restart catch-up: one list read when the saved week still has an
     // entry. Wins only (Unity's offline contract); a missing own doc re-seeds.
@@ -648,7 +672,7 @@ public sealed class ValuationFlow
             own.CarKey, own.Score, _ledger.EntryWeek,
             _ledger.EnteredAtUtc ?? _clock.UtcNow);
         _catchUpDone = true;
-        _board.StartWatching();
+        _board.StartWatching(_clock.UtcNow);
         _saver.SaveDriver(_rivals.LastResult);
         if (gains.WinCount > 0 && gains.TotalXp > 0.0)
         {

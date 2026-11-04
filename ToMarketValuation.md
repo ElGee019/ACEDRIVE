@@ -224,13 +224,20 @@ retroactively for new weeks only (old entries keep their stored score).
 ### 3.2 Services
 
 - `IValuationBoard` (Services): `IsOnline`, `OwnUid`, `ListAsync`,
-  `PushEntryAsync`, `WipeOwnAsync`, `StartWatching`/`StopWatching`,
-  `event Changed`.
+  `ListSinceAsync`, `OwnEntryExistsAsync`, `PushEntryAsync`, `WipeOwnAsync`,
+  `StartWatching(DateTime)`/`StopWatching`, `event Changed`,
+  `event OwnEntryMissing`.
 - `FirestoreValuationBoard`: wraps the existing `FirestoreValuationEntries`,
   maps docs through `ValuationEntryMapper`, filters the legacy cloud
-  `house-entry` doc, and runs a **30 s background watcher** while an entry is
+  `house-entry` doc, and runs a **60 s background watcher** while an entry is
   live. WHY: Firestore REST has no `Listen`; this task is off the 10 Hz loop
-  and only raises `Changed`.
+  and only raises `Changed`. The poll is a **range read on `enteredAt`** (the
+  cursor starts at the entry's own stamp, minus a two-minute overlap for clock
+  drift), not the whole list: an idle poll returns no documents, and Firestore
+  bills per document returned, so polling nobody costs nothing. Before it
+  publishes a batch it confirms the own doc is still listed (one `get`);
+  a missing doc raises `OwnEntryMissing` instead, so a push that never landed
+  cannot earn against rivals. A failed check keeps the cursor and retries.
 - `ValuationEntryMapper`: doc → `ValuationEntry` (`uid`, `playerName`,
   `carId`, `jobsWithCar`, `engineBrokenPercent`, `score`, `enteredAt`).
 - `OfflineValuationBoard`: empty list, push returns true, watcher no-op.
@@ -445,7 +452,10 @@ Flow/integration (`TestSession`):
 2. **maxRpm** — no column in `cars.json`; horsepower/10 substitution needs
    sign-off (or an RPM data pass before launch).
 3. **REST live comparison** — Unity's listener is immediate; the port's
-   background watcher re-reads every 30 s. If Firestore adds a realtime REST
+   background watcher asks every 60 s for what landed since its cursor
+   (`enteredAt` range read, so an idle poll costs no reads). A wildly skewed
+   rival clock can put an entry behind the cursor; the two-minute overlap and
+   the restart catch-up cover ordinary drift. If Firestore adds a realtime REST
    path later, replace `FirestoreValuationBoard.WatchAsync`.
 4. **House entry** — Unity's is local-only. The legacy `ResetAsync` writes a
    shared `house-entry` doc; the new board filters it. Decide whether to keep

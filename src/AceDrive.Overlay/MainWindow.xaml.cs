@@ -354,11 +354,17 @@ public partial class MainWindow : Window
             return null;
         }
 
+        // WHY the DPI conversion: WM_NCHITTEST and ScreenToClient speak physical
+        // pixels, while ActualWidth/Height are device-independent units. At 125%
+        // scaling the direct comparison turned the bottom 8 DIP band into ~190
+        // DIPs of resize-only window, which swallowed the BACK button at the
+        // bottom of every page (the button could not be clicked at all).
+        DpiScale dpi = VisualTreeHelper.GetDpi(this);
+        double dipX = cx / dpi.DpiScaleX;
+        double dipY = cy / dpi.DpiScaleY;
         const int band = 8;
-        int width = (int)ActualWidth;
-        int height = (int)ActualHeight;
-        bool bottom = cy >= height - band;
-        bool right = cx >= width - band;
+        bool bottom = dipY >= ActualHeight - band;
+        bool right = dipX >= ActualWidth - band;
         if (bottom && right)
         {
             return Native.HTBOTTOMRIGHT;

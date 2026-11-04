@@ -1,0 +1,170 @@
+<UserControl x:Class="AceDrive.Overlay.Views.AssignJobScreenView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
+    <UserControl.Resources>
+        <!-- One work-family button: the same button for car sharing, taxi and
+             delivery. Tag carries that family's finished-job flag; the shared
+             trigger paints the label teal when it is true. -->
+        <Style x:Key="JobButton" TargetType="Button"
+               BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Margin" Value="0,0,0,8"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}"
+                             Value="True">
+                    <Setter Property="Foreground" Value="#FF97EAD2"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- One quiet card per work family that explains its own rule above the
+             family's button (the day's car-sharing schedule, the delivery
+             hubs), so the block reads as an explanation instead of another
+             button. -->
+        <Style x:Key="JobCard" TargetType="Border">
+            <Setter Property="Background" Value="#14FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#33FFFFFF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="CarShareTime" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFBFC4C9"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="CarShareCustomer" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style x:Key="CarShareDetail" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFA8AFB6"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style x:Key="JobNote" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFBFC4C9"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+    </UserControl.Resources>
+    <!-- Assign-a-job page (PORTPLAN 23): the title at the top like every page,
+         a card above each work-family button explaining that family, the three
+         buttons, and BACK flush at the bottom like the bank's stack. A pick
+         assigns the employee and returns to the employees page, so the player
+         knows what CAR SHARING, TAXI JOB or DELIVERY JOB is worth. -->
+    <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Style="{StaticResource PageTitle}" FontSize="20"
+                   Text="{loc:Loc Key=AssignJobTitle}"/>
+
+        <StackPanel Grid.Row="1" VerticalAlignment="Top" Margin="16,0">
+            <Border Style="{StaticResource JobCard}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FormLabel}" Margin="0,0,0,6"
+                               FontSize="13"
+                               Text="{loc:Loc Key=AssignJobCarShareHeading}"/>
+
+                    <ItemsControl ItemsSource="{Binding CarShareRequests}"
+                                  Visibility="{Binding HasCarShareRequests,
+                                               Converter={StaticResource BoolToVis}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="44"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource CarShareTime}"
+                                               Text="{Binding Time}"/>
+                                    <StackPanel Grid.Column="1" Margin="0,0,8,0">
+                                        <TextBlock Style="{StaticResource CarShareCustomer}"
+                                                   Text="{Binding Customer}"/>
+                                        <TextBlock Style="{StaticResource CarShareDetail}"
+                                                   Text="{Binding Route}"/>
+                                    </StackPanel>
+                                    <TextBlock Grid.Column="2"
+                                               Style="{StaticResource CarShareDetail}"
+                                               VerticalAlignment="Center"
+                                               HorizontalAlignment="Right"
+                                               Text="{Binding Distance}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Style="{StaticResource JobNote}"
+                               Text="{loc:Loc Key=AssignJobCarShareEmpty}"
+                               Visibility="{Binding HasCarShareRequests,
+                                            Converter={StaticResource InverseBoolToVis}}"/>
+
+                    <TextBlock Style="{StaticResource JobNote}"
+                               Text="{loc:Loc Key=AssignJobCarShareRule}"/>
+                    <TextBlock Style="{StaticResource JobNote}"
+                               Text="{loc:Loc Key=AssignJobCarShareEarnings}"/>
+                </StackPanel>
+            </Border>
+
+            <Button Style="{StaticResource JobButton}"
+                    Content="{loc:Loc Key=AssignJobCarSharing}"
+                    Tag="{Binding CarSharingFinished}"
+                    Command="{Binding CarSharingCommand}"/>
+
+            <Border Style="{StaticResource JobCard}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FormLabel}" Margin="0,0,0,6"
+                               FontSize="13"
+                               Text="{loc:Loc Key=AssignJobTaxiHeading}"/>
+
+                    <TextBlock Style="{StaticResource JobNote}"
+                               Text="{loc:Loc Key=AssignJobTaxiNote}"/>
+                </StackPanel>
+            </Border>
+
+            <Button Style="{StaticResource JobButton}"
+                    Content="{loc:Loc Key=AssignJobTaxi}"
+                    Tag="{Binding TaxiJobsFinished}"
+                    Command="{Binding TaxiCommand}"/>
+
+            <Border Style="{StaticResource JobCard}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource FormLabel}" Margin="0,0,0,6"
+                               FontSize="13"
+                               Text="{loc:Loc Key=AssignJobDeliveryHeading}"/>
+
+                    <TextBlock Style="{StaticResource JobNote}"
+                               Text="{loc:Loc Key=AssignJobDeliveryNote}"/>
+                </StackPanel>
+            </Border>
+
+            <Button Style="{StaticResource JobButton}"
+                    Content="{loc:Loc Key=AssignJobDelivery}"
+                    Tag="{Binding DeliveryJobsFinished}"
+                    Command="{Binding DeliveryCommand}"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2">
+            <Button Content="{loc:Loc Key=AssignJobBack}" Command="{Binding BackCommand}">
+                <Button.Style>
+                    <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding BackFlash}" Value="True">
+                                <Setter Property="Foreground" Value="#FF97EAD2"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

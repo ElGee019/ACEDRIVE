@@ -7,8 +7,9 @@ namespace AceDrive.Overlay.Services;
 /// ValuationEntriesService). The flow reads the list to draw a competitor,
 /// pushes the player's own entry once a week, and wipes that entry on the
 /// Monday reset. The live watcher is the event seam: the implementation
-/// raises <see cref="Changed"/> with a fresh list after entries land, so the
-/// flow compares newcomers without polling the network from the gameplay loop.
+/// raises <see cref="Changed"/> with the entries that landed since its last
+/// read, so the flow compares newcomers without polling the network from the
+/// gameplay loop.
 /// </summary>
 public interface IValuationBoard
 {
@@ -31,12 +32,25 @@ public interface IValuationBoard
     /// <summary>Deletes only this player's entry on the weekly reset.</summary>
     Task<bool> WipeOwnAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Starts the live newcomer watcher (no-op offline).</summary>
-    void StartWatching();
+    /// <summary>
+    /// Starts the live newcomer watcher from the moment the entry was made
+    /// (no-op offline). Everything older is already accounted for: the draw
+    /// seeds the settled set and the restart catch-up settles the rest.
+    /// </summary>
+    void StartWatching(DateTime sinceUtc);
 
     /// <summary>Stops the watcher when the entry goes away (reset/offline).</summary>
     void StopWatching();
 
-    /// <summary>A fresh list arrived; raised off the UI thread.</summary>
+    /// <summary>
+    /// Entries that landed since the last read; off the UI thread. Only raised
+    /// while this player's entry is listed, so nothing pays without an entry.
+    /// </summary>
     event Action<IReadOnlyList<ValuationEntry>>? Changed;
+
+    /// <summary>
+    /// This player's entry is gone from the list (wipe/TTL): nothing can be
+    /// compared any more. Raised off the UI thread.
+    /// </summary>
+    event Action? OwnEntryMissing;
 }

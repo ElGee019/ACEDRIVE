@@ -130,7 +130,7 @@ After the split `MainViewModel` is a coordinator, not an owner:
   `ReadoutPaint` — 60 code lines, not 229;
 - intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
 - the panel policy's *call sites*: the navigator's page reports route into
-  `PanelPresenter`, which owns the mid-job call gate, which page a call opens
+  `PanelPresenter`, which owns the mid-job call gate, which page a call resumes
   and `Present`/`Hide` (S6 moved the policy off the coordinator so the story
   flow and the voice router could be root-built);
 - session plumbing that is genuinely view-owned: settings store, save-data
@@ -306,11 +306,10 @@ directory + store, `PoiArrivalRouter`, `Trunk`, preference store + preferences,
 culture, `FareTable`, `InsuranceRules`, `IFriendshipStore`, delivery fares,
 `DrivenDistanceMeter`, `ShopInteriors`).
 *Deviations:*
-- A `PanelPresenter` owns the call gate, the first-show rule and
+- A `PanelPresenter` owns the call gate, the resume policy and
   `Present`/`Hide`; the story flow and the voice router both need them before
-  the coordinator exists. The latch that used to be the coordinator's
-  `_introShown` moved to `OverlayShell.HasBeenShown` (it is a fact about the
-  panel, not a policy).
+  the coordinator exists. The `HasBeenShown` latch is gone: a call resumes the
+  current page, so there is no first-show branch left to decide.
 - `IVoiceHost` is deleted: `VoiceRouter` takes `PanelPresenter`,
   `ICarBrandSource`, `IContentSource`, the HUD, the clock and the log directly,
   which is the option §6 left open.
@@ -530,12 +529,14 @@ with "never" is only allowed for data that cannot change in a session
 (embedded packs), and must say so.
 
 The market valuation's live comparison is the one cache fed by a background
-task: `FirestoreValuationBoard` re-reads the weekly list every 30 s on its own
-token-linked task and publishes only through `Changed`, so the 10 Hz `Poll`
-drains a queue instead of touching the network. The bound is the queue itself —
-a slow tick processes the backlog on the next pass, it never grows without a
-reader — and stopping the watcher (Monday reset, own entry gone) cancels the
-task that fills it.
+task: `FirestoreValuationBoard` asks every 60 s for the entries that landed
+since its cursor (`enteredAt` range read) on its own token-linked task, and
+publishes only through `Changed`, so the 10 Hz `Poll` drains a queue instead of
+touching the network. The read is what keeps the server free: nothing new
+answers no documents, and Firestore bills per document returned, so an idle
+poll costs nothing. The bound is the queue itself — a slow tick processes the
+backlog on the next pass, it never grows without a reader — and stopping the
+watcher (Monday reset, own entry gone) cancels the task that fills it.
 
 The weekly missing-person run adds **no cache row**: its phase, drawn shop,
 elder, attempts, home address and priced receipt are session state owned by
@@ -696,7 +697,7 @@ Working agreements earned so far:
   `bool PinStop(leg)` — reporting plus a degrade signal, never a host getter.
 - Pages are built by one collaborator and cached there; the coordinator keeps
   only the panel *call sites* (`PanelPresenter` owns `Present`/`Hide`, the
-  mid-job call gate and which page a call opens) and routes its own page swaps
+  mid-job call gate and which page a call resumes) and routes its own page swaps
   through `Navigation.ShowScreen`, the one beat-cancelling seam.
 - A page whose domain belongs elsewhere is a report on the host, not a builder
   in the navigator: the settings page (story flow + RESET GAME) and a shift that

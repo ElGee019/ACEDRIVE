@@ -170,6 +170,44 @@
   <data name="CommunityCentreHired" xml:space="preserve"><value>{0} has been hired and joins your team.</value></data>
   <data name="CommunityCentreEmpty" xml:space="preserve"><value>Nobody is looking for work here right now.</value></data>
   <data name="CommunityCentreBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- The employees page behind the menu's EMPLOYEES tile (PORTPLAN 23): the
+       hired crew only, each row's NOT ON JOB / ARRIVED button (or ON JOB text)
+       on the right, the no-unused-cars line above them, and the assign-a-job
+       page the button opens. -->
+  <data name="EmployeesTitle" xml:space="preserve"><value>EMPLOYEES</value></data>
+  <data name="EmployeesTeam" xml:space="preserve"><value>YOUR EMPLOYEES</value></data>
+  <data name="EmployeesEmpty" xml:space="preserve"><value>You have no employees yet. Hire one at the Community Centre.</value></data>
+  <data name="EmployeesNoUnusedCars" xml:space="preserve"><value>No unused cars in your garage.</value></data>
+  <data name="EmployeesNotOnJob" xml:space="preserve"><value>NOT ON JOB</value></data>
+  <data name="EmployeesOnJob" xml:space="preserve"><value>ON JOB</value></data>
+  <data name="EmployeesArrived" xml:space="preserve"><value>ARRIVED</value></data>
+  <data name="EmployeesEarnedXp" xml:space="preserve"><value>{0} earned {1:0.000} XP for you.</value></data>
+  <data name="EmployeesEarnedCr" xml:space="preserve"><value>{0} earned {1:0.00} CR for you.</value></data>
+  <data name="EmployeesBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- The assign-a-job page a NOT ON JOB button opens: the title at the top,
+       the day's car-sharing block, the three work-family buttons and BACK. -->
+  <data name="AssignJobTitle" xml:space="preserve"><value>ASSIGN JOB</value></data>
+  <data name="AssignJobCarSharing" xml:space="preserve"><value>CAR SHARING</value></data>
+  <data name="AssignJobTaxi" xml:space="preserve"><value>TAXI JOB</value></data>
+  <data name="AssignJobDelivery" xml:space="preserve"><value>DELIVERY JOB</value></data>
+  <data name="AssignJobBack" xml:space="preserve"><value>BACK</value></data>
+  <!-- The car-sharing block above the CAR SHARING button: the day's requests,
+       the citizen rule and the XP earnings, in the player's own wording. -->
+  <data name="AssignJobCarShareHeading" xml:space="preserve"><value>CAR SHARING REQUESTS · TODAY</value></data>
+  <data name="AssignJobCarShareEmpty" xml:space="preserve"><value>Nobody needs a car share today.</value></data>
+  <data name="AssignJobCarShareRule" xml:space="preserve"><value>Your amount of citizens set how many Car-Sharing rides are needed.</value></data>
+  <data name="AssignJobCarShareEarnings" xml:space="preserve"><value>Earnings are XP only.</value></data>
+  <data name="AssignJobCarShareTime" xml:space="preserve"><value>{0:00}:{1:00}</value></data>
+  <data name="AssignJobCarShareRoute" xml:space="preserve"><value>{0} → {1}</value></data>
+  <data name="AssignJobCarShareDistance" xml:space="preserve"><value>{0:0.0} km</value></data>
+  <!-- The taxi block above the TAXI JOB button: the one-line promise of what
+       sending an employee on a taxi shift pays. -->
+  <data name="AssignJobTaxiHeading" xml:space="preserve"><value>TAXI JOBS</value></data>
+  <data name="AssignJobTaxiNote" xml:space="preserve"><value>Send any employee out to complete taxi jobs and earn extra CR.</value></data>
+  <!-- The delivery block above the DELIVERY JOB button: the one-line promise
+       of what sending an employee on a delivery pays. -->
+  <data name="AssignJobDeliveryHeading" xml:space="preserve"><value>DELIVERY JOBS</value></data>
+  <data name="AssignJobDeliveryNote" xml:space="preserve"><value>Send any employee out to complete delivery jobs and earn extra CR.</value></data>
   <data name="MaxDialogueTitle" xml:space="preserve"><value>A NEW TURN</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>
@@ -485,6 +523,15 @@ Accept this job?</value></data>
   <data name="ReceiptStandingsLost" xml:space="preserve"><value>You lost {0} positions.</value></data>
   <data name="ReceiptStandingsNoChange" xml:space="preserve"><value>No change in standings.</value></data>
   <data name="ReceiptContinue" xml:space="preserve"><value>CONTINUE</value></data>
+  <!-- Fuel receipt (PORTPLAN 37): a fill EVO's own pump made, priced by the
+       overlay. {0} is the litres, the CR/L on the pump, the amount paid, and
+       the station attendant's familiarity band. Placeholders survive
+       translation; translators may reorder, never remove. -->
+  <data name="FuelReceiptTitle" xml:space="preserve"><value>FUEL RECEIPT</value></data>
+  <data name="FuelReceiptLitres" xml:space="preserve"><value>Fuel added: {0:0.0} L</value></data>
+  <data name="FuelReceiptPrice" xml:space="preserve"><value>Fuel price: €{0:0.00}/L</value></data>
+  <data name="FuelReceiptPaid" xml:space="preserve"><value>Paid: €{0:0.00}</value></data>
+  <data name="FuelReceiptFree" xml:space="preserve"><value>Free Tank Refill card used — no charge this visit.</value></data>
   <!-- Shift-ended page (PORTPLAN 12, Unity ShiftEndedScreen): the shift that
        just timed out, its lifetime records and the best-single-shift world
        standings. {0} is the jobs / amount / minutes / ordinal, {1} the board

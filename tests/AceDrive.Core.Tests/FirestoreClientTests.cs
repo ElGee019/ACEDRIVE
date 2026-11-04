@@ -114,6 +114,31 @@ public sealed class FirestoreClientTests
     }
 
     [Fact]
+    public async Task QueryTextAfter_SendsAGreaterThanFilterOnTheStringValue()
+    {
+        var handler = new FakeFirestoreHandler();
+        var (client, http) = await CreateAsync(handler);
+        using (http)
+        {
+            await client.QueryTextAfterAsync(
+                "acevo_enteredForValuation", "enteredAt",
+                "2026-11-02T12:00:00.0000000Z", CancellationToken.None);
+        }
+
+        Assert.Contains(":runQuery", handler.Uris[^1]);
+        using JsonDocument body = JsonDocument.Parse(handler.Bodies[^1]);
+        JsonElement filter = body.RootElement.GetProperty("structuredQuery")
+            .GetProperty("where").GetProperty("fieldFilter");
+        Assert.Equal("GREATER_THAN", filter.GetProperty("op").GetString());
+        Assert.Equal(
+            "enteredAt",
+            filter.GetProperty("field").GetProperty("fieldPath").GetString());
+        Assert.Equal(
+            "2026-11-02T12:00:00.0000000Z",
+            filter.GetProperty("value").GetProperty("stringValue").GetString());
+    }
+
+    [Fact]
     public async Task List_FollowsThePageToken()
     {
         var handler = new FakeFirestoreHandler();

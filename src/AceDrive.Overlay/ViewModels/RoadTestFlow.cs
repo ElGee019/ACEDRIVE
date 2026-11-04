@@ -271,7 +271,7 @@ public sealed class RoadTestFlow
 
     /// <summary>
     /// The briefing's BACK: no drive started, so the calendar the row was tapped
-    /// on comes back (the player's own page, not the jobs page a call opens).
+    /// on comes back (the player's own page, not the jobs page).
     /// Nothing of the visit exists yet: no receipt, no result, nothing to save.
     /// </summary>
     public void CloseBriefing()
@@ -660,8 +660,8 @@ public sealed class RoadTestFlow
     }
 
     // The receipt page's CONTINUE: the visit is complete (the pick rotated when
-    // the shot settled), so the player lands on the menu — the page a call
-    // opens — instead of the jobs page the receipt was opened over.
+    // the shot settled), so the player lands on the menu instead of the jobs
+    // page the receipt was opened over.
     private void FinishReceipt()
     {
         if (_phase != RoadTestPhase.Receipt)
