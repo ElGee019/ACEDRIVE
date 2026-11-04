@@ -3431,6 +3431,11 @@ public sealed class MainViewModelTests
         // tap only reveals the week's roster.
         screen.ShowCandidatesCommand.Execute(null);
         Assert.IsType<CommunityCentreScreenViewModel>(session.Vm.CurrentScreen);
+
+        // BACK leaves the interior for the main page, exactly like a shop the
+        // player called up: the menu is what a call would have opened.
+        screen.BackCommand.Execute(null);
+        Assert.IsType<MenuScreenViewModel>(session.Vm.CurrentScreen);
     }
 
     [Fact]
