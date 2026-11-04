@@ -10,12 +10,22 @@ internal static class Native
     private const string GameProcessName = "AssettoCorsaEVO";
 
     public const int GWL_EXSTYLE = -20;
+    public const int GWL_STYLE = -16;
     public const int WS_EX_TRANSPARENT = 0x00000020;
     public const int WS_EX_NOACTIVATE = 0x08000000;
+    public const int WS_CAPTION = 0x00C00000;
+    public const int WS_THICKFRAME = 0x00040000;
     public const int WM_ENTERSIZEMOVE = 0x0231;
     public const int WM_EXITSIZEMOVE = 0x0232;
     public const int WM_MOUSEACTIVATE = 0x0021;
+    public const int WM_NCHITTEST = 0x0084;
     public const int MA_NOACTIVATE = 3;
+    // Hit-test results returned from WM_NCHITTEST to keep the resize grip alive
+    // on a window whose WS_THICKFRAME was cleared (a borderless window with no
+    // frame region for the DWM to paint white). BOTTOMRIGHT restores the grip.
+    public const int HTBOTTOMRIGHT = 17;
+    public const int HTBOTTOM = 15;
+    public const int HTRIGHT = 11;
 
     [DllImport("user32.dll")]
     public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
@@ -39,6 +49,61 @@ internal static class Native
 
     [DllImport("kernel32.dll")]
     private static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ScreenToClient(IntPtr hWnd, ref Point point);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    /// <summary>
+    /// Converts a screen point to the window's client coordinates for the
+    /// WM_NCHITTEST resize grip. False when the conversion fails, so the caller
+    /// falls back to the default hit-test instead of misreporting an edge.
+    /// </summary>
+    public static bool TryScreenToClient(IntPtr hWnd, int x, int y, out int clientX, out int clientY)
+    {
+        var point = new Point { X = x, Y = y };
+        if (ScreenToClient(hWnd, ref point))
+        {
+            clientX = point.X;
+            clientY = point.Y;
+            return true;
+        }
+
+        clientX = 0;
+        clientY = 0;
+        return false;
+    }
+
+    // The DWM corner preference: 0x21 sets DWMWA_WINDOW_CORNER_PREFERENCE and
+    // 2 is DWMWCP_ROUND. This replaces the layered-window rounded corners that
+    // AllowsTransparency used to fake, so the overlay can render opaque
+    // (hardware-accelerated) and still keep its chrome. Win11 only: older
+    // builds ignore the attribute, so the window simply keeps square corners.
+    private const int DwmwaWindowCornerPreference = 33;
+    private const int DwmwcpRound = 2;
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(
+        IntPtr hWnd, int attribute, ref int value, int valueSize);
+
+    /// <summary>
+    /// Rounds the window's corners through the DWM instead of a layered window.
+    /// Best-effort: the attribute is ignored before Win11 (the call returns
+    /// E_INVALIDARG), leaving square corners rather than failing the window.
+    /// </summary>
+    public static void RoundCorners(IntPtr hWnd)
+    {
+        int preference = DwmwcpRound;
+        _ = DwmSetWindowAttribute(
+            hWnd, DwmwaWindowCornerPreference, ref preference, sizeof(int));
+    }
 
     /// <summary>True while <paramref name="hWnd"/> owns the foreground.</summary>
     public static bool IsForeground(IntPtr hWnd) => GetForegroundWindow() == hWnd;
@@ -124,5 +189,19 @@ internal static class Native
     {
         int style = GetWindowLong(hWnd, GWL_EXSTYLE);
         _ = SetWindowLong(hWnd, GWL_EXSTYLE, style | WS_EX_NOACTIVATE);
+    }
+
+    /// <summary>
+    /// Clears the caption and thick-frame styles so an opaque borderless window
+    /// has no non-client region for the DWM to paint. On Win11 a
+    /// WindowStyle=None window still carrying WS_THICKFRAME (from
+    /// ResizeMode=CanResizeWithGrip) draws a white strip along its top edge,
+    /// which the DWM's rounded corner then cuts into. The grip's resize survives
+    /// through WM_NCHITTEST (see MainWindow.WndProc) instead of the frame.
+    /// </summary>
+    public static void SetBorderless(IntPtr hWnd)
+    {
+        int style = GetWindowLong(hWnd, GWL_STYLE);
+        _ = SetWindowLong(hWnd, GWL_STYLE, style & ~(WS_CAPTION | WS_THICKFRAME));
     }
 }

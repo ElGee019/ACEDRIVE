@@ -15,8 +15,8 @@ public sealed class FileSaveDataResetter : ISaveDataResetter
 {
     // The career: onboarding walk + profile, wallet/trunk/streak/zone,
     // garage, town, appetite, clock/week, road test, taxi shift, familiarity,
-    // brand mileage, the resident book drawn for taxi jobs and the discovered
-    // POI addresses.
+    // brand mileage, the resident book drawn for taxi jobs, the discovered POI
+    // addresses and the community centre's hired crew.
     private static readonly string[] SaveFiles =
     [
         "onboarding.json",
@@ -33,6 +33,7 @@ public sealed class FileSaveDataResetter : ISaveDataResetter
         "residents.json",
         "addresses.json",
         "todos_state.json",
+        "employees.json",
     ];
 
     private readonly string _directory;

@@ -9,12 +9,14 @@ namespace AceDrive.Core;
 public static class AccidentRules
 {
     /// <summary>
-    /// HOW much of the raw speed share a hit actually costs. WHY a tenth: the
-    /// raw share wrote off half a 40 000 CR car for one 120 km/h shunt, which
-    /// the career economy cannot carry — a full-speed impact now costs 10 % of
-    /// the car and it takes ten of them, unrepaired, to total it.
+    /// HOW much of the raw speed share a hit actually costs. WHY a twentieth:
+    /// the raw share wrote off half a 40 000 CR car for one 120 km/h shunt, and
+    /// even a tenth still billed 2 000 CR for that one bump — twenty times the
+    /// 100 CR a career starts with, which reads as a tax on existing rather
+    /// than the price of one mistake. A full-speed impact now costs 5 % of the
+    /// car and it takes twenty of them, unrepaired, to total it.
     /// </summary>
-    public const double RepairScale = 0.1;
+    public const double RepairScale = 0.05;
 
     /// <summary>
     /// The repair bill as a fraction of the car's value, 0..1. The impact
@@ -23,7 +25,7 @@ public static class AccidentRules
     /// share is then scaled by <see cref="RepairScale"/>. A missing or
     /// non-positive top speed reads 0 (the caller logs the gap rather than
     /// inventing a denominator); an impact above the rated top speed clamps to
-    /// a tenth of the value, the same as a hit at exactly the rated speed.
+    /// a twentieth of the value, the same as a hit at exactly the rated speed.
     /// </summary>
     public static double RepairFraction(double impactSpeedKmh, double topSpeedKmh)
     {

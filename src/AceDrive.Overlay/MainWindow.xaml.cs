@@ -24,10 +24,6 @@ public partial class MainWindow : Window
 {
     private const string BackdropUri = "pack://application:,,,/Assets/backdrop.webp";
 
-    // Matches the alpha of the #F214161A solid fallback (0xF2 = 95 %): the
-    // game stays 5 % visible through the panel.
-    private const double BackdropOpacity = 0.95;
-
     private readonly MainViewModel _vm;
     private readonly ILog _log;
     // The call input: this window owns the HWND and its messages, the service
@@ -39,7 +35,7 @@ public partial class MainWindow : Window
     private readonly bool _introDone;
 
     // The deferred hide (ApplyShown): a blank page is painted before the window
-    // goes away, so the frame a layered window keeps for its next Show() is the
+    // goes away, so the frame the window keeps for its next Show() is the
     // chrome instead of the page being replaced.
     private bool _hidePending;
     private int _hideTicks;
@@ -85,6 +81,12 @@ public partial class MainWindow : Window
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             HwndSource.FromHwnd(hwnd)?.AddHook(WndProc);
+            // The window is opaque (AllowsTransparency=False) so it renders on
+            // the GPU. The DWM rounds the corners, and the caption/thick-frame
+            // styles are cleared so no white non-client strip is painted across
+            // the top (resize keeps working through WM_NCHITTEST).
+            Native.RoundCorners(hwnd);
+            Native.SetBorderless(hwnd);
             _callInput.Attach(hwnd, () => _vm.ToggleShowCommand.Execute(null));
         };
         // WHY: App only calls Show() when the VM wants the window visible at
@@ -156,7 +158,6 @@ public partial class MainWindow : Window
             Backdrop.Background = new ImageBrush(art)
             {
                 Stretch = Stretch.UniformToFill,
-                Opacity = BackdropOpacity,
             };
             // The window keeps the XAML standard size (the home page's design
             // proportions): the art fills it and crops the small difference
@@ -207,12 +208,12 @@ public partial class MainWindow : Window
         ScheduleHide();
     }
 
-    // WHY the hide is blanked and deferred by one painted frame: a layered
-    // (AllowsTransparency) window keeps the last frame it painted while it is
-    // hidden, and Show() presents that frame before the page handed over since
-    // can be drawn — the missing-person receipt briefly flashed the quest page
-    // it replaced. Blanking the page here, then hiding once the blank frame has
-    // been painted, leaves the window with nothing stale to show.
+    // WHY the hide is blanked and deferred by one painted frame: a hidden
+    // window keeps the last frame it painted while it is hidden, and Show()
+    // presents that frame before the page handed over since can be drawn — the
+    // missing-person receipt briefly flashed the quest page it replaced.
+    // Blanking the page here, then hiding once the blank frame has been
+    // painted, leaves the window with nothing stale to show.
     private void ScheduleHide()
     {
         _hidePending = true;
@@ -330,6 +331,46 @@ public partial class MainWindow : Window
         {
             _vm.SetResizing(false);
         }
+        else if (msg == Native.WM_NCHITTEST && ResizeHitTest(hwnd, lParam) is { } resizeEdge)
+        {
+            // WHY: the caption/thick-frame styles were cleared so the DWM paints
+            // no white strip across the top, but that also removed the OS resize
+            // border. Reporting the bottom-right corner (and the bottom/right
+            // edges) here restores the grip resize without the frame.
+            handled = true;
+            return new IntPtr(resizeEdge);
+        }
         return IntPtr.Zero;
+    }
+
+    // Maps the mouse screen point to the client rect and reports a resize edge
+    // when it lands in the grip band, or null so DefWindowProc keeps the default.
+    private int? ResizeHitTest(IntPtr hwnd, IntPtr lParam)
+    {
+        int x = unchecked((short)(long)lParam);
+        int y = unchecked((short)((long)lParam >> 16));
+        if (!Native.TryScreenToClient(hwnd, x, y, out int cx, out int cy))
+        {
+            return null;
+        }
+
+        const int band = 8;
+        int width = (int)ActualWidth;
+        int height = (int)ActualHeight;
+        bool bottom = cy >= height - band;
+        bool right = cx >= width - band;
+        if (bottom && right)
+        {
+            return Native.HTBOTTOMRIGHT;
+        }
+        if (bottom)
+        {
+            return Native.HTBOTTOM;
+        }
+        if (right)
+        {
+            return Native.HTRIGHT;
+        }
+        return null;
     }
 }

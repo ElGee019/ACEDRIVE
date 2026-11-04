@@ -4,18 +4,18 @@ namespace AceDrive.Core.Tests;
 
 /// <summary>The accident repair economy (Unity RepairCostCalculator's
 /// successor, but scaled by impact speed instead of trip distance): a top
-/// speed impact costs a tenth of the car, half the top speed half of that, the
-/// fraction clamps at both ends, and the bill never passes the car's
+/// speed impact costs a twentieth of the car, half the top speed half of that,
+/// the fraction clamps at both ends, and the bill never passes the car's
 /// price.</summary>
 public sealed class AccidentRulesTests
 {
     [Fact]
-    public void TopSpeedImpact_CostsATenthOfTheCar()
+    public void TopSpeedImpact_CostsATwentiethOfTheCar()
     {
         double fraction = AccidentRules.RepairFraction(240.0, 240.0);
 
-        Assert.Equal(0.1, fraction, 6);
-        Assert.Equal(4000.0, AccidentRules.RepairCost(40000.0, fraction), 6);
+        Assert.Equal(0.05, fraction, 6);
+        Assert.Equal(2000.0, AccidentRules.RepairCost(40000.0, fraction), 6);
     }
 
     [Fact]
@@ -23,24 +23,24 @@ public sealed class AccidentRulesTests
     {
         double fraction = AccidentRules.RepairFraction(120.0, 240.0);
 
-        Assert.Equal(0.05, fraction, 6);
-        Assert.Equal(2000.0, AccidentRules.RepairCost(40000.0, fraction), 6);
+        Assert.Equal(0.025, fraction, 6);
+        Assert.Equal(1000.0, AccidentRules.RepairCost(40000.0, fraction), 6);
     }
 
     [Fact]
     public void TheScaleIsLinear()
     {
-        Assert.Equal(0.025, AccidentRules.RepairFraction(60.0, 240.0), 6);
-        Assert.Equal(0.075, AccidentRules.RepairFraction(180.0, 240.0), 6);
+        Assert.Equal(0.0125, AccidentRules.RepairFraction(60.0, 240.0), 6);
+        Assert.Equal(0.0375, AccidentRules.RepairFraction(180.0, 240.0), 6);
     }
 
     [Fact]
-    public void ImpactAboveTheRatedTopSpeed_ClampsToTheSameTenth()
+    public void ImpactAboveTheRatedTopSpeed_ClampsToTheSameTwentieth()
     {
         double fraction = AccidentRules.RepairFraction(300.0, 240.0);
 
-        Assert.Equal(0.1, fraction, 6);
-        Assert.Equal(4000.0, AccidentRules.RepairCost(40000.0, fraction), 6);
+        Assert.Equal(0.05, fraction, 6);
+        Assert.Equal(2000.0, AccidentRules.RepairCost(40000.0, fraction), 6);
     }
 
     [Fact]

@@ -56,6 +56,9 @@ internal sealed class TestSessionOptions
     public FakeCarBrandSource? CarBrands { get; init; }
     public Trunk? Trunk { get; init; }
     public IReadOnlyList<IPoiArrivalHandler>? PoiHandlers { get; init; }
+    // The community centre's hired crew and weekly hire roster (PORTPLAN 54):
+    // a suite that pins the roster hands its fake in instead of starting empty.
+    public IEmployeeStore? EmployeeStore { get; init; }
     public PoiDirectory? PoiDirectory { get; init; }
     public IPoiDirectoryStore? PoiStore { get; init; }
     public PoiSpawner? PoiSpawner { get; init; }

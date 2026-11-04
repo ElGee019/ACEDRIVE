@@ -4,7 +4,7 @@
         xmlns:vm="clr-namespace:AceDrive.Overlay.ViewModels"
         xmlns:views="clr-namespace:AceDrive.Overlay.Views"
         Title="AceDrive HUD" Width="413.6" Height="200" MinHeight="200"
-        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStyle="None" AllowsTransparency="False" Background="#14161A"
         ShowActivated="False" ShowInTaskbar="False" Topmost="True"
         ResizeMode="NoResize" Focusable="False">
     <!-- Same two-ring companion frame as MainWindow: a 200 px strip while
@@ -27,8 +27,10 @@
         <FontFamily x:Key="TourneyThin">pack://application:,,,/AceDrive.Overlay;component/Assets/Fonts/#Tourney Thin</FontFamily>
     </Window.Resources>
     <!-- The frame is the same black as the driving strip; the request page
-         paints no backdrop of its own. -->
-    <Border Background="#F214161A" CornerRadius="18" Padding="10">
+         paints no backdrop of its own. The outer Border stays a plain
+         rectangle: the DWM rounds the window's corners (Native.RoundCorners),
+         so a second CornerRadius here would clip the white ring unevenly. -->
+    <Border Background="#14161A" Padding="10">
         <Border BorderBrush="#FFFFFFFF" BorderThickness="2" CornerRadius="8" Padding="14,10">
             <Grid>
                 <!-- Normal task text: the destination/wrong-car line, the

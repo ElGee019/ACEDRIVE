@@ -159,6 +159,17 @@
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
   <data name="PancakeTitle" xml:space="preserve"><value>PANCAKES</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>COMMUNITY CENTRE</value></data>
+  <!-- The post-intro community centre interior (PORTPLAN 54, Unity
+       CommunityCentre's hire mode): one greeting, the HIRE AN EMPLOYEE reveal,
+       the week's five resident candidates and the confirmation after a hire. -->
+  <data name="CommunityCentreGreeting" xml:space="preserve"><value>The community centre keeps the town running. Hire a resident to join your team.</value></data>
+  <data name="CommunityCentreHire" xml:space="preserve"><value>HIRE AN EMPLOYEE</value></data>
+  <data name="CommunityCentreCandidates" xml:space="preserve"><value>RESIDENTS LOOKING FOR WORK</value></data>
+  <data name="CommunityCentreFriendship" xml:space="preserve"><value>Familiarity: {0}</value></data>
+  <data name="CommunityCentreHireRow" xml:space="preserve"><value>HIRE</value></data>
+  <data name="CommunityCentreHired" xml:space="preserve"><value>{0} has been hired and joins your team.</value></data>
+  <data name="CommunityCentreEmpty" xml:space="preserve"><value>Nobody is looking for work here right now.</value></data>
+  <data name="CommunityCentreBack" xml:space="preserve"><value>BACK</value></data>
   <data name="MaxDialogueTitle" xml:space="preserve"><value>A NEW TURN</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="VoiceInfoTitle" xml:space="preserve"><value>VOICE CONTROL</value></data>

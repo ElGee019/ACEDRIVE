@@ -89,11 +89,11 @@ public sealed class JobAccidentTests
         Assert.Equal("HudAccidentRepair", hud.TaskPrompt.ActionKey);
         // The prompt carries the impact speed, the customer who lost the
         // friendship and the bill the button takes (120 of 240 km/h on a
-        // 40 000 CR car: a twentieth of its value).
+        // 40 000 CR car: a fortieth of its value).
         Assert.Equal("120", hud.TaskPrompt.Args![0]);
         var (customer, delta) = Assert.Single(friends.Deltas);
         Assert.Equal(customer, hud.TaskPrompt.Args[1]);
-        Assert.Equal("2000.00", hud.TaskPrompt.Args[2]);
+        Assert.Equal("1000.00", hud.TaskPrompt.Args[2]);
         Assert.Equal(-1, delta);
         // The ride cannot be resumed: both job commands guard on the phase, and
         // the crash dropped it to None.
@@ -110,12 +110,12 @@ public sealed class JobAccidentTests
         TestSessionResult rig = New(garage, hud, new FakeFriendshipStore(), wallet);
         TaxiFlow.Propose(rig.Vm);
         TaxiFlow.Pickup(rig.Vm, rig.Clock);
-        Crash(rig.Vm, rig.Clock, rig.Tel); // 120 of 240 km/h: a twentieth of the car's value
+        Crash(rig.Vm, rig.Clock, rig.Tel); // 120 of 240 km/h: a fortieth of the car's value
 
         hud.RaiseTaskAction();
 
-        Assert.Equal(48000.0, wallet.Cash, 6);              // 40000 × 0.05 paid
-        Assert.Equal(1800.0, wallet.PendingInsurance, 6);   // 90 % of the bill
+        Assert.Equal(49000.0, wallet.Cash, 6);              // 40000 × 0.025 paid
+        Assert.Equal(900.0, wallet.PendingInsurance, 6);    // 90 % of the bill
         Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
         Assert.Null(hud.TaskPrompt);
         Assert.IsType<MenuScreenViewModel>(rig.Vm.CurrentScreen);
@@ -134,7 +134,7 @@ public sealed class JobAccidentTests
 
         hud.RaiseTaskAction();
 
-        Assert.Equal(48000.0, wallet.Cash, 6);
+        Assert.Equal(49000.0, wallet.Cash, 6);
         Assert.Equal(0.0, wallet.PendingInsurance, 6);
         Assert.IsType<MenuScreenViewModel>(rig.Vm.CurrentScreen);
     }
@@ -143,7 +143,7 @@ public sealed class JobAccidentTests
     public void RepairWithShortCash_LeavesTheDebtAndClaimsTheWholeBill()
     {
         var hud = new FakeTelemetryHud();
-        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
+        var wallet = new DriverWallet(new DriverState(500.0, 0.0));
         Garage garage = GarageWith(insured: true);
         TestSessionResult rig = New(garage, hud, new FakeFriendshipStore(), wallet);
         TaxiFlow.Propose(rig.Vm);
@@ -152,11 +152,11 @@ public sealed class JobAccidentTests
 
         hud.RaiseTaskAction();
 
-        // The repair is not optional: the 2 000 CR bill leaves a 1 000 CR debt
+        // The repair is not optional: the 1 000 CR bill leaves a 500 CR debt
         // (Unity's RepairScreen subtracts regardless) and the claim is 90 % of
         // the bill, not of what the cash happened to hold.
-        Assert.Equal(-1000.0, wallet.Cash, 6);
-        Assert.Equal(1800.0, wallet.PendingInsurance, 6);
+        Assert.Equal(-500.0, wallet.Cash, 6);
+        Assert.Equal(900.0, wallet.PendingInsurance, 6);
         Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
     }
 
@@ -171,12 +171,12 @@ public sealed class JobAccidentTests
 
         // No job was live, so the prompt names no lost friendship: just the
         // impact speed and the bill the button takes (120 of 240 km/h on a
-        // 40 000 CR car: a twentieth of its value).
+        // 40 000 CR car: a fortieth of its value).
         Assert.NotNull(hud.TaskPrompt);
         Assert.Equal("HudAccidentSolo", hud.TaskPrompt!.TextKey);
         Assert.Equal("HudAccidentRepair", hud.TaskPrompt.ActionKey);
         Assert.Equal("120", hud.TaskPrompt.Args![0]);
-        Assert.Equal("2000.00", hud.TaskPrompt.Args[1]);
+        Assert.Equal("1000.00", hud.TaskPrompt.Args[1]);
         Assert.Equal(2, hud.TaskPrompt.Args.Count);
         Assert.Empty(friends.Deltas);
     }
@@ -198,8 +198,8 @@ public sealed class JobAccidentTests
         Crash(rig.Vm, rig.Clock, rig.Tel);
         hud.RaiseTaskAction();
 
-        Assert.Equal(48000.0, wallet.Cash, 6);              // 40000 × 0.05 paid
-        Assert.Equal(1800.0, wallet.PendingInsurance, 6);   // 90 % of the bill
+        Assert.Equal(49000.0, wallet.Cash, 6);              // 40000 × 0.025 paid
+        Assert.Equal(900.0, wallet.PendingInsurance, 6);    // 90 % of the bill
         Assert.Equal(0.0, garage.Current!.BodyDamage, 6);
         Assert.Null(hud.TaskPrompt);
         // A free-roam crash is not an interruption: the drive keeps the screen.
@@ -226,7 +226,7 @@ public sealed class JobAccidentTests
         Crash(rig.Vm, rig.Clock, rig.Tel);
         hud.RaiseTaskAction();
 
-        Assert.Equal(48000.0, wallet.Cash, 6);
+        Assert.Equal(49000.0, wallet.Cash, 6);
         PointOfInterest broker = Assert.Single(
             directory.All, poi => poi.Type == PoiTypes.Insurance);
         var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
@@ -307,8 +307,8 @@ public sealed class JobAccidentTests
         Crash(rig.Vm, rig.Clock, rig.Tel);
         hud.RaiseTaskAction();
 
-        Assert.Equal(48000.0, wallet.Cash, 6);            // the bill is still taken
-        Assert.Equal(1800.0, wallet.PendingInsurance, 6); // 90 % of the 2 000 CR bill
+        Assert.Equal(49000.0, wallet.Cash, 6);           // the bill is still taken
+        Assert.Equal(900.0, wallet.PendingInsurance, 6); // 90 % of the 1 000 CR bill
         var intro = Assert.IsType<PoiIntroScreenViewModel>(rig.Vm.CurrentScreen);
         Assert.EndsWith(
             Strings.Get("PoiIntroInsuranceGrandma"), intro.Body, StringComparison.Ordinal);
@@ -406,14 +406,14 @@ public sealed class JobAccidentTests
 
         Crash(rig.Vm, rig.Clock, rig.Tel);
 
-        // 120 of 240 km/h on a 40 000 CR car is a 2 000 CR bill; half is 1 000.
-        Assert.Equal("1000.00", hud.TaskPrompt!.Args![2]);
+        // 120 of 240 km/h on a 40 000 CR car is a 1 000 CR bill; half is 500.
+        Assert.Equal("500.00", hud.TaskPrompt!.Args![2]);
         Assert.Contains(
             hud.TaskPrompt.Notes!, note => note.TextKey == "RewardHalfDamageNote");
 
         hud.RaiseTaskAction();
 
-        Assert.Equal(49000.0, wallet.Cash, 6);
+        Assert.Equal(49500.0, wallet.Cash, 6);
         Assert.Equal(0.0, wallet.PendingInsurance, 6);
         Assert.DoesNotContain(rig.Trunk.Items, item => item.Name == "HALF DAMAGE REDUCTION");
     }
@@ -534,6 +534,6 @@ public sealed class JobAccidentTests
         intro.ContinueCommand.Execute(null);
 
         Assert.Same(page, rig.Vm.CurrentScreen);
-        Assert.Equal("CR48000.00", page.CashAmount);
+        Assert.Equal("CR49000.00", page.CashAmount);
     }
 }

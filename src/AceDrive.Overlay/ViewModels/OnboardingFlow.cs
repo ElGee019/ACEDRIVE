@@ -54,8 +54,11 @@ public sealed class OnboardingFlow : IScreenController
     private readonly ICallArmer? _callArmer;
     // Story destinations that are not shop interiors: the friend pickups,
     // grandma's pancakes and the community centre. Registering the action here
-    // keeps a new leg out of EnterPoi's branching.
-    private readonly Dictionary<string, Action<PointOfInterest>> _storyArrivals;
+    // keeps a new leg out of EnterPoi's branching. The answer says whether the
+    // story consumed the tap: the community centre answers false once its
+    // licence is banked, which lets the typed router open the hiring interior
+    // on the same door.
+    private readonly Dictionary<string, Func<PointOfInterest, bool>> _storyArrivals;
 
     // WHY read through on demand: Data/*.json edits (wake aliases, transcript
     // confusions) take effect while the overlay runs; pages built later pick
@@ -153,10 +156,18 @@ public sealed class OnboardingFlow : IScreenController
         _stopVoice = stopVoice;
         _callBinder = callBinder;
         _callArmer = callArmer;
-        _storyArrivals = new Dictionary<string, Action<PointOfInterest>>(StringComparer.Ordinal)
+        _storyArrivals = new Dictionary<string, Func<PointOfInterest, bool>>(StringComparer.Ordinal)
         {
-            [PoiTypes.Person] = PickUpFriend,
-            [PoiTypes.Home] = _ => EnterHome(),
+            [PoiTypes.Person] = friend =>
+            {
+                PickUpFriend(friend);
+                return true;
+            },
+            [PoiTypes.Home] = _ =>
+            {
+                EnterHome();
+                return true;
+            },
             [PoiTypes.CommunityCentre] = _ => EnterCommunityCentre(),
         };
         _progress = _onboarding.Load();
@@ -526,16 +537,21 @@ public sealed class OnboardingFlow : IScreenController
 
     // The community-centre arrival grants the taxi license. Its Continue banks
     // the visit so the HUD never sends a licensed driver back to the same door.
-    // The address stays on the addresses page, but a later visit is closed:
-    // the license conversation only opens on its live leg.
-    private void EnterCommunityCentre()
+    // The address stays on the addresses page; a later visit is the hiring
+    // interior (Unity's post-intro hire mode), so this story stop answers false
+    // and lets EnterPoi's typed router build that page. Before the tour reaches
+    // the centre there is no interior: a stray ENTER stays a no-op.
+    private bool EnterCommunityCentre()
     {
         if (!_progress.PancakesDone || _progress.CommunityCentreDone)
         {
-            return;
+            // True = the story answered the tap (nothing to open yet); false =
+            // the introduction is over and the business interior owns the door.
+            return !_progress.PancakesDone;
         }
 
         ShowCommunityCentreDialogue();
+        return true;
     }
 
     private void ShowCommunityCentreDialogue() =>
@@ -659,9 +675,10 @@ public sealed class OnboardingFlow : IScreenController
         // (an interior, a dialogue, or a door with nothing to open).
         _hud?.DestinationEntered();
 
-        if (_storyArrivals.TryGetValue(poi.Type, out Action<PointOfInterest>? arrive))
+        if (_storyArrivals.TryGetValue(
+                poi.Type, out Func<PointOfInterest, bool>? arrive)
+            && arrive(poi))
         {
-            arrive(poi);
             return;
         }
 

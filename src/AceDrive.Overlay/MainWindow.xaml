@@ -4,8 +4,8 @@
         xmlns:vm="clr-namespace:AceDrive.Overlay.ViewModels"
         xmlns:views="clr-namespace:AceDrive.Overlay.Views"
         Title="AceDrive" Width="413.6" Height="917.2"
-        WindowStyle="None" AllowsTransparency="True" ShowActivated="False"
-        Background="Transparent" Topmost="True"
+        WindowStyle="None" AllowsTransparency="False" ShowActivated="False"
+        Background="#14161A" Topmost="True"
         ResizeMode="CanResizeWithGrip" ShowInTaskbar="True" MinWidth="200" MinHeight="80">
     <!-- Standard panel: the home page's 1080 x 2280 design canvas mapped to
          the 413.6 width gives 873.2 for the page; the 44 px of border chrome
@@ -46,6 +46,9 @@
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:AddressesScreenViewModel}">
             <views:AddressesScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:CommunityCentreScreenViewModel}">
+            <views:CommunityCentreScreenView/>
         </DataTemplate>
         <DataTemplate DataType="{x:Type vm:SuggestCarModScreenViewModel}">
             <views:SuggestCarModScreenView/>
@@ -160,13 +163,16 @@
         </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes
-         the edge line 10 px inward so the dark fill frames it. The window fill
-         is transparent because an opaque window background would square off the
-         rounded corners behind both rings.
+         the edge line 10 px inward so the dark fill frames it. The window is
+         opaque (AllowsTransparency="False") so WPF renders it on the GPU; the
+         rounded outer corners come from the DWM (Native.RoundCorners), so this
+         outer Border stays a plain rectangle and no longer carries its own
+         CornerRadius — a second, larger curve here pulled the dark fill away
+         from the DWM's corner and clipped the white inner ring at the top.
          The dark fill is the fallback: the WebP backdrop is applied in code
          (MainWindow.ApplyBackdrop) because a XAML ImageSource would render-
          thread-crash on machines whose WIC has no WebP codec (older Win10). -->
-    <Border x:Name="Backdrop" Background="#F214161A" CornerRadius="18" Padding="10">
+    <Border x:Name="Backdrop" Background="#14161A" Padding="10">
         <Border BorderBrush="#FFFFFFFF" BorderThickness="2" CornerRadius="8" Padding="10">
             <!-- Screens only, companion parity. Scroll: fixed size can clip taller pages.
                  Horizontal scroll stays off so long lines wrap inside the

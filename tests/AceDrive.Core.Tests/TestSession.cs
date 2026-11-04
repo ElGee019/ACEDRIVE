@@ -310,6 +310,15 @@ internal static class TestSession
         var touristenFlow = new TouristenfahrtenFlow(
             touristenMenu, touristenDoors, options.Hud, touristenSettlement, meter,
             taxiRulesInstance, beat, clock, touristenWeekends, new Random(12), logger);
+        // The community centre's post-intro hiring page (PORTPLAN 54): the
+        // same resident table, zone and directory the production root hands it,
+        // with the crew's fake store and its own seeded stream.
+        var employeeRoster = new EmployeeRoster(
+            options.EmployeeStore ?? new FakeEmployeeStore(), new Random(16));
+        var communityCentre = new CommunityCentreInteriors(
+            employeeRoster, residentsInstance, directory, zoneInstance,
+            new PoiGenerator(map, PoiCatalog.Default, seed: 13),
+            friendsInstance, () => dayCycle.DisplayWeek, beat, logger);
         // The venue's typed handler, registered after its flow exactly like the
         // root does, so ENTER on the pinned house opens the showcase.
         IReadOnlyList<IPoiArrivalHandler> arrivals =
@@ -317,6 +326,9 @@ internal static class TestSession
             new WhereIsWillyPoiHandler(willyFlow),
             new ValuationPoiHandler(valuationFlow),
             new RoadTestPoiHandler(roadTestFlow),
+            new DelegatePoiHandler(
+                PoiTypes.CommunityCentre,
+                (_, backCommand, _) => communityCentre.Open(backCommand)),
             .. handlers,
         ];
         var poiArrivals = new PoiArrivalRouter(poiWorld.Handlers(arrivals));

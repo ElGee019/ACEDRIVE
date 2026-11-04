@@ -17,6 +17,7 @@ public sealed class SaveDataResetterTests
             "city.json", "hunger.json", "gameclock.json", "roadtest.json",
             "shift.json", "friendship.json", "brand_mileage.json",
             "residents.json", "addresses.json", "todos_state.json",
+            "employees.json",
         ];
         foreach (string name in career)
         {

@@ -121,6 +121,17 @@
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
   <data name="PancakeTitle" xml:space="preserve"><value>PANNEKOEKEN</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>BUURTHUIS</value></data>
+  <!-- Het buurthuis na de introductie (PORTPLAN 54): begroeting, de knop om
+       werknemers te zoeken, de vijf kandidaten van deze week en de bevestiging
+       na een aanwerving. -->
+  <data name="CommunityCentreGreeting" xml:space="preserve"><value>Het buurthuis houdt de buurt draaiende. Huur een bewoner in voor je team.</value></data>
+  <data name="CommunityCentreHire" xml:space="preserve"><value>HUUR EEN WERKNEMER IN</value></data>
+  <data name="CommunityCentreCandidates" xml:space="preserve"><value>BEWONERS DIE WERK ZOEKEN</value></data>
+  <data name="CommunityCentreFriendship" xml:space="preserve"><value>Bekendheid: {0}</value></data>
+  <data name="CommunityCentreHireRow" xml:space="preserve"><value>HUUR IN</value></data>
+  <data name="CommunityCentreHired" xml:space="preserve"><value>{0} is aangenomen en sluit zich bij je team aan.</value></data>
+  <data name="CommunityCentreEmpty" xml:space="preserve"><value>Er is op dit moment niemand op zoek naar werk.</value></data>
+  <data name="CommunityCentreBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="MaxDialogueTitle" xml:space="preserve"><value>EEN NIEUWE WENDING</value></data>
   <data name="DialogueContinue" xml:space="preserve"><value>DOORGAAN</value></data>
   <data name="SpeakerGrandma" xml:space="preserve"><value>Oma</value></data>

@@ -472,6 +472,17 @@ public partial class App : Application, IDisposable
         var dayCycle = new DayCycle(
             game, shift, shifts, shiftStandings, telemetry, profileStore,
             rivals, saver, beat, calendarGate, startWeek, _log);
+        // The community centre's post-intro hiring interior (PORTPLAN 54): its
+        // roster draws from the same resident table and zone the taxi jobs use,
+        // and its own seeded stream keeps a hire roll from reshuffling another
+        // draw. The handler joins the typed arrival list below; only a career
+        // that already banked the licence ever reaches it, because the story
+        // flow declines the tap from then on.
+        var employeeRoster = new EmployeeRoster(
+            new JsonEmployeeStore(_log), new Random(taxiSeed + 16));
+        var communityCentre = new CommunityCentreInteriors(
+            employeeRoster, residents, poiDirectory, zone, poiGenerator,
+            friendships, () => dayCycle.DisplayWeek, beat, _log);
         // The weekly missing-person run (ToWhereIsWilly.md): its own flow owns
         // the Wednesday draw, the search, the drive home and the receipt, so
         // the coordinator only forwards the calendar tap, the poll and the one
@@ -507,6 +518,12 @@ public partial class App : Application, IDisposable
             new WhereIsWillyPoiHandler(willyFlow),
             new RoadTestPoiHandler(roadTestFlow),
             new StorePoiHandler(stores, trunk, driver, garage, friendships, beat),
+            // The community centre is a story door during the introduction;
+            // the story flow answers those taps itself and declines the ones
+            // after the licence, so only the post-intro visit lands here.
+            new DelegatePoiHandler(
+                PoiTypes.CommunityCentre,
+                (_, backCommand, _) => communityCentre.Open(backCommand)),
         ];
         // The session-start catch-up (PORTPLAN items 30/47): the starter car a
         // pre-garage save never created, and today's login bonus. It owns the

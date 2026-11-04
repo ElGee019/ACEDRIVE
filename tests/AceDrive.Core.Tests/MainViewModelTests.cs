@@ -3409,6 +3409,31 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void EnteringTheCommunityCentreAfterTheIntro_OpensTheHiringPage()
+    {
+        // The licence is banked: the same door is now the town's hiring hall,
+        // not the introduction's conversation (Unity's hire mode).
+        var progress = new OnboardingState(
+            null, null, BirthdayDone: true,
+            PancakesDone: true,
+            CommunityCentreAddress: new AddressLocation("Street 1", 17, HouseSide.Left),
+            CommunityCentreDone: true,
+            MaxErrandDone: true);
+        var hud = new FakeTelemetryHud();
+        var session = Create(progress: progress, hud: hud);
+
+        var screen = OpenPoi<CommunityCentreScreenViewModel>(
+            session.Vm, hud, "Community Centre");
+
+        Assert.True(session.Vm.IsShown);
+        Assert.Equal(Strings.Get("CommunityCentreGreeting"), screen.Greeting);
+        // The page opens on Unity's one hiring button and stays put when the
+        // tap only reveals the week's roster.
+        screen.ShowCandidatesCommand.Execute(null);
+        Assert.IsType<CommunityCentreScreenViewModel>(session.Vm.CurrentScreen);
+    }
+
+    [Fact]
     public void JustinsPlace_SitsOnAStreetConnectingHomeAndMaxs()
     {
         // The pair shares one street that connects the home street or Max's

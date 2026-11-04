@@ -77,6 +77,12 @@ public partial class HudWindow : Window
         {
             var hwnd = new WindowInteropHelper(this).Handle;
             Native.SetNoActivate(hwnd);
+            // The window is opaque (AllowsTransparency=False) so it renders on
+            // the GPU. The DWM rounds the corners, and the caption/thick-frame
+            // styles are cleared so no white non-client strip is painted across
+            // the top (the HUD never resizes, so no WM_NCHITTEST is needed).
+            Native.RoundCorners(hwnd);
+            Native.SetBorderless(hwnd);
             HwndSource.FromHwnd(hwnd)?.AddHook(OnMessage);
         };
         PreviewMouseLeftButtonDown += OnDrag;
