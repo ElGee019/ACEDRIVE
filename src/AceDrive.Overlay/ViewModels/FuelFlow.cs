@@ -38,6 +38,12 @@ public sealed class FuelFlow
     private string? _lastTrack;
     private int _lastPacketId = -1;
 
+    // Where the driven car's odometer stood when this session was first seen:
+    // a fill is priced only after the player has driven away from the spawn, so
+    // the tank EVO tops up on load/restart is never billed.
+    private double _sessionStartOdometerKm;
+    private bool _sessionPrimed;
+
     // WHY late: the host is the coordinator, built after this flow. Only a
     // settled fill reaches it, and the coordinator attaches in its constructor.
     private IFuelHost _host = null!;
@@ -101,9 +107,11 @@ public sealed class FuelFlow
     }
 
     /// <summary>
-    /// Feeds one live physics sample. A settled fill is charged and reported
-    /// here; the introduction drives are free, the same gate the accident and
-    /// the breakdown rolls use, so the walk is never interrupted by a bill.
+    /// Feeds one live sample. Only a fill the player drove to is charged and
+    /// reported: EVO tops the tank up on load, on restart and at the pit box,
+    /// and the temporary freeroam map can spawn the car with a fresh tank, so
+    /// those refuels are re-primed instead of billed. The introduction drives
+    /// are free too, the same gate the accident and breakdown rolls use.
     /// </summary>
     public void Observe(TelemetrySample sample, DateTime now)
     {
@@ -112,8 +120,41 @@ public sealed class FuelFlow
             return;
         }
 
+        if (sample.FuelLitres is not { } litres || _garage.Current is not { } car)
+        {
+            // No official fuel field (graphics block missing/torn) or no car to
+            // bill: nothing can be priced. The tracker keeps its state so a
+            // one-frame graphic hiccup does not split a real fill in two.
+            return;
+        }
+
         bool newSession = IsNewSession(sample);
-        if (_fills.Observe(sample.FuelLitres, now, newSession) is { } fill)
+        if (newSession || !_sessionPrimed)
+        {
+            _sessionPrimed = true;
+            _sessionStartOdometerKm = car.Odometer;
+        }
+
+        // A tank that was topped up at the pit box (load/restart/pit service)
+        // is not a purchase, and neither is a jump in the first metres of a
+        // session: the player has to have driven away from the spawn before a
+        // fill counts. Re-priming here drops any accumulation started under
+        // the pit flag, so a stop that begins in the box is never billed even
+        // when the car leaves before the level settles.
+        double drivenKm = car.Odometer - _sessionStartOdometerKm;
+        if (drivenKm < 0.0)
+        {
+            // An engine swap can reset the odometer; start the count again.
+            _sessionStartOdometerKm = car.Odometer;
+            drivenKm = 0.0;
+        }
+        if (sample.InPit || drivenKm < (_rules.MinDriveBeforeFillMetres / 1000.0))
+        {
+            _fills.Reset();
+            return;
+        }
+
+        if (_fills.Observe(litres, now, newSession) is { } fill)
         {
             Settle(fill);
         }

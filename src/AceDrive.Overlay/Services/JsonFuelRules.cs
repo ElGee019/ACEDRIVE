@@ -56,5 +56,7 @@ public sealed class JsonFuelRules
         && rules.DailyChangeMin <= rules.DailyChangeMax
         && rules.MinFillLitres > 0.0
         && rules.SettleSeconds > 0.0
+        && double.IsFinite(rules.MinDriveBeforeFillMetres)
+        && rules.MinDriveBeforeFillMetres >= 0.0
         && rules.OwnerName is not null;
 }

@@ -17,16 +17,20 @@ public sealed record TrackInfo(
 /// so the core speed/gear read keeps working on its own. <c>CarDamage</c> is
 /// the sum of EVO's five collision-damage zones in the game's absolute units;
 /// it only ever jumps on a hit (or drops on a repair/session reload).
-/// <c>FuelLitres</c> is the tank level in the AC1-compatible fuel field
-/// (litres); the fuel receipt prices the rise it sees, so a frame without the
-/// field simply reports 0 and the tracker re-primes.</summary>
+/// <c>FuelLitres</c> comes from EVO's graphics block, the documented live
+/// source (the AC1 physics mirror is deprecated); null when that block is
+/// missing or the reading is out of range, so no fill can be priced.
+/// <c>InPit</c> mirrors the graphics block's pit-box/pit-lane flags: EVO tops
+/// the tank up there on load, restart and pit service, and those refuels are
+/// not purchases.</summary>
 public sealed record TelemetrySample(
     int PacketId, float Gas, float Brake, int Gear,
     int Rpm, float SteerRad, float SpeedKmh,
     float? NormalizedPosition = null,
     TrackInfo? Track = null,
     float CarDamage = 0f,
-    float FuelLitres = 0f);
+    float? FuelLitres = null,
+    bool InPit = false);
 
 /// <summary>
 /// Abstraction over EVO shared memory. Lets ViewModels run against

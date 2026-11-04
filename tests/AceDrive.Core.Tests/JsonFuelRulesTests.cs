@@ -18,6 +18,7 @@ public sealed class JsonFuelRulesTests
           "MaxPricePerLitre": 2.50,
           "MinFillLitres": 1.0,
           "SettleSeconds": 2.0,
+          "MinDriveBeforeFillMetres": 150.0,
           "OwnerName": "Anke Vogt"
         }
         """;
@@ -35,6 +36,7 @@ public sealed class JsonFuelRulesTests
         Assert.Equal(2.50, rules.MaxPricePerLitre);
         Assert.Equal(1.0, rules.MinFillLitres);
         Assert.Equal(2.0, rules.SettleSeconds);
+        Assert.Equal(150.0, rules.MinDriveBeforeFillMetres);
         Assert.Equal("Anke Vogt", rules.OwnerName);
         Assert.Empty(log.Warnings);
     }
@@ -66,6 +68,7 @@ public sealed class JsonFuelRulesTests
     [InlineData("window-inverted")]
     [InlineData("min-fill-zero")]
     [InlineData("settle-zero")]
+    [InlineData("drive-gate-negative")]
     [InlineData("owner-missing")]
     public void InvalidRules_FallBackToUnityDefaults(string which)
     {
@@ -81,6 +84,7 @@ public sealed class JsonFuelRulesTests
             "window-inverted" => FuelRules.Default with { DailyChangeMin = 0.2, DailyChangeMax = -0.2 },
             "min-fill-zero" => FuelRules.Default with { MinFillLitres = 0.0 },
             "settle-zero" => FuelRules.Default with { SettleSeconds = 0.0 },
+            "drive-gate-negative" => FuelRules.Default with { MinDriveBeforeFillMetres = -1.0 },
             "owner-missing" => FuelRules.Default with { OwnerName = null! },
             _ => throw new ArgumentOutOfRangeException(nameof(which)),
         };
@@ -106,6 +110,7 @@ public sealed class JsonFuelRulesTests
         Assert.Equal(0.15, rules.DailyChangeMax);
         Assert.Equal(1.40, rules.MinPricePerLitre);
         Assert.Equal(2.20, rules.MaxPricePerLitre);
+        Assert.Equal(100.0, rules.MinDriveBeforeFillMetres);
     }
 
     private static FuelRules Load(string json, TestLog log)

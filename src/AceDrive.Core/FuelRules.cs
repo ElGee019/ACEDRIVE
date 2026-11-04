@@ -19,6 +19,7 @@ public sealed record FuelRules(
     double MaxPricePerLitre,
     double MinFillLitres,
     double SettleSeconds,
+    double MinDriveBeforeFillMetres,
     string OwnerName)
 {
     /// <summary>The test-shell fallback: Unity's shipped numbers and one
@@ -31,6 +32,11 @@ public sealed record FuelRules(
         MaxPricePerLitre: 2.20,
         MinFillLitres: 0.5,
         SettleSeconds: 1.5,
+        // WHY a drive gate: EVO tops the tank up on load/restart and at the pit
+        // box, and the current freeroam map is a stand-in, so those top-ups
+        // must never be priced. A fill only counts after the player has driven
+        // at least this far from the spawn/session baseline.
+        MinDriveBeforeFillMetres: 100.0,
         OwnerName: "Rolf Brenner");
 
     /// <summary>The same clamp Unity's UpdateFuelPrice applies after every

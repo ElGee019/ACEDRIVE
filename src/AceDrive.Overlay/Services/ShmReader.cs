@@ -20,7 +20,6 @@ internal sealed class ShmReader : ITelemetrySource
     private const int OffPacketId = 0;
     private const int OffGas = 4;
     private const int OffBrake = 8;
-    private const int OffFuel = 12;   // litres, AC1-compatible fuel field
     private const int OffGear = 16;   // 0=R, 1=N, 2..N=forward
     private const int OffRpms = 20;
     private const int OffSteer = 24;  // rad, -=left
@@ -39,6 +38,15 @@ internal sealed class ShmReader : ITelemetrySource
     // log prints sm_version so a future layout change is visible immediately.
     private const int OffGraphicsPacketId = 0;
     private const int OffGraphicsNpos = 1244;          // normalised lap position, 0..1
+    // Fuel and the pit flags (ACE_SharedFileOut_Documentation_v1). The offsets
+    // follow from the documented graphics layout (_pack_ = 4) and are confirmed
+    // by npos landing on 1244, the anchor the position read already uses. WHY
+    // the graphics block and not physics offset 12: that AC1 fuel slot is a
+    // deprecated mirror; the documented live source is this field.
+    private const int OffGraphicsFuel = 196;           // float, litres
+    private const int OffGraphicsInPitBox = 3119;      // bool (1 byte), garage
+    private const int OffGraphicsInPitLane = 3120;     // bool (1 byte)
+    private const float MaxPlausibleFuelLitres = 250f;  // the biggest tank ships 126 L
     private const int OffStaticSmVersion = 0;          // char[15]
     private const int OffStaticTrack = 136;            // char[33]
     private const int OffStaticTrackConfiguration = 169; // char[33]
@@ -49,7 +57,11 @@ internal sealed class ShmReader : ITelemetrySource
     // past the AC1 prefix, so the view must cover the whole block (it used to
     // stop at 64: speed/gear only).
     private const int PhysicsViewBytes = 800;
-    private const int GraphicsViewBytes = 2048;
+    // WHY 0: EVO's graphics block is ~6-8 kB and its exact size varies, while
+    // the pit flags at 3119 need more than the old 2048-byte view. A zero-size
+    // view maps the whole mapping, so no fixed guess can truncate it (and a
+    // short mapping is handled by the length guards in TryReadFuel/position).
+    private const int GraphicsViewBytes = 0;
     private const int StaticViewBytes = 256;
 
     private const string PhysicsMap = @"Local\acevo_pmf_physics";
@@ -364,6 +376,15 @@ internal sealed class ShmReader : ITelemetrySource
     private static bool TryReadNormalizedPosition(
         MemoryMappedViewAccessor view, out float normalizedPosition)
     {
+        // WHY the length guard: the whole-mapping view can be shorter than the
+        // documented block on a foreign/truncated mapping; reading past it
+        // would fail the sample instead of just losing the address.
+        if (view.Capacity < OffGraphicsNpos + sizeof(float))
+        {
+            normalizedPosition = float.NaN;
+            return false;
+        }
+
         int packet = view.ReadInt32(OffGraphicsPacketId);
         normalizedPosition = view.ReadSingle(OffGraphicsNpos);
         if (packet != view.ReadInt32(OffGraphicsPacketId))
@@ -438,7 +459,6 @@ internal sealed class ShmReader : ITelemetrySource
         float steer = view.ReadSingle(OffSteer);
         float speed = view.ReadSingle(OffSpeedKmh);
         float damage = ReadCarDamage(view);
-        float fuel = view.ReadSingle(OffFuel);
 
         if (packet != view.ReadInt32(OffPacketId))
         {
@@ -452,7 +472,6 @@ internal sealed class ShmReader : ITelemetrySource
             steer = view.ReadSingle(OffSteer);
             speed = view.ReadSingle(OffSpeedKmh);
             damage = ReadCarDamage(view);
-            fuel = view.ReadSingle(OffFuel);
 
             if (packet != view.ReadInt32(OffPacketId))
             {
@@ -469,9 +488,51 @@ internal sealed class ShmReader : ITelemetrySource
             normalizedPosition = position;
         }
 
+        float? fuelLitres = null;
+        bool inPit = false;
+        if (graphicsView is not null
+            && TryReadFuel(graphicsView, out float litres, out bool pit))
+        {
+            fuelLitres = litres;
+            inPit = pit;
+        }
+
         return new TelemetrySample(
-            packet, gas, brake, gear, rpm, steer, speed, normalizedPosition, track, damage,
-            fuel);
+            PacketId: packet, Gas: gas, Brake: brake, Gear: gear, Rpm: rpm,
+            SteerRad: steer, SpeedKmh: speed, NormalizedPosition: normalizedPosition,
+            Track: track, CarDamage: damage, FuelLitres: fuelLitres, InPit: inPit);
+    }
+
+    // Fuel and the pit flags live deep in the graphics block, so a truncated or
+    // foreign mapping must degrade to "no fuel" instead of reading past the
+    // view — that would fail the whole sample and drop the HUD with it.
+    private static bool TryReadFuel(
+        MemoryMappedViewAccessor view, out float litres, out bool inPit)
+    {
+        litres = 0f;
+        inPit = false;
+        if (view.Capacity < OffGraphicsFuel + sizeof(float))
+        {
+            return false;
+        }
+
+        float value = view.ReadSingle(OffGraphicsFuel);
+        if (!float.IsFinite(value) || value < 0f || value > MaxPlausibleFuelLitres)
+        {
+            // A torn or foreign frame: no fill may be priced from it.
+            return false;
+        }
+        litres = value;
+
+        // The pit flags sit past the tyre and damage blocks. A mapping that
+        // stops short of them still carries a usable tank level, so the fill is
+        // simply treated as "not in the pit".
+        if (view.Capacity > OffGraphicsInPitLane)
+        {
+            inPit = view.ReadByte(OffGraphicsInPitBox) != 0
+                || view.ReadByte(OffGraphicsInPitLane) != 0;
+        }
+        return true;
     }
 
     // Sum of the five damage zones: EVO writes absolute units per zone, and the
