@@ -38,6 +38,7 @@ public sealed class TaxiJobFlow
     private readonly VoiceBeat _beat;
     private readonly GameStateSaver _saver;
     private readonly IRivalsService _rivals;
+    private readonly JobMileageMeter _mileage;
     private readonly TripBreakdowns _breakdowns;
     private readonly ITelemetryHud? _hud;
     private readonly ILog _log;
@@ -71,6 +72,7 @@ public sealed class TaxiJobFlow
         Glovebox glovebox, Trunk trunk,
         IFriendshipStore friends, FleetService fleet, GameClock game, IClock clock,
         VoiceBeat beat, GameStateSaver saver, IRivalsService rivals,
+        JobMileageMeter mileage,
         TripBreakdowns breakdowns, ITelemetryHud? hud, ILog log)
     {
         _proposals = proposals;
@@ -93,6 +95,7 @@ public sealed class TaxiJobFlow
         _beat = beat;
         _saver = saver;
         _rivals = rivals;
+        _mileage = mileage;
         _breakdowns = breakdowns;
         _hud = hud;
         _log = log;
@@ -196,6 +199,9 @@ public sealed class TaxiJobFlow
         if (job is null) return;
         _job = job;
         _job.Phase = JobPhase.ToPickup;
+        // The finished job banks the odometer this moment stood at; ACCEPT is
+        // the start of the drive the settle measures (PORTPLAN 44).
+        _mileage.StartJob();
         // The chargeable distance is fixed here: the drive from where the job
         // started to the pickup plus the pickup-to-drop-off leg, both on the
         // closed lap. Neither the odometer nor a detour can move the fare.
@@ -364,6 +370,9 @@ public sealed class TaxiJobFlow
         _job.Phase = JobPhase.Complete;
         _pendingRequest = null;
         _hud?.SetJobGuidance(null);
+        // The drop-off is the one settle that banks the ride's odometer delta
+        // before the receipt's save carries the new driving record.
+        _mileage.FinishJob();
         _host.SettleRide(_job);
         _job.Patrols = [];
         _job.FinedPatrolIds.Clear();
@@ -375,6 +384,7 @@ public sealed class TaxiJobFlow
     private void AbandonJob()
     {
         _job.Phase = JobPhase.None;
+        _mileage.CancelJob();
         _job.Patrols = [];
         _job.FinedPatrolIds.Clear();
         _job.WarnedPatrolIds.Clear();

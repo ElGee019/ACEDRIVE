@@ -108,6 +108,7 @@ public sealed class NavigationTests
                 saver, new VisitLedger(), beat, log),
             day, log);
         var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
+        var jobMileage = new JobMileageMeter(() => garageInstance.Current, wallet, new Random(1));
         var breakdowns = new TripBreakdowns(
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0),
             garageInstance, onboarding, wallet, rivals, saver, beat, log);
@@ -119,10 +120,10 @@ public sealed class NavigationTests
             new FleetService(
                 garageInstance, poolCars, game, wallet, InsuranceRules.Default, log,
                 brands, new FakeContentSource(TestSession.EmptyContent)),
-            game, clock, beat, saver, rivals, breakdowns, null, log);
+            game, clock, beat, saver, rivals, jobMileage, breakdowns, null, log);
         var delivery = new DeliveryFlow(
-            board, career, city, friends, wallet, glovebox, trunk, meter, breakdowns,
-            clock, beat, log);
+            board, career, city, friends, wallet, glovebox, trunk, meter, jobMileage,
+            breakdowns, clock, beat, log);
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(
@@ -132,7 +133,8 @@ public sealed class NavigationTests
             new ResidentBook(
                 new FakeResidentStore(),
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), log),
-            wallet, friends, game, TaxiRules.Default, beat, log,
+            wallet, jobMileage, () => { },
+            friends, game, TaxiRules.Default, beat, log,
             CarHaulPolicy.Development, new Random(13));
         haul.Attach(new FakeCarHaulHost());
         // The weekly market valuation's flow: the calendar's Monday tap starts

@@ -4919,4 +4919,98 @@ public sealed class MainViewModelTests
         Assert.Equal(1, shifts.ShiftsCompleted);
         Assert.Equal((shifts.BestEarnings, shifts.BestFirstEarnedTicks), Assert.Single(board.Refreshes));
     }
+
+    // One clean career past the tour with the tour's La Strada door banked, on
+    // a clock whose login bonus is already claimed: the boot must not add the
+    // streak's random skill point the award assertions read.
+    private static (TestSessionResult Session, DriverWallet Wallet, FakeDriverStore Drivers) CleanRig()
+    {
+        var saved = new DriverState(0.0, 0.0, LastDailyBonusDate: "2026-10-12");
+        var wallet = new DriverWallet(saved);
+        var drivers = new FakeDriverStore();
+        // A priced car with a top speed, so the accident feed can bill it: the
+        // road-test pool leaves that column at zero.
+        var spec = new CarSpec(
+            "ks_test_sedan", 2020, "Test", "Sedan",
+            Passengers: 4, Class: 3, Price: 40000.0, TopSpeedKmh: 240);
+        var pool = new[] { spec };
+        var garage = new Garage(pool);
+        garage.Add(spec, week: 1);
+        TestSessionResult session = Create(
+            speedKmh: 0f,
+            progress: FinishedTour(),
+            cars: pool,
+            garage: garage,
+            wallet: wallet,
+            savedDriver: saved,
+            driverStore: drivers,
+            clock: new FakeClock { Now = new DateTime(2026, 10, 12, 0, 30, 0, DateTimeKind.Utc) });
+        return (session, wallet, drivers);
+    }
+
+    private static double SkillTotal(DriverWallet wallet) =>
+        wallet.Rating.Cornering + wallet.Rating.Concentration + wallet.Rating.OffTheLine;
+
+    [Fact]
+    public void FinishedTaxiJob_BanksTheOdometerDistanceAndPaysTheCleanRun()
+    {
+        // PORTPLAN 44: the distance is the odometer delta between ACCEPT and
+        // the drop-off settle, never a per-tick accumulation. Driving the leg
+        // banks nothing until the job finishes.
+        (TestSessionResult session, DriverWallet wallet, FakeDriverStore drivers) = CleanRig();
+        (MainViewModel vm, FakeClock clock, FakeTelemetry tel, _) = session;
+
+        TaxiFlow.Propose(vm);
+        TaxiFlow.Pickup(vm, clock);
+        TaxiFlow.AnswerRequest(vm);
+        TaxiFlow.Drive(vm, clock, tel, 5.0);
+
+        Assert.Equal(0.0, wallet.JobDistanceKm, precision: 9);
+        Assert.Equal(0.0, wallet.AccidentFreeKm, precision: 9);
+
+        vm.DropoffCommand.Execute(null);
+
+        Assert.Equal(5.0, wallet.JobDistanceKm, precision: 6);
+        Assert.Equal(5.0, wallet.AccidentFreeKm, precision: 6);
+        Assert.Equal(5.0, wallet.LongestAccidentFreeKm, precision: 6);
+        // Every five clean kilometres pays one random skill point; the point
+        // rides the settle's driver save, so a kill cannot replay it.
+        Assert.Equal(61.0, SkillTotal(wallet), precision: 9);
+        Assert.Equal(5.0, drivers.Saved[^1].JobDistanceKm, precision: 6);
+        Assert.Equal(5.0, drivers.Saved[^1].LongestAccidentFreeKm, precision: 6);
+    }
+
+    [Fact]
+    public void ACrash_BanksTheCleanPartThenDropsTheRunAndCountsTheAccident()
+    {
+        // The crash is the event that folds the run into the record: the
+        // four kilometres driven before the hit count as a clean run, the hit
+        // resets the live run, and the crash count moves the attentive rating.
+        (TestSessionResult session, DriverWallet wallet, FakeDriverStore drivers) = CleanRig();
+        (MainViewModel vm, FakeClock clock, FakeTelemetry tel, _) = session;
+
+        TaxiFlow.Propose(vm);
+        TaxiFlow.Pickup(vm, clock);
+        TaxiFlow.AnswerRequest(vm);
+        TaxiFlow.Drive(vm, clock, tel, 4.0);
+
+        tel.Next = tel.Next with { SpeedKmh = 120f, CarDamage = 0f };
+        clock.Advance(TimeSpan.FromSeconds(0.1));
+        vm.Poll();
+        tel.Next = tel.Next with { SpeedKmh = 0f, CarDamage = 50f };
+        clock.Advance(TimeSpan.FromSeconds(0.1));
+        vm.Poll();
+
+        Assert.Equal(1, wallet.Accidents);
+        Assert.Equal(4.0, wallet.JobDistanceKm, precision: 2);
+        Assert.Equal(4.0, wallet.LongestAccidentFreeKm, precision: 2);
+        Assert.Equal(0.0, wallet.AccidentFreeKm, precision: 9);
+        Assert.Equal(4.0, wallet.AttentiveRating, precision: 1);
+        // The crash's own banded penalty (overall 20 -> -1 each) rides the
+        // same driver save; no clean-run point was due at four kilometres.
+        Assert.Equal(57.0, SkillTotal(wallet), precision: 9);
+        Assert.Equal(4.0, drivers.Saved[^1].JobDistanceKm, precision: 2);
+        Assert.Equal(0.0, drivers.Saved[^1].AccidentFreeKm, precision: 9);
+        Assert.Equal(1, drivers.Saved[^1].Accidents);
+    }
 }

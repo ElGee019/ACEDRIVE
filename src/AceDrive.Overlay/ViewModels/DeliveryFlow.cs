@@ -26,6 +26,7 @@ public sealed class DeliveryFlow
     private readonly Glovebox _glovebox;
     private readonly Trunk _trunk;
     private readonly DrivenDistanceMeter _meter;
+    private readonly JobMileageMeter _mileage;
     private readonly TripBreakdowns _breakdowns;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
@@ -50,7 +51,7 @@ public sealed class DeliveryFlow
     public DeliveryFlow(
         DeliveryBoard board, DeliveryCareer career, CityEconomy city,
         IFriendshipStore friends, DriverWallet wallet, Glovebox glovebox, Trunk trunk,
-        DrivenDistanceMeter meter, TripBreakdowns breakdowns,
+        DrivenDistanceMeter meter, JobMileageMeter mileage, TripBreakdowns breakdowns,
         IClock clock, VoiceBeat beat, ILog log)
     {
         _board = board;
@@ -61,6 +62,7 @@ public sealed class DeliveryFlow
         _glovebox = glovebox;
         _trunk = trunk;
         _meter = meter;
+        _mileage = mileage;
         _breakdowns = breakdowns;
         _clock = clock;
         _beat = beat;
@@ -149,6 +151,9 @@ public sealed class DeliveryFlow
         _job = new DeliveryJob(stops, run);
         _storeLegStarted = false;
         _meter.Reset();
+        // The run's start odometer: the last store's settle banks the drive
+        // (PORTPLAN 44), not the shared leg meter.
+        _mileage.StartJob();
         _log.LogInfo($"delivery started: {stops.Count} stops, " +
             $"{run.StoreKeys.Count} stores, goods €{run.PaidForGoods:0.00}");
         _host.HidePanel();
@@ -230,6 +235,7 @@ public sealed class DeliveryFlow
     {
         _job = null;
         _storeLegStarted = false;
+        _mileage.CancelJob();
         _host.ClearGuidance();
     }
 
@@ -259,6 +265,9 @@ public sealed class DeliveryFlow
 
         if (_job is { } run)
         {
+            // The last stop is the finished job: bank the run's odometer delta
+            // before the settle's save carries the driving record.
+            _mileage.FinishJob();
             _host.Settle(run.Run);
         }
     }

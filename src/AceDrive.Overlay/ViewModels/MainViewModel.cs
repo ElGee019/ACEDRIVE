@@ -108,6 +108,10 @@ public sealed class MainViewModel
     private readonly Action? _quit;
     private readonly ILog _log;
     private readonly DriverWallet _wallet;
+    // The finished-job odometer bank (PORTPLAN 44): the flow that owns a job
+    // starts it, the settle finishes it, and a crash folds the clean run into
+    // the record. No per-tick distance is read here.
+    private readonly JobMileageMeter _mileage;
     // The carried reward cards the poll applies (Invincible Rides) and the
     // crash path spends (DR Protection, shield, repair cards). The trunk is
     // where the cards live; the glovebox owns what they mean.
@@ -224,7 +228,7 @@ public sealed class MainViewModel
         ITelemetrySource telemetry, IClock clock, WorldTicks world, TaxiShift shift,
         ISettingsStore store, ILog log, IVoiceListener voice, ICarBrandSource carBrands,
         AddressMap addressMap, TaxiRules taxiRules,
-        VoiceBeat beat, DriverWallet wallet,
+        VoiceBeat beat, DriverWallet wallet, JobMileageMeter mileage,
         Glovebox glovebox, Trunk trunk,
         IRivalsService rivals,
         Garage garage,
@@ -258,6 +262,7 @@ public sealed class MainViewModel
         _voice = voice;
         _carBrands = carBrands;
         _wallet = wallet;
+        _mileage = mileage;
         _glovebox = glovebox;
         _trunk = trunk;
         _rivals = rivals;
@@ -866,10 +871,19 @@ public sealed class MainViewModel
         // detector unprimed, so the intro's own dents never surface as a crash
         // on the first real tick.
         bool invincible = _glovebox.HasCharges(RewardCardEffect.InvincibleRides, _trunk);
-        if (!_story.IntroInProgress && _fleet.ObserveAccident(s, now, invincible) is { } accident)
+        if (!_story.IntroInProgress)
         {
-            SaveGarage();
-            EndJobForAccident(accident);
+            if (_fleet.ObserveAccident(s, now, invincible) is { } accident)
+            {
+                // The crash is the one event that resets the clean run: the
+                // partial job distance earned before the hit is banked first,
+                // then the record takes the crash (PORTPLAN 44). The repair
+                // prompt's own path banks the driver file, rating penalty and
+                // record included (EndJobForAccident saves before it shows).
+                _mileage.RegisterAccident();
+                SaveGarage();
+                EndJobForAccident(accident);
+            }
         }
         _hud?.Update(
             s, _garage.Current?.Odometer, gameRunning: true, _fleet.IsDrivingWrongCar());

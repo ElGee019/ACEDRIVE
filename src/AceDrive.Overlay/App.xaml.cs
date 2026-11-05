@@ -215,6 +215,12 @@ public partial class App : Application, IDisposable
         var driverStore = new JsonDriverStore(_log);
         DriverState? savedDriver = driverStore.Load();
         var driver = new DriverWallet(savedDriver);
+        // The finished-job odometer bank (PORTPLAN 44): the flows start it and
+        // the settle finishes it, so the driving record sees one comparison per
+        // job instead of a per-tick distance feed. Its own seeded stream pays
+        // the five-kilometre skill awards.
+        var jobMileage = new JobMileageMeter(
+            () => garage.Current, driver, new Random(taxiSeed + 20));
         // The care-package ledger (PORTPLAN 21): the kits on store shelves and
         // the kits in the car resume with the driver, so a restart after a
         // pickup still owes the community centre the bags it is carrying.
@@ -607,11 +613,11 @@ public partial class App : Application, IDisposable
         var taxi = new TaxiJobFlow(
             taxiProposals, addressMap, carBrands, cars, requests, requestTable,
             police, taxiRules, fares, garage, driver, glovebox, trunk, friendships, fleet,
-            game, wall, beat, saver, rivals, breakdowns, hud, _log);
+            game, wall, beat, saver, rivals, jobMileage, breakdowns, hud, _log);
         // The delivery run from DELIVER to receipt, with its own board page.
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, driver, glovebox, trunk,
-            meter, breakdowns, wall, beat, _log);
+            meter, jobMileage, breakdowns, wall, beat, _log);
         // The Cento Miglia entry (PORTPLAN 49): the drive to the start, the
         // registration check and the race to the finish, in its own collaborator
         // so neither job flow grows a third phase machine. Its settle prices the
@@ -632,7 +638,9 @@ public partial class App : Application, IDisposable
         var haul = new CarHaulFlow(
             brands, cars, poiDirectory, haulDealerDoor, zone, addressMap,
             () => AddressBook.Home(addressMap, profileStore.Load()),
-            residents, driver, friendships, game, taxiRules, beat, _log,
+            residents, driver, jobMileage,
+            () => saver.SaveDriver(rivals.LastResult),
+            friendships, game, taxiRules, beat, _log,
             CarHaulPolicy.LoyaltyGate, new Random(taxiSeed + 13));
         // The weekly market valuation (PORTPLAN 49): its own flow owns the
         // Monday week, the venue leg and the live/offline comparison, so the
@@ -763,6 +771,7 @@ public partial class App : Application, IDisposable
             taxiRules,
             beat,
             driver,
+            jobMileage,
             glovebox,
             trunk,
             rivals,

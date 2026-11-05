@@ -122,6 +122,22 @@
                                FontSize="15" TextAlignment="Center" Margin="0,2"/>
                 </StackPanel>
             </Border>
+
+            <Border Style="{StaticResource SectionSpacer}"/>
+
+            <!-- Driving record (PORTPLAN 44): the longest clean run and the
+                 attentive-driver percentage, both read from the wallet's
+                 finished-job record. -->
+            <Border Style="{StaticResource SectionRule}">
+                <StackPanel>
+                    <TextBlock Style="{StaticResource SectionHeading}"
+                               Text="{loc:Loc Key=WalletDrivingRecord}"/>
+                    <TextBlock Text="{Binding LongestAccidentFreeLine}" Foreground="#FFF"
+                               FontSize="15" TextAlignment="Center" Margin="0,2"/>
+                    <TextBlock Text="{Binding AttentiveRatingLine}" Foreground="#FFF"
+                               FontSize="15" TextAlignment="Center" Margin="0,2"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Button bar: BACK stretches the full panel width in its own bottom

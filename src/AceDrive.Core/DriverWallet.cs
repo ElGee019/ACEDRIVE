@@ -22,8 +22,17 @@ public sealed class DriverWallet
     /// it: a resumed save always beats the seed, never re-applies it.</summary>
     public const double StartingCash = 100.0;
 
+    // The driving record (PORTPLAN 44): the wallet owns it because the same
+    // snapshot banks it, and only this class ever writes it.
+    private readonly DrivingRecord _driving;
+
     public DriverWallet(DriverState? saved = null)
     {
+        _driving = new DrivingRecord(
+            saved?.JobDistanceKm ?? 0.0,
+            saved?.AccidentFreeKm ?? 0.0,
+            saved?.LongestAccidentFreeKm ?? 0.0,
+            saved?.Accidents ?? 0);
         // A debt is a real state: an accident repair the player cannot refuse
         // can outrun the cash, and restarting must not forgive it. Only a
         // non-finite hand-edit falls back to the seed.
@@ -120,6 +129,42 @@ public sealed class DriverWallet
     /// skill point, rolled on the caller's seeded RNG.</summary>
     public void AddRandomSkill(Random rng, double delta) =>
         Rating = Rating.AddRandomSkill(rng, delta);
+
+    /// <summary>The kilometres every finished job has banked (PORTPLAN 44).</summary>
+    public double JobDistanceKm => _driving.JobDistanceKm;
+
+    /// <summary>The clean run since the last billed crash.</summary>
+    public double AccidentFreeKm => _driving.AccidentFreeKm;
+
+    /// <summary>The longest clean run ever banked.</summary>
+    public double LongestAccidentFreeKm => _driving.LongestAccidentFreeKm;
+
+    /// <summary>Billed crashes over the career.</summary>
+    public int Accidents => _driving.Accidents;
+
+    /// <summary>The attentive-driver reading (PORTPLAN 44): career km per crash,
+    /// capped at 100, and 100 while no crash has been billed.</summary>
+    public double AttentiveRating => _driving.AttentiveRating;
+
+    /// <summary>
+    /// Banks one finished job's odometer delta and pays one random skill point
+    /// per five clean kilometres (PORTPLAN 44), rolled on the caller's seeded
+    /// RNG. Answers how many points were paid, so the caller can tell a silent
+    /// bank from one that moved the rating.
+    /// </summary>
+    public int BankJobDistance(double km, Random rng)
+    {
+        int awards = _driving.Bank(km);
+        for (int i = 0; i < awards; i++)
+        {
+            Rating = Rating.AddRandomSkill(rng, 1.0);
+        }
+
+        return awards;
+    }
+
+    /// <summary>A billed crash ends the clean run but keeps the record.</summary>
+    public void RegisterAccident() => _driving.RegisterAccident();
 
     /// <summary>The savings-bank balance (Unity PlayerData.bankAmount).
     /// Interest accrues here and compounds; job payouts land in Cash.</summary>
@@ -381,6 +426,10 @@ public sealed class DriverWallet
         Cornering = Rating.Cornering,
         Concentration = Rating.Concentration,
         OffTheLine = Rating.OffTheLine,
+        JobDistanceKm = JobDistanceKm,
+        AccidentFreeKm = AccidentFreeKm,
+        LongestAccidentFreeKm = LongestAccidentFreeKm,
+        Accidents = Accidents,
         CreditEarned = CreditEarned,
         ClubReputation = ClubReputation,
         StarOfTheShowWins = StarOfTheShowWins,

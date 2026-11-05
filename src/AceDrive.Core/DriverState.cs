@@ -64,7 +64,11 @@ namespace AceDrive.Core;
 /// resumes at the community centre instead of losing them.
 /// The glove compartment's card capacity (PORTPLAN 61, Unity
 /// PlayerData.gloveboxSlots) is the last reading: 0 on a save written before the
-/// reward cards existed, which the Glovebox heals from its own table.</summary>
+/// reward cards existed, which the Glovebox heals from its own table.
+/// The driving record (PORTPLAN 44) rides along: the kilometres finished jobs
+/// banked, the clean run since the last billed crash, the longest clean run and
+/// the crash count, so the wallet's attentive-driver reading resumes instead of
+/// starting over on every launch.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -123,7 +127,16 @@ public sealed record DriverState(
     // How many reward cards the glove compartment may hold (PORTPLAN 61, Unity
     // PlayerData.gloveboxSlots). 0 is "never written", never a legal capacity —
     // the +1 slot reward only ever grows a healed count.
-    int GloveboxSlots = 0)
+    int GloveboxSlots = 0,
+    // The driving record (PORTPLAN 44): the lifetime job kilometres, the clean
+    // run since the last billed crash, the longest clean run ever banked and
+    // the crash count. All four ride the one driver save, so neither the
+    // wallet's attentive reading nor a five-kilometre skill award is replayed
+    // or lost on a restart.
+    double JobDistanceKm = 0.0,
+    double AccidentFreeKm = 0.0,
+    double LongestAccidentFreeKm = 0.0,
+    int Accidents = 0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

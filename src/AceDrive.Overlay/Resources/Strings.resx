@@ -557,10 +557,11 @@ Accept this job?</value></data>
   <data name="BankAfter" xml:space="preserve"><value>Balance After Withdrawal: CR{0:0.00}</value></data>
   <data name="BankWithdraw" xml:space="preserve"><value>WITHDRAW</value></data>
   <data name="BankBack" xml:space="preserve"><value>BACK</value></data>
-  <!-- Wallet page (PORTPLAN items 06/43/48/60): the account summary, the
-       global XP leaderboard heading and the three driver-rating skills.
-       {0:0.00} = CR/XP on the two-decimal ledger, {0:0} = a whole-percent
-       skill share. Placeholders survive translation; translators may
+  <!-- Wallet page (PORTPLAN items 06/43/44/48/60): the account summary, the
+       global XP leaderboard heading, the three driver-rating skills and the
+       driving record. {0:0.00} = CR/XP on the two-decimal ledger, {0:0} = a
+       whole-percent skill or attentive share, {0:0.0} = the longest clean run
+       in kilometres. Placeholders survive translation; translators may
        reorder, never remove. -->
   <data name="WalletTitle" xml:space="preserve"><value>WALLET</value></data>
   <data name="WalletCashLabel" xml:space="preserve"><value>CURRENT CR</value></data>
@@ -573,6 +574,9 @@ Accept this job?</value></data>
   <data name="WalletConcentration" xml:space="preserve"><value>Concentration: {0:0}%</value></data>
   <data name="WalletCornering" xml:space="preserve"><value>Cornering: {0:0}%</value></data>
   <data name="WalletOffTheLine" xml:space="preserve"><value>Off-The-Line: {0:0}%</value></data>
+  <data name="WalletDrivingRecord" xml:space="preserve"><value>DRIVING RECORD</value></data>
+  <data name="WalletLongestAccidentFree" xml:space="preserve"><value>Longest without accident: {0:0.0} km</value></data>
+  <data name="WalletAttentiveRating" xml:space="preserve"><value>Attentive driver: {0:0}%</value></data>
   <data name="WalletBack" xml:space="preserve"><value>BACK</value></data>
   <!-- Operating-zone expansion page (PORTPLAN 58, Unity ZoneExpansionScreen):
        the street that just joined, the zone's count and area, the jobs to the

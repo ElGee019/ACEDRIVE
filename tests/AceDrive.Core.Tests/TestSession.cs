@@ -66,6 +66,10 @@ internal static class TestSession
         var walletInstance = options.Wallet ?? new DriverWallet(options.SavedDriver);
         var pool = options.Cars ?? TestRoadCars.Pool;
         var garageInstance = options.Garage ?? new Garage(pool);
+        // The finished-job odometer bank (PORTPLAN 44): the same car and wallet
+        // the session settles on, with a fixed award stream per session.
+        var jobMileage = new JobMileageMeter(
+            () => garageInstance.Current, walletInstance, new Random(17));
         var friendsInstance = options.Friendships ?? new FakeFriendshipStore();
         var trunkInstance = options.Trunk ?? new Trunk(options.SavedDriver?.Trunk);
         // The glove compartment's card rules sit over the same wallet and trunk
@@ -262,10 +266,11 @@ internal static class TestSession
             taxiRulesInstance, faresInstance, garageInstance, walletInstance,
             glovebox, trunkInstance,
             friendsInstance, fleet, game, clock, beat, saver, rivalsInstance,
+            jobMileage,
             breakdownsInstance, options.Hud, logger);
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, walletInstance,
-            glovebox, trunkInstance, meter, breakdownsInstance, clock, beat, logger);
+            glovebox, trunkInstance, meter, jobMileage, breakdownsInstance, clock, beat, logger);
         // The Cento Miglia entry (PORTPLAN 49): its own flow and settle, on the
         // same wallet, garage and trunk the assertions read.
         var cento = new CentoRaceFlow(walletInstance, garageInstance, beat, logger);
@@ -282,7 +287,8 @@ internal static class TestSession
             brandMileageInstance, pool, directory, haulDealerDoor, zoneInstance, map,
             () => AddressBook.Home(map, profiles.Load()),
             residentsInstance,
-            walletInstance, friendsInstance, game, taxiRulesInstance, beat, logger,
+            walletInstance, jobMileage, () => { },
+            friendsInstance, game, taxiRulesInstance, beat, logger,
             CarHaulPolicy.LoyaltyGate, new Random(13));
         // The weekly market valuation (PORTPLAN 49): the same ledger, board and
         // wallet the assertions read, with a pinned draw stream of its own.
@@ -402,6 +408,7 @@ internal static class TestSession
             voiceInstance, brands, map,
             taxiRulesInstance,
             beat, walletInstance,
+            jobMileage,
             glovebox, trunkInstance,
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,

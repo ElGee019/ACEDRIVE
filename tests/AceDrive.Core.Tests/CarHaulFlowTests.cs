@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Windows.Input;
 using AceDrive.Core;
 using AceDrive.Overlay.Localization;
+using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
@@ -220,7 +221,9 @@ public sealed class CarHaulFlowTests
             [new CarSpec("ks_abarth_695", 2014, "Abarth", "695 Biposto", Class: 6)],
             directory, dealerDoor, zone, AddressMap.Default,
             () => new AddressLocation("Street 1", 1, HouseSide.Right),
-            residents, wallet, friends, game, TaxiRules.Default,
+            residents, wallet,
+            new JobMileageMeter(() => null, wallet, new Random(1)), () => { },
+            friends, game, TaxiRules.Default,
             new VoiceBeat(clock), new TestLog(),
             policy ?? CarHaulPolicy.Development, new Random(1));
         flow.Attach(host);

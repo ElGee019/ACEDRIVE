@@ -1,4 +1,5 @@
 using AceDrive.Core;
+using AceDrive.Overlay.Services;
 using AceDrive.Overlay.ViewModels;
 
 namespace AceDrive.Core.Tests;
@@ -55,7 +56,9 @@ public sealed class DeliveryFlowTests
         var flow = new DeliveryFlow(
             new DeliveryBoard(catalog), career, city, friends ?? new FakeFriendshipStore(),
             walletInstance, new Glovebox(RewardTable.Default, walletInstance), carrying,
-            new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh), breakdowns, clock, beat,
+            new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh),
+            new JobMileageMeter(() => garageInstance.Current, walletInstance, new Random(1)),
+            breakdowns, clock, beat,
             new NullLogger());
         var host = new FakeDeliveryHost();
         flow.Attach(host);

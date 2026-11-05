@@ -31,6 +31,40 @@ public sealed class WalletScreenViewModelTests
         Assert.Equal("Concentration: 42%", vm.ConcentrationLine);
         Assert.Equal("Cornering: 31%", vm.CorneringLine);
         Assert.Equal("Off-The-Line: 54%", vm.OffTheLineLine);
+        Assert.Equal("Longest without accident: 0.0 km", vm.LongestAccidentFreeLine);
+        Assert.Equal("Attentive driver: 100%", vm.AttentiveRatingLine);
+    }
+
+    [Fact]
+    public void Open_ReadsTheCareerDrivingRecord()
+    {
+        var wallet = new DriverWallet(new DriverState(
+            0.0, 0.0,
+            JobDistanceKm: 150.0,
+            AccidentFreeKm: 20.0,
+            LongestAccidentFreeKm: 120.0,
+            Accidents: 2));
+
+        var vm = NewViewModel(wallet);
+
+        Assert.Equal("Longest without accident: 120.0 km", vm.LongestAccidentFreeLine);
+        Assert.Equal("Attentive driver: 75%", vm.AttentiveRatingLine);
+    }
+
+    [Fact]
+    public void Refresh_RepaintsTheDrivingRecordTheWalletMoved()
+    {
+        var wallet = new DriverWallet();
+        var vm = NewViewModel(wallet);
+        Assert.Equal("Longest without accident: 0.0 km", vm.LongestAccidentFreeLine);
+
+        wallet.BankJobDistance(8.2, new Random(1));
+        wallet.RegisterAccident();
+        vm.Refresh();
+
+        Assert.Equal("Longest without accident: 8.2 km", vm.LongestAccidentFreeLine);
+        // 8.2 career km over one crash is the km-per-crash percentage.
+        Assert.Equal("Attentive driver: 8%", vm.AttentiveRatingLine);
     }
 
     [Fact]

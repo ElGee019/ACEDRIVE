@@ -6,9 +6,10 @@ using AceDrive.Overlay.Services;
 namespace AceDrive.Overlay.ViewModels;
 
 /// <summary>
-/// The wallet page (PORTPLAN items 06/43/48/60): the driver's current CR,
-/// XP total and bank saldo, the global XP leaderboard and the three
-/// driver-rating skills, with one way back to the menu. All figures come
+/// The wallet page (PORTPLAN items 06/43/44/48/60): the driver's current CR,
+/// XP total and bank saldo, the global XP leaderboard, the three driver-rating
+/// skills and the driving record (longest clean run and attentive-driver
+/// percentage), with one way back to the menu. All figures come
 /// from the shared Core state and the standings service; the page owns only
 /// presentation and a fresh read on open (Unity's Show semantics) — and again
 /// when an interruption hands it back (<see cref="IRefreshableScreen"/>) — so
@@ -99,6 +100,22 @@ public sealed class WalletScreenViewModel : ViewModelBase, IVoiceScreen, IRefres
     }
     private string _offTheLineLine = "";
 
+    /// <summary>The longest clean run banked by finished jobs.</summary>
+    public string LongestAccidentFreeLine
+    {
+        get => _longestAccidentFreeLine;
+        private set => SetField(ref _longestAccidentFreeLine, value);
+    }
+    private string _longestAccidentFreeLine = "";
+
+    /// <summary>Career km per crash as a capped percentage, 100 % with none.</summary>
+    public string AttentiveRatingLine
+    {
+        get => _attentiveRatingLine;
+        private set => SetField(ref _attentiveRatingLine, value);
+    }
+    private string _attentiveRatingLine = "";
+
     /// <summary>Teal-glow acknowledgment for the navigating BACK tap.</summary>
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
     private bool _backFlash;
@@ -119,6 +136,10 @@ public sealed class WalletScreenViewModel : ViewModelBase, IVoiceScreen, IRefres
         ConcentrationLine = Strings.Format("WalletConcentration", _wallet.Rating.Concentration);
         CorneringLine = Strings.Format("WalletCornering", _wallet.Rating.Cornering);
         OffTheLineLine = Strings.Format("WalletOffTheLine", _wallet.Rating.OffTheLine);
+        LongestAccidentFreeLine = Strings.Format(
+            "WalletLongestAccidentFree", _wallet.LongestAccidentFreeKm);
+        AttentiveRatingLine = Strings.Format(
+            "WalletAttentiveRating", _wallet.AttentiveRating);
     }
 
     // The one path back: a click and the voice tap's deferred end both land

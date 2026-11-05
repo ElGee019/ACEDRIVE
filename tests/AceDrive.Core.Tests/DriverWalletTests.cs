@@ -384,4 +384,67 @@ public sealed class DriverWalletTests
         wallet.AddReceipt(Receipt());
         Assert.Equal(13.78, wallet.Snapshot().CreditEarned, precision: 6);
     }
+
+    [Fact]
+    public void BankJobDistance_PaysOneRandomSkillPerFiveCleanKilometres()
+    {
+        var wallet = new DriverWallet(new DriverState(0.0, 0.0));
+        var rng = new Random(7);
+
+        Assert.Equal(0, wallet.BankJobDistance(4.9, rng));
+        Assert.Equal(60.0, TotalRating(wallet), precision: 9);
+        Assert.Equal(4.9, wallet.AccidentFreeKm, precision: 9);
+
+        Assert.Equal(1, wallet.BankJobDistance(0.1, rng));
+        // The point lands on exactly one skill (never split across all three).
+        Assert.Equal(61.0, TotalRating(wallet), precision: 9);
+        Assert.Equal(5.0, wallet.AccidentFreeKm, precision: 9);
+        Assert.Equal(5.0, wallet.JobDistanceKm, precision: 9);
+        Assert.Equal(5.0, wallet.LongestAccidentFreeKm, precision: 9);
+    }
+
+    [Fact]
+    public void BankJobDistance_RidesTheSnapshotAndResumes()
+    {
+        var wallet = new DriverWallet(new DriverState(
+            0.0, 0.0,
+            JobDistanceKm: 10.0, AccidentFreeKm: 4.0,
+            LongestAccidentFreeKm: 10.0, Accidents: 1));
+        Assert.Equal(4.0, wallet.AccidentFreeKm, precision: 9);
+        Assert.Equal(10.0, wallet.AttentiveRating, precision: 9);
+
+        // One save carries the record: the next session must not re-pay a
+        // point already banked, and must not lose the legal run either.
+        var resumed = new DriverWallet(wallet.Snapshot());
+        Assert.Equal(4.0, resumed.AccidentFreeKm, precision: 9);
+        Assert.Equal(10.0, resumed.JobDistanceKm, precision: 9);
+        Assert.Equal(1, resumed.Accidents);
+        Assert.Equal(60.0, TotalRating(resumed), precision: 9);
+
+        Assert.Equal(1, resumed.BankJobDistance(1.0, new Random(3)));
+        Assert.Equal(5.0, resumed.Snapshot().AccidentFreeKm, precision: 9);
+        Assert.Equal(11.0, resumed.Snapshot().JobDistanceKm, precision: 9);
+    }
+
+    [Fact]
+    public void RegisterAccident_DropsTheRunButKeepsTheRecord()
+    {
+        var wallet = new DriverWallet(new DriverState(
+            0.0, 0.0,
+            JobDistanceKm: 25.0, AccidentFreeKm: 12.0,
+            LongestAccidentFreeKm: 12.0));
+
+        wallet.RegisterAccident();
+
+        Assert.Equal(0.0, wallet.AccidentFreeKm, precision: 9);
+        Assert.Equal(12.0, wallet.LongestAccidentFreeKm, precision: 9);
+        Assert.Equal(25.0, wallet.JobDistanceKm, precision: 9);
+        Assert.Equal(1, wallet.Accidents);
+        Assert.Equal(25.0, wallet.AttentiveRating, precision: 9);
+        Assert.Equal(1, wallet.Snapshot().Accidents);
+    }
+
+    // The three shares' sum: an accident-free award moves exactly one of them.
+    private static double TotalRating(DriverWallet wallet) =>
+        wallet.Rating.Cornering + wallet.Rating.Concentration + wallet.Rating.OffTheLine;
 }

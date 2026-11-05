@@ -434,6 +434,9 @@ Deze klus aannemen?</value></data>
   <data name="WalletConcentration" xml:space="preserve"><value>Concentratie: {0:0}%</value></data>
   <data name="WalletCornering" xml:space="preserve"><value>Bochten: {0:0}%</value></data>
   <data name="WalletOffTheLine" xml:space="preserve"><value>Startreactie: {0:0}%</value></data>
+  <data name="WalletDrivingRecord" xml:space="preserve"><value>RIJDRECORD</value></data>
+  <data name="WalletLongestAccidentFree" xml:space="preserve"><value>Langst zonder ongeval: {0:0.0} km</value></data>
+  <data name="WalletAttentiveRating" xml:space="preserve"><value>Attentieve rijder: {0:0}%</value></data>
   <data name="WalletBack" xml:space="preserve"><value>TERUG</value></data>
   <data name="ZoneExpansionTitle" xml:space="preserve"><value>WERKGEBIED UITGEBREID</value></data>
   <data name="ZoneExpansionNewStreet" xml:space="preserve"><value>Nieuwe straat toegevoegd aan je werkgebied</value></data>

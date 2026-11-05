@@ -32,6 +32,8 @@ public sealed class CarHaulFlow
     private readonly Func<AddressLocation?> _home;
     private readonly ResidentBook _residents;
     private readonly DriverWallet _wallet;
+    private readonly JobMileageMeter _mileage;
+    private readonly Action _saveDriver;
     private readonly IFriendshipStore _friendships;
     private readonly GameClock _game;
     private readonly TaxiRules _rules;
@@ -54,7 +56,8 @@ public sealed class CarHaulFlow
         IBrandMileageStore brands, IReadOnlyList<CarSpec> cars, PoiDirectory pois,
         IHaulDealerDoor dealerDoor, OperatingZone zone, AddressMap map,
         Func<AddressLocation?> home,
-        ResidentBook residents, DriverWallet wallet, IFriendshipStore friendships,
+        ResidentBook residents, DriverWallet wallet, JobMileageMeter mileage,
+        Action saveDriver, IFriendshipStore friendships,
         GameClock game, TaxiRules rules, VoiceBeat beat, ILog log,
         CarHaulPolicy policy, Random rng)
     {
@@ -67,6 +70,8 @@ public sealed class CarHaulFlow
         ArgumentNullException.ThrowIfNull(home);
         ArgumentNullException.ThrowIfNull(residents);
         ArgumentNullException.ThrowIfNull(wallet);
+        ArgumentNullException.ThrowIfNull(mileage);
+        ArgumentNullException.ThrowIfNull(saveDriver);
         ArgumentNullException.ThrowIfNull(friendships);
         ArgumentNullException.ThrowIfNull(game);
         ArgumentNullException.ThrowIfNull(rules);
@@ -84,6 +89,8 @@ public sealed class CarHaulFlow
         _home = home;
         _residents = residents;
         _wallet = wallet;
+        _mileage = mileage;
+        _saveDriver = saveDriver;
         _friendships = friendships;
         _game = game;
         _rules = rules;
@@ -234,6 +241,8 @@ public sealed class CarHaulFlow
 
         _run = new CarHaulRun(_offer);
         _offer = null;
+        // The two legs' odometer starts here; the settle banks the delta.
+        _mileage.StartJob();
         PinDealer();
         _host.ShowPage(BuildPage());
         _host.RefreshControl();
@@ -272,7 +281,11 @@ public sealed class CarHaulFlow
             friendship?.Level ?? 0,
             friendship?.TierIncreased ?? false);
 
+        _mileage.FinishJob();
         _wallet.AddHaul(receipt);
+        // The haul's receipt is the only bank this job path writes; the
+        // odometer delta rides it with the cash.
+        _saveDriver();
         _lastDeliveredOn = _game.GameNow;
         _run = null;
         _host.PinTarget(null);
