@@ -28,7 +28,11 @@ public static class PlacedStore
 
         int capacity = Capacity(poi.Category, catalog);
         double price = catalog.AverageUnitPrice(poi.Category);
-        if (capacity <= 0 || price <= 0.0)
+        double volume = catalog.AverageUnitVolume(poi.Category);
+        // A row with no priced or no sized item cannot be ordered: the board
+        // would show a store whose order can never fit a trunk. Missing
+        // content degrades to "shop only", never to a free restock.
+        if (capacity <= 0 || price <= 0.0 || volume <= 0.0)
         {
             return null;
         }
@@ -45,7 +49,8 @@ public static class PlacedStore
             Category: poi.Category,
             // The POI is the persisted identity; its door is the destination
             // the delivery run drives to (placed stores need no second table).
-            Address: poi.Address);
+            Address: poi.Address,
+            LitresPerUnit: Math.Round(volume, 3));
     }
 
     /// <summary>The rows for every real shop door in the directory.</summary>

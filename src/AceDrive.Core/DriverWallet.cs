@@ -69,6 +69,14 @@ public sealed class DriverWallet
         // PlayerData.gloveboxSlots). 0 means "never written": the Glovebox heals
         // it from the reward table's own starting capacity on its first read.
         GloveboxSlots = Math.Max(0, saved?.GloveboxSlots ?? 0);
+        // The Cento Miglia assertivity stat (PORTPLAN 49, Unity
+        // PlayerData.assertivity): 0 on a fresh or pre-stat save, grown by
+        // declined passenger requests. A torn hand-edit reads as the fresh
+        // value instead of poisoning the reputation factor.
+        double savedAssertivity = saved?.Assertivity ?? 0.0;
+        Assertivity = double.IsFinite(savedAssertivity)
+            ? Math.Max(0.0, savedAssertivity)
+            : 0.0;
     }
 
     public double Cash { get; private set; }
@@ -101,6 +109,29 @@ public sealed class DriverWallet
     /// <summary>Star of the Show wins so far (Unity starOfTheShowWins): each
     /// new win pays more than the last, so the total is career state.</summary>
     public int StarOfTheShowWins { get; private set; }
+
+    /// <summary>
+    /// The driver's assertivity (Unity PlayerData.assertivity): a declined
+    /// passenger request adds a tenth of a point. The Cento Miglia reads whole
+    /// points only, so the fraction is visible on the receipt while the race
+    /// reputation grows in integer steps.
+    /// </summary>
+    public double Assertivity { get; private set; }
+
+    /// <summary>
+    /// Unity CustomerRequestScreen.OnPassiveDeclineClicked: declining an ask
+    /// raises assertivity, and the next SaveDriver banks it. A negative or
+    /// non-finite delta is ignored, and the stat never falls below zero.
+    /// </summary>
+    public void AddAssertivity(double delta)
+    {
+        if (!double.IsFinite(delta) || delta == 0.0)
+        {
+            return;
+        }
+
+        Assertivity = Math.Max(0.0, Assertivity + delta);
+    }
 
     /// <summary>The persisted driver-rating skills (Unity PlayerData's three
     /// driver* fields). Skill events move them through the Add* helpers below;
@@ -345,10 +376,12 @@ public sealed class DriverWallet
     }
 
     /// <summary>
-    /// A dealer trade-in: the money returns capital already spent on the car, so
-    /// it moves cash but deliberately not the lifetime-earned reading (a resale
-    /// is not job income; the "earn CR" ToDo must not be farmed by flipping
-    /// cars). Non-positive and non-finite amounts are ignored.
+    /// A cash-only credit for money coming back: a dealer trade-in, an
+    /// insurance refund, or the escrow a delivery released at its settle. It
+    /// returns capital already spent, so it moves cash but deliberately not
+    /// the lifetime-earned reading (a resale or refund is not job income; the
+    /// "earn CR" ToDo must not be farmed by flipping cars). Non-positive and
+    /// non-finite amounts are ignored.
     /// </summary>
     public void AddSale(double amount)
     {
@@ -365,9 +398,10 @@ public sealed class DriverWallet
         Earn(receipt.Total);
     }
 
-    /// <summary>One settled delivery run: the wholesale cost left with the
-    /// goods and the retail payout plus the fare came back — the receipt's
-    /// TotalEarned IS the wallet delta, so no separate lines to keep apart.</summary>
+    /// <summary>One settled delivery run: the receipt's TotalEarned IS the
+    /// profit delta. The wholesale cost already left cash at DELIVER, so the
+    /// settle releases that escrow beside this line (JobSettlement), which
+    /// makes the cash return gross while the lifetime reading earns profit.</summary>
     public void AddDelivery(DeliveryReceipt receipt)
     {
         ApplyCash(receipt.TotalEarned);
@@ -433,6 +467,7 @@ public sealed class DriverWallet
         CreditEarned = CreditEarned,
         ClubReputation = ClubReputation,
         StarOfTheShowWins = StarOfTheShowWins,
+        Assertivity = Assertivity,
         GloveboxSlots = GloveboxSlots,
     };
 

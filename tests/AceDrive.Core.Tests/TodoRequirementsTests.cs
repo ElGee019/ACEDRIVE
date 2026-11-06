@@ -27,6 +27,22 @@ public sealed class TodoRequirementsTests
     }
 
     [Fact]
+    public void ClubReputation_WalksTheClubTierGates()
+    {
+        var requirement = new ClubReputationRequirement();
+        Assert.Equal(1.0, requirement.InitialTarget);
+        Assert.Equal(2.0, requirement.Advance(new TodoCycle(1.0, 1, 0)).Target);
+        Assert.Equal(4.0, requirement.Advance(new TodoCycle(2.0, 2, 0)).Target);
+
+        // The wallet reading is fractional: a settled race lands between two
+        // gates, and the tip still knows exactly which gate it asked for.
+        var facts = new TodoFacts(0, 0, 1.5, 0, 0, 0, 0, 0.0, 0, false, false, false, false, false, false);
+        Assert.True(requirement.IsMet(facts, 1.0));
+        Assert.False(requirement.IsMet(facts, 2.0));
+        Assert.Equal(1.5, requirement.Current(facts));
+    }
+
+    [Fact]
     public void BankStandings_RidesTheInterestAllowance()
     {
         var requirement = new BankStandingsRequirement();
@@ -85,7 +101,7 @@ public sealed class TodoRequirementsTests
         Assert.Equal(4.5, requirement.Advance(new TodoCycle(3.0, 2, 0)).Target);
 
         // Unity displays floor(target + 0.5): 4.5 cars reads as "Own 5 cars".
-        var facts = new TodoFacts(0, 0, 0, 0, 0, 0, 0, 4, false, false, false, false, false, false);
+        var facts = new TodoFacts(0, 0, 0.0, 0, 0, 0, 0, 0.0, 4, false, false, false, false, false, false);
         Assert.False(requirement.IsMet(facts, 4.5));
         Assert.True(requirement.IsMet(facts with { OwnedCars = 5 }, 4.5));
     }
@@ -99,7 +115,7 @@ public sealed class TodoRequirementsTests
 
         Assert.True(requirement.IsOneTime);
         Assert.Equal(PoiTypes.CarWash, requirement.PoiType);
-        var facts = new TodoFacts(0, 0, 0, 0, 0, 0, 0, 0, false, false, false, false, false, false);
+        var facts = new TodoFacts(0, 0, 0.0, 0, 0, 0, 0, 0.0, 0, false, false, false, false, false, false);
         Assert.False(requirement.IsMet(facts, 0));
         Assert.True(requirement.IsMet(facts with { CarWashEntered = true }, 0));
         Assert.Equal(1.0, requirement.Current(facts with { CarWashEntered = true }));
@@ -115,7 +131,7 @@ public sealed class TodoRequirementsTests
         Assert.True(requirement.IsOneTime);
         Assert.Equal(TodoSubject.GoToMaxGroceryStore, requirement.UnlockedBy);
         Assert.Null(requirement.PoiType);
-        var facts = new TodoFacts(0, 0, 0, 0, 0, 0, 0, 0, false, false, false, false, false, false);
+        var facts = new TodoFacts(0, 0, 0.0, 0, 0, 0, 0, 0.0, 0, false, false, false, false, false, false);
         Assert.False(requirement.IsMet(facts, 0));
         Assert.True(requirement.IsMet(facts with { DeliveryCareerOpened = true }, 0));
         Assert.Equal(1.0, requirement.Current(facts with { DeliveryCareerOpened = true }));

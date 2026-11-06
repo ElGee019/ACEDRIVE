@@ -13,8 +13,8 @@ public sealed class JsonDeliveryCatalogTests
           "WholesaleRate": 0.7,
           "StartCredP": 100,
           "Stores": [
-            { "Key": "a", "Name": "Store A", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.5, "Category": "groceries", "Address": { "StreetName": "Street 1", "HouseNumber": 7, "Side": 1 } },
-            { "Key": "b", "Name": "Store B", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.2 }
+            { "Key": "a", "Name": "Store A", "Owner": "Hahn", "StockedUnits": 12, "UnitCapacity": 40, "PricePerUnit": 2.5, "LitresPerUnit": 0.4, "Category": "groceries", "Address": { "StreetName": "Street 1", "HouseNumber": 7, "Side": 1 } },
+            { "Key": "b", "Name": "Store B", "Owner": "Fuchs", "StockedUnits": 6, "UnitCapacity": 40, "PricePerUnit": 2.2, "LitresPerUnit": 0.3 }
           ]
         }
         """;
@@ -27,6 +27,8 @@ public sealed class JsonDeliveryCatalogTests
         Assert.Equal(0.7, catalog.WholesaleRate);
         Assert.Equal(100, catalog.StartCredP);
         Assert.Equal("Store A", catalog.Stores[0].Name);
+        Assert.Equal(0.4, catalog.Stores[0].LitresPerUnit);
+        Assert.Equal(0.3, catalog.Stores[1].LitresPerUnit);
         // Career gating (PORTPLAN 18): a store without a category is plain
         // data, not a broken file — open content predates careers.
         Assert.Equal("groceries", catalog.Stores[0].Category);
@@ -59,12 +61,13 @@ public sealed class JsonDeliveryCatalogTests
     }
 
     [Theory]
-    [InlineData("""{"WholesaleRate":0,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":41,"UnitCapacity":40,"PricePerUnit":2}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":0,"PricePerUnit":2}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":-1},{"Key":"a","Name":"Dup","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"Address":{"StreetName":"","HouseNumber":1}}]}""")]
-    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"Address":{"StreetName":"Street 1","HouseNumber":0}}]}""")]
+    [InlineData("""{"WholesaleRate":0,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"LitresPerUnit":0.4}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":41,"UnitCapacity":40,"PricePerUnit":2,"LitresPerUnit":0.4}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":0,"PricePerUnit":2,"LitresPerUnit":0.4}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":-1,"LitresPerUnit":0.4},{"Key":"a","Name":"Dup","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"LitresPerUnit":0.4}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"LitresPerUnit":0.4,"Address":{"StreetName":"","HouseNumber":1}}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"LitresPerUnit":0.4,"Address":{"StreetName":"Street 1","HouseNumber":0}}]}""")]
+    [InlineData("""{"WholesaleRate":0.7,"StartCredP":100,"Stores":[{"Key":"a","Name":"A","Owner":"O","StockedUnits":1,"UnitCapacity":40,"PricePerUnit":2,"LitresPerUnit":0}]}""")]
     public void InvalidBalanceOrStore_FallsBackToDefault(string json)
     {
         var catalog = LoadFrom(json, out TestLog log);

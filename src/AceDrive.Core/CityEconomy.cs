@@ -204,6 +204,36 @@ public sealed class CityEconomy
         return moved;
     }
 
+    /// <summary>
+    /// A budget-capped delivery: raises one shelf by the order's units, capped
+    /// at the store's capacity. Unlike <see cref="Restock(IReadOnlyList{string})"/>
+    /// it never fills the store — the units the player could not afford stay
+    /// missing for a later order. Returns whether the shelf moved.
+    /// </summary>
+    public bool AddStock(string storeKey, int units)
+    {
+        if (units <= 0)
+        {
+            return false;
+        }
+
+        int position = IndexOf(storeKey);
+        if (position < 0)
+        {
+            return false;
+        }
+
+        StoreState cell = _cells[position];
+        int target = Math.Min(_board[position].UnitCapacity, cell.StockedUnits + units);
+        if (target == cell.StockedUnits)
+        {
+            return false;
+        }
+
+        _cells[position] = cell with { StockedUnits = target };
+        return true;
+    }
+
     /// <summary>What the next session reopens: one cell per store, copied so
     /// the saved view cannot mutate with a later tick. Exit-only, like Unity's
     /// storeStates, which are never written mid-session.</summary>

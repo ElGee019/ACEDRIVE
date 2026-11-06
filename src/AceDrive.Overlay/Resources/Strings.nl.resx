@@ -273,6 +273,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="TodoEarnCr" xml:space="preserve"><value>Verdien in totaal {0} CR. (nu {1})</value></data>
   <data name="TodoEarnXp" xml:space="preserve"><value>Verdien in totaal {0} XP. (nu {1:0.00})</value></data>
   <data name="TodoBankStandings" xml:space="preserve"><value>Heb {0} CR op de bank. (nu {1:0.00})</value></data>
+  <data name="TodoClubReputation" xml:space="preserve"><value>Bereik een clubreputatie van {0}. (nu {1:0.00})</value></data>
   <data name="TodoDeliveryJobs" xml:space="preserve"><value>Voltooi {0} bezorgingen. (nu {1})</value></data>
   <data name="TodoSetDestinations" xml:space="preserve"><value>Bereik {0} bestemmingen zonder gebruik van GPS. (nu {1})</value></data>
   <data name="TodoOperatingZone" xml:space="preserve"><value>Bereik een werkgebied van {0} km. (nu {1:0.00})</value></data>
@@ -316,6 +317,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DeliveryStoreGrowthDown" xml:space="preserve"><value>▼ {0} inwoner / uur</value></data>
   <data name="DeliveryStoreGrowthFlat" xml:space="preserve"><value>▬ 0 inwoner / uur</value></data>
   <data name="DeliveryConfirmed" xml:space="preserve"><value>Bestelling bevestigd voor €{0:0.00}</value></data>
+  <data name="DeliveryConfirmedPartial" xml:space="preserve"><value>Bestelling bevestigd: {0} / {1} eenheden voor €{2:0.00}</value></data>
   <data name="DeliveryOpenCareer" xml:space="preserve"><value>NIEUW CARRIERE OPENEN</value></data>
   <data name="DeliveryDeliver" xml:space="preserve"><value>BEZORGEN</value></data>
   <data name="DeliveryBack" xml:space="preserve"><value>TERUG</value></data>
@@ -324,6 +326,10 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="DeliveryNeedCredP" xml:space="preserve"><value>Je hebt vertrouwenspunten nodig om een bezorgcarrière te starten. Bezoek Max' kruidenier.</value></data>
   <data name="DeliverySelectHint" xml:space="preserve"><value>Kies een of meer winkels om een bezorgklus voor hen te starten.</value></data>
   <data name="DeliveryFullyStocked" xml:space="preserve"><value>{0} is nog volledig bevoorraad.</value></data>
+  <data name="DeliveryNoFunds" xml:space="preserve"><value>Niet genoeg CR voor de bestelling van {0}.</value></data>
+  <data name="DeliveryNoSpace" xml:space="preserve"><value>De bestelling van {0} past niet in de kofferbak.</value></data>
+  <data name="DeliveryNoRunFunds" xml:space="preserve"><value>Niet genoeg CR om de goederen te betalen.</value></data>
+  <data name="DeliveryRunNoSpace" xml:space="preserve"><value>De bestelling past niet meer in de kofferbak.</value></data>
   <data name="DeliveryNumber1" xml:space="preserve"><value>EEN</value></data>
   <data name="DeliveryNumber2" xml:space="preserve"><value>TWEE</value></data>
   <data name="DeliveryNumber3" xml:space="preserve"><value>DRIE</value></data>

@@ -75,5 +75,6 @@ internal static class CustomerRequestTestData
             Tier2Chance: tier2,
             Tier3Chance: tier3,
             TimerSeconds: 19,
+            AssertivityPerDecline: 0.1,
             MonitorRules: monitor ?? RideMonitorRules.Default);
 }

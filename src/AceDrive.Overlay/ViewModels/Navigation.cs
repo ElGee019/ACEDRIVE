@@ -711,6 +711,7 @@ public sealed class Navigation
             stamp.Week,
             stamp.Year,
             _wallet.ClubReputation,
+            _wallet.Assertivity,
             _zone.StreetIds.Count > 0,
             _garage.Cars.Count,
             CurrentCarClass(),

@@ -5,7 +5,8 @@ namespace AceDrive.Core.Tests;
 /// <summary>The live delivery run's stop cursor (PORTPLAN 19).</summary>
 public sealed class DeliveryJobTests
 {
-    private static readonly DeliveryRun Run = new(["store"], 10.0, 20.0);
+    private static readonly DeliveryRun Run = new(
+        [new DeliveryOrder("store", 5, 10.0, 20.0)]);
 
     private static DeliveryJob Job() => new(
         [

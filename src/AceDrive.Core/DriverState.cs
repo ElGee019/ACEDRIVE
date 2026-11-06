@@ -68,7 +68,11 @@ namespace AceDrive.Core;
 /// The driving record (PORTPLAN 44) rides along: the kilometres finished jobs
 /// banked, the clean run since the last billed crash, the longest clean run and
 /// the crash count, so the wallet's attentive-driver reading resumes instead of
-/// starting over on every launch.</summary>
+/// starting over on every launch.
+/// The assertivity stat (PORTPLAN 49, Unity PlayerData.assertivity) is the last
+/// reading: every declined passenger request adds a tenth of a point, and each
+/// whole point slightly speeds the Cento Miglia's club-reputation growth. It
+/// defaults to 0, Unity's fresh-driver value.</summary>
 public sealed record DriverState(
     double Cash,
     double Xp,
@@ -136,7 +140,11 @@ public sealed record DriverState(
     double JobDistanceKm = 0.0,
     double AccidentFreeKm = 0.0,
     double LongestAccidentFreeKm = 0.0,
-    int Accidents = 0)
+    int Accidents = 0,
+    // The Cento Miglia assertivity stat (Unity PlayerData.assertivity): 0 is
+    // the fresh driver, a declined request adds 0.1, and only whole points
+    // reach the race's reputation factor (see CentoReputation).
+    double Assertivity = 0.0)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

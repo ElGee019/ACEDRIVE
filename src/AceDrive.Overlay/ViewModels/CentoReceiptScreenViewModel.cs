@@ -8,13 +8,13 @@ namespace AceDrive.Overlay.ViewModels;
 /// Cento Miglia receipt page (PORTPLAN item 49, port of Unity
 /// CentoMigliaScreen's CentoReceipt panel): congratulations, the finishing
 /// place, the placement purse, the club reputation the race earned, the
-/// assertivity/garage/class calculation line (minus the assertivity stat the
-/// port has not brought over), the Star of the Show outcome, the award or
-/// certificate that joined the car, the wallet and CONTINUE.
+/// assertivity/garage/class calculation line, the Star of the Show outcome, the
+/// award or certificate that joined the car, the field's final standings in
+/// place order (the player's row highlighted), the wallet and CONTINUE.
 ///
-/// Unity also prints the final standings; the port has no NPC field yet, so
-/// the receipt hides that block until the field lands. All values are computed
-/// once by the settle and never change here.
+/// The field is the player plus three club rivals; none of them drove, so the
+/// settlement drew the order and this page only formats it. All values are
+/// computed once by the settle and never change here.
 /// </summary>
 public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IKeepPanelOpen
 {
@@ -43,6 +43,7 @@ public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, I
         _wallet = wallet;
         _beat = beat;
         _continueCommand = continueCommand;
+        Standings = BuildStandings(receipt.Standings);
         ContinueCommand = new RelayCommand(Continue);
         RebuildVoice();
     }
@@ -50,6 +51,9 @@ public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, I
     /// <summary>"Congratulations you completed the week 3 Cento Miglia for the …".</summary>
     public string CongratsLine => Strings.Format(
         "CentoReceiptCongrats", _receipt.Week, _receipt.ClubLabel);
+
+    /// <summary>The drawn finishing place (1 to the field size).</summary>
+    public int Placement => _receipt.Placement;
 
     /// <summary>"1st PLACE" - Unity's place line with its ordinal suffix.</summary>
     public string PlaceLine => _receipt.Placement switch
@@ -69,9 +73,10 @@ public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, I
     public string ReputationLine => Strings.Format(
         "CentoReceiptReputation", _receipt.CarName, _receipt.EarnedReputation);
 
-    /// <summary>The garage/class calculation (Unity's assertivity is not ported).</summary>
+    /// <summary>Unity's assertivity/garage/class calculation, all three terms.</summary>
     public string CalculationLine => Strings.Format(
-        "CentoReceiptCalculation", _receipt.OwnedCars, _receipt.CarClass);
+        "CentoReceiptCalculation",
+        _receipt.Assertivity, _receipt.OwnedCars, _receipt.CarClass);
 
     /// <summary>True when the award was won: the reward line turns teal.</summary>
     public bool StarWon => _receipt.StarWon;
@@ -86,6 +91,9 @@ public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, I
     public string ItemLine => _receipt.StarWon
         ? Strings.Get("CentoReceiptAwardStored")
         : Strings.Get("CentoReceiptCertificateStored");
+
+    /// <summary>The final standings, place order, the player's row flagged.</summary>
+    public IReadOnlyList<CentoStandingRow> Standings { get; }
 
     /// <summary>"+ 1500.00 CR" - the purse the race banked.</summary>
     public string TotalLine => Strings.Format("CentoReceiptTotal", _receipt.TotalEarned);
@@ -117,4 +125,33 @@ public sealed class CentoReceiptScreenViewModel : ViewModelBase, IVoiceScreen, I
             [Strings.Get("ReceiptContinue")] = FlashThenContinue,
         };
     }
+
+    // Unity's standings rows: place, name, car and rounded driver rating. The
+    // fields are formatted once here, so the ItemsControl binds a string instead
+    // of redoing the lookup on every layout pass.
+    private static List<CentoStandingRow> BuildStandings(
+        IReadOnlyList<CentoStanding> standings)
+    {
+        var rows = new List<CentoStandingRow>(standings.Count);
+        foreach (CentoStanding standing in standings)
+        {
+            string name = standing.IsPlayer && string.IsNullOrWhiteSpace(standing.Name)
+                ? Strings.Get("CentoReceiptYou")
+                : standing.Name;
+            rows.Add(new CentoStandingRow(
+                Strings.Format(
+                    "CentoReceiptStanding",
+                    Ordinal(standing.Place), name, standing.Car, standing.DriverRating),
+                standing.IsPlayer));
+        }
+        return rows;
+    }
+
+    private static string Ordinal(int place) => place switch
+    {
+        1 => Strings.Get("CentoOrdinalFirst"),
+        2 => Strings.Get("CentoOrdinalSecond"),
+        3 => Strings.Get("CentoOrdinalThird"),
+        _ => Strings.Format("CentoOrdinalOther", place),
+    };
 }

@@ -276,12 +276,14 @@ For instance "{0}".</value></data>
   <data name="CentoWeek" xml:space="preserve"><value>Week {0}</value></data>
   <data name="CentoReputation" xml:space="preserve"><value>YOUR CLUB REPUTATION: {0:0.00000}</value></data>
   <!-- The page's intro: the elements that grow the club reputation are the
-       driven distance, the car class and the garage size (CentoReputation's
-       GrowthFactor), so the line names exactly those three. -->
-  <data name="CentoWelcome" xml:space="preserve"><value>Welcome to Cento Miglia. Where you build reputation based on the kilometres you race, the class of the car you drive and how many cars you own.</value></data>
+       driven distance, the whole assertivity points, the car class and the
+       garage size (CentoReputation's GrowthFactor), so the line names exactly
+       those four. -->
+  <data name="CentoWelcome" xml:space="preserve"><value>Welcome to Cento Miglia. Where you build reputation based on the kilometres you race, your assertivity, the class of the car you drive and how many cars you own.</value></data>
   <data name="CentoTierRequirement" xml:space="preserve"><value>Requires Reputation Level {0}</value></data>
   <data name="CentoFreeEntry" xml:space="preserve"><value>Club Reputation: Free entry</value></data>
   <data name="CentoEligibilityReputation" xml:space="preserve"><value>Club Reputation: {0:0} / {1}</value></data>
+  <data name="CentoAssertivity" xml:space="preserve"><value>Your assertivity rating: {0:0.0}</value></data>
   <data name="CentoOwnsCar" xml:space="preserve"><value>You own {0} car</value></data>
   <data name="CentoOwnsCars" xml:space="preserve"><value>You own {0} cars</value></data>
   <data name="CentoCarClass" xml:space="preserve"><value>The car class of your current car: {0}</value></data>
@@ -330,6 +332,7 @@ For instance "{0}".</value></data>
   <data name="TodoEarnCr" xml:space="preserve"><value>Earn {0} CR in total. (currently {1})</value></data>
   <data name="TodoEarnXp" xml:space="preserve"><value>Earn {0} XP in total. (currently {1:0.00})</value></data>
   <data name="TodoBankStandings" xml:space="preserve"><value>Have {0} CR in the bank. (currently {1:0.00})</value></data>
+  <data name="TodoClubReputation" xml:space="preserve"><value>Reach a Club Reputation of {0}. (currently {1:0.00})</value></data>
   <data name="TodoDeliveryJobs" xml:space="preserve"><value>Complete {0} delivery jobs. (currently {1})</value></data>
   <data name="TodoSetDestinations" xml:space="preserve"><value>Reach {0} destinations without using GPS. (currently {1})</value></data>
   <data name="TodoOperatingZone" xml:space="preserve"><value>Reach an operating zone of {0} km. (currently {1:0.00})</value></data>
@@ -385,6 +388,8 @@ For instance "{0}".</value></data>
   <data name="DeliveryStoreGrowthDown" xml:space="preserve"><value>▼ {0} citizen / hr</value></data>
   <data name="DeliveryStoreGrowthFlat" xml:space="preserve"><value>▬ 0 citizen / hr</value></data>
   <data name="DeliveryConfirmed" xml:space="preserve"><value>Order Confirmed for €{0:0.00}</value></data>
+  <!-- A budget-capped order: units bought, units the store still needs, cost. -->
+  <data name="DeliveryConfirmedPartial" xml:space="preserve"><value>Order Confirmed: {0} / {1} units for €{2:0.00}</value></data>
   <data name="DeliveryOpenCareer" xml:space="preserve"><value>OPEN NEW CAREER</value></data>
   <data name="DeliveryDeliver" xml:space="preserve"><value>DELIVER</value></data>
   <data name="DeliveryBack" xml:space="preserve"><value>BACK</value></data>
@@ -395,6 +400,13 @@ For instance "{0}".</value></data>
   <!-- The refusal shown for three seconds when a store needs no restock;
        {0} is the store's name, so a translation may reorder it. -->
   <data name="DeliveryFullyStocked" xml:space="preserve"><value>{0} is still fully stocked.</value></data>
+  <!-- A tap the player's cash or the car's trunk cannot cover, and a DELIVER
+       refused for the same reason after the cart was staged; {0} is the
+       store's name. -->
+  <data name="DeliveryNoFunds" xml:space="preserve"><value>Not enough CR for {0}'s order.</value></data>
+  <data name="DeliveryNoSpace" xml:space="preserve"><value>{0}'s order does not fit in the trunk.</value></data>
+  <data name="DeliveryNoRunFunds" xml:space="preserve"><value>Not enough CR to pay for the goods.</value></data>
+  <data name="DeliveryRunNoSpace" xml:space="preserve"><value>The order no longer fits in the trunk.</value></data>
   <!-- Row number buttons (delivery page): spoken/written words so voice and
        sight share one label. Keys are positional (1 = top row); rows past
        the last key fall back to plain digits in the ViewModel. -->
@@ -931,12 +943,11 @@ Accept this job?</value></data>
   <data name="CentoRegisterClosed" xml:space="preserve"><value>Wrong again. You are not allowed to enter.</value></data>
   <!-- Cento Miglia receipt (Unity CentoMigliaScreen's CentoReceipt panel): the
        place line (English ordinal suffixes; a translator may reword the whole
-       line), the placement purse, the reputation the race earned, the garage
-       calculation, the Star of the Show outcome and where the item went. The
-       assertivity stat is not ported, so its clause is left out of the
-       calculation sentence; placeholders survive translation. The
-       congratulations line names the event's week (the port replaced Unity's
-       game year with it), {1} the club that issued it. -->
+       line), the placement purse, the reputation the race earned, the
+       assertivity/garage calculation, the Star of the Show outcome, where the
+       item went and the field's final standings. Placeholders survive
+       translation. The congratulations line names the event's week (the port
+       replaced Unity's game year with it), {1} the club that issued it. -->
   <data name="CentoReceiptTitle" xml:space="preserve"><value>CENTO MIGLIA RECEIPT</value></data>
   <data name="CentoReceiptCongrats" xml:space="preserve"><value>Congratulations you completed the week {0} Cento Miglia for the {1}</value></data>
   <data name="CentoPlaceFirst" xml:space="preserve"><value>1st PLACE</value></data>
@@ -945,7 +956,18 @@ Accept this job?</value></data>
   <data name="CentoPlaceOther" xml:space="preserve"><value>{0}th PLACE</value></data>
   <data name="CentoReceiptEarnings" xml:space="preserve"><value>+ {0:0.00} CR (Placement Earnings, Tier {1}, Rep x{2:0.0000})</value></data>
   <data name="CentoReceiptReputation" xml:space="preserve"><value>Participating with the {0} earned you {1:0.00000} Club Reputation.</value></data>
-  <data name="CentoReceiptCalculation" xml:space="preserve"><value>Taken into account the size of your car collection ({0}) and the class of your car ({1}).</value></data>
+  <data name="CentoReceiptCalculation" xml:space="preserve"><value>Taken into account Assertivity({0:0.0}), size of your car collection ({1}) and the class of your car ({2}).</value></data>
+  <!-- The final standings block: the heading, the ordinal labels (English
+       suffixes; a translator may reword them) and one row carrying the place,
+       the competitor, the car and the driver rating. {0} place, {1} name,
+       {2} car, {3} DR. CentoReceiptYou prints an unnamed player's row. -->
+  <data name="CentoReceiptResults" xml:space="preserve"><value>RESULTS</value></data>
+  <data name="CentoOrdinalFirst" xml:space="preserve"><value>1st</value></data>
+  <data name="CentoOrdinalSecond" xml:space="preserve"><value>2nd</value></data>
+  <data name="CentoOrdinalThird" xml:space="preserve"><value>3rd</value></data>
+  <data name="CentoOrdinalOther" xml:space="preserve"><value>{0}th</value></data>
+  <data name="CentoReceiptStanding" xml:space="preserve"><value>{0}  {1} — {2} - DR: {3}</value></data>
+  <data name="CentoReceiptYou" xml:space="preserve"><value>YOU</value></data>
   <data name="CentoReceiptStarWon" xml:space="preserve"><value>You have been awarded STAR OF THE SHOW! You receive {0:0.00} CR</value></data>
   <data name="CentoReceiptStarLost" xml:space="preserve"><value>No STAR OF THE SHOW this time.</value></data>
   <data name="CentoReceiptAwardStored" xml:space="preserve"><value>Your Star of the Show Award has been added to the trunk of your car.</value></data>

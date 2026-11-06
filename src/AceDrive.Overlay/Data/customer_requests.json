@@ -2,6 +2,7 @@
     "timerSeconds": 19,
     "tier2Chance": 0.2,
     "tier3Chance": 0.2,
+    "assertivityPerDecline": 0.1,
     "speedChallengeText": "Please get there quickly!",
     "monitor": {
         "movingKmh": 15,

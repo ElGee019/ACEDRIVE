@@ -12,9 +12,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// award/certificate into the car's trunk. Then it hands the receipt page to
 /// the shell.
 ///
-/// The race is solo until the NPC field lands, so the finishing place is first;
-/// the receipt still carries the place so the field's arrival changes no page
-/// and no rule but the placement input.
+/// The field is the player plus the rules' three club rivals. They never drive:
+/// the settle shuffles the four entrants into a seeded finishing order, so the
+/// place the receipt prints (and the purse, the concentration award and the Star
+/// of the Show multiplier that read it) is drawn rather than always first.
 /// </summary>
 public sealed class CentoRaceSettlement
 {
@@ -24,7 +25,6 @@ public sealed class CentoRaceSettlement
     // it out of the food's way, and the page files it under the compartment
     // because the catalogue defines no bite for it.
     private const double ItemVolumeLitres = 0.1;
-    private const int SoloPlacement = 1;
 
     private readonly DriverWallet _wallet;
     private readonly Garage _garage;
@@ -48,13 +48,15 @@ public sealed class CentoRaceSettlement
     }
 
     /// <summary>
-    /// Banks the finished race and shows its receipt. The reputation pair is the
-    /// ticker's start/end reading; the car that ran is the garage's current one,
-    /// the same source the event page counted from.
+    /// Draws the field, banks the finished race and shows its receipt. The
+    /// reputation pair is the ticker's start/end reading; the car that ran is the
+    /// garage's current one, the same source the event page counted from, and
+    /// <paramref name="playerName"/> is the profile's display name (empty when
+    /// the player has not named themselves, which the receipt prints as YOU).
     /// </summary>
     public void Settle(
         CentoMigliaEvent race, double startReputation, double endReputation,
-        IJobSettlementHost host)
+        string playerName, IJobSettlementHost host)
     {
         ArgumentNullException.ThrowIfNull(race);
         ArgumentNullException.ThrowIfNull(host);
@@ -63,10 +65,14 @@ public sealed class CentoRaceSettlement
         string carName = _garage.Current is { } current
             ? CarTitles.Of(current.Key, car)
             : string.Empty;
+        CentoRaceResult result = CentoRaceField.Draw(
+            _rules.Rivals, playerName ?? string.Empty, carName,
+            PlayerRating(), _rng);
         CentoReceipt receipt = CentoReceiptBuilder.Build(
-            race, SoloPlacement, startReputation, endReputation, carName,
-            car?.Class ?? 0, _garage.Cars.Count, _wallet.StarOfTheShowWins,
-            _rules, _rng);
+            race, result.PlayerPlacement, result.Standings,
+            startReputation, endReputation, carName,
+            car?.Class ?? 0, _garage.Cars.Count, _wallet.Assertivity,
+            _wallet.StarOfTheShowWins, _rules, _rng);
         _wallet.AddCentoRace(receipt);
         _wallet.AddConcentration(receipt.ConcentrationAward);
         if (receipt.ItemName.Length > 0)
@@ -80,12 +86,19 @@ public sealed class CentoRaceSettlement
         host.SaveDriver(standings: null);
         host.RefreshJob();
         _log.LogInfo(
-            $"cento miglia settled: tier {race.TierNumber}, place {receipt.Placement}, " +
-            $"purse {receipt.PlacementEarnings:0.00} + star {receipt.StarPrize:0.00}, " +
+            $"cento miglia settled: tier {race.TierNumber}, place {receipt.Placement} " +
+            $"of {receipt.Standings.Count}, purse {receipt.PlacementEarnings:0.00} + " +
+            $"star {receipt.StarPrize:0.00}, " +
             $"rep {receipt.StartReputation:0.00000} -> {receipt.EndReputation:0.00000}, " +
-            $"wins {receipt.StarWins}, item '{receipt.ItemName}', " +
-            $"wallet {_wallet.Cash:0.00}");
+            $"assertivity {receipt.Assertivity:0.0}, wins {receipt.StarWins}, " +
+            $"item '{receipt.ItemName}', wallet {_wallet.Cash:0.00}");
         host.ShowReceipt(new CentoReceiptScreenViewModel(
             receipt, _wallet, _beat, new RelayCommand(host.GoToMenuPage)));
     }
+
+    // Unity's standings row shows the rounded Overall; the port's other rating
+    // displays round the same way, so the receipt's player row matches the
+    // wallet page.
+    private int PlayerRating() =>
+        (int)Math.Round(_wallet.Rating.Overall, MidpointRounding.AwayFromZero);
 }

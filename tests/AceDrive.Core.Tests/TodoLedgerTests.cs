@@ -10,11 +10,12 @@ namespace AceDrive.Core.Tests;
 public sealed class TodoLedgerTests
 {
     private static TodoFacts Facts(
-        double cr = 0.0, double xp = 0.0, double bank = 1000.0,
+        double cr = 0.0, double xp = 0.0, double rep = 0.0, double bank = 1000.0,
         int taxi = 0, int delivery = 0, int reached = 0, double zone = 0.0,
         int cars = 1, bool max = false, bool wash = false, bool dealer = false,
         bool insurance = false, bool bankVisit = false, bool career = false) =>
-        new(cr, xp, bank, taxi, delivery, reached, zone, cars, max, wash, dealer, insurance, bankVisit, career);
+        new(cr, xp, rep, bank, taxi, delivery, reached, zone, cars,
+            max, wash, dealer, insurance, bankVisit, career);
 
     private static TodoLedger Fresh() => TodoLedger.Fresh(TodoTable.Default);
 
@@ -313,6 +314,27 @@ public sealed class TodoLedgerTests
         TodoLedger resumed = TodoLedger.Resume(TodoTable.Default, null);
 
         Assert.Equal(Subjects(Fresh(), Facts()), Subjects(resumed, Facts()));
+    }
+
+    [Fact]
+    public void ClubReputationTip_CompletesFromTheWalletReading()
+    {
+        TodoLedger ledger = Fresh();
+
+        // A settled Cento Miglia lands the club level between two gates: the
+        // tip it meets is the first one, and the popup names that target.
+        TodoFacts facts = Facts(rep: 1.5);
+        Assert.Contains(TodoSubject.ClubReputation, ledger.Sync(facts).Completed);
+
+        TodoSlotView tip = Assert.Single(
+            ledger.CompletedTips(facts),
+            view => view.SubjectId == TodoSubject.ClubReputation);
+        Assert.Equal("TodoClubReputation", tip.CopyKey);
+        Assert.Equal(1.0, tip.Target);
+
+        // The later gates wait for a later race, not for a re-sync.
+        ledger.Acknowledge(facts);
+        Assert.DoesNotContain(TodoSubject.ClubReputation, ledger.Sync(facts).Completed);
     }
 
     [Fact]

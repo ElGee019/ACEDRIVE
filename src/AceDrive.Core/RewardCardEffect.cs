@@ -15,10 +15,8 @@ namespace AceDrive.Core;
 /// rename must not silently turn an effect off; the enum is the contract, and
 /// Data/reward_cards.json declares which card carries which effect.
 /// <see cref="FreeTankRefill"/> fires on a fill the fuel receipt prices
-/// (PORTPLAN 37). One effect still has no source and stays carried until its
-/// system lands: <see cref="CustomerForgiveness"/> (taxi wrong-address
-/// cancellation unbuilt, item 11). <see cref="WorkerBonus"/> fires on an
-/// employee delivery (item 23).
+/// (PORTPLAN 37). <see cref="WorkerBonus"/> fires on an employee delivery
+/// (item 23).
 /// </summary>
 public enum RewardCardEffect
 {
@@ -30,9 +28,6 @@ public enum RewardCardEffect
 
     /// <summary>One repair bill covered in full (the accident body repair).</summary>
     FreeCarRepair,
-
-    /// <summary>No friendship loss after a wrong-address cancellation (dormant).</summary>
-    CustomerForgiveness,
 
     /// <summary>Refund the wholesale CR invested in a delivery that fails.</summary>
     DeliveryInsurance,

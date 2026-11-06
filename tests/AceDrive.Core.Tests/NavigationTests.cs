@@ -122,8 +122,12 @@ public sealed class NavigationTests
                 brands, new FakeContentSource(TestSession.EmptyContent)),
             game, clock, beat, saver, rivals, jobMileage, breakdowns, null, log);
         var delivery = new DeliveryFlow(
-            board, career, city, friends, wallet, glovebox, trunk, meter, jobMileage,
-            breakdowns, clock, beat, log);
+            board, career, city, friends, wallet, glovebox, trunk, () => 1000.0,
+            AddressMap.Default,
+            stop => stop.Kind == DeliveryStopKind.Store
+                ? board.Catalog.Find(stop.Key)?.Address
+                : null,
+            jobMileage, breakdowns, clock, beat, log);
         var cento = new CentoRaceFlow(wallet, garageInstance, beat, log);
         cento.Attach(new FakeCentoRaceHost());
         var haul = new CarHaulFlow(

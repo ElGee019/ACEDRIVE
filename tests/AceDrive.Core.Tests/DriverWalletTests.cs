@@ -258,6 +258,37 @@ public sealed class DriverWalletTests
     }
 
     [Fact]
+    public void Assertivity_StartsAtZeroResumesAndRidesTheSnapshot()
+    {
+        Assert.Equal(0.0, new DriverWallet().Assertivity);
+
+        var resumed = new DriverWallet(new DriverState(0, 0, Assertivity: 2.3));
+        Assert.Equal(2.3, resumed.Assertivity, precision: 6);
+        Assert.Equal(2.3, resumed.Snapshot().Assertivity, precision: 6);
+
+        // A torn hand-edit reads as the fresh value instead of poisoning the
+        // Cento Miglia reputation factor.
+        Assert.Equal(
+            0.0,
+            new DriverWallet(new DriverState(0, 0, Assertivity: double.NaN)).Assertivity);
+    }
+
+    [Fact]
+    public void AddAssertivity_GrowsByTheDeclineAndNeverGoesBelowZero()
+    {
+        var wallet = new DriverWallet(new DriverState(0, 0));
+
+        wallet.AddAssertivity(0.1);
+        wallet.AddAssertivity(0.1);
+        Assert.Equal(0.2, wallet.Assertivity, precision: 6);
+
+        wallet.AddAssertivity(-0.5);
+        Assert.Equal(0.0, wallet.Assertivity, precision: 6);
+        wallet.AddAssertivity(double.NaN);
+        Assert.Equal(0.0, wallet.Assertivity, precision: 6);
+    }
+
+    [Fact]
     public void Snapshot_RoundTrips()
     {
         var wallet = new DriverWallet(new DriverState(100.0, 5.0));

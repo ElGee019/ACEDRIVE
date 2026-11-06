@@ -10,7 +10,7 @@ public sealed class CentoReputationTickerTests
     [Fact]
     public void Add_StandingStillNeverGrowsTheReputation()
     {
-        var ticker = new CentoReputationTicker(1.25, 12, 1);
+        var ticker = new CentoReputationTicker(1.25, 12, 1, 0.0);
 
         for (int i = 0; i < 600; i++)
         {
@@ -24,23 +24,37 @@ public sealed class CentoReputationTickerTests
     [Fact]
     public void Add_BanksTheDistanceTheCarCovers()
     {
-        var ticker = new CentoReputationTicker(1.25, 12, 1);
+        var ticker = new CentoReputationTicker(1.25, 12, 1, 0.0);
 
         // Half a second at 100 km/h is 1/72 km.
         ticker.Add(100f, 0.5);
 
         Assert.Equal(100.0 / 3600.0 * 0.5, ticker.DistanceKm, precision: 12);
         Assert.Equal(
-            CentoReputation.AfterDistance(1.25, 12, 1, ticker.DistanceKm),
+            CentoReputation.AfterDistance(1.25, 12, 1, 0.0, ticker.DistanceKm),
             ticker.Value,
             precision: 12);
         Assert.True(ticker.Value > 1.25);
     }
 
     [Fact]
+    public void Add_ReadsTheAssertivityStat()
+    {
+        // The same drive grows further with whole assertivity points behind it.
+        var plain = new CentoReputationTicker(1.0, 12, 1, 0.0);
+        var assertive = new CentoReputationTicker(1.0, 12, 1, 5.0);
+
+        plain.Add(100f, 0.5);
+        assertive.Add(100f, 0.5);
+
+        Assert.Equal(plain.DistanceKm, assertive.DistanceKm, precision: 12);
+        Assert.True(assertive.Value > plain.Value);
+    }
+
+    [Fact]
     public void Add_IgnoresAStalledTornOrReversedPoll()
     {
-        var ticker = new CentoReputationTicker(1.0, 12, 1);
+        var ticker = new CentoReputationTicker(1.0, 12, 1, 0.0);
 
         ticker.Add(100f, 0.0);
         ticker.Add(100f, 1.0);       // a stalled poll: the odometer's guard
@@ -55,8 +69,8 @@ public sealed class CentoReputationTickerTests
     [Fact]
     public void Add_ClampsATelemetryGlitch()
     {
-        var glitched = new CentoReputationTicker(1.0, 12, 1);
-        var fastest = new CentoReputationTicker(1.0, 12, 1);
+        var glitched = new CentoReputationTicker(1.0, 12, 1, 0.0);
+        var fastest = new CentoReputationTicker(1.0, 12, 1, 0.0);
 
         glitched.Add(5000f, 0.5);
         fastest.Add(500f, 0.5);

@@ -211,6 +211,7 @@ public sealed class TodoBoard : ITodoList
         return new TodoFacts(
             _wallet.CreditEarned,
             _wallet.Xp,
+            _wallet.ClubReputation,
             _wallet.BankBalance,
             _jobs.TaxiCompleted,
             _jobs.DeliveryCompleted,

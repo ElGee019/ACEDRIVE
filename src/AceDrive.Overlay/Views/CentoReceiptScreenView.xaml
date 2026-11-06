@@ -4,10 +4,10 @@
              xmlns:loc="clr-namespace:AceDrive.Overlay.Localization">
     <!-- Cento Miglia receipt (PORTPLAN 49, Unity CentoMigliaScreen's
          CentoReceipt panel): the congratulations, the place, the placement
-         purse, the reputation the race earned, the garage/class calculation, the
-         Star of the Show outcome with where the award went, the purse total and
-         the wallet, then CONTINUE. Unity's final standings stay out until the
-         NPC field lands; nothing on this page is interactive except the exit. -->
+         purse, the reputation the race earned, the assertivity/garage/class
+         calculation, the Star of the Show outcome with where the award went, the
+         field's final standings, the purse total and the wallet, then CONTINUE.
+         Nothing on this page is interactive except the exit. -->
     <Grid MinHeight="{Binding ViewportHeight, RelativeSource={RelativeSource AncestorType=ScrollViewer}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -47,6 +47,31 @@
             </TextBlock>
             <TextBlock Text="{Binding ItemLine}" Foreground="#FFBFC4C9" FontSize="13"
                        TextAlignment="Center" TextWrapping="Wrap" Margin="0,2,0,6"/>
+            <Border Style="{StaticResource SectionDivider}"/>
+            <!-- Unity's final standings: the player plus the three drawn club
+                 rivals, place order, the player's own row teal like the other
+                 own-row boards. The order never changes on this page. -->
+            <TextBlock Text="{loc:Loc Key=CentoReceiptResults}" Foreground="#FFF"
+                       FontSize="14" FontWeight="Bold" TextAlignment="Center"/>
+            <ItemsControl ItemsSource="{Binding Standings}" Margin="0,2,0,0">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Text}" FontSize="13"
+                                   TextAlignment="Center" TextWrapping="Wrap">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="#FFFFFFFF"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPlayer}" Value="True">
+                                            <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
             <Border Style="{StaticResource SectionDivider}"/>
             <TextBlock Text="{Binding TotalLine}" Foreground="#FF97EAD2" FontSize="20"
                        TextAlignment="Center"/>

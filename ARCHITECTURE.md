@@ -100,7 +100,7 @@ coordinator. Pages take commands from the domain that owns them.
 | Collaborator | Owns (state) | Public surface | Reporting host |
 |---|---|---|---|
 | `TaxiJobFlow` ✅ | the job, `_dirtyRefusedJob`, `_pendingRequest`, `_requestDueAt`, `_requestScreen`, `_proposal`, `_acceptJobAction`, `_speedChallengeArmed`, `_conditionMonitor`, `_trackLengthMeters`, `_playerPosition` | `OpenProposal`, `Tick(now)`, `AdvanceLeg(sample)`, `Job`, `InProgress`, `LegActive`, `PickupCommand`, `DropoffCommand`, `SetTrackLength`, `ObservePosition` | `ITaxiJobHost` (8 members) |
-| `DeliveryFlow` ✅ | the run, `_storeLegStarted`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `Advance(sample, dt)`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
+| `DeliveryFlow` ✅ | the run, `_trackLengthMeters`, `_boardPage` | `OpenBoard`, `RefreshBoard`, `Board`, `Start(run)`, `SetTrackLength`, `Deliver`, `Stop`, `InProgress` | `IDeliveryHost` (8 members): page, panel, HUD pin, hub page, settle |
 | `CarHaulFlow` ✅ | — (settle-only today: the legs arrive with the driving slice) | `Settle(back)` → the receipt page; `_wallet`, `_saver`, `_brands`, the pool and the calendar as dependencies | none: the caller puts the returned receipt up with its own BACK command |
 | `RoadTestFlow` ✅ | the visit's phase, the pick under test, the page, the leg's clock and the crossing pair, the two board reads (the car's board and the all-cars record book) | `Begin()` (calendar row → the week's briefing), `BeginDrive()` (briefing START), `CloseBriefing()` (briefing BACK), `Enter(poi)` (the door — refused unless the announced car is the pick), `Start()` (0-60), `Advance(sample)` (counter/timer/crossing, voiding a run whose car was swapped), `Continue`, `Back`, `Phase`, `InFlight` | `IRoadTestHost` (6 members): reveal the page, show the receipt, hide the panel, show the control page, return to the calendar, show the menu page |
 | `TripBreakdowns` ✅ | — | `Roll(kind)`, `Interrupt(outcome, back)` | none: the flows put the returned page up |
@@ -125,7 +125,7 @@ coordinator. Pages take commands from the domain that owns them.
 After the split `MainViewModel` is a coordinator, not an owner:
 
 - lifecycle: `Start`, `Poll`, `Dispose`, the timer;
-- the 10 Hz loop: feed the delivery meter, tick `TaxiJobFlow`, `DayCycle`, `WorldTicks`,
+- the 10 Hz loop: tick `TaxiJobFlow`, `DayCycle`, `WorldTicks`,
   the Cento entry, the valuation, the missing-person run and the road test, apply
   `ReadoutPaint` — 60 code lines, not 229;
 - intent routing: `OnVoiceHeard`, the hotkey/toggle, POI `ENTER`;
@@ -158,14 +158,14 @@ stores + saved state
   └ GameStateSaver                        OverlayShell
   └ DeliveryBoard (the live catalogue)    TelemetryReadouts (no dependencies)
   └ TripBreakdowns (breakdowns, garage, onboarding progress, wallet, saver)
-      └ JobSettlement (state owners + board + meter; the host supplies the saves)
+      └ JobSettlement (state owners + board + fares; the host supplies the saves)
       └ ShopInteriors (saver)
       └ DayCycle (game clock, shift, records, shift board, telemetry, saver)
       └ WorldTicks (game clock, city, hunger, fleet, board, career, saver, rivals)
       └ DriverCatchUp (onboarding store, garage, streak, wallet, rng, saver, rivals)
       └ ZoneGrowth (zone, map, onboarding store, profile store, online, log)
       └ TaxiJobFlow (saver, proposals, requests, police, wallet, breakdowns, …)
-      └ DeliveryFlow (board, career, city, meter, breakdowns)
+      └ DeliveryFlow (board, career, city, map + doors, breakdowns)
       └ CarHaulFlow (watcher, pool, wallet, DayCycle, saver; the legs come later)
       └ RoadTestFlow (onboarding's La Strada door, road-test board, wallet, HUD)
       └ PoiWorld (growth, directory, career, shops, board, DayCycle's week)
@@ -205,13 +205,16 @@ hands it the paid leg.
 page's `TaxiShiftCommand` no longer needs the coordinator's job, and six
 constructor parameters left with the flow.
 *Deviation:* no `TripMeter` wrapper — it would have had no behaviour of its own,
-so both flows take `DrivenDistanceMeter` directly.
+so the flows took `DrivenDistanceMeter` directly. The delivery run has since
+left it for its planned-route charge (PORTPLAN 19), so the meter now serves the
+Touristenfahrten corner legs only.
 
 **S2 — `DeliveryFlow`** ✅ (~150 lines incl. `SourceOwners`). Owns the run, the
-meter edge and the board page; `Start` rolls the breakdown, `Stop` drops the run
-so the settle can bank it.
-*Unblocked:* `JobSettlement.SettleDeliveryRun` has one caller, the shared meter
-has exactly two consumers, and `ITaxiJobHost` lost the two breakdown members it
+route it prices at DELIVER and the board page; `Start` rolls the breakdown,
+prices the hub-plus-store route and `Stop` drops the run so the settle can bank
+it.
+*Unblocked:* `JobSettlement.SettleDeliveryRun` has one caller, and
+`ITaxiJobHost` lost the two breakdown members it
 was only forwarding.
 *Deviations:* decision 1 settled as the small `TripBreakdowns` collaborator
 (roll, tow fee, page) that both flows take, so neither host knows about the

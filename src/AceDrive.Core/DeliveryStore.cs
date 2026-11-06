@@ -9,11 +9,13 @@ namespace AceDrive.Core;
 /// EUR. Stocked/capacity mirror the Unity slots model collapsed to unit
 /// counts until the per-item order screen (PORTPLAN 17) lands; StockedUnits
 /// is the fill the town starts with — the live shelf count is CityEconomy's.
-/// Category is the wholesale career that supplies the store (item 18):
-/// its stores stay off the board until a hub of that category is bought.
-/// No category means open content that never needed a career. Address is the
-/// door the delivery HUD pins: every real board row derives it from its shop
-/// POI, so there is no second address table.
+/// LitresPerUnit is the trunk volume one ordered unit takes, derived from the
+/// shelf catalogue like PricePerUnit; the order page caps units so the whole
+/// run fits the car. Category is the wholesale career that supplies the
+/// store (item 18): its stores stay off the board until a hub of that
+/// category is bought. No category means open content that never needed a
+/// career. Address is the door the delivery HUD pins: every real board row
+/// derives it from its shop POI, so there is no second address table.
 /// </summary>
 public sealed record DeliveryStore(
     string Key,
@@ -23,7 +25,8 @@ public sealed record DeliveryStore(
     int UnitCapacity,
     double PricePerUnit,
     string Category = "",
-    AddressLocation? Address = null)
+    AddressLocation? Address = null,
+    double LitresPerUnit = 0.0)
 {
     /// <summary>Unity StoreListView: rows under 25 % flag as URGENT.</summary>
     public const double UrgentPercent = 25.0;

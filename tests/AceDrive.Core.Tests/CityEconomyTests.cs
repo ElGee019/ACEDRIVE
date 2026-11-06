@@ -167,6 +167,26 @@ public sealed class CityEconomyTests
     }
 
     [Fact]
+    public void AddStock_RaisesTheShelfByTheOrderedUnitsOnly()
+    {
+        // A budget-capped order fills only what it paid for: the rest of the
+        // store's need stays missing instead of jumping to capacity.
+        DeliveryStore store = Shelf(12);
+        var city = Town(store);
+
+        Assert.True(city.AddStock(store.Key, 10));
+        Assert.Equal(22, Stock(city, store));
+
+        // Over-ordering past capacity and a key the board never held are
+        // clamped / ignored, and a zero-unit leg says nothing.
+        Assert.True(city.AddStock(store.Key, 30));
+        Assert.Equal(40, Stock(city, store));
+        Assert.False(city.AddStock(store.Key, 5));
+        Assert.False(city.AddStock(store.Key, 0));
+        Assert.False(city.AddStock("gone", 5));
+    }
+
+    [Fact]
     public void Restock_TheTownFollowsTheNewBand()
     {
         // No second call wires the growth: the tick reads the fill, so the

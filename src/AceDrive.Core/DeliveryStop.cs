@@ -8,5 +8,11 @@ namespace AceDrive.Core;
 /// One stop of a delivery run: the hub that loads a category's freight or the
 /// store that receives it. Name and key are the POI identity the HUD and the
 /// board already use; the address stays in the host's directory/catalog.
+/// Units is the store's ordered quantity (0 on a hub pickup): a partial order
+/// raises the shelf by exactly that many units.
 /// </summary>
-public sealed record DeliveryStop(DeliveryStopKind Kind, string Key, string Name);
+public sealed record DeliveryStop(
+    DeliveryStopKind Kind,
+    string Key,
+    string Name,
+    int Units = 0);

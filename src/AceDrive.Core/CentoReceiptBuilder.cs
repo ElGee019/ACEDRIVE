@@ -1,8 +1,9 @@
 // Cento Miglia receipt builder (PORTPLAN item 49, port of Unity
 // CentoMigliaScreen.ProcessReceiptRewards + PopulateReceipt): the placement
-// purse, the Star of the Show roll and the generated award/certificate. The
-// Star of the Show roll rides a seeded Random so a test pins the outcome
-// (AGENTS: randomness is a seeded instance, never the shared global).
+// purse, the Star of the Show roll, the generated award/certificate and the
+// drawn field's standings. The Star of the Show roll rides a seeded Random so a
+// test pins the outcome (AGENTS: randomness is a seeded instance, never the
+// shared global).
 namespace AceDrive.Core;
 
 /// <summary>
@@ -14,18 +15,21 @@ public static class CentoReceiptBuilder
 {
     /// <summary>
     /// Builds the receipt for a finished race. <paramref name="placement"/> is
-    /// the finishing place (1 when the player is first), the reputation pair is
-    /// the race's start/end reading, and <paramref name="previousStarWins"/>
-    /// is the career total the prize scales on.
+    /// the finishing place the field draw gave the player, the reputation pair
+    /// is the race's start/end reading, <paramref name="assertivity"/> is the
+    /// driver's stat at the finish and <paramref name="previousStarWins"/> is
+    /// the career total the prize scales on.
     /// </summary>
     public static CentoReceipt Build(
         CentoMigliaEvent race,
         int placement,
+        IReadOnlyList<CentoStanding> standings,
         double startReputation,
         double endReputation,
         string carName,
         int carClass,
         int ownedCars,
+        double assertivity,
         int previousStarWins,
         CentoRaceRules rules,
         Random rng)
@@ -64,10 +68,12 @@ public static class CentoReceiptBuilder
             carName ?? string.Empty,
             carClass,
             ownedCars,
+            Math.Max(0.0, FiniteOr(assertivity, 0.0)),
             starWon,
             prize,
             wins,
             item,
+            standings ?? [],
             ConcentrationAward(place),
             total);
     }

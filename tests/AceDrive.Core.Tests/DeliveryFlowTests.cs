@@ -6,7 +6,7 @@ namespace AceDrive.Core.Tests;
 
 /// <summary>
 /// The delivery run on its own (PORTPLAN 19): the trip-start roll, the cart
-/// order the stops are pinned in, the first store leg's meter reset, the
+/// order the stops are pinned in, the route priced at DELIVER, the
 /// unreachable-door skip and the settle after the last stop. Every effect the
 /// shell owns (page, panel, HUD, receipt) is asserted through the fake host.
 /// </summary>
@@ -14,6 +14,19 @@ public sealed class DeliveryFlowTests
 {
     private static readonly CarSpec Car = new(
         "ks_test_car", 2020, "Test", "Car", Passengers: 2, Class: 16, Price: 12000.0, EngineCc: 2000);
+
+    // Ten-metre houses on a 1 km lap: hub 10 m, post 290 m, bakery 560 m, so
+    // the priced route hub -> post -> bakery is 280 + 270 = 550 m.
+    private static readonly AddressMap RouteMap = new(
+        "Germany", "Brands", 1000.0, 10.0,
+        [
+            new AddressStreet("street-1", "Street 1", 0.0, 0.25),
+            new AddressStreet("street-2", "Street 2", 0.25, 0.5),
+            new AddressStreet("street-3", "Street 3", 0.5, 0.75),
+        ]);
+
+    private static readonly AddressLocation HubDoor =
+        new("Street 1", 2, HouseSide.Left);
 
     private static readonly DeliveryStore Post = new(
         "adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, "groceries",
@@ -53,20 +66,36 @@ public sealed class DeliveryFlowTests
             new BreakdownStrategy(MaintenanceRules.Default, seed: 0), garageInstance,
             onboarding ?? new FakeOnboardingStore(), walletInstance, new FakeRivals(),
             TestSaveState.Saver(clock, walletInstance, garageInstance), beat, new NullLogger());
+        var host = new FakeDeliveryHost();
+        // The shell resolves a stop's door; a doorless stop answers null, so it
+        // is neither pinned nor priced.
+        AddressLocation? Door(DeliveryStop stop) =>
+            stop.Kind == DeliveryStopKind.Hub
+                ? HubDoor
+                : host.Doorless.Contains(stop.Key)
+                    ? null
+                    : catalog.Find(stop.Key)?.Address;
         var flow = new DeliveryFlow(
             new DeliveryBoard(catalog), career, city, friends ?? new FakeFriendshipStore(),
             walletInstance, new Glovebox(RewardTable.Default, walletInstance), carrying,
-            new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh),
+            () => 1000.0, RouteMap, Door,
             new JobMileageMeter(() => garageInstance.Current, walletInstance, new Random(1)),
             breakdowns, clock, beat,
             new NullLogger());
-        var host = new FakeDeliveryHost();
         flow.Attach(host);
         return (flow, host, city);
     }
 
-    private static DeliveryRun Cart(params DeliveryStore[] stores) =>
-        new([.. stores.Select(store => store.Key)], PaidForGoods: 28.0, ReceivedForGoods: 63.0);
+    private static DeliveryRun Cart(params DeliveryStore[] stores)
+    {
+        DeliveryCatalog catalog = Catalog;
+        List<DeliveryOrder> orders = [];
+        foreach (DeliveryStore store in stores)
+        {
+            orders.Add(catalog.Order(store, store.UnitsNeeded));
+        }
+        return new DeliveryRun(orders);
+    }
 
     [Fact]
     public void Start_PinsTheHubPickupThenEveryStoreInCartOrder_AndSettlesTheLastStop()
@@ -86,9 +115,66 @@ public sealed class DeliveryFlowTests
         flow.Deliver(); // last store: nothing left to pin
 
         DeliveryRun settled = Assert.Single(host.Settled);
-        Assert.Equal([Post.Key, Bakery.Key], settled.StoreKeys);
+        Assert.Equal([Post.Key, Bakery.Key], settled.Orders.Select(order => order.StoreKey));
         Assert.False(flow.InProgress);
         Assert.Equal(Post.UnitCapacity, city.Live(Post).StockedUnits);
+        Assert.Equal(Bakery.UnitCapacity, city.Live(Bakery).StockedUnits);
+    }
+
+    [Fact]
+    public void Start_PricesThePlannedRoute_SoTheDriveCannotMoveTheCharge()
+    {
+        var (flow, host, _) = Build(OwnedGroceryCareer());
+
+        flow.Start(Cart(Post, Bakery));
+        flow.Deliver(); // hub
+        flow.Deliver(); // the post
+        flow.Deliver(); // the bakery: the last stop settles
+
+        // Hub door 10 m -> post 290 m -> bakery 560 m: the planned legs only,
+        // the approach to the hub stays uncharged.
+        Assert.Equal(0.55, Assert.Single(host.Settled).DistanceKm, 3);
+    }
+
+    [Fact]
+    public void Start_WithADoorlessStop_PricesOnlyTheDoorsItCanResolve()
+    {
+        var (flow, host, _) = Build(OwnedGroceryCareer());
+        host.Doorless.Add(Bakery.Key);
+
+        flow.Start(Cart(Post, Bakery));
+        flow.Deliver(); // hub
+        flow.Deliver(); // the post
+        flow.Deliver(); // the bakery is skipped and settles here
+
+        // The bakery contributes no leg: hub 10 m -> post 290 m only.
+        Assert.Equal(0.28, Assert.Single(host.Settled).DistanceKm, 3);
+    }
+
+
+    [Fact]
+    public void Start_ChargesTheWholesaleSumBeforeTheTripRisk()
+    {
+        var wallet = new DriverWallet(new DriverState(100.0, 0.0));
+        var (flow, _, _) = Build(OwnedGroceryCareer(), wallet: wallet);
+
+        Assert.True(flow.Start(Cart(Post)));
+
+        Assert.Equal(51.0, wallet.Cash, 6); // 100 − 2.50 × 0.7 × 28
+    }
+
+    [Fact]
+    public void Start_WithCashBelowTheGoods_IsRefusedAndKeepsTheCash()
+    {
+        var wallet = new DriverWallet(new DriverState(10.0, 0.0));
+        var (flow, host, _) = Build(OwnedGroceryCareer(), wallet: wallet);
+
+        Assert.False(flow.Start(Cart(Post)));
+
+        Assert.Equal(10.0, wallet.Cash, 6);
+        Assert.False(flow.InProgress);
+        Assert.Empty(host.Pinned);
+        Assert.Empty(host.Settled);
     }
 
     [Fact]
@@ -148,7 +234,9 @@ public sealed class DeliveryFlowTests
         Assert.Empty(host.Pinned);
         Assert.Empty(host.Settled);
         Assert.IsType<BreakdownScreenViewModel>(Assert.Single(host.Revealed));
-        Assert.Equal(900.0, wallet.Cash, 6); // the mechanic's tow-in fee
+        // 1 000 CR − the 49.00 goods charge − the 100 CR tow fee. No shield
+        // is carried, so the lost cargo stays paid for.
+        Assert.Equal(851.0, wallet.Cash, 6);
         var (owner, delta) = Assert.Single(friends.Deltas);
         Assert.Equal(career.OwnedFor("groceries")!.OwnerName, owner);
         Assert.Equal(-1, delta);
@@ -185,8 +273,10 @@ public sealed class DeliveryFlowTests
         var (owner, delta) = Assert.Single(friends.Deltas);
         Assert.Equal(career.OwnedFor("groceries")!.OwnerName, owner);
         Assert.Equal(-1, delta);
-        // 1 000 CR − the 100 CR tow fee + the 28 CR goods refund.
-        Assert.Equal(928.0, wallet.Cash, 6);
+        // 1 000 CR − the 49.00 goods charge − the 100 CR tow fee + the same
+        // 49.00 back from the insurance card: the refund now refunds a real
+        // debit instead of minting cash.
+        Assert.Equal(900.0, wallet.Cash, 6);
         var page = Assert.IsType<BreakdownScreenViewModel>(Assert.Single(host.Revealed));
         Assert.True(page.NoteVisible);
         Assert.Contains("Delivery Insurance Shield", page.NoteLine, StringComparison.Ordinal);
@@ -204,7 +294,7 @@ public sealed class DeliveryFlowTests
         var (flow, host, _) = Build(career, friends: friends);
         flow.Start(Cart(Post, Bakery));
 
-        Assert.Equal(28.0, flow.FailForAccident());
+        Assert.Equal(67.48, flow.FailForAccident());
 
         Assert.False(flow.InProgress);
         Assert.Equal(1, host.Clears);

@@ -49,7 +49,7 @@ public sealed class JsonCustomerRequestStore
         _log.LogInfo(
             $"customer requests loaded: suffixes={table.SuffixRequests.Count} " +
             $"tracked={tracked} categories={table.QuestionCategories.Count} " +
-            $"timer={table.TimerSeconds}s");
+            $"timer={table.TimerSeconds}s assertivity={table.AssertivityPerDecline:0.0}");
         return table;
     }
 
@@ -58,6 +58,8 @@ public sealed class JsonCustomerRequestStore
         if (table.TimerSeconds <= 0
             || !IsChance(table.Tier2Chance)
             || !IsChance(table.Tier3Chance)
+            || !double.IsFinite(table.AssertivityPerDecline)
+            || table.AssertivityPerDecline < 0.0
             || string.IsNullOrWhiteSpace(table.SpeedChallengeText)
             || table.SuffixRequests is not { Count: > 0 }
             || table.QuestionCategories is not { Count: > 0 }

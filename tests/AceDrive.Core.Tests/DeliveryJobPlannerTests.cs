@@ -33,13 +33,16 @@ public sealed class DeliveryJobPlannerTests
         return career;
     }
 
+    private static DeliveryOrder Line(string key, int units = 30) =>
+        new(key, units, units * 1.75, units * 2.25);
+
     [Fact]
     public void OneHubPerCategory_ThenEveryStoreInCartOrder()
     {
         DeliveryCareer career = Career();
 
         IReadOnlyList<DeliveryStop> stops = DeliveryJobPlanner.Plan(
-            Catalog, career, ["grocery", "coffee", "grocery"]);
+            Catalog, career, [Line("grocery"), Line("coffee"), Line("grocery")]);
 
         Assert.Equal(
             [
@@ -54,6 +57,7 @@ public sealed class DeliveryJobPlannerTests
             stops.Take(2).Select(stop => stop.Name));
         Assert.Equal(["grocery", "coffee", "grocery"],
             stops.Skip(2).Select(stop => stop.Key));
+        Assert.Equal([30, 30, 30], stops.Skip(2).Select(stop => stop.Units));
     }
 
     [Fact]
@@ -63,7 +67,7 @@ public sealed class DeliveryJobPlannerTests
         Assert.True(career.TryOpenCareer(1, 0, 1)); // The Food Hub upgrade
 
         DeliveryStop hub = Assert.Single(
-            DeliveryJobPlanner.Plan(Catalog, career, ["grocery"]),
+            DeliveryJobPlanner.Plan(Catalog, career, [Line("grocery")]),
             stop => stop.Kind == DeliveryStopKind.Hub);
 
         Assert.Equal("The Food Hub", hub.Name);
@@ -74,18 +78,19 @@ public sealed class DeliveryJobPlannerTests
     public void OpenStore_NeedsNoHubLeg()
     {
         IReadOnlyList<DeliveryStop> stops = DeliveryJobPlanner.Plan(
-            Catalog, new DeliveryCareer(Hubs, 0, TestNames.For()), ["open"]);
+            Catalog, new DeliveryCareer(Hubs, 0, TestNames.For()), [Line("open", units: 7)]);
 
         DeliveryStop stop = Assert.Single(stops);
         Assert.Equal(DeliveryStopKind.Store, stop.Kind);
         Assert.Equal("open", stop.Key);
+        Assert.Equal(7, stop.Units);
     }
 
     [Fact]
     public void MissingStore_IsSkipped()
     {
         IReadOnlyList<DeliveryStop> stops = DeliveryJobPlanner.Plan(
-            Catalog, new DeliveryCareer(Hubs, 0, TestNames.For()), ["gone"]);
+            Catalog, new DeliveryCareer(Hubs, 0, TestNames.For()), [Line("gone")]);
 
         Assert.Empty(stops);
     }

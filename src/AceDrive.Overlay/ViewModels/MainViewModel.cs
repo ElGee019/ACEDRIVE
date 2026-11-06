@@ -576,7 +576,7 @@ public sealed class MainViewModel
     void ICentoRaceHost.SetReputation(double? reputation) => _hud?.SetReputation(reputation);
     bool ICentoRaceHost.ParkedAtTarget => _hud?.ParkedAtTarget ?? false;
     void ICentoRaceHost.SettleRace(CentoMigliaEvent race, double start, double end) =>
-        _centoSettlement.Settle(race, start, end, this);
+        _centoSettlement.Settle(race, start, end, PlayerName(), this);
 
     // The host slice the weekly valuation sees: the flow owns the week, the
     // venue leg and the comparison; the shell owns the panel, the briefing page
@@ -840,6 +840,9 @@ public sealed class MainViewModel
         if (s.Track is { LengthMeters: > 0.0 } track && double.IsFinite(track.LengthMeters))
         {
             _taxi.SetTrackLength(track.LengthMeters);
+            // The delivery run prices its route from door offsets on the same
+            // live length, so its charge follows the track the HUD pins.
+            _delivery.SetTrackLength(track.LengthMeters);
         }
 
         // The taxi flow prices the drive to the pickup from the car's position
@@ -904,28 +907,21 @@ public sealed class MainViewModel
             SaveGarage();
         }
 
-        // Meter runs while a paid leg is live: the taxi passenger leg, the
-        // delivery store legs and the Touristenfahrten corner legs share the one
-        // accumulator (the jobs cannot overlap). The stalled-frame guard and the
-        // speed clamp keep a torn read from inflating a fare or a delivery
-        // charge. The delivery run resets it when the first store leg starts, so
-        // hub pickups are not charged as delivery distance; the Touristenfahrten
-        // run resets it when the goods load and at every receipt.
+        // Meter runs while a paid leg is live: the taxi passenger leg and the
+        // Touristenfahrten corner legs share the one accumulator (the jobs
+        // cannot overlap). The stalled-frame guard and the speed clamp keep a
+        // torn read from inflating a fare. The delivery run needs none of it:
+        // its charge is the route stamped at DELIVER (PORTPLAN 19), so driving
+        // more kilometres cannot pay more.
         if (_taxi.LegActive)
         {
             // The flow owns the leg: the patrols and the passenger's promise.
             // The fare was priced at ACCEPT from the calculated distance.
             _taxi.AdvanceLeg(s);
         }
-        else if (_delivery.InProgress)
-        {
-            // The delivery twin: the same shared accumulator, reset by the flow
-            // at the first store leg.
-            _delivery.Advance(s, dt);
-        }
         else if (_touristen.InProgress)
         {
-            // The third consumer: reset when the goods load and after each
+            // The second consumer: reset when the goods load and after each
             // receipt, so only the corner legs are priced.
             _touristen.Advance(s, dt);
         }

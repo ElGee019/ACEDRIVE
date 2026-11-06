@@ -7,7 +7,7 @@ namespace AceDrive.Core;
 /// challenge chance, then the car-stat quiz chance. Own seeded stream so the
 /// proposal/resident draws and their pinned tests never shift when a request
 /// is rolled. A tier that lands on a quiz but has no usable car/category
-/// yields no request (WhatCar, the Unity fallback, is deferred).
+/// yields no request (WhatCar, the Unity fallback, is dropped).
 /// </summary>
 public sealed class CustomerRequestRoller : ICustomerRequestRoller
 {

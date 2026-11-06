@@ -411,7 +411,12 @@ public sealed class TaxiJobFlow
         _job.TipEligible = outcome.TipEligible;
         _job.QuizAnsweredCorrectly = outcome.QuizAnsweredCorrectly;
         _job.SpeedChallengeAgreed = outcome.SpeedChallengeAgreed;
-        ApplyQuizRating(outcome);
+        bool ratingMoved = ApplyQuizRating(outcome);
+        bool assertivityMoved = ApplyAssertivity(outcome);
+        if (ratingMoved || assertivityMoved)
+        {
+            _saver.SaveDriver(_rivals.LastResult);
+        }
         ApplyRequestConditions(outcome);
 
         if (outcome.SpeedChallengeAgreed)
@@ -530,19 +535,43 @@ public sealed class TaxiJobFlow
     // Unity CustomerRequestScreen.HandleAnswer: a correct quiz answer lifts
     // off-the-line by 1, a wrong answer or a timeout drops it by 1 (both reach
     // here with QuizAnsweredCorrectly false). The skill belongs to the driver,
-    // not the car, so an unowned free-roam car pays the same.
-    private void ApplyQuizRating(CustomerRequestOutcome outcome)
+    // not the car, so an unowned free-roam car pays the same. Answers whether
+    // the reading moved, so the caller banks it exactly once.
+    private bool ApplyQuizRating(CustomerRequestOutcome outcome)
     {
         if (_job.Request?.Quiz is null)
         {
-            return;
+            return false;
         }
 
         bool correct = outcome.Answered && outcome.QuizAnsweredCorrectly;
         _wallet.AddOffTheLine(correct ? 1.0 : -1.0);
-        _saver.SaveDriver(_rivals.LastResult);
         _log.LogInfo($"[Rating] quiz {(correct ? "correct" : "missed")}: " +
             $"off-the-line {_wallet.Rating.OffTheLine:0.00}");
+        return true;
+    }
+
+    // Unity CustomerRequestScreen.OnPassiveDeclineClicked: every declined ask
+    // raises assertivity by the table's tenth of a point, and the Cento Miglia
+    // reads whole points when it grows the club reputation. Unity saved the
+    // player data right there; the caller banks the wallet once for both this
+    // and the quiz's off-the-line move.
+    private bool ApplyAssertivity(CustomerRequestOutcome outcome)
+    {
+        if (!outcome.Declined)
+        {
+            return false;
+        }
+
+        double delta = _requestTable.AssertivityPerDecline;
+        if (delta <= 0.0 || !double.IsFinite(delta))
+        {
+            return false;
+        }
+
+        _wallet.AddAssertivity(delta);
+        _log.LogInfo($"[Rating] request declined: assertivity {_wallet.Assertivity:0.0}");
+        return true;
     }
 
     private double TrackLengthMeters() =>

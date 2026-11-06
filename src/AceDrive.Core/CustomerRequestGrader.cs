@@ -30,7 +30,8 @@ public static class CustomerRequestGrader
                 TipEligible: false,
                 QuizAnsweredCorrectly: false,
                 SpeedChallengeAgreed: false,
-                Answered: true)
+                Answered: true,
+                Declined: true)
             : CustomerRequestOutcome.None;
 
     public static CustomerRequestOutcome Answer(CustomerRequest request, int index)

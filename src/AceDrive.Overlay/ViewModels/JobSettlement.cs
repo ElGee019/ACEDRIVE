@@ -42,9 +42,7 @@ public sealed class JobSettlement
     // overlay ran must be priced by the run that delivered to it.
     private readonly DeliveryBoard _deliveryBoard;
     private readonly DeliveryCareer _career;
-    private readonly CityEconomy _city;
     private readonly DeliveryFareTable _deliveryFares;
-    private readonly DrivenDistanceMeter _meter;
     private readonly FareTable _fares;
     private readonly TaxiRules _taxiRules;
     private readonly VoiceBeat _beat;
@@ -56,8 +54,8 @@ public sealed class JobSettlement
         JobLedger jobs, Glovebox glovebox, Trunk trunk, DailyStreak streak, IClock clock,
         FleetService fleet, ICarRaritySource rarity, IFriendshipStore friends,
         IBrandMileageStore brands, IPlayerTelemetry online, IRivalsService rivals,
-        DeliveryBoard deliveryBoard, DeliveryCareer career, CityEconomy city,
-        DeliveryFareTable deliveryFares, DrivenDistanceMeter meter,
+        DeliveryBoard deliveryBoard, DeliveryCareer career,
+        DeliveryFareTable deliveryFares,
         FareTable fares, TaxiRules taxiRules,
         VoiceBeat beat, ITelemetryHud? hud, ILog log)
     {
@@ -78,9 +76,7 @@ public sealed class JobSettlement
         _rivals = rivals;
         _deliveryBoard = deliveryBoard;
         _career = career;
-        _city = city;
         _deliveryFares = deliveryFares;
-        _meter = meter;
         _fares = fares;
         _taxiRules = taxiRules;
         _beat = beat;
@@ -89,9 +85,10 @@ public sealed class JobSettlement
     }
 
     /// <summary>
-    /// Prices the live meter, banks it to the wallet, the driver save and the
-    /// shift, and shows the receipt. The odometer already banked the wear per
-    /// poll, so the settle must not add the distance a second time.
+    /// Prices the ride from the ACCEPT-stamped distance, banks it to the
+    /// wallet, the driver save and the shift, and shows the receipt. The
+    /// odometer already banked the wear per poll, so the settle must not add
+    /// the distance a second time.
     /// </summary>
     public void SettleTaxiRide(
         TaxiJobState job, string homeCountry, string carBrand, IJobSettlementHost host)
@@ -240,18 +237,17 @@ public sealed class JobSettlement
     }
 
     /// <summary>
-    /// The last store is served: the measured store-leg distance prices the
-    /// receipt, the sum of every stop pays out exactly like Unity's per-store
-    /// ApplyStoreDeliveryEffects, and the run banks once. Every ordered shelf
-    /// is filled even if a stop was skipped for a missing address.
+    /// The last store is served: the run's planned route (stamped at DELIVER,
+    /// never the odometer) prices the receipt, the sum of every stop pays out
+    /// exactly like Unity's per-store ApplyStoreDeliveryEffects, and the run
+    /// banks once. The shelves were filled arrival by arrival
+    /// (<see cref="DeliveryFlow"/>), so the settle only prices and banks.
     /// </summary>
     public void SettleDeliveryRun(
         DeliveryRun run, string homeCountry, IJobSettlementHost host)
     {
         host.ClearDeliveryRun();
-        double distanceKm = _meter.DistanceKm;
-        _meter.Reset();
-        _ = _city.Restock(run.StoreKeys);
+        double distanceKm = run.DistanceKm;
 
         // Unity ApplyStoreDeliveryEffects runs per stop; the sum receipt
         // totals it: each store credits its producing hub's ramp, distinct
@@ -259,9 +255,9 @@ public sealed class JobSettlement
         // changed mid-run) earns nothing instead of crashing the settle.
         List<string> owners = [];
         int credPEarned = 0;
-        foreach (string key in run.StoreKeys)
+        foreach (DeliveryOrder order in run.Orders)
         {
-            if (_deliveryBoard.Catalog.Find(key) is not { } store)
+            if (_deliveryBoard.Catalog.Find(order.StoreKey) is not { } store)
             {
                 continue;
             }
@@ -325,6 +321,13 @@ public sealed class JobSettlement
                     "[Reward] goods boosted but no DELIVERY PROFIT BOOST card was carried");
             }
         }
+        // The goods left cash at DELIVER; the receipt's TotalEarned already
+        // nets that cost out, so release the escrow before banking the profit.
+        // AddSale is cash-only: the released cost is not lifetime income.
+        if (run.PaidForGoods > 0.0)
+        {
+            _wallet.AddSale(run.PaidForGoods);
+        }
         _wallet.AddDelivery(receipt);
         // Delivery's km feed: the owned car contributes to the global rarity
         // board and the country aggregate, exactly like the taxi settle. Its
@@ -371,7 +374,7 @@ public sealed class JobSettlement
         // progress the player can see, so it goes to disk now.
         host.SaveClock();
         host.SaveGarage();
-        _log.LogInfo($"delivery settled: {run.StoreKeys.Count} stores " +
+        _log.LogInfo($"delivery settled: {run.Orders.Count} stores " +
             $"dist={receipt.DistanceKm:0.00}km " +
             $"paid={receipt.PaidForGoods:0.00} received={receipt.ReceivedForGoods:0.00} " +
             $"fare={receipt.DistanceCharge:0.00} earned={receipt.TotalEarned:0.00} " +

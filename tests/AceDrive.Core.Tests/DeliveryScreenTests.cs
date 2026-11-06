@@ -11,15 +11,15 @@ public sealed class DeliveryScreenTests
 {
     // Adenau Post: 12/40 = 30 % amber (low band: -1/hr), needs 28 -> 2.50*0.7*28 = 49.00
     private static readonly DeliveryStore Post =
-        new("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50);
+        new("adenau-post", "Adenau Post", "Hahn", 12, 40, 2.50, LitresPerUnit: 0.4);
 
     // Nurburg Kiosk: 6/40 = 15 % red/urgent (empty band: -2/hr), needs 34 -> 2.20*0.7*34 = 52.36
     private static readonly DeliveryStore Kiosk =
-        new("nurburg-kiosk", "Nurburg Kiosk", "Fuchs", 6, 40, 2.20);
+        new("nurburg-kiosk", "Nurburg Kiosk", "Fuchs", 6, 40, 2.20, LitresPerUnit: 0.4);
 
     // Full Market: 40/40 = 100 % (high band: +2/hr), so it takes no order.
     private static readonly DeliveryStore FullMarket =
-        new("full-market", "Full Market", "Schmitz", 40, 40, 4.40);
+        new("full-market", "Full Market", "Schmitz", 40, 40, 4.40, LitresPerUnit: 0.4);
 
     private static readonly DeliveryCatalog Catalog =
         new([Post, Kiosk, FullMarket], 0.7, 100);
@@ -37,7 +37,9 @@ public sealed class DeliveryScreenTests
         List<DeliveryRun> Runs)
         Create(DeliveryCatalog? catalog = null, HubCatalog? hubs = null,
             FakeClock? clock = null, VoiceBeat? beat = null,
-            double? startCredP = null)
+            double? startCredP = null, DriverWallet? wallet = null,
+            Trunk? trunk = null, double trunkLitres = 1000.0,
+            bool startAccepted = true)
     {
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
         var log = new TestLog();
@@ -51,9 +53,16 @@ public sealed class DeliveryScreenTests
         clock ??= new FakeClock();
         beat ??= new VoiceBeat(clock);
         var vm = new DeliveryJobScreenViewModel(
-            board, career, city, log,
+            board, career, city, wallet ?? new DriverWallet(),
+            trunk ?? new Trunk(), () => trunkLitres,
+            log,
             new RelayCommand(() => fired[0] = true),
-            new ParameterizedCommand<DeliveryRun>(r => { fired[1] = true; runs.Add(r!); }),
+            run =>
+            {
+                fired[1] = true;
+                runs.Add(run);
+                return startAccepted;
+            },
             new RelayCommand(() => fired[2] = true),
             clock, beat);
         return (vm, log, fired, career, runs);
@@ -104,7 +113,7 @@ public sealed class DeliveryScreenTests
     }
 
     [Fact]
-    public void TapStore_ConfirmsFullRestockOrder()
+    public void TapStore_ConfirmsTheFullOrderWhenAffordable()
     {
         var (vm, log, _, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
@@ -150,20 +159,20 @@ public sealed class DeliveryScreenTests
     {
         var clock = new FakeClock();
         var (vm, _, _, _, _) = Create(clock: clock);
-        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+        Assert.Equal(string.Empty, vm.NoticeLine);
 
         vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
-        Assert.Equal("Full Market is still fully stocked.", vm.StockedNoticeLine);
+        Assert.Equal("Full Market is still fully stocked.", vm.NoticeLine);
         Assert.False(Row(vm, "full-market").IsConfirmed);
 
         // Two seconds in the refusal still shows; the third second clears it.
         clock.Advance(TimeSpan.FromSeconds(2));
         vm.UpdateNotice();
-        Assert.Equal("Full Market is still fully stocked.", vm.StockedNoticeLine);
+        Assert.Equal("Full Market is still fully stocked.", vm.NoticeLine);
 
         clock.Advance(TimeSpan.FromSeconds(1) + TimeSpan.FromMilliseconds(1));
         vm.UpdateNotice();
-        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+        Assert.Equal(string.Empty, vm.NoticeLine);
     }
 
     [Fact]
@@ -171,11 +180,11 @@ public sealed class DeliveryScreenTests
     {
         var (vm, _, _, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
-        Assert.NotEqual(string.Empty, vm.StockedNoticeLine);
+        Assert.NotEqual(string.Empty, vm.NoticeLine);
 
         // Staging a real order is the player moving on: the old refusal goes.
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
-        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+        Assert.Equal(string.Empty, vm.NoticeLine);
         Assert.True(Row(vm, "adenau-post").IsConfirmed);
     }
 
@@ -184,12 +193,12 @@ public sealed class DeliveryScreenTests
     {
         var (vm, _, _, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "full-market"));
-        Assert.NotEqual(string.Empty, vm.StockedNoticeLine);
+        Assert.NotEqual(string.Empty, vm.NoticeLine);
 
         // The page is cached across navigation, so the way out clears the
         // hold instead of leaving a stale refusal for the next visit.
         vm.BackCommand.Execute(null);
-        Assert.Equal(string.Empty, vm.StockedNoticeLine);
+        Assert.Equal(string.Empty, vm.NoticeLine);
     }
 
     [Fact]
@@ -227,7 +236,9 @@ public sealed class DeliveryScreenTests
         // wholesale out (49.00), retail payout of the live pre-restock
         // shelves in (2.50 × 0.9 × 28 = 63.00).
         DeliveryRun run = Assert.Single(runs);
-        Assert.Equal(["adenau-post"], run.StoreKeys);
+        DeliveryOrder order = Assert.Single(run.Orders);
+        Assert.Equal("adenau-post", order.StoreKey);
+        Assert.Equal(28, order.Units);
         Assert.Equal(49.00, run.PaidForGoods);
         Assert.Equal(63.00, run.ReceivedForGoods);
         DeliveryRow post = Row(vm, "adenau-post");
@@ -271,7 +282,7 @@ public sealed class DeliveryScreenTests
         Assert.True(fired[0]);
         Assert.Equal(0.0, vm.CartTotal);
         Assert.Equal("OPEN NEW CAREER", vm.MainButtonLabel);
-        Assert.Contains("orders cancelled: €52.36 refunded", string.Join("|", log.Infos), StringComparison.Ordinal);
+        Assert.Contains("orders cancelled: €52.36 released", string.Join("|", log.Infos), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -459,12 +470,121 @@ public sealed class DeliveryScreenTests
     }
 
     [Fact]
-    public void CartMath_TotalSumsWholesaleCosts()
+    public void CartMath_CapsEachOrderToTheCashStillFree()
     {
+        // Starting cash 100: the full post order (49.00) leaves 51.00, which
+        // buys 33 of the kiosk's 34 missing units (50.82) — the last unit
+        // stays on the shelf instead of overdrawing the wallet.
         var (vm, _, _, _, _) = Create();
         vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
         vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
-        // 2.50*0.7*28 + 2.20*0.7*34 = 49.00 + 52.36
-        Assert.Equal(101.36, vm.CartTotal);
+
+        DeliveryRow kiosk = Row(vm, "nurburg-kiosk");
+        Assert.True(kiosk.IsConfirmed);
+        Assert.Equal("Order Confirmed: 33 / 34 units for €50.82", kiosk.ConfirmedLine);
+        Assert.Equal(99.82, vm.CartTotal);
+    }
+
+    [Fact]
+    public void TapStore_WithNoCash_RefusesAndNamesTheStore()
+    {
+        var (vm, log, _, _, _) = Create(
+            wallet: new DriverWallet(new DriverState(0.0, 0.0)));
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+
+        Assert.False(Row(vm, "adenau-post").IsConfirmed);
+        Assert.Equal(0.0, vm.CartTotal);
+        Assert.Equal("Not enough CR for Adenau Post's order.", vm.NoticeLine);
+        Assert.Contains("not enough cash: Adenau Post", string.Join("|", log.Infos),
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Deliver_WhenTheHostRefusesTheCharge_KeepsTheCart()
+    {
+        // The host owns the hand-over charge: a refused start must not eat the
+        // staged order, or the player would lose it to a silent backend rule.
+        var (vm, _, fired, _, _) = Create(startAccepted: false);
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+        vm.MainButtonCommand.Execute(null);
+
+        Assert.True(fired[1]);
+        Assert.Equal(49.00, vm.CartTotal);
+        Assert.True(Row(vm, "adenau-post").IsConfirmed);
+        Assert.Equal("Not enough CR to pay for the goods.", vm.NoticeLine);
+    }
+
+    [Fact]
+    public void TapStore_CapsTheOrderToTheFreeTrunkLitres()
+    {
+        // 5 L of free boot: at 0.4 L a unit that is 12 of the post's 28
+        // missing units, even though the cash would buy all of them.
+        var (vm, _, _, _, _) = Create(trunkLitres: 5.0);
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+
+        DeliveryRow post = Row(vm, "adenau-post");
+        Assert.Equal("Order Confirmed: 12 / 28 units for €21.00", post.ConfirmedLine);
+        Assert.Equal(21.00, vm.CartTotal);
+
+        // The remaining 0.2 L cannot take a single kiosk unit: the tap is
+        // answered, and the kiosk order is not staged.
+        vm.ToggleOrderCommand.Execute(Row(vm, "nurburg-kiosk"));
+        Assert.False(Row(vm, "nurburg-kiosk").IsConfirmed);
+        Assert.Equal("Nurburg Kiosk's order does not fit in the trunk.", vm.NoticeLine);
+    }
+
+    [Fact]
+    public void TapStore_WithAFullTrunk_RefusesTheOrder()
+    {
+        var trunk = new Trunk();
+        trunk.Add(new StoreItem("CRATE", 1.0, 5.0, 0, "groceries"), 1);
+        var (vm, _, _, _, _) = Create(trunk: trunk, trunkLitres: 5.0);
+
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+
+        Assert.False(Row(vm, "adenau-post").IsConfirmed);
+        Assert.Equal(0.0, vm.CartTotal);
+        Assert.Equal("Adenau Post's order does not fit in the trunk.", vm.NoticeLine);
+    }
+
+    [Fact]
+    public void Deliver_WhenTheTrunkNoLongerFits_KeepsTheCart()
+    {
+        // 12 L boot holds the 11.2 L post order, then cargo lands in it: the
+        // DELIVER re-check must refuse rather than drive an overloaded car.
+        var trunk = new Trunk();
+        var (vm, _, fired, _, _) = Create(trunk: trunk, trunkLitres: 12.0);
+        vm.ToggleOrderCommand.Execute(Row(vm, "adenau-post"));
+        trunk.Add(new StoreItem("CRATE", 1.0, 5.0, 0, "groceries"), 1);
+
+        vm.MainButtonCommand.Execute(null);
+
+        Assert.False(fired[1]); // never reached the host's charge
+        Assert.Equal(49.00, vm.CartTotal);
+        Assert.True(Row(vm, "adenau-post").IsConfirmed);
+        Assert.Equal("The order no longer fits in the trunk.", vm.NoticeLine);
+    }
+
+    [Fact]
+    public void AffordableUnitsByVolume_ExactFitKeepsTheLastUnit()
+    {
+        // 25 × 0.4 L is exactly 10.0 L; binary residue must not lose a unit.
+        var store = new DeliveryStore("s", "S", "O", 0, 40, 2.0, LitresPerUnit: 0.4);
+        Assert.Equal(25, DeliveryCatalog.AffordableUnitsByVolume(store, 10.0));
+        Assert.Equal(24, DeliveryCatalog.AffordableUnitsByVolume(store, 9.99));
+        // A legacy/hand-authored row with no volume is bounded by cash only.
+        Assert.Equal(40, DeliveryCatalog.AffordableUnitsByVolume(store with { LitresPerUnit = 0.0 }, 1.0));
+    }
+
+    [Fact]
+    public void DeliveryRun_FitsIn_ToleratesMillilitreRounding()
+    {
+        // A cart loaded to the exact limit reads as fitting; a real overload
+        // (10 % over) is refused.
+        var run = new DeliveryRun(
+            [new DeliveryOrder("s", 25, 10.0, 20.0, Volume: 10.0)]);
+        Assert.True(run.FitsIn(10.0));
+        Assert.True(run.FitsIn(9.9995));
+        Assert.False(run.FitsIn(9.9));
     }
 }

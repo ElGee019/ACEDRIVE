@@ -6,73 +6,77 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// Confirmed restock orders waiting for hub pickup (Unity
-/// player.pickupCart). One full-restock order per store until the per-item
-/// order screen arrives; until then a confirmed store re-answers to its
-/// row and drops the order.
+/// player.pickupCart). One line per store, carrying the units the player
+/// could afford and the trunk litres they take; a confirmed store re-answers
+/// to its row and drops the order. The committed cash and volume are the
+/// page's budget guards: a second order may only use what the cart has not
+/// already earmarked.
 /// </summary>
 public sealed class DeliveryCart
 {
-    private readonly List<string> _storeKeys = new();
+    private readonly List<DeliveryOrder> _orders = new();
 
-    public IReadOnlyList<string> ConfirmedKeys => _storeKeys;
+    public IReadOnlyList<DeliveryOrder> Orders => _orders;
 
-    public bool IsEmpty => _storeKeys.Count == 0;
+    public bool IsEmpty => _orders.Count == 0;
 
     public DeliveryPhase Phase => IsEmpty ? DeliveryPhase.OpenCareer : DeliveryPhase.Deliver;
 
-    public bool Contains(string key) => _storeKeys.Contains(key);
+    /// <summary>Wholesale CR already earmarked by the cart's orders.</summary>
+    public double TotalCost
+    {
+        get
+        {
+            double total = 0.0;
+            foreach (DeliveryOrder order in _orders)
+            {
+                total += order.WholesaleCost;
+            }
+            return Math.Round(total, 2, MidpointRounding.AwayFromZero);
+        }
+    }
+
+    /// <summary>Trunk litres already earmarked by the cart's orders.</summary>
+    public double TotalVolume
+    {
+        get
+        {
+            double total = 0.0;
+            foreach (DeliveryOrder order in _orders)
+            {
+                total += order.Volume;
+            }
+            return Math.Round(total, 3, MidpointRounding.AwayFromZero);
+        }
+    }
+
+    public bool Contains(string key) => Find(key) is not null;
+
+    /// <summary>The cart's line for a store, or null when it holds no order.</summary>
+    public DeliveryOrder? Find(string key)
+    {
+        foreach (DeliveryOrder order in _orders)
+        {
+            if (order.StoreKey == key) return order;
+        }
+        return null;
+    }
 
     /// <summary>Confirms an order; already-confirmed stores are left as-is.</summary>
-    public void Confirm(string key)
+    public void Confirm(DeliveryOrder order)
     {
-        if (!Contains(key)) _storeKeys.Add(key);
+        if (!Contains(order.StoreKey)) _orders.Add(order);
     }
 
-    public void Remove(string key) => _storeKeys.Remove(key);
+    public void Remove(string key) => _orders.RemoveAll(order => order.StoreKey == key);
 
-    public void Clear() => _storeKeys.Clear();
-
-    /// <summary>Total wholesale CR committed by the cart (escrow model,
-    /// released on the save/economy page; PORTPLAN 19 + 51). Read on the
-    /// town's live shelves: the order's price follows the need the goods
-    /// actually fill, the same number the row shows.</summary>
-    public double TotalCost(DeliveryCatalog catalog, CityEconomy city)
-    {
-        double total = 0.0;
-        foreach (string key in _storeKeys)
-        {
-            DeliveryStore? store = catalog.Find(key);
-            if (store is not null) total += catalog.OrderCost(city.Live(store));
-        }
-        return Math.Round(total, 2);
-    }
-
-    /// <summary>Total retail payout the cart's deliveries come back with,
-    /// read on the town's live shelves: what a store actually receives is
-    /// its current pre-restock need (Unity's per-item quantities collapse
-    /// to unit needs until the order screen lands, item 17).</summary>
-    public double TotalPayout(DeliveryCatalog catalog, CityEconomy city)
-    {
-        double total = 0.0;
-        foreach (string key in _storeKeys)
-        {
-            DeliveryStore? store = catalog.Find(key);
-            if (store is not null) total += catalog.PayoutCost(city.Live(store));
-        }
-        return Math.Round(total, 2);
-    }
+    public void Clear() => _orders.Clear();
 
     /// <summary>
-    /// The whole cart as one run: store keys plus the money it moves —
-    /// wholesale out, retail payout in — computed before any restock so the
-    /// sums see the shelves the goods fill. Empty carts run nothing.
+    /// The whole cart as one run, in cart order. Empty carts run nothing; the
+    /// run's money is derived from its lines so the page's budget guard and
+    /// the hand-over charge read the same numbers.
     /// </summary>
-    public DeliveryRun? Run(DeliveryCatalog catalog, CityEconomy city)
-    {
-        if (_storeKeys.Count == 0) return null;
-        return new DeliveryRun(
-            [.. _storeKeys],
-            TotalCost(catalog, city),
-            TotalPayout(catalog, city));
-    }
+    public DeliveryRun? Run() =>
+        _orders.Count == 0 ? null : new DeliveryRun([.. _orders]);
 }

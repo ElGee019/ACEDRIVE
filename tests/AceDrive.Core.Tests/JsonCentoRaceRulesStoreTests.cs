@@ -36,7 +36,12 @@ public sealed class JsonCentoRaceRulesStoreTests
                   "starPlacementMultipliers": [ 1.5, 1.0 ],
                   "starPrizePerWin": 250,
                   "awardItemName": "Award {0} - {1}",
-                  "certificateItemName": "Certificate {0} {1} - Tier {2}"
+                  "certificateItemName": "Certificate {0} {1} - Tier {2}",
+                  "rivals": [
+                    { "name": "A", "car": "Car A", "driverRating": 40 },
+                    { "name": "B", "car": "Car B", "driverRating": 50 },
+                    { "name": "C", "car": "Car C", "driverRating": 60 }
+                  ]
                 }
                 """);
             var log = new TestLog();
@@ -46,9 +51,28 @@ public sealed class JsonCentoRaceRulesStoreTests
             Assert.Equal(0.5, rules.StarBaseChance);
             Assert.Equal(250.0, rules.StarPrizePerWin);
             Assert.Equal("Award {0} - {1}", rules.AwardItemName);
+            Assert.Equal(3, rules.Rivals.Count);
+            Assert.Equal("B", rules.Rivals[1].Name);
             Assert.Empty(log.Warnings);
         }
         finally { File.Delete(file); }
+    }
+
+    [Fact]
+    public void RealDataFile_LoadsTheThreeRivals()
+    {
+        string data = Path.Combine(AppContext.BaseDirectory, "Data");
+        var log = new TestLog();
+
+        CentoRaceRules rules = new JsonCentoRaceRulesStore(
+            Path.Combine(data, "cento_race.json"), log).Load();
+
+        Assert.Empty(log.Warnings);
+        Assert.Equal(3, rules.Rivals.Count);
+        Assert.Equal("Viktor Brandl", rules.Rivals[0].Name);
+        Assert.Equal("Alfa Romeo Giulia GTA Sprint", rules.Rivals[0].Car);
+        Assert.Equal(42, rules.Rivals[0].DriverRating);
+        Assert.All(rules.Rivals, rival => Assert.True(rival.DriverRating > 0));
     }
 
     [Fact]

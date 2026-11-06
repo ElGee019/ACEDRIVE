@@ -22,9 +22,7 @@ namespace AceDrive.Overlay.ViewModels;
 ///
 /// Unity's weekly one-entry gate is absent with the race: it is written by a
 /// finished race. The header keeps Unity's reputation floor (a raw 0 prints as
-/// 1.00000) and the detail panel keeps its three lines; the assertivity line
-/// stays out for the same reason it does on the customer-request page (the stat
-/// has no port yet).
+/// 1.00000) and the detail panel keeps its four lines, assertivity included.
 /// </summary>
 public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IPolledScreen
 {
@@ -217,9 +215,8 @@ public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IP
 
     /// <summary>
     /// The detail panel's eligibility block, one line each like Unity's
-    /// TextEligibility: the reputation the tier asks for, the garage size and
-    /// the current car's class. Unity's fourth line (assertivity) has no stat
-    /// behind it in this port.
+    /// TextEligibility: the reputation the tier asks for, the driver's
+    /// assertivity, the garage size and the current car's class.
     /// </summary>
     public string EligibilityText
     {
@@ -235,11 +232,13 @@ public sealed class CentoMigliaScreenViewModel : ViewModelBase, IVoiceScreen, IP
                 : Strings.Format(
                     "CentoEligibilityReputation",
                     _facts.ClubReputation, row.Tier.ReputationRequired);
+            string assertivity = Strings.Format("CentoAssertivity", _facts.Assertivity);
             string cars = Strings.Format(
                 _facts.CarsOwned == 1 ? "CentoOwnsCar" : "CentoOwnsCars",
                 _facts.CarsOwned);
             return string.Join(
-                '\n', reputation, cars, Strings.Format("CentoCarClass", _facts.CarClass));
+                '\n', reputation, assertivity, cars,
+                Strings.Format("CentoCarClass", _facts.CarClass));
         }
     }
 

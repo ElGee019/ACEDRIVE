@@ -111,7 +111,9 @@ public sealed class BreakdownFlowTests
         board.MainButtonCommand.Execute(null);
 
         Assert.IsType<BreakdownScreenViewModel>(vm.CurrentScreen); // no receipt
-        Assert.Equal(before - 100.0, wallet.Cash, 6);              // the tow fee
+        // The run paid its 49.00 goods charge at DELIVER and then lost the
+        // cargo to the tow fee: 1000 − 49 − 100.
+        Assert.Equal(before - 149.0, wallet.Cash, 6);
     }
 
     [Fact]

@@ -10,11 +10,14 @@ namespace AceDrive.Core;
 /// page stays a formatter and the tests can pin a fresh driver in one line. The
 /// planned route rides along because the page reports its distance and hands the
 /// doors to the race, so the page never reads the zone or the map itself.
+/// Assertivity rides here too: Unity's eligibility block prints it, and the
+/// race's reputation factor reads its whole points.
 /// </summary>
 public sealed record CentoMigliaFacts(
     int Week,
     int Year,
     double ClubReputation,
+    double Assertivity,
     bool HasDiscoveredStreets,
     int CarsOwned,
     int CarClass,

@@ -19,10 +19,11 @@ public sealed class CentoReceiptBuilderTests
     private static CentoReceipt Build(
         int placement = 1, double start = 1.0, double end = 1.0,
         int carClass = 12, int ownedCars = 1, int starWins = 0,
-        string carName = "Mazda MX-5", int seed = 0) =>
+        string carName = "Mazda MX-5", int seed = 0,
+        double assertivity = 0.0, IReadOnlyList<CentoStanding>? standings = null) =>
         CentoReceiptBuilder.Build(
-            Race(), placement, start, end, carName, carClass, ownedCars,
-            starWins, Rules, new Random(seed));
+            Race(), placement, standings ?? [], start, end, carName, carClass,
+            ownedCars, assertivity, starWins, Rules, new Random(seed));
 
     [Fact]
     public void PlacementPaysTheLadderTimesTheTierAndTheReputation()
@@ -96,10 +97,39 @@ public sealed class CentoReceiptBuilderTests
     }
 
     [Fact]
+    public void Assertivity_RidesTheReceiptUntilItIsClamped()
+    {
+        Assert.Equal(2.9, Build(assertivity: 2.9).Assertivity, precision: 6);
+        // A torn or hand-edited negative never prints below the fresh driver.
+        Assert.Equal(0.0, Build(assertivity: -4.0).Assertivity);
+        Assert.Equal(0.0, Build(assertivity: double.NaN).Assertivity);
+    }
+
+    [Fact]
+    public void Standings_RideTheReceipt()
+    {
+        CentoStanding[] field =
+        [
+            new(1, "Elodie Marchand", "Abarth 695 biposto", 51, IsPlayer: false),
+            new(2, "", "Mazda MX-5", 20, IsPlayer: true),
+        ];
+
+        CentoReceipt receipt = Build(placement: 2, standings: field);
+
+        Assert.Equal(field, receipt.Standings.ToArray());
+        Assert.Equal(2, receipt.Placement);
+    }
+
+    [Fact]
     public void SameSeed_AnswersTheSameReceipt()
     {
         CentoReceipt first = Build(seed: 4, carClass: 40);
         CentoReceipt again = Build(seed: 4, carClass: 40);
-        Assert.Equal(first, again);
+        Assert.Equal(first.Placement, again.Placement);
+        Assert.Equal(first.PlacementEarnings, again.PlacementEarnings, precision: 6);
+        Assert.Equal(first.StarWon, again.StarWon);
+        Assert.Equal(first.StarPrize, again.StarPrize, precision: 6);
+        Assert.Equal(first.ItemName, again.ItemName);
+        Assert.Equal(first.Standings.ToArray(), again.Standings.ToArray());
     }
 }

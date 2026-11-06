@@ -26,24 +26,41 @@ public static class CentoReputation
 
     /// <summary>
     /// Unity ReputationCalculator.Divisor. The per-tick gain is tiny on
-    /// purpose: (car class + owned cars) / 1,000,000, so a race adds a few
-    /// thousandths, not a tier.
+    /// purpose: (assertivity + car class + owned cars) / 1,000,000, so a race
+    /// adds a few thousandths, not a tier.
     /// </summary>
     public const double Divisor = 1_000_000.0;
 
     /// <summary>
-    /// One tick's multiplier (Unity CalculateFactor). Unity also adds the
-    /// driver's assertivity, a stat this port has not ported yet; the car
-    /// class and the garage size are the whole factor here, so the port's
-    /// growth matches Unity on the same inputs modulo that missing stat.
-    /// Negative inputs are clamped instead of shrinking the reputation.
+    /// One tick's multiplier (Unity CalculateFactor). Unity adds the driver's
+    /// assertivity, the car class and the garage size, each divided by
+    /// <see cref="Divisor"/>; the assertivity contribution is Unity's truncating
+    /// <c>(int)</c> cast, so 1.9 points count as one and a decline's 0.1 only
+    /// pays once ten of them accumulate. Negative or non-finite inputs are
+    /// clamped instead of shrinking the reputation.
     /// </summary>
-    public static double GrowthFactor(int carClass, int ownedCars)
+    public static double GrowthFactor(int carClass, int ownedCars, double assertivity)
     {
         double factor = 1.0
+            + (AssertivityPoints(assertivity) / Divisor)
             + (Math.Max(0, carClass) / Divisor)
             + (Math.Max(0, ownedCars) / Divisor);
         return double.IsFinite(factor) && factor > 0.0 ? factor : 1.0;
+    }
+
+    /// <summary>
+    /// The whole assertivity points Unity's cast keeps: a fractional reading
+    /// earns nothing extra until it reaches the next integer, and a huge or torn
+    /// value clamps to the int range so the factor stays finite.
+    /// </summary>
+    private static double AssertivityPoints(double assertivity)
+    {
+        if (!double.IsFinite(assertivity) || assertivity <= 0.0)
+        {
+            return 0.0;
+        }
+
+        return Math.Min(Math.Truncate(assertivity), int.MaxValue);
     }
 
     /// <summary>
@@ -54,7 +71,8 @@ public static class CentoReputation
     /// sample never sends the counter backwards.
     /// </summary>
     public static double AfterDistance(
-        double startReputation, int carClass, int ownedCars, double distanceKm)
+        double startReputation, int carClass, int ownedCars, double assertivity,
+        double distanceKm)
     {
         if (!double.IsFinite(startReputation) || startReputation <= 0.0)
         {
@@ -68,7 +86,7 @@ public static class CentoReputation
 
         double ticks = distanceKm / TickKilometres;
         double grown = startReputation
-            * Math.Pow(GrowthFactor(carClass, ownedCars), ticks);
+            * Math.Pow(GrowthFactor(carClass, ownedCars, assertivity), ticks);
         return double.IsFinite(grown) && grown >= startReputation
             ? grown
             : startReputation;

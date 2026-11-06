@@ -22,8 +22,21 @@ public sealed class JobSettlementTests
         new AddressLocation("Street 3", 7, HouseSide.Right));
 
     private static DeliveryCatalog Catalog => new([Post, Bakery], 0.7, 100);
-    private static DeliveryRun Cart => new(
-        [Post.Key, Bakery.Key], PaidForGoods: 28.0, ReceivedForGoods: 63.0);
+    private static DeliveryRun Cart
+    {
+        get
+        {
+            DeliveryCatalog catalog = Catalog;
+            DeliveryOrder[] orders =
+            [
+                catalog.Order(Post, Post.UnitsNeeded),
+                catalog.Order(Bakery, Bakery.UnitsNeeded),
+            ];
+            // The route the run is charged for, stamped at DELIVER like a
+            // taxi's ACCEPT distance; the tests never drive to earn it.
+            return new DeliveryRun(orders) { DistanceKm = 8.2 };
+        }
+    }
 
     private static DeliveryCareer OwnedGroceryCareer()
     {
@@ -40,8 +53,7 @@ public sealed class JobSettlementTests
     public void SettleDeliveryRun_SumsEveryStoreCredPAndBanksTheRun()
     {
         DeliveryCareer career = OwnedGroceryCareer();
-        var (settlement, wallet, _, jobs, zone, online, meter, host, _) = Build(career);
-        Drive(meter);
+        var (settlement, wallet, _, jobs, zone, online, host, _) = Build(career);
 
         settlement.SettleDeliveryRun(Cart, "Germany", host);
 
@@ -51,7 +63,7 @@ public sealed class JobSettlementTests
         Assert.True(receipt.HasCredP);
         Assert.Equal("Credibility Points earned: 3", receipt.CredPEarnedLine);
         Assert.Equal("Total Credibility Points: 3", receipt.TotalCredPLine);
-        Assert.True(wallet.Cash > 35.0); // the goods margin plus the measured distance
+        Assert.True(wallet.Cash > 35.0); // the goods margin plus the route fare
         Assert.Equal(1, jobs.Completed);
         Assert.Equal(1, zone.CountedJobs);
         Assert.Equal(1, host.ProgressBanked);
@@ -66,9 +78,8 @@ public sealed class JobSettlementTests
         // A borrowed free-roam car must not distort the ownership economy: the
         // goods money still lands, the career counters and XP do not.
         DeliveryCareer career = OwnedGroceryCareer();
-        var (settlement, wallet, garage, jobs, zone, online, meter, host, _) =
+        var (settlement, wallet, garage, jobs, zone, online, host, _) =
             Build(career, liveCar: "ks_mazda_mx5_na");
-        Drive(meter);
 
         settlement.SettleDeliveryRun(Cart, "Germany", host);
 
@@ -91,9 +102,8 @@ public sealed class JobSettlementTests
         [
             new TrunkItem("DELIVERY PROFIT BOOST", 0.0) { Quantity = 1 },
         ]);
-        var (settlement, wallet, _, _, _, _, meter, host, carrying) =
+        var (settlement, wallet, _, _, _, _, host, carrying) =
             Build(career, trunk: trunk);
-        Drive(meter);
 
         settlement.SettleDeliveryRun(Cart, "Germany", host);
 
@@ -101,8 +111,8 @@ public sealed class JobSettlementTests
             Assert.Single(host.Receipts));
         Assert.True(receipt.HasProfitBoost);
         Assert.Contains("20%", receipt.ProfitBoostLine, StringComparison.Ordinal);
-        // 20% on the 63 CR goods payout, the fare untouched: 75.60 in.
-        Assert.Equal("€75.60", receipt.ReceivedLine.Amount);
+        // 20% on the 86.76 CR goods payout, the fare untouched: 104.11 in.
+        Assert.Equal("€104.11", receipt.ReceivedLine.Amount);
         Assert.DoesNotContain(carrying.Items, item => item.Name == "DELIVERY PROFIT BOOST");
         Assert.True(wallet.Cash > 0.0);
     }
@@ -122,9 +132,8 @@ public sealed class JobSettlementTests
                 UsesMax = 5,
             },
         ]);
-        var (settlement, _, _, _, _, _, meter, host, carrying) =
+        var (settlement, _, _, _, _, _, host, carrying) =
             Build(career, trunk: trunk);
-        Drive(meter);
 
         settlement.SettleDeliveryRun(Cart, "Germany", host);
 
@@ -134,19 +143,9 @@ public sealed class JobSettlementTests
         Assert.Equal(5, card.UsesMax);
     }
 
-    // 8.2 km at 360 km/h in half-second polls: the meter ignores a stalled tick
-    // (dt ≥ 1 s), so the drive is fed the way the 10 Hz poll would.
-    private static void Drive(DrivenDistanceMeter meter)
-    {
-        for (int i = 0; i < 164; i++)
-        {
-            meter.Add(360f, 0.5);
-        }
-    }
-
     private static (
         JobSettlement Settlement, DriverWallet Wallet, Garage Garage, JobLedger Jobs,
-        OperatingZone Zone, FakePlayerTelemetry Online, DrivenDistanceMeter Meter,
+        OperatingZone Zone, FakePlayerTelemetry Online,
         FakeJobSettlementHost Host, Trunk Trunk)
         Build(DeliveryCareer career, string? liveCar = null, Trunk? trunk = null)
     {
@@ -167,7 +166,6 @@ public sealed class JobSettlementTests
         var zone = new OperatingZone(null, seed: 0, AddressMap.Default);
         var jobs = new JobLedger();
         var online = new FakePlayerTelemetry();
-        var meter = new DrivenDistanceMeter(TaxiRules.Default.MaxMeterSpeedKmh);
         var carrying = trunk ?? new Trunk();
         var glovebox = new Glovebox(RewardTable.Default, wallet);
         var settlement = new JobSettlement(
@@ -175,10 +173,10 @@ public sealed class JobSettlementTests
             new DailyStreak(clock, null), clock,
             fleet, new FakeCarRarity(), new FakeFriendshipStore(), new FakeBrandMileageStore(),
             online, new FakeRivals(), new DeliveryBoard(catalog), career,
-            new CityEconomy(catalog.Stores, CityRules.Default), DeliveryFareTable.Default,
-            meter, FareTable.Default,
+            DeliveryFareTable.Default,
+            FareTable.Default,
             TaxiRules.Default, new VoiceBeat(clock), null, new NullLogger());
-        return (settlement, wallet, garage, jobs, zone, online, meter,
+        return (settlement, wallet, garage, jobs, zone, online,
             new FakeJobSettlementHost(), carrying);
     }
 }

@@ -1,7 +1,8 @@
 // Cento Miglia race balance (PORTPLAN item 49, port of Unity
-// CentoMigliaScreen.ProcessReceiptRewards/PopulateReceipt): the placement
-// payout ladder, the Star of the Show logistic curve and the generated item
-// names. Balance lives in Data/cento_race.json; Default is the test-shell
+// CentoMigliaScreen.ProcessReceiptRewards/PopulateReceipt and
+// RaceParticipantPicker): the placement payout ladder, the Star of the Show
+// logistic curve, the generated item names and the three club rivals. Balance
+// lives in Data/cento_race.json; Default is the test-shell
 // fallback, not the source of truth (AGENTS: no magic balance values).
 namespace AceDrive.Core;
 
@@ -27,6 +28,10 @@ namespace AceDrive.Core;
 /// {1} car.</param>
 /// <param name="CertificateItemName">Item name template for a finishing
 /// certificate: {0} week, {1} year, {2} tier.</param>
+/// <param name="Rivals">The club competitors the settle shuffles with the
+/// player into the finishing order. Unity draws three residents and three
+/// catalogue cars; the port keeps its three rivals in content because the race
+/// does not simulate them. An empty roster is the solo fallback.</param>
 public sealed record CentoRaceRules(
     IReadOnlyList<double> PlacementEarnings,
     double StarBaseChance,
@@ -35,7 +40,8 @@ public sealed record CentoRaceRules(
     IReadOnlyList<double> StarPlacementMultipliers,
     double StarPrizePerWin,
     string AwardItemName,
-    string CertificateItemName)
+    string CertificateItemName,
+    IReadOnlyList<CentoCompetitor> Rivals)
 {
     /// <summary>Unity's literals, byte for byte: the shipped values live in
     /// Data/cento_race.json, this copy is the deterministic fallback.</summary>
@@ -47,5 +53,11 @@ public sealed record CentoRaceRules(
         StarPlacementMultipliers: [1.2, 1.0, 0.8, 0.6],
         StarPrizePerWin: 500.0,
         AwardItemName: "Star of the Show Award {0} - {1}",
-        CertificateItemName: "Cento Miglia Certificate Week {0} {1} - Tier {2}");
+        CertificateItemName: "Cento Miglia Certificate Week {0} {1} - Tier {2}",
+        Rivals:
+        [
+            new CentoCompetitor("Viktor Brandl", "Alfa Romeo Giulia GTA Sprint", 42),
+            new CentoCompetitor("Elodie Marchand", "Abarth 695 biposto", 51),
+            new CentoCompetitor("Tommy Whitcombe", "Mazda MX-5", 33),
+        ]);
 }

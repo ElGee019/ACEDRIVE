@@ -27,15 +27,17 @@ public sealed class CustomerRequestGraderTests
         Assert.False(outcome.SpeedChallengeAgreed);
         Assert.False(outcome.QuizAnsweredCorrectly);
         Assert.True(outcome.Answered);
+        Assert.False(outcome.Declined);
     }
 
     [Fact]
-    public void PassiveDecline_NoTip()
+    public void PassiveDecline_NoTipButGrowsAssertivity()
     {
         CustomerRequestOutcome outcome = CustomerRequestGrader.Decline(Passive);
 
         Assert.False(outcome.TipEligible);
         Assert.True(outcome.Answered);
+        Assert.True(outcome.Declined);
     }
 
     [Fact]
@@ -50,13 +52,14 @@ public sealed class CustomerRequestGraderTests
     }
 
     [Fact]
-    public void SpeedDecline_NoTipNoAgreement()
+    public void SpeedDecline_NoTipNoAgreementButGrowsAssertivity()
     {
         CustomerRequestOutcome outcome = CustomerRequestGrader.Decline(Speed);
 
         Assert.False(outcome.TipEligible);
         Assert.False(outcome.SpeedChallengeAgreed);
         Assert.True(outcome.Answered);
+        Assert.True(outcome.Declined);
     }
 
     [Fact]

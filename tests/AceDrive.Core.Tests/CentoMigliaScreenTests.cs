@@ -25,8 +25,8 @@ public sealed class CentoMigliaScreenTests
     private static CentoMigliaFacts Facts(
         double reputation = 1.5, bool streets = true,
         int cars = 2, int carClass = 16, int week = 3, int year = 1924,
-        double routeKm = 0.9645) =>
-        new(week, year, reputation, streets, cars, carClass,
+        double routeKm = 0.9645, double assertivity = 0.0) =>
+        new(week, year, reputation, assertivity, streets, cars, carClass,
             new CentoRoutePlan(
                 new AddressLocation("Street 1", 1, HouseSide.Right),
                 new AddressLocation("Street 2", 1, HouseSide.Right),
@@ -128,7 +128,7 @@ public sealed class CentoMigliaScreenTests
         Assert.Equal("1920s Era Only", h.Page.DetailLabel);
         Assert.Equal("Exclusive event.", h.Page.DetailDescription);
         Assert.Equal(
-            "Club Reputation: 2 / 2\nYou own 2 cars\nThe car class of your current car: 16",
+            "Club Reputation: 2 / 2\nYour assertivity rating: 0.0\nYou own 2 cars\nThe car class of your current car: 16",
             h.Page.EligibilityText);
     }
 
@@ -149,12 +149,12 @@ public sealed class CentoMigliaScreenTests
     }
 
     [Fact]
-    public void FreeTier_PrintsFreeEntryAndTheSingularCarCount()
+    public void FreeTier_PrintsFreeEntryTheSingularCarCountAndAssertivity()
     {
-        Harness h = Create(Facts(reputation: 0.0, cars: 1, carClass: 0));
+        Harness h = Create(Facts(reputation: 0.0, cars: 1, carClass: 0, assertivity: 3.4));
         h.Page.TierCommand.Execute(h.Page.Tiers[0]);
         Assert.Equal(
-            "Club Reputation: Free entry\nYou own 1 car\nThe car class of your current car: 0",
+            "Club Reputation: Free entry\nYour assertivity rating: 3.4\nYou own 1 car\nThe car class of your current car: 0",
             h.Page.EligibilityText);
     }
 

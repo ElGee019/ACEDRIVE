@@ -63,6 +63,24 @@ public sealed class FleetService
         _driven.CurrentIdentity?.FindIn(_cars) is { } car ? Math.Max(1, car.Passengers) : 1;
 
     /// <summary>
+    /// Trunk litres of the car driven now: the watcher's live car (owned or a
+    /// free-roam loaner — its boot still carries the freight), else the
+    /// garage's current car while the watcher is quiet. Zero when neither
+    /// resolves, which blocks a delivery order instead of inventing space.
+    /// </summary>
+    public double TrunkCapacity()
+    {
+        if (_driven.CurrentIdentity?.FindIn(_cars) is { } live)
+        {
+            return live.TrunkLitres;
+        }
+
+        return _garage.Current is { } current
+            ? _garage.SpecOf(current)?.TrunkLitres ?? 0.0
+            : 0.0;
+    }
+
+    /// <summary>
     /// The car that earns class/rarity XP and the global km increment: the
     /// live car when it matches an owned garage row, the garage's current car
     /// when the watcher has not announced one yet, and null when the player is

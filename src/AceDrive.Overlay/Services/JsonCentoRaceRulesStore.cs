@@ -55,13 +55,13 @@ public sealed class JsonCentoRaceRulesStore
         }
 
         _log.LogInfo($"cento race balance loaded: {rules.PlacementEarnings.Count} places, " +
-            $"star prize {rules.StarPrizePerWin:0}");
+            $"{rules.Rivals.Count} rivals, star prize {rules.StarPrizePerWin:0}");
         return rules;
     }
 
-    // One broken field would break either the purse or the award, so the whole
-    // table falls back together: a half-applied balance is worse than Unity's
-    // own numbers.
+    // One broken field would break either the purse, the award or the field, so
+    // the whole table falls back together: a half-applied balance is worse than
+    // Unity's own numbers.
     private static bool IsUsable(CentoRaceRules rules) =>
         rules.PlacementEarnings is { Count: > 0 }
         && rules.StarPlacementMultipliers is { Count: > 0 }
@@ -69,7 +69,15 @@ public sealed class JsonCentoRaceRulesStore
         && double.IsFinite(rules.StarSteepness) && rules.StarSteepness >= 0.0
         && double.IsFinite(rules.StarPrizePerWin) && rules.StarPrizePerWin >= 0.0
         && !string.IsNullOrWhiteSpace(rules.AwardItemName)
-        && !string.IsNullOrWhiteSpace(rules.CertificateItemName);
+        && !string.IsNullOrWhiteSpace(rules.CertificateItemName)
+        && rules.Rivals is { Count: > 0 }
+        && rules.Rivals.All(IsUsable);
+
+    private static bool IsUsable(CentoCompetitor rival) =>
+        rival is not null
+        && !string.IsNullOrWhiteSpace(rival.Name)
+        && !string.IsNullOrWhiteSpace(rival.Car)
+        && rival.DriverRating >= 0;
 
     private static bool IsChance(double chance) =>
         double.IsFinite(chance) && chance >= 0.0 && chance <= 1.0;

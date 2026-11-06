@@ -13,6 +13,7 @@ namespace AceDrive.Core;
 public sealed record TodoFacts(
     double CreditEarned,
     double Xp,
+    double ClubReputation,
     double Bank,
     int TaxiJobs,
     int DeliveryJobs,

@@ -460,12 +460,13 @@ public partial class App : Application, IDisposable
         // row) and the one instance the board page, the run planner and the
         // settle all read.
         var deliveryBoard = new DeliveryBoard(deliveryCatalog);
-        // Prices and banks one finished job; the poll feeds the same meter, so
-        // the instance is shared rather than owned by either side.
+        // Prices and banks one finished job. The meter is the touristen corner
+        // legs' accumulator (the taxi and delivery jobs are priced from their
+        // planned route), so it is shared with that flow only.
         var settlement = new JobSettlement(
             driver, garage, shift, zone, jobs, glovebox, trunk, streak, wall,
             fleet, rarity, friendships, brands, telemetry, rivals,
-            deliveryBoard, deliveryCareer, city, deliveryFares, meter,
+            deliveryBoard, deliveryCareer, deliveryFares,
             fares, taxiRules, beat, hud, _log);
         var saver = new GameStateSaver(
             wall, game, clockStore, driverStore, garageStore, cityStore,
@@ -615,9 +616,13 @@ public partial class App : Application, IDisposable
             police, taxiRules, fares, garage, driver, glovebox, trunk, friendships, fleet,
             game, wall, beat, saver, rivals, jobMileage, breakdowns, hud, _log);
         // The delivery run from DELIVER to receipt, with its own board page.
+        // Its charge is the planned route over the address map, so the flow
+        // gets the map and the door resolver the companion pins from; the
+        // shell's own position and clock never price it.
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, city, friendships, driver, glovebox, trunk,
-            meter, jobMileage, breakdowns, wall, beat, _log);
+            fleet.TrunkCapacity, addressMap, poiWorld.StopDoor,
+            jobMileage, breakdowns, wall, beat, _log);
         // The Cento Miglia entry (PORTPLAN 49): the drive to the start, the
         // registration check and the race to the finish, in its own collaborator
         // so neither job flow grows a third phase machine. Its settle prices the

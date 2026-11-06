@@ -855,7 +855,8 @@ public sealed class MainViewModelTests
         {
             Result = CustomerRequestTestData.PassiveRequest,
         };
-        var (vm, clock, tel, _) = Create(speedKmh: 0f, requests: requests);
+        var wallet = new DriverWallet(DriverState.Fresh);
+        var (vm, clock, tel, _) = Create(speedKmh: 0f, requests: requests, wallet: wallet);
 
         TaxiFlow.Propose(vm);
         var screen = Assert.IsType<CustomerRequestScreenViewModel>(
@@ -867,6 +868,9 @@ public sealed class MainViewModelTests
         vm.DropoffCommand.Execute(null);
 
         Assert.False(Assert.IsType<TaxiReceiptScreenViewModel>(vm.CurrentScreen).HasTip);
+        // Unity OnPassiveDeclineClicked: the decline grows assertivity by the
+        // table's tenth, banked with the wallet the next launch reopens.
+        Assert.Equal(0.1, wallet.Assertivity, precision: 6);
     }
 
     [Fact]
@@ -2258,7 +2262,10 @@ public sealed class MainViewModelTests
         vm.Poll();
 
         var receipt = Assert.IsType<CentoReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal("1st PLACE", receipt.PlaceLine);
+        // The field is drawn, so the place is one to four; the purse is still
+        // paid for whichever place the shuffle gave the player.
+        Assert.Matches("^[1-4](st|nd|rd|th) PLACE$", receipt.PlaceLine);
+        Assert.Equal(4, receipt.Standings.Count);
         Assert.True(wallet.Cash > 0.0);
         Assert.True(wallet.ClubReputation > 1.0);
         Assert.Single(trunk.Items);
@@ -4043,9 +4050,10 @@ public sealed class MainViewModelTests
     public void Deliver_PinsTheHubPickupThenTheStoreAndSettlesTheReceipt()
     {
         // PORTPLAN 19: DELIVER hands the run to the host, which pins the hub
-        // pickup first, then the store leg. The store leg's measured 8.2 km
-        // settle the goods money, the hub ramp's CredP and the owner's
-        // familiarity; CONTINUE returns to the delivery board the run came
+        // pickup first, then the store leg. The route priced at DELIVER (hub
+        // door to store door on the seeded map) settles the goods money, the
+        // hub ramp's CredP and the owner's familiarity; the drive itself never
+        // moves the fare. CONTINUE returns to the delivery board the run came
         // from.
         var catalog = new DeliveryCatalog(
             [new DeliveryStore(
@@ -4056,7 +4064,7 @@ public sealed class MainViewModelTests
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
             CredPRamp.UnityDefault);
-        var wallet = EmptyWallet();
+        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
         var friends = new FakeFriendshipStore();
         var hud = new FakeTelemetryHud();
         var session = Create(
@@ -4079,7 +4087,7 @@ public sealed class MainViewModelTests
         board.MainButtonCommand.Execute(null);
 
         // DELIVER pins the hub pickup first, then the store leg after the
-        // freight is loaded; the store leg's 8.2 km prices the receipt.
+        // freight is loaded; the route priced at DELIVER prices the receipt.
         Assert.False(vm.IsShown);
         Assert.Equal("HudDeliveryHubDrive", hud.JobGuidance!.DriveKey);
         hud.RaiseJobEnter();
@@ -4088,11 +4096,12 @@ public sealed class MainViewModelTests
         hud.RaiseJobEnter();
 
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
-        // 63.00 payout + 129.40 fare - 49.00 wholesale = the profit delta.
-        Assert.Equal(143.40, wallet.Cash);
-        // Delivery XP is the taxi rate at a fifth: (8.2 × class 1 × rarity 1)
-        // / 100 × 0.2 = 0.0164.
-        Assert.Equal(0.0164, wallet.Xp, precision: 9);
+        // 1 000 start − 49.00 charged at DELIVER + 63.00 payout + 4.89 seeded
+        // route fare + the 49.00 escrow release = the run's 18.89 profit.
+        Assert.Equal(1018.89, wallet.Cash);
+        // Delivery XP is the taxi rate at a fifth: (0.2445 × class 1 × rarity
+        // 1) / 100 × 0.2 = 0.000489.
+        Assert.Equal(0.000489, wallet.Xp, precision: 9);
         // The ramp paid the producing hub's block; the familiarity went to
         // its owner, drawn from the name pool at purchase.
         string owner = Assert.Single(friends.Names);
@@ -4126,7 +4135,7 @@ public sealed class MainViewModelTests
             [new HubTier(1, true, [
                 new HubCareer("groceries", "GROCERIES", [new HubLevel("Grocers and Sons", 100)])])],
             CredPRamp.UnityDefault);
-        var wallet = EmptyWallet();
+        var wallet = new DriverWallet(new DriverState(1000.0, 0.0));
         var rarity = new FakeCarRarity { CarCount = 3 };
         var telemetry = new FakePlayerTelemetry();
         var rivals = new FakeRivals { Result = new RivalsResult(4, 30, 2, 6, false) };
@@ -4152,7 +4161,7 @@ public sealed class MainViewModelTests
         hud.RaiseJobEnter(); // deliver the store
 
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(143.40, wallet.Cash);
+        Assert.Equal(1018.89, wallet.Cash);
         Assert.Equal(0.0, wallet.Xp);
         Assert.Contains("0.00", receipt.XpLine, StringComparison.Ordinal);
         Assert.Empty(rarity.Recorded);
@@ -4160,7 +4169,7 @@ public sealed class MainViewModelTests
         Assert.Empty(rivals.RefreshedAt);
         Assert.Empty(rivals.Pushed);
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(143.40, saved.Cash);
+        Assert.Equal(1018.89, saved.Cash);
         Assert.Equal(0, saved.ExpansionJobs);
     }
 
@@ -4461,7 +4470,8 @@ public sealed class MainViewModelTests
             0.0, 0.0, StreetIds: ["home"], ExpansionJobs: 1);
         var hud = new FakeTelemetryHud();
         var session = Create(
-            catalog: catalog, hubs: hubs, wallet: EmptyWallet(),
+            catalog: catalog, hubs: hubs,
+            wallet: new DriverWallet(new DriverState(1000.0, 0.0)),
             savedDriver: saved, speedKmh: 0f, hud: hud);
         var (vm, clock, tel, _) = session;
 

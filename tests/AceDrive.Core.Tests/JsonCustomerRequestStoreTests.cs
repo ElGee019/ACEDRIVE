@@ -13,6 +13,7 @@ public sealed class JsonCustomerRequestStoreTests
           "timerSeconds": 14,
           "tier2Chance": 0.2,
           "tier3Chance": 0.2,
+          "assertivityPerDecline": 0.1,
           "speedChallengeText": "Quickly!",
           "monitor": {
             "movingKmh": 15,
@@ -84,6 +85,7 @@ public sealed class JsonCustomerRequestStoreTests
             Assert.Equal(14, table.TimerSeconds);
             Assert.Equal(0.2, table.Tier2Chance);
             Assert.Equal(0.2, table.Tier3Chance);
+            Assert.Equal(0.1, table.AssertivityPerDecline);
             Assert.Equal("Quickly!", table.SpeedChallengeText);
             Assert.Equal(RideMonitorRules.Default, table.MonitorRules);
             SuffixRequest line = table.SuffixRequests["and some friends"];
@@ -172,6 +174,7 @@ public sealed class JsonCustomerRequestStoreTests
 
         Assert.Empty(log.Warnings);
         Assert.Equal(19, table.TimerSeconds);
+        Assert.Equal(0.1, table.AssertivityPerDecline);
         Assert.Equal(43, table.SuffixRequests.Count);
         Assert.Equal(6, table.QuestionCategories.Count);
         Assert.Equal(6, table.QuestionCategories.Select(c => c.Stat).Distinct().Count());

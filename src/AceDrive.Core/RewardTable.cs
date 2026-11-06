@@ -23,10 +23,6 @@ public sealed record RewardTable(
                 "FREE CAR REPAIR", "One free car repair",
                 Effect: RewardCardEffect.FreeCarRepair),
             new RewardCard(
-                "CUSTOMER FORGIVENESS PASS",
-                "Do not lose friendship with a customer following selection of a wrong address",
-                Effect: RewardCardEffect.CustomerForgiveness),
-            new RewardCard(
                 "+500CR BONUS", "500 CR added to your bank account", RewardCardKind.CashBonus),
             new RewardCard(
                 "+1 GLOVEBOX SLOT", "1 extra card fits in the glovebox",

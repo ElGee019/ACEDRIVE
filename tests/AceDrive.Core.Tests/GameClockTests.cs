@@ -2,15 +2,15 @@ using AceDrive.Core;
 
 namespace AceDrive.Core.Tests;
 
-/// <summary>Game time runs at half the Unity clock speed and carries the
+/// <summary>Game time runs on AceDrive's own ~27x wall clock, carrying the
 /// calendar days with it (PORTPLAN item 50).</summary>
 public sealed class GameClockTests
 {
     [Fact]
-    public void HalfSpeed_TwoPointTwoSecondsPerGameMinute()
+    public void TwentySevenTimesWallClock_TwoPointTwoSecondsPerGameMinute()
     {
-        // Unity ticks one game minute per 1.1 real seconds; AceDrive halves
-        // that pace, so 2.2 real seconds make one game minute.
+        // 60 / 2.2 = ~27.3 game minutes per real minute: 2.2 real seconds
+        // make one game minute, independent of EVO's time of day.
         var clock = new FakeClock();
         var game = new GameClock(clock, clock.UtcNow);
         clock.Advance(TimeSpan.FromSeconds(2.2));

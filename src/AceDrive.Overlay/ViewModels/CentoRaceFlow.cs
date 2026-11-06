@@ -10,10 +10,11 @@ namespace AceDrive.Overlay.ViewModels;
 /// start door, type the registration number the club issued, race to the finish
 /// with the club reputation growing on the companion, and settle the receipt.
 ///
-/// The race is solo on purpose — Unity's three NPC competitors are the next
-/// slice — so the player's place is first and the receipt pays the first-place
-/// purse. The reputation ticker is Unity's factor charged once per 0.01 km
-/// driven: the level at the start multiplied by the car/garage factor for every
+/// The field is three club rivals the settle shuffles with the player (PORTPLAN
+/// item 49): they never drive, they only take a place on the receipt, so the
+/// finishing order is drawn at settlement rather than simulated on the route.
+/// The reputation ticker is Unity's factor charged once per 0.01 km driven: the
+/// level at the start multiplied by the assertivity/car/garage factor for every
 /// 10 m the car covers, painted live and written back when the finish is
 /// reached. A parked car grows nothing, so the entry cannot farm a club's
 /// standing by standing still. The host owns the panel, the HUD and the saves;
@@ -141,7 +142,7 @@ public sealed class CentoRaceFlow
         // the floor is what the race grows from and what the receipt reports.
         _startReputation = CentoMiglia.DisplayReputation(_wallet.ClubReputation);
         _ticker = new CentoReputationTicker(
-            _startReputation, CarClass(), _garage.Cars.Count);
+            _startReputation, CarClass(), _garage.Cars.Count, _wallet.Assertivity);
         _reputation = _startReputation;
         // Pin first: the counter is painted beside the drive-to sentence the
         // leg owns.

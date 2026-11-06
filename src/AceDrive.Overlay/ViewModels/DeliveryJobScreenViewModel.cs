@@ -8,53 +8,69 @@ namespace AceDrive.Overlay.ViewModels;
 /// <summary>
 /// Delivery career page (PORTPLAN items 16-19, port of Unity
 /// DeliveryJobScreen + StoreListView): stats header, the restockable store
-/// list and the phase-flipping main button. A row tap confirms a
-/// full-restock order into the pickup cart and flips the page between
-/// OPEN NEW CAREER and DELIVER; a tap on a store that is already full is
-/// refused with a three-second notice naming it. The back button becomes
-/// CANCEL ORDER while the cart holds orders, mirroring the Unity screen. Only stores whose
-/// wholesale career has been opened show on the board (Unity's
-/// HasHubForCategory eligibility), so the board starts empty and the hub
-/// page fills it. Per-item quantities arrive with the order screen (item
-/// 17); the run crosses to the map, so both actions come in as
-/// injected commands (composition, no IScreenController growth). DELIVER
-/// freezes the cart's money on the live shelves and hands the run to the
-/// host, which drives the hub pickups and store drop-offs on the companion
-/// and settles the receipt after the last stop (the taxi ACCEPT hand-over's
-/// delivery twin); the shelves are filled at each stop, never on this tap.
-/// Voice parity with the control page: every button answers to its text.
+/// list and the phase-flipping main button. A row tap confirms an order for
+/// as many of the store's missing units as the player's cash and the car's
+/// free trunk litres still cover (both minus what the cart already
+/// committed), then flips the page between OPEN NEW CAREER and DELIVER; the
+/// units left over stay on the shelf for a later run. A tap on a store that
+/// is already full is refused with a three-second notice naming it, and so
+/// is a tap that cannot afford — or cannot fit — a single unit. The back
+/// button becomes CANCEL ORDER while the cart holds orders, mirroring the
+/// Unity screen. Only stores whose wholesale career has been opened show on
+/// the board (Unity's HasHubForCategory eligibility), so the board starts
+/// empty and the hub page fills it. The run crosses to the map, so both
+/// actions come in as injected commands (composition, no IScreenController
+/// growth). DELIVER re-checks the trunk, charges the goods and hands the run
+/// to the host, which drives the hub pickups and store drop-offs on the
+/// companion and settles the receipt after the last stop; each store arrival
+/// raises only the ordered units, never the whole shelf. The shelves are
+/// filled at each stop, never on this tap. Voice parity with the control
+/// page: every button answers to its text.
 /// </summary>
 public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
 {
-    // Unity order-screen rule: a fully stocked store takes no order. The
-    // refusal names the store for three real seconds, like the control page's
-    // COMING SOON hold, so the tap is never silent.
-    private const double StockedNoticeSeconds = 3;
+    // Unity order-screen rule: a fully stocked store takes no order, and a
+    // store the player cannot afford takes none either. The refusal names the
+    // store for three real seconds, like the control page's COMING SOON hold,
+    // so the tap is never silent.
+    private const double NoticeSeconds = 3;
+    private const string FullyStockedKey = "DeliveryFullyStocked";
+    private const string NoFundsKey = "DeliveryNoFunds";
+    private const string NoSpaceKey = "DeliveryNoSpace";
+    private const string RunUnfundedKey = "DeliveryNoRunFunds";
+    private const string RunNoSpaceKey = "DeliveryRunNoSpace";
 
     private DeliveryCatalog _catalog;
     private readonly DeliveryCareer _career;
     private readonly CityEconomy _city;
+    private readonly DriverWallet _wallet;
+    private readonly Trunk _trunk;
+    private readonly Func<double> _trunkCapacity;
     private readonly DeliveryCart _cart = new();
     private readonly ILog _log;
     private readonly IClock _clock;
     private readonly VoiceBeat _beat;
     private readonly ICommand _backCommand;
-    private readonly ParameterizedCommand<DeliveryRun> _runCommand;
+    private readonly Func<DeliveryRun, bool> _startRun;
     private readonly ICommand _hubCommand;
 
     public DeliveryJobScreenViewModel(
-        DeliveryCatalog catalog, DeliveryCareer career, CityEconomy city, ILog log,
-        ICommand backCommand, ParameterizedCommand<DeliveryRun> runCommand, ICommand hubCommand,
+        DeliveryCatalog catalog, DeliveryCareer career, CityEconomy city, DriverWallet wallet,
+        Trunk trunk, Func<double> trunkCapacity,
+        ILog log, ICommand backCommand, Func<DeliveryRun, bool> startRun, ICommand hubCommand,
         IClock clock, VoiceBeat beat)
     {
         _catalog = catalog;
         _career = career;
         _city = city;
+        _wallet = wallet;
+        _trunk = trunk;
+        _trunkCapacity = trunkCapacity;
         _log = log;
         _clock = clock;
         _beat = beat;
         _backCommand = backCommand;
-        _runCommand = runCommand;
+        _startRun = startRun;
         _hubCommand = hubCommand;
 
         ToggleOrderCommand = new ParameterizedCommand<DeliveryRow>(ToggleOrder);
@@ -102,21 +118,22 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
     private bool _backFlash;
 
-    /// <summary>Copy naming the store whose fully-stocked refusal is showing;
-    /// empty the rest of the time, so the view collapses the line.</summary>
-    public string StockedNoticeLine { get => _stockedNoticeLine; private set => SetField(ref _stockedNoticeLine, value); }
-    private string _stockedNoticeLine = string.Empty;
+    /// <summary>Copy naming the event that refused the tap (a full store or an
+    /// unaffordable one); empty the rest of the time, so the view collapses
+    /// the line.</summary>
+    public string NoticeLine { get => _noticeLine; private set => SetField(ref _noticeLine, value); }
+    private string _noticeLine = string.Empty;
 
-    // The refusal hold's deadline. Latest tap wins (a second full store
-    // restarts it), like the control page's COMING SOON hold.
-    private DateTime _stockedNoticeUntil;
+    // The refusal hold's deadline. Latest tap wins (a second refusal restarts
+    // it), like the control page's COMING SOON hold.
+    private DateTime _noticeUntil;
 
     public IReadOnlyDictionary<string, Action> VoiceActions { get; private set; } =
         new Dictionary<string, Action>();
 
-    /// <summary>Total wholesale money committed by the cart (for logs/tests;
-    /// the escrow wallet itself lands with the save, PORTPLAN 51).</summary>
-    public double CartTotal => _cart.TotalCost(_catalog, _city);
+    /// <summary>Wholesale money the cart has already earmarked (for logs/tests;
+    /// DELIVER charges it and the receipt nets it out).</summary>
+    public double CartTotal => _cart.TotalCost;
 
     /// <summary>Unity re-shows this screen after the hub page closes, so it
     /// re-pulls career state (spent CredP, newly connected stores). This
@@ -140,19 +157,47 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
             // Unity order-screen rule: a fully stocked store takes no order.
             // The refused tap is answered, not just logged: the page names
             // the store for three seconds.
-            ShowStockedNotice(row.Store.Name);
+            ShowNotice(FullyStockedKey, row.Store.Name);
             _log.LogInfo($"order skipped, fully stocked: {row.Store.Name}");
             return;
         }
         // A tap that stages or drops an order is the player moving on, so an
         // older refusal must not linger beside it.
-        ClearStockedNotice();
+        ClearNotice();
         string key = row.Store.Key;
-        bool confirmed = !_cart.Contains(key);
-        if (confirmed) _cart.Confirm(key);
-        else _cart.Remove(key);
-        _log.LogInfo($"{(confirmed ? "order confirmed" : "order dropped")}: " +
-            $"{row.Store.Name} €{_catalog.OrderCost(row.Store):0.00}");
+        if (_cart.Contains(key))
+        {
+            _cart.Remove(key);
+            _log.LogInfo($"order dropped: {row.Store.Name}");
+            RebuildRows();
+            return;
+        }
+
+        // The cart may only earmark resources that are still free: earlier
+        // orders already hold their wholesale sum and their trunk litres, so
+        // this one gets the remainder of both. The lower cap wins.
+        double cashBudget = _wallet.Cash - _cart.TotalCost;
+        double litreBudget = _trunk.Remaining(_trunkCapacity()) - _cart.TotalVolume;
+        int byCash = _catalog.AffordableUnits(row.Store, cashBudget);
+        int bySpace = DeliveryCatalog.AffordableUnitsByVolume(row.Store, litreBudget);
+        int units = Math.Min(byCash, bySpace);
+        if (units <= 0)
+        {
+            ShowNotice(byCash <= 0 ? NoFundsKey : NoSpaceKey, row.Store.Name);
+            _log.LogInfo(byCash <= 0
+                ? $"order skipped, not enough cash: {row.Store.Name} " +
+                  $"needs €{_catalog.OrderCost(row.Store, 1):0.00} per unit"
+                : $"order skipped, trunk too full: {row.Store.Name} " +
+                  $"needs {row.Store.LitresPerUnit:0.###} L per unit, " +
+                  $"{litreBudget:0.###} L free");
+            return;
+        }
+
+        DeliveryOrder order = _catalog.Order(row.Store, units);
+        _cart.Confirm(order);
+        _log.LogInfo($"order confirmed: {row.Store.Name} " +
+            $"{units}/{row.Store.UnitsNeeded} units €{order.WholesaleCost:0.00} " +
+            $"({order.Volume:0.###} L)");
         RebuildRows();
     }
 
@@ -168,51 +213,63 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
             _hubCommand.Execute(null);
             return;
         }
-        // The run leaves this page: the host takes over the drive, pins the
-        // first hub/store leg on the companion and settles the receipt after
+        // The run leaves this page: the host charges the goods, takes over the
+        // drive, pins the first hub/store leg and settles the receipt after
         // the last stop (the taxi ACCEPT hand-over's delivery twin).
         StartRun();
     }
 
     // The ordered stores are the delivered ones: a full store takes no order,
     // so the cart never holds a shelf that does not need the drop-off. The
-    // money is frozen here on the live pre-run shelves and handed to the host;
-    // filling the shelves is CityEconomy's rule at each confirmed stop, never
-    // this page's job. Clearing the cart reflects that it became a live run —
-    // the escrow ledger that pre-books the debit at confirm lands with the
-    // save (PORTPLAN 51).
+    // host charges the run's wholesale sum before the trip risk and fills
+    // each shelf by the ordered units at each confirmed stop. Clearing the
+    // cart reflects that it became a live run; a refused start keeps it so
+    // the player can drop an order and try again.
     private void StartRun()
     {
-        DeliveryRun? run = _cart.Run(_catalog, _city);
+        DeliveryRun? run = _cart.Run();
         if (run is null)
         {
             return;
         }
 
+        // The trunk could have changed since the lines were staged (cargo
+        // eaten, a keepsake dropped in, another car selected): never start a
+        // run the car cannot physically carry.
+        if (!run.FitsIn(_trunk.Remaining(_trunkCapacity())))
+        {
+            ShowNotice(RunNoSpaceKey);
+            return;
+        }
+
+        if (!_startRun(run))
+        {
+            ShowNotice(RunUnfundedKey);
+            return;
+        }
         _log.LogInfo($"delivery run started: €{run.PaidForGoods:0.00} -> " +
-            $"{string.Join(", ", _cart.ConfirmedKeys.Select(NameOf))}");
+            $"{string.Join(", ", _cart.Orders.Select(OrderName))}");
         _cart.Clear();
         RebuildRows();
-        _runCommand.Execute(run);
     }
 
-    // A cart key always has a catalog row (a row tap is the only way in);
+    // An order line always has a catalog row (a row tap is the only way in);
     // falling back to the key keeps the log line whole if content changed
     // under a staged cart.
-    private string NameOf(string key) => _catalog.Find(key)?.Name ?? key;
+    private string OrderName(DeliveryOrder order) =>
+        _catalog.Find(order.StoreKey)?.Name ?? order.StoreKey;
 
     private void OnBack()
     {
         ClearVoiceFlash();
         // A cached page must not re-open mid-hold: the way out drops the
         // refusal copy, like the control page's COMING SOON label.
-        ClearStockedNotice();
+        ClearNotice();
         if (!_cart.IsEmpty)
         {
-            // Unity: leaving with a pending cart is CANCEL ORDER, which
-            // refunds the escrow first. No wallet yet: clearing the cart is
-            // the whole refund until the save lands (PORTPLAN 51).
-            _log.LogInfo($"orders cancelled: €{_cart.TotalCost(_catalog, _city):0.00} refunded");
+            // Nothing was charged yet (the goods leave cash at DELIVER), so
+            // cancelling only releases the cart's earmarked sum.
+            _log.LogInfo($"orders cancelled: €{_cart.TotalCost:0.00} released");
             _cart.Clear();
             RebuildRows();
         }
@@ -237,28 +294,31 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
     }
 
     /// <summary>
-    /// Clears the expired fully-stocked notice. Called from the 10 Hz poll (a
+    /// Clears the expired refusal notice. Called from the 10 Hz poll (a
     /// refresh guard would swallow a same-second expiry): one length check per
     /// tick while idle, one DateTime compare while it shows, allocations only
     /// on the edge.
     /// </summary>
     public void UpdateNotice()
     {
-        if (StockedNoticeLine.Length > 0 && _clock.UtcNow >= _stockedNoticeUntil)
+        if (NoticeLine.Length > 0 && _clock.UtcNow >= _noticeUntil)
         {
-            ClearStockedNotice();
+            ClearNotice();
         }
     }
 
-    // The refusal slot: the store's own name in the resx sentence, shown for
-    // three real seconds. The deadline is stamped once; the poll only compares.
-    private void ShowStockedNotice(string storeName)
+    // The refusal slot: a resx sentence (with the store's own name where the
+    // copy has a slot), shown for three real seconds. The deadline is stamped
+    // once; the poll only compares.
+    private void ShowNotice(string key, string? storeName = null)
     {
-        StockedNoticeLine = Strings.Format("DeliveryFullyStocked", storeName);
-        _stockedNoticeUntil = _clock.UtcNow + TimeSpan.FromSeconds(StockedNoticeSeconds);
+        NoticeLine = storeName is null
+            ? Strings.Get(key)
+            : Strings.Format(key, storeName);
+        _noticeUntil = _clock.UtcNow + TimeSpan.FromSeconds(NoticeSeconds);
     }
 
-    private void ClearStockedNotice() => StockedNoticeLine = string.Empty;
+    private void ClearNotice() => NoticeLine = string.Empty;
 
     // Confirmed rows first (cart order, like Unity's staged list), then the
     // rest by stock percentage ascending: emptiest stores need help most.
@@ -275,9 +335,9 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
 
         var rows = new List<DeliveryRow>(visible.Count);
         int position = 1;
-        foreach (string key in _cart.ConfirmedKeys)
+        foreach (DeliveryOrder order in _cart.Orders)
         {
-            DeliveryStore? store = _catalog.Find(key);
+            DeliveryStore? store = _catalog.Find(order.StoreKey);
             if (store is null || !_career.Connects(store)) continue;
             rows.Add(BuildRow(_city.Live(store), confirmed: true, position++));
         }
@@ -296,19 +356,31 @@ public sealed class DeliveryJobScreenViewModel : ViewModelBase, IVoiceScreen
         RebuildVoice();
     }
 
-    private DeliveryRow BuildRow(DeliveryStore store, bool confirmed, int position) => new(
-        store,
-        NumberWord(position),
-        store.Name,
-        store.Owner.ToUpperInvariant(),
-        Strings.Format("DeliveryUnits", store.StockedUnits, store.UnitCapacity),
-        StoreGrowthLine(_city.GrowthPerHour(store)),
-        Strings.Format("DeliveryPercent", store.StockPercent),
-        store.StockPercent,
-        store.Level,
-        store.IsUrgent && !confirmed,
-        confirmed,
-        confirmed ? Strings.Format("DeliveryConfirmed", _catalog.OrderCost(store)) : string.Empty);
+    private DeliveryRow BuildRow(DeliveryStore store, bool confirmed, int position)
+    {
+        DeliveryOrder? order = confirmed ? _cart.Find(store.Key) : null;
+        return new(
+            store,
+            NumberWord(position),
+            store.Name,
+            store.Owner.ToUpperInvariant(),
+            Strings.Format("DeliveryUnits", store.StockedUnits, store.UnitCapacity),
+            StoreGrowthLine(_city.GrowthPerHour(store)),
+            Strings.Format("DeliveryPercent", store.StockPercent),
+            store.StockPercent,
+            store.Level,
+            store.IsUrgent && !confirmed,
+            confirmed,
+            order is null ? string.Empty : ConfirmedLine(store, order));
+    }
+
+    // A budget-capped line names the units it bought so the player can see
+    // what stayed on the shelf; a full line keeps the shorter copy.
+    private static string ConfirmedLine(DeliveryStore store, DeliveryOrder order) =>
+        order.Units < store.UnitsNeeded
+            ? Strings.Format(
+                "DeliveryConfirmedPartial", order.Units, store.UnitsNeeded, order.WholesaleCost)
+            : Strings.Format("DeliveryConfirmed", order.WholesaleCost);
 
     // One resx key per row position: translators own the spoken word. A
     // catalog grown past the last key degrades to plain digits rather than

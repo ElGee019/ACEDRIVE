@@ -8,7 +8,7 @@ public sealed class TodoSubjectTests
     [Fact]
     public void EverySubject_HasARequirement()
     {
-        Assert.Equal(14, TodoSubject.All.Count);
+        Assert.Equal(15, TodoSubject.All.Count);
         foreach (string subject in TodoSubject.All)
         {
             Assert.True(TodoRequirements.IsRegistered(subject));
@@ -36,6 +36,16 @@ public sealed class TodoSubjectTests
         }
 
         Assert.False(TodoRequirements.Get(TodoSubject.TaxiJobs).IsOneTime);
+        Assert.False(TodoRequirements.Get(TodoSubject.ClubReputation).IsOneTime);
+    }
+
+    [Fact]
+    public void ClubReputation_IsLiveFromTheFirstCareerDay()
+    {
+        // No door and no gate: the club's reputation is a wallet reading, so
+        // the tip can join a slot on day one.
+        Assert.True(TodoRequirements.IsInitiallyActive(TodoSubject.ClubReputation));
+        Assert.Null(TodoRequirements.Get(TodoSubject.ClubReputation).PoiType);
     }
 
     [Fact]

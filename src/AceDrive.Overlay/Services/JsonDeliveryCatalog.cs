@@ -41,8 +41,9 @@ public sealed class JsonDeliveryCatalog
 
     // Wholesale rate must be a real discount cut and the payout rate a real
     // retail take (Unity: 0.7 buys, 0.9 sells); every store needs a unique
-    // key, a name to show and a positive capacity with stock inside its
-    // bounds, or the row math (need, %, cost) lies.
+    // key, a name to show, a positive capacity with stock inside its bounds
+    // and a positive unit volume (the order page caps by trunk space), or the
+    // row math (need, %, cost) lies.
     private static bool IsValid(DeliveryCatalog catalog)
     {
         if (catalog.WholesaleRate is <= 0 or > 1
@@ -59,6 +60,7 @@ public sealed class JsonDeliveryCatalog
                 || store.UnitCapacity <= 0
                 || store.StockedUnits < 0 || store.StockedUnits > store.UnitCapacity
                 || store.PricePerUnit < 0
+                || store.LitresPerUnit <= 0.0
                 || (store.Address is { } address
                     && (string.IsNullOrWhiteSpace(address.StreetName)
                         || address.HouseNumber < 1))

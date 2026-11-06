@@ -21,6 +21,7 @@ public sealed record CustomerRequestTable(
     double Tier2Chance,
     double Tier3Chance,
     int TimerSeconds,
+    double AssertivityPerDecline,
     [property: JsonPropertyName("monitor")] RideMonitorRules MonitorRules)
 {
     public static readonly CustomerRequestTable Empty = new(
@@ -30,5 +31,6 @@ public sealed record CustomerRequestTable(
         Tier2Chance: 0.0,
         Tier3Chance: 0.0,
         TimerSeconds: 19,
+        AssertivityPerDecline: 0.1,
         MonitorRules: RideMonitorRules.Default);
 }

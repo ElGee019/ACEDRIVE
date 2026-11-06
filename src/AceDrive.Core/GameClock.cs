@@ -1,17 +1,20 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// Accelerated game time for the week system (PORTPLAN item 50). The wall
-/// clock flows in through <see cref="IClock"/>; game minutes accumulate from
-/// real elapsed time so FakeClock tests stay deterministic. Stateless apart
-/// from its two anchors: no tick counting, no events yet (day-change logging
-/// lives with the caller, which owns the ILog).
+/// Accelerated game time for the week system (PORTPLAN item 50). An
+/// independent clock: its own saved moment plus real elapsed time at a fixed
+/// ~27x, never EVO's time of day. The wall clock flows in through
+/// <see cref="IClock"/>, so FakeClock tests stay deterministic. Stateless
+/// apart from its two anchors: no tick counting, no events yet (day-change
+/// logging lives with the caller, which owns the ILog).
 /// </summary>
 public sealed class GameClock
 {
-    // WHY half of Unity's GameTimeConfigSO.DefaultTickInterval (1.1 real
-    // seconds per game minute): a full game day then lasts ~53 real minutes,
-    // so the calendar strip turns over at a readable pace on the overlay.
+    // WHY ~27x: a full game day then lasts ~53 real minutes, so the calendar
+    // strip turns over at a readable pace. The rate is AceDrive's own (2.2
+    // real seconds per game minute), not Unity's faster tick and not EVO's
+    // clock: a pace read off the game would jump whenever the player pauses
+    // or loads a session.
     public const double RealSecondsPerGameMinute = 2.2;
 
     private const int MinutesPerDay = 24 * 60;

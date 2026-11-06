@@ -181,7 +181,7 @@ internal static class TestSession
             glovebox, trunkInstance,
             streakInstance, clock, fleet, rarityInstance, friendsInstance,
             brandMileageInstance, telemetryInstance, rivalsInstance, deliveryBoard,
-            deliveryCareer, cityInstance, deliveryFaresInstance, meter,
+            deliveryCareer, deliveryFaresInstance,
             faresInstance, taxiRulesInstance, beat, options.Hud, logger);
         var shops = new ShopInteriors(
             walletInstance, garageInstance, glovebox, trunkInstance, game,
@@ -270,7 +270,8 @@ internal static class TestSession
             breakdownsInstance, options.Hud, logger);
         var delivery = new DeliveryFlow(
             deliveryBoard, deliveryCareer, cityInstance, friendsInstance, walletInstance,
-            glovebox, trunkInstance, meter, jobMileage, breakdownsInstance, clock, beat, logger);
+            glovebox, trunkInstance, fleet.TrunkCapacity, map, poiWorld.StopDoor,
+            jobMileage, breakdownsInstance, clock, beat, logger);
         // The Cento Miglia entry (PORTPLAN 49): its own flow and settle, on the
         // same wallet, garage and trunk the assertions read.
         var cento = new CentoRaceFlow(walletInstance, garageInstance, beat, logger);

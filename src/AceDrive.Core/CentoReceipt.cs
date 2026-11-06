@@ -5,17 +5,18 @@ namespace AceDrive.Core;
 
 /// <summary>
 /// One settled Cento Miglia: the finish, the purse, the reputation the race
-/// grew and the Star of the Show outcome. Unity keeps only the live
-/// ActiveMilleMiglia and writes the fields straight onto PlayerData; the port
-/// hands the page one record so the money, the reputation and the item are
-/// priced together and can be asserted without a screen.
+/// grew, the field's final standings and the Star of the Show outcome. Unity
+/// keeps only the live ActiveMilleMiglia and writes the fields straight onto
+/// PlayerData; the port hands the page one record so the money, the reputation,
+/// the field and the item are priced together and can be asserted without a
+/// screen.
 /// </summary>
 /// <param name="Year">The game year the event was entered in.</param>
 /// <param name="Week">The calendar week the event was entered in.</param>
 /// <param name="Tier">The club tier that issued the event (1 to 8).</param>
 /// <param name="ClubLabel">The tier's printed label.</param>
-/// <param name="Placement">The finishing place (Unity's playerPlacement); the
-/// port has no NPC field yet, so a solo race finishes first.</param>
+/// <param name="Placement">The finishing place the field draw gave the player
+/// (Unity's playerPlacement, 1 to the field size).</param>
 /// <param name="PlacementEarnings">CR for the place: the ladder value times the
 /// tier and the race-end reputation (Unity's placement earnings).</param>
 /// <param name="StartReputation">The club reputation when the race started.</param>
@@ -24,10 +25,14 @@ namespace AceDrive.Core;
 /// <param name="CarName">The car that ran the race, its display name.</param>
 /// <param name="CarClass">That car's class, the Star of the Show input.</param>
 /// <param name="OwnedCars">The garage size at the finish, the receipt's own line.</param>
+/// <param name="Assertivity">The driver's assertivity at the finish (Unity
+/// PlayerData.assertivity), printed on the calculation line and read as whole
+/// points by the race's reputation growth.</param>
 /// <param name="StarWon">True when the Star of the Show roll succeeded.</param>
 /// <param name="StarPrize">CR the award paid (zero on a certificate).</param>
 /// <param name="StarWins">The career's Star of the Show wins after this race.</param>
 /// <param name="ItemName">The generated award/certificate the driver receives.</param>
+/// <param name="Standings">The field's final standings in place order.</param>
 /// <param name="ConcentrationAward">The driver-rating points the place earns
 /// (Unity: first place +2, second +1, the rest nothing).</param>
 /// <param name="TotalEarned">The purse actually banked: placement plus prize.</param>
@@ -44,9 +49,11 @@ public sealed record CentoReceipt(
     string CarName,
     int CarClass,
     int OwnedCars,
+    double Assertivity,
     bool StarWon,
     double StarPrize,
     int StarWins,
     string ItemName,
+    IReadOnlyList<CentoStanding> Standings,
     double ConcentrationAward,
     double TotalEarned);

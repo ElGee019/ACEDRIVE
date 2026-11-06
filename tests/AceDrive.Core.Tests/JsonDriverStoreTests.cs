@@ -20,7 +20,8 @@ public sealed class JsonDriverStoreTests
                 [
                     new TrunkItem("MAPLE SYRUP", 0.4) { Quantity = 2 },
                 ],
-                Cornering: 31.0, Concentration: 42.0, OffTheLine: 53.0));
+                Cornering: 31.0, Concentration: 42.0, OffTheLine: 53.0,
+                Assertivity: 3.7));
 
             DriverState? loaded = store.Load();
 
@@ -33,6 +34,7 @@ public sealed class JsonDriverStoreTests
             Assert.Equal(31.0, loaded.Cornering);
             Assert.Equal(42.0, loaded.Concentration);
             Assert.Equal(53.0, loaded.OffTheLine);
+            Assert.Equal(3.7, loaded.Assertivity);
             Assert.Empty(log.Warnings);
         }
         finally { File.Delete(file); }

@@ -31,6 +31,9 @@ public sealed class PlacedStoreTests
         Assert.Equal(200, row.UnitCapacity);
         Assert.Equal(200, row.StockedUnits);
         Assert.True(row.PricePerUnit > 0.0);
+        // The default groceries average 0.3533... L per unit, rounded to the
+        // millilitre the order page prices against.
+        Assert.Equal(0.353, row.LitresPerUnit);
         Assert.Equal(0, row.UnitsNeeded); // placed stores open full
     }
 
@@ -54,6 +57,20 @@ public sealed class PlacedStoreTests
         Assert.Equal("coffee_beans", row.Category);
         Assert.Equal(40, row.UnitCapacity);
         Assert.Equal(7.0, row.PricePerUnit);
+        Assert.Equal(0.1, row.LitresPerUnit);
+    }
+
+    [Fact]
+    public void StoreWithoutASizedItem_CannotBecomeABoardRow()
+    {
+        // No volume means the order page cannot cap the trunk: the row would
+        // let a full store's need ride in a 0 L boot, so it stays shop-only.
+        var catalog = new StoreCatalog(
+            [new StoreItem("GHOST", 2.0, 0.0, 0, "groceries")],
+            DefaultStock: 20);
+
+        Assert.Null(PlacedStore.Row(
+            Store("grocery_store_0", PoiTypes.GroceryStore, "groceries"), catalog));
     }
 
     [Fact]

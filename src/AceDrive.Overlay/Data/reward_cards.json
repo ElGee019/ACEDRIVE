@@ -15,12 +15,6 @@
       "Effect": "FreeCarRepair"
     },
     {
-      "Title": "CUSTOMER FORGIVENESS PASS",
-      "Description": "Do not lose friendship with a customer following selection of a wrong address",
-      "Kind": "Card",
-      "Effect": "CustomerForgiveness"
-    },
-    {
       "Title": "+500CR BONUS",
       "Description": "500 CR added to your bank account",
       "Kind": "CashBonus"

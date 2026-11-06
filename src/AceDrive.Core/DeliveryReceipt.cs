@@ -10,9 +10,10 @@ namespace AceDrive.Core;
 /// rounded to cents. The friendship tail carries the producing hub's owner
 /// (assigned at hub purchase, Unity WholesaleHub.ownerName): empty means
 /// the run rested on no owned hub, so the receipt hides the block. The
-/// wallet delta is <see cref="TotalEarned"/> itself: the wholesale cost
-/// left with the run and the retail payout plus the fare came back, a
-/// positive earned is the run's profit added to the cash.
+/// wholesale <see cref="PaidForGoods"/> left cash at DELIVER; the wallet
+/// now takes the gross return (<see cref="ReceivedForGoods"/> +
+/// <see cref="DistanceCharge"/>) and <see cref="TotalEarned"/> is the run's
+/// net profit, which the lifetime reading banks and the page shows as TOTAL.
 /// </summary>
 public sealed record DeliveryReceipt(
     double DistanceKm,

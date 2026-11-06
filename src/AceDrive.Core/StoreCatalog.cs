@@ -73,7 +73,19 @@ public sealed record StoreCatalog(
     /// until the per-item order screen lands. Zero when the category is not
     /// in the catalogue.
     /// </summary>
-    public double AverageUnitPrice(string category)
+    public double AverageUnitPrice(string category) =>
+        WeightedAverage(category, item => item.Price);
+
+    /// <summary>
+    /// The average trunk volume one unit of this category takes, weighted by
+    /// the layout exactly like the price. The delivery board prices a run in
+    /// collapsed units, so a store's order volume must follow the same
+    /// average; zero when the category carries no volume data.
+    /// </summary>
+    public double AverageUnitVolume(string category) =>
+        WeightedAverage(category, item => item.Volume);
+
+    private double WeightedAverage(string category, Func<StoreItem, double> metric)
     {
         if (Layouts is not null && Layouts.TryGetValue(category, out var layout))
         {
@@ -86,8 +98,8 @@ public sealed record StoreCatalog(
                     continue;
                 }
 
-                (double average, int priced) = AveragePriceOf(source);
-                if (priced == 0)
+                (double average, int sampled) = AverageOf(source, metric);
+                if (sampled == 0)
                 {
                     continue;
                 }
@@ -102,20 +114,21 @@ public sealed record StoreCatalog(
             }
         }
 
-        return AveragePriceOf(category).Average;
+        return AverageOf(category, metric).Average;
     }
 
     // Sum and count in one pass: an empty source category carries no weight.
-    private (double Average, int Count) AveragePriceOf(string category)
+    private (double Average, int Count) AverageOf(
+        string category, Func<StoreItem, double> metric)
     {
         double total = 0.0;
         int count = 0;
         foreach (StoreItem item in Items)
         {
             if (string.Equals(item.Category, category, StringComparison.OrdinalIgnoreCase)
-                && item.Price > 0.0)
+                && metric(item) > 0.0)
             {
-                total += item.Price;
+                total += metric(item);
                 count++;
             }
         }

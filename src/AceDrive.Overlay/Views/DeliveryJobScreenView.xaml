@@ -45,10 +45,10 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <!-- The number button IS the row's button: tapping ONE,
-                             TWO, … confirms or drops the full-restock order for
-                             that store (per-item steppers arrive with the order
-                             screen). The store read-out keeps its place beside
-                             it, borderless. -->
+                             TWO, … confirms the store's order for as many
+                             missing units as the player's free cash covers, or
+                             drops a line it already holds. The store read-out
+                             keeps its place beside it, borderless. -->
                         <Grid Margin="0,2">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="Auto"/>
@@ -108,17 +108,17 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-            <!-- Fully-stocked refusal: a tap on a store that needs no restock
-                 names that store here for three real seconds, so the refused
-                 click is answered instead of silent. Collapsed at every other
-                 moment, which is why it sits under the list and never shifts
-                 the rows while it shows. -->
-            <TextBlock Text="{Binding StockedNoticeLine}" Foreground="#FF97EAD2"
+            <!-- Refused-tap notice: a store that needs no restock, or one the
+                 player cannot afford, is answered here for three real seconds
+                 instead of silent. Collapsed at every other moment, which is
+                 why it sits under the list and never shifts the rows while it
+                 shows. -->
+            <TextBlock Text="{Binding NoticeLine}" Foreground="#FF97EAD2"
                        FontSize="13" TextWrapping="Wrap" Margin="4,0,4,10">
                 <TextBlock.Style>
                     <Style TargetType="TextBlock">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding StockedNoticeLine}" Value="">
+                            <DataTrigger Binding="{Binding NoticeLine}" Value="">
                                 <Setter Property="Visibility" Value="Collapsed"/>
                             </DataTrigger>
                         </Style.Triggers>

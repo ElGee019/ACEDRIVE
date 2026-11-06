@@ -22,13 +22,17 @@ public sealed class CentoReputationTicker
     private readonly double _startReputation;
     private readonly int _carClass;
     private readonly int _ownedCars;
+    private readonly double _assertivity;
 
-    public CentoReputationTicker(double startReputation, int carClass, int ownedCars)
+    public CentoReputationTicker(
+        double startReputation, int carClass, int ownedCars, double assertivity)
     {
         _startReputation = startReputation;
         _carClass = carClass;
         _ownedCars = ownedCars;
-        Value = CentoReputation.AfterDistance(startReputation, carClass, ownedCars, 0.0);
+        _assertivity = assertivity;
+        Value = CentoReputation.AfterDistance(
+            startReputation, carClass, ownedCars, assertivity, 0.0);
     }
 
     /// <summary>Kilometres banked on the race leg.</summary>
@@ -59,6 +63,6 @@ public sealed class CentoReputationTicker
 
         DistanceKm += km;
         Value = CentoReputation.AfterDistance(
-            _startReputation, _carClass, _ownedCars, DistanceKm);
+            _startReputation, _carClass, _ownedCars, _assertivity, DistanceKm);
     }
 }

@@ -15,6 +15,7 @@ public static class TodoRequirements
             [TodoSubject.CrEarnings] = new CrEarningsRequirement(),
             [TodoSubject.XpEarnings] = new XpEarningsRequirement(),
             [TodoSubject.BankStandings] = new BankStandingsRequirement(),
+            [TodoSubject.ClubReputation] = new ClubReputationRequirement(),
             [TodoSubject.TaxiJobs] = new TaxiJobsRequirement(),
             [TodoSubject.SetDestinationsManually] = new SetDestinationsRequirement(),
             [TodoSubject.OperatingZone] = new OperatingZoneRequirement(),
