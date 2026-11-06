@@ -6,20 +6,18 @@ using AceDrive.Core;
 namespace AceDrive.Overlay.Services;
 
 /// <summary>
-/// The public Firebase client configuration: project id, web API key and
-/// optional storage bucket. Read from %APPDATA%\AceDrive\firebase.json, with
-/// EVO_FIREBASE_PROJECT / EVO_FIREBASE_API_KEY / EVO_FIREBASE_BUCKET as
-/// overrides. A tester package also ships a copy beside the exe
-/// (Data/firebase.json) so a fresh machine gets the online layer without
-/// setup; that copy is a build artifact, never a repository file. The key is
-/// a client key by design, but it still never enters the repository: no
-/// config means the online layer stays off.
+/// The public Firebase client configuration: project id and web API key.
+/// Read from %APPDATA%\AceDrive\firebase.json, with EVO_FIREBASE_PROJECT /
+/// EVO_FIREBASE_API_KEY as overrides. A tester package also ships a copy
+/// beside the exe (Data/firebase.json) so a fresh machine gets the online
+/// layer without setup; that copy is a build artifact, never a repository
+/// file. The key is a client key by design, but it still never enters the
+/// repository: no config means the online layer stays off.
 /// </summary>
-public sealed record FirebaseOptions(string ProjectId, string ApiKey, string StorageBucket)
+public sealed record FirebaseOptions(string ProjectId, string ApiKey)
 {
     private const string ProjectVariable = "EVO_FIREBASE_PROJECT";
     private const string ApiKeyVariable = "EVO_FIREBASE_API_KEY";
-    private const string BucketVariable = "EVO_FIREBASE_BUCKET";
 
     /// <summary>
     /// Loads the configuration, or null when it is absent/incomplete. A
@@ -30,14 +28,13 @@ public sealed record FirebaseOptions(string ProjectId, string ApiKey, string Sto
     {
         string? project = Environment.GetEnvironmentVariable(ProjectVariable);
         string? apiKey = Environment.GetEnvironmentVariable(ApiKeyVariable);
-        string? bucket = Environment.GetEnvironmentVariable(BucketVariable);
 
         // The per-player file wins over the copy the package ships, so a
         // tester can point the overlay at another project without republishing.
-        TryReadConfig(DataPaths.UserSave("firebase.json"), log, ref project, ref apiKey, ref bucket);
+        TryReadConfig(DataPaths.UserSave("firebase.json"), log, ref project, ref apiKey);
         if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(apiKey))
         {
-            TryReadConfig(DataPaths.GameData("firebase.json"), log, ref project, ref apiKey, ref bucket);
+            TryReadConfig(DataPaths.GameData("firebase.json"), log, ref project, ref apiKey);
         }
 
         if (string.IsNullOrWhiteSpace(project) || string.IsNullOrWhiteSpace(apiKey))
@@ -46,18 +43,15 @@ public sealed record FirebaseOptions(string ProjectId, string ApiKey, string Sto
             return null;
         }
 
-        string storage = string.IsNullOrWhiteSpace(bucket)
-            ? project.Trim() + ".appspot.com"
-            : bucket.Trim();
-        log.LogInfo($"firebase: project {project.Trim()}, storage {storage}");
-        return new FirebaseOptions(project.Trim(), apiKey.Trim(), storage);
+        log.LogInfo($"firebase: project {project.Trim()}");
+        return new FirebaseOptions(project.Trim(), apiKey.Trim());
     }
 
     // WHY ref locals instead of a parsed record: the precedence is env > user
     // file > shipped file, and each source only fills what the earlier one
     // left empty.
     private static void TryReadConfig(
-        string file, ILog log, ref string? project, ref string? apiKey, ref string? bucket)
+        string file, ILog log, ref string? project, ref string? apiKey)
     {
         if (!File.Exists(file))
         {
@@ -70,7 +64,6 @@ public sealed record FirebaseOptions(string ProjectId, string ApiKey, string Sto
             JsonElement root = doc.RootElement;
             project = FirstNonEmpty(project, ReadString(root, "projectId"));
             apiKey = FirstNonEmpty(apiKey, ReadString(root, "apiKey"));
-            bucket = FirstNonEmpty(bucket, ReadString(root, "storageBucket"));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
         {

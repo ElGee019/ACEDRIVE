@@ -13,11 +13,11 @@ public sealed class FirestoreClientTests
     {
         HttpClient http = new(handler);
         var session = new FirebaseSession(
-            new FirebaseOptions("project", "key", "bucket"),
+            new FirebaseOptions("project", "key"),
             http, new FakeSessionStore(), new NullLogger());
         await session.InitializeAsync(CancellationToken.None);
         var client = new FirestoreClient(
-            new FirebaseOptions("project", "key", "bucket"), session, http, new NullLogger());
+            new FirebaseOptions("project", "key"), session, http, new NullLogger());
         return (client, http);
     }
 

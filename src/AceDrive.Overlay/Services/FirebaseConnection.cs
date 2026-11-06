@@ -5,7 +5,7 @@ namespace AceDrive.Overlay.Services;
 
 /// <summary>
 /// One configured Firebase connection: the shared HTTP client, the anonymous
-/// session and the Firestore/Storage transports. The composition root news
+/// session and the Firestore transport. The composition root news
 /// this once and passes the consumer services down; disposing it cancels the
 /// in-flight background board loads cleanly on exit.
 /// </summary>
@@ -27,13 +27,11 @@ public sealed class FirebaseConnection : IDisposable
         Options = options;
         Session = new FirebaseSession(options, _http, new JsonFirebaseSessionStore(), log);
         Database = new FirestoreClient(options, Session, _http, log);
-        Storage = new FirebaseStorage(options, Session, _http, log);
     }
 
     public FirebaseOptions Options { get; }
     public FirebaseSession Session { get; }
     public IFirestoreDatabase Database { get; }
-    public FirebaseStorage Storage { get; }
     public CancellationToken StopToken => _stop.Token;
 
     /// <summary>Starts the anonymous login without blocking startup.</summary>

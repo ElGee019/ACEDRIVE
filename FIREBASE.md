@@ -20,8 +20,7 @@ Create `%AppData%\AceDrive\firebase.json`:
 ```json
 {
   "projectId": "latestdrivebs",
-  "apiKey": "<Firebase web API key>",
-  "storageBucket": "latestdrivebs.appspot.com"
+  "apiKey": "<Firebase web API key>"
 }
 ```
 
@@ -36,7 +35,6 @@ key (or remove the application restriction on this key) and put that in
 |---|---|
 | `EVO_FIREBASE_PROJECT` | project id |
 | `EVO_FIREBASE_API_KEY` | web API key |
-| `EVO_FIREBASE_BUCKET` | optional storage bucket |
 
 Delete the file (or leave it absent) to force the offline null-objects.
 
@@ -107,8 +105,8 @@ Live wiring:
   restart catch-up. Offline, the same page compares against the local house
   entry.
 
-Backend-only today (no ACEDRIVE screen/caller yet, compiled and tested):
-road-test time/brake boards, cloud car sprites.
+Every transport above has a live caller. Cloud car sprites have no screen yet,
+so the overlay ships no Storage client: the shared bucket stays the Unity game's.
 
 ## 6. Rarity model
 

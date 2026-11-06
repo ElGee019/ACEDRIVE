@@ -13,7 +13,7 @@ public sealed class FirebaseSessionTests
         using HttpClient http = new(handler);
         var store = new FakeSessionStore();
         using var sessionWithStore = new FirebaseSession(
-            new FirebaseOptions("project", "key", "bucket"), http, store, new NullLogger());
+            new FirebaseOptions("project", "key"), http, store, new NullLogger());
 
         Assert.True(await sessionWithStore.InitializeAsync(CancellationToken.None));
         Assert.Equal("uid-1", sessionWithStore.Uid);
@@ -29,7 +29,7 @@ public sealed class FirebaseSessionTests
         var handler = new FakeAuthHandler();
         using HttpClient http = new(handler);
         using var session = new FirebaseSession(
-            new FirebaseOptions("project", "key", "bucket"),
+            new FirebaseOptions("project", "key"),
             http, new FakeSessionStore(), new NullLogger());
 
         Assert.Equal("token", await session.GetIdTokenAsync(CancellationToken.None));
@@ -43,7 +43,7 @@ public sealed class FirebaseSessionTests
         var handler = new FakeAuthHandler();
         using HttpClient http = new(handler);
         var session = new FirebaseSession(
-            new FirebaseOptions("project", "key", "bucket"),
+            new FirebaseOptions("project", "key"),
             http, new FakeSessionStore(), new NullLogger());
 
         session.Dispose();
