@@ -39,6 +39,13 @@ public static class TodoRequirements
             [TodoSubject.VisitBank] = new VisitTodoRequirement(
                 TodoSubject.VisitBank, "TodoVisitBank", "TodoVisitBank",
                 facts => facts.BankEntered),
+            // WHY no POI type: EVO's pump is a forecourt, not a door the marker
+            // network opens, so the fill is the visit and the tip carries
+            // authored copy instead of a station name.
+            [TodoSubject.VisitFuelStation] = new VisitTodoRequirement(
+                TodoSubject.VisitFuelStation,
+                "TodoVisitFuelStation", "TodoVisitFuelStation",
+                facts => facts.FuelStationVisited),
         };
 
     /// <summary>The rule for a subject; unknown ids are a programming error.</summary>

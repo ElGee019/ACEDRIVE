@@ -608,7 +608,7 @@ public partial class App : Application, IDisposable
         var fuel = new FuelFlow(
             new FuelMarket(fuelRules, fuelPrices.Load(), game.GameDay, taxiSeed + 19),
             new FuelFillTracker(fuelRules), fuelRules, game, garage, onboardingStore,
-            friendships, driver, glovebox, trunk, saver, rivals, fuelPrices, beat, _log);
+            friendships, driver, glovebox, trunk, visits, saver, rivals, fuelPrices, beat, _log);
         // The taxi job from proposal to receipt; the shell attaches itself as
         // its host right after construction.
         var taxi = new TaxiJobFlow(

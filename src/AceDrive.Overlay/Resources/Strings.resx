@@ -328,6 +328,7 @@ For instance "{0}".</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Click Max's Grocery Store, drive there and enter the store.</value></data>
   <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Go to the JOBS page, select DELIVERY JOB and open a career of choice.</value></data>
   <data name="TodoVisitBank" xml:space="preserve"><value>Visit the bank to withdraw some of your savings.</value></data>
+  <data name="TodoVisitFuelStation" xml:space="preserve"><value>Fill up your tank at a fuel station.</value></data>
   <data name="TodoTaxiJobs" xml:space="preserve"><value>Complete {0} taxi jobs. (currently {1})</value></data>
   <data name="TodoEarnCr" xml:space="preserve"><value>Earn {0} CR in total. (currently {1})</value></data>
   <data name="TodoEarnXp" xml:space="preserve"><value>Earn {0} XP in total. (currently {1:0.00})</value></data>

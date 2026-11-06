@@ -69,6 +69,23 @@ public sealed class FuelFlowTests
     }
 
     [Fact]
+    public void ARefuel_StampsTheOneTimeFuelStationVisit()
+    {
+        Garage garage = GarageWithCar();
+        var session = MainViewModelTests.Create(
+            speedKmh: 0f, progress: Done, wallet: Wallet(100.0),
+            garage: garage, fuelRules: Rules);
+
+        Fill(session.Vm, session.Tel, session.Clock, garage, from: 20f, to: 55f);
+
+        // The fill is the visit (PORTPLAN 46): there is no forecourt door, so
+        // the receipt edge syncs the list and the completed block names the tip.
+        Assert.Contains(
+            session.Todos.CompletedLines,
+            line => line.CopyKey == "TodoVisitFuelStation");
+    }
+
+    [Fact]
     public void ContinuingTheReceipt_HandsBackThePageItInterrupted()
     {
         Garage garage = GarageWithCar();

@@ -25,6 +25,7 @@ public sealed class FuelFlow
     private readonly DriverWallet _wallet;
     private readonly Glovebox _glovebox;
     private readonly Trunk _trunk;
+    private readonly VisitLedger _visits;
     private readonly GameStateSaver _saver;
     private readonly IRivalsService _rivals;
     private readonly IFuelPriceStore _prices;
@@ -51,7 +52,8 @@ public sealed class FuelFlow
     public FuelFlow(
         FuelMarket market, FuelFillTracker fills, FuelRules rules, GameClock game,
         Garage garage, IOnboardingStore onboarding, IFriendshipStore friendships,
-        DriverWallet wallet, Glovebox glovebox, Trunk trunk, GameStateSaver saver,
+        DriverWallet wallet, Glovebox glovebox, Trunk trunk, VisitLedger visits,
+        GameStateSaver saver,
         IRivalsService rivals, IFuelPriceStore prices, VoiceBeat beat, ILog log)
     {
         ArgumentNullException.ThrowIfNull(market);
@@ -64,6 +66,7 @@ public sealed class FuelFlow
         ArgumentNullException.ThrowIfNull(wallet);
         ArgumentNullException.ThrowIfNull(glovebox);
         ArgumentNullException.ThrowIfNull(trunk);
+        ArgumentNullException.ThrowIfNull(visits);
         ArgumentNullException.ThrowIfNull(saver);
         ArgumentNullException.ThrowIfNull(rivals);
         ArgumentNullException.ThrowIfNull(prices);
@@ -79,6 +82,7 @@ public sealed class FuelFlow
         _wallet = wallet;
         _glovebox = glovebox;
         _trunk = trunk;
+        _visits = visits;
         _saver = saver;
         _rivals = rivals;
         _prices = prices;
@@ -171,6 +175,11 @@ public sealed class FuelFlow
         FuelReceipt receipt = FuelReceiptBuilder.Build(
             fill.Litres, _market.PricePerLitre, free, friendship);
 
+        // WHY the visit is stamped here: the ToDo list's fuel-station tip
+        // (PORTPLAN 46) has no forecourt door to enter, so the fill the player
+        // drove to is the visit. It is set before the save so a kill between
+        // the receipt and the next throttle never forgets the tip.
+        _visits.MarkFuelStation();
         _wallet.ChargeInFull(receipt.Total);
         // Bank first, then report: a kill between the receipt and the next
         // throttle would otherwise forget the charge and the familiarity.

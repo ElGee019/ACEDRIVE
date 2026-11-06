@@ -13,9 +13,10 @@ public sealed class TodoLedgerTests
         double cr = 0.0, double xp = 0.0, double rep = 0.0, double bank = 1000.0,
         int taxi = 0, int delivery = 0, int reached = 0, double zone = 0.0,
         int cars = 1, bool max = false, bool wash = false, bool dealer = false,
-        bool insurance = false, bool bankVisit = false, bool career = false) =>
+        bool insurance = false, bool bankVisit = false, bool fuel = false,
+        bool career = false) =>
         new(cr, xp, rep, bank, taxi, delivery, reached, zone, cars,
-            max, wash, dealer, insurance, bankVisit, career);
+            max, wash, dealer, insurance, bankVisit, fuel, career);
 
     private static TodoLedger Fresh() => TodoLedger.Fresh(TodoTable.Default);
 
@@ -53,6 +54,9 @@ public sealed class TodoLedgerTests
         Assert.Contains(TodoSubject.OwnCars, state.Queue);
         Assert.DoesNotContain(TodoSubject.VisitCarWash, state.Queue);
         Assert.DoesNotContain(TodoSubject.VisitBank, state.Queue);
+        // The fuel station's visit needs no door, so it queues like a
+        // progressive subject from the first career day.
+        Assert.Contains(TodoSubject.VisitFuelStation, state.Queue);
         // The gated follow-up waits for its gate, so it is queued by neither.
         Assert.DoesNotContain(TodoSubject.OpenDeliveryCareer, state.Queue);
     }
@@ -335,6 +339,28 @@ public sealed class TodoLedgerTests
         // The later gates wait for a later race, not for a re-sync.
         ledger.Acknowledge(facts);
         Assert.DoesNotContain(TodoSubject.ClubReputation, ledger.Sync(facts).Completed);
+    }
+
+    [Fact]
+    public void FuelStationTip_IsQueuedFromDayOne_AndCompletesOnTheFirstFill()
+    {
+        TodoLedger ledger = Fresh();
+
+        // No door gates it: the tip waits in rotation like a progressive one.
+        Assert.Contains(TodoSubject.VisitFuelStation, ledger.Snapshot().Queue);
+        Assert.Empty(ledger.Sync(Facts()).Completed);
+
+        Assert.Contains(
+            TodoSubject.VisitFuelStation, ledger.Sync(Facts(fuel: true)).Completed);
+        TodoSlotView tip = Assert.Single(
+            ledger.CompletedTips(Facts(fuel: true)),
+            view => view.SubjectId == TodoSubject.VisitFuelStation);
+        Assert.Equal("TodoVisitFuelStation", tip.CopyKey);
+
+        // The one visit retires: a second fill never pays a second kit.
+        ledger.Acknowledge(Facts(fuel: true));
+        Assert.DoesNotContain(
+            TodoSubject.VisitFuelStation, ledger.Sync(Facts(fuel: true)).Completed);
     }
 
     [Fact]

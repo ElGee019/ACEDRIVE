@@ -4,10 +4,11 @@
 // ClubReputation joins after the delivery tips rather than in Unity's exact
 // (unrecoverable) slot: reputation only moves at a settled Cento Miglia, and a
 // tip nobody can complete inside the first career week makes a poor early
-// slot. One Unity subject is still absent: VisitFuelStation, because the port
-// has no fuel-station door to enter — the fill receipt (item 37) is the fuel
-// sim's money side, not a visit. OpenDeliveryCareer is AceDrive's own
-// addition: Max's grocery tip's gated follow-up (IUnlockedTodo), beside it.
+// slot. VisitFuelStation is Unity's last subject back in the list: EVO has no
+// forecourt door the marker network can open, so the visit is the first settled
+// fill — the pump the player drove to is the station, and the fuel receipt
+// (item 37) is the evidence of standing at it. OpenDeliveryCareer is AceDrive's
+// own addition: Max's grocery tip's gated follow-up (IUnlockedTodo), beside it.
 namespace AceDrive.Core;
 
 /// <summary>Stable ids for every ToDo subject the career can complete.</summary>
@@ -28,6 +29,7 @@ public static class TodoSubject
     public const string DeliveryJobsCompleted = "DeliveryJobsCompleted";
     public const string ClubReputation = "ClubReputation";
     public const string VisitBank = "VisitBank";
+    public const string VisitFuelStation = "VisitFuelStation";
 
     /// <summary>Every subject, in the order the ledger queues them.</summary>
     public static readonly IReadOnlyList<string> All =
@@ -47,6 +49,7 @@ public static class TodoSubject
         DeliveryJobsCompleted,
         ClubReputation,
         VisitBank,
+        VisitFuelStation,
     ];
 
     public static bool IsKnown(string? id)

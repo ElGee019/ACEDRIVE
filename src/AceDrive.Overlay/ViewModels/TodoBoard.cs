@@ -226,6 +226,7 @@ public sealed class TodoBoard : ITodoList
             _visits.CarDealer,
             _visits.InsuranceBroker,
             _wallet.HasEnteredBank,
+            _visits.FuelStation,
             _career.Owned.Count > 0);
     }
 

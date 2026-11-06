@@ -500,14 +500,19 @@ public sealed class TodoLedger
         }
     }
 
-    // Unity Reset queues every non-one-time subject outside the four slots.
-    // One-time subjects join only through Activate (their door was placed).
+    // Unity Reset queues every subject that is live from the first career day,
+    // outside the four slots. A subject that waits for its door or its gate is
+    // not live yet and joins only through Activate / UnlockGatedSubjects; a
+    // one-time subject with no door (the fuel station) queues like a
+    // progressive one, unless its popup already ran and retired it.
     private void FillQueue()
     {
         foreach (string subject in TodoSubject.All)
         {
+            ITodoRequirement requirement = TodoRequirements.Get(subject);
             if (IsVisible(subject)
-                || TodoRequirements.Get(subject).IsOneTime
+                || !TodoRequirements.IsInitiallyActive(subject)
+                || (requirement.IsOneTime && _shown.Contains(subject))
                 || _queue.Contains(subject))
             {
                 continue;

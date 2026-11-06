@@ -8,7 +8,7 @@ public sealed class TodoSubjectTests
     [Fact]
     public void EverySubject_HasARequirement()
     {
-        Assert.Equal(15, TodoSubject.All.Count);
+        Assert.Equal(16, TodoSubject.All.Count);
         foreach (string subject in TodoSubject.All)
         {
             Assert.True(TodoRequirements.IsRegistered(subject));
@@ -29,7 +29,8 @@ public sealed class TodoSubjectTests
                  {
                      TodoSubject.GoToMaxGroceryStore, TodoSubject.VisitCarWash,
                      TodoSubject.VisitCarDealer, TodoSubject.VisitInsuranceBroker,
-                     TodoSubject.VisitBank, TodoSubject.OpenDeliveryCareer,
+                     TodoSubject.VisitBank, TodoSubject.VisitFuelStation,
+                     TodoSubject.OpenDeliveryCareer,
                  })
         {
             Assert.True(TodoRequirements.Get(subject).IsOneTime);
@@ -59,6 +60,10 @@ public sealed class TodoSubjectTests
         Assert.False(TodoRequirements.IsInitiallyActive(TodoSubject.OpenDeliveryCareer));
         Assert.True(TodoRequirements.IsInitiallyActive(TodoSubject.GoToMaxGroceryStore));
         Assert.True(TodoRequirements.IsInitiallyActive(TodoSubject.TaxiJobs));
+        // The fuel station has no door to wait for: the first fill is the
+        // visit, so the tip is live from the first career day.
+        Assert.True(TodoRequirements.IsInitiallyActive(TodoSubject.VisitFuelStation));
+        Assert.Null(TodoRequirements.Get(TodoSubject.VisitFuelStation).PoiType);
     }
 
     [Fact]

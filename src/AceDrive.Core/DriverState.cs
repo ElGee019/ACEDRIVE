@@ -144,7 +144,10 @@ public sealed record DriverState(
     // The Cento Miglia assertivity stat (Unity PlayerData.assertivity): 0 is
     // the fresh driver, a declined request adds 0.1, and only whole points
     // reach the race's reputation factor (see CentoReputation).
-    double Assertivity = 0.0)
+    double Assertivity = 0.0,
+    // The first settled fill (PORTPLAN 46): the fuel station's one-time visit
+    // tip has no door to stamp, so the pump stamp is what retires it.
+    bool VisitedFuelStation = false)
 {
     public static readonly DriverState Fresh = new(0.0, 0.0);
 }

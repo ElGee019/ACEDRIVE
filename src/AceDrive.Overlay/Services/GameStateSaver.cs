@@ -169,6 +169,7 @@ public sealed class GameStateSaver
             VisitedCarWash = _visits.CarWash,
             VisitedCarDealer = _visits.CarDealer,
             VisitedInsurance = _visits.InsuranceBroker,
+            VisitedFuelStation = _visits.FuelStation,
             Bank = _wallet.BankBalance,
             HasEnteredBank = _wallet.HasEnteredBank,
             Trunk = _trunk.Snapshot(),

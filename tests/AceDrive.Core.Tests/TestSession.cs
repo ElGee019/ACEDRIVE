@@ -169,7 +169,8 @@ internal static class TestSession
             new FuelMarket(fuelRulesInstance, fuelPricesInstance.Load(), game.GameDay, seed: 21),
             new FuelFillTracker(fuelRulesInstance), fuelRulesInstance, game,
             garageInstance, onboardingStore, friendsInstance, walletInstance,
-            glovebox, trunkInstance, saver, rivalsInstance, fuelPricesInstance, beat, logger);
+            glovebox, trunkInstance, visitsInstance, saver, rivalsInstance,
+            fuelPricesInstance, beat, logger);
         var brandMileageInstance = options.BrandMileage ?? new FakeBrandMileageStore();
         var telemetryInstance = options.Telemetry ?? new FakePlayerTelemetry();
         var meter = new DrivenDistanceMeter(taxiRulesInstance.MaxMeterSpeedKmh);

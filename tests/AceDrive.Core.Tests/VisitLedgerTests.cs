@@ -12,6 +12,7 @@ public sealed class VisitLedgerTests
         Assert.False(visits.CarWash);
         Assert.False(visits.CarDealer);
         Assert.False(visits.InsuranceBroker);
+        Assert.False(visits.FuelStation);
     }
 
     [Fact]
@@ -23,9 +24,19 @@ public sealed class VisitLedgerTests
         Assert.True(visits.CarWash);
         Assert.False(visits.CarDealer);
         Assert.True(visits.InsuranceBroker);
+        Assert.False(visits.FuelStation);
 
         visits.MarkCarDealer();
         Assert.True(visits.CarDealer);
         Assert.True(visits.CarWash); // the other flags never reset
+    }
+
+    [Fact]
+    public void FuelStation_ResumesFromTheFirstFillStamp()
+    {
+        var visits = new VisitLedger(new DriverState(0.0, 0.0, VisitedFuelStation: true));
+
+        Assert.True(visits.FuelStation);
+        Assert.False(visits.CarWash);
     }
 }

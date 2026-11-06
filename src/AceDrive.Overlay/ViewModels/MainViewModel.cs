@@ -558,8 +558,14 @@ public sealed class MainViewModel
     // The host slice the fuel receipt sees (PORTPLAN 37): a fill is an event the
     // player did not start, so it interrupts the page that was up and CONTINUE
     // hands it back — the insurance broker page's policy, not a job receipt's.
-    void IFuelHost.ShowFuelReceipt(object page) =>
+    void IFuelHost.ShowFuelReceipt(object page)
+    {
         _panel.PresentInterruption(page, "fuel receipt");
+        // The fill is the one-time fuel-station visit (PORTPLAN 46). The ToDo
+        // list reads cold edges, never the poll, so the receipt is the edge
+        // that flags the tip; the ledger saves its own file inside.
+        _todos.Sync();
+    }
     void IFuelHost.ResumeAfterFuelReceipt() => _panel.ResumeInterrupted();
     // The host slice the Cento Miglia entry sees: the flow owns the phases, the
     // registration check and the reputation ticker; the shell owns the panel,

@@ -269,6 +269,7 @@ Bijvoorbeeld "{0}".</value></data>
   <data name="TodoMaxGrocery" xml:space="preserve"><value>Klik op Max' kruidenier, rijd erheen en ga de winkel binnen.</value></data>
   <data name="TodoOpenDeliveryCareer" xml:space="preserve"><value>Ga naar de KLUSSEN-pagina, kies BEZORGKLUS en open een carrière naar keuze.</value></data>
   <data name="TodoVisitBank" xml:space="preserve"><value>Ga naar de bank om een deel van je spaargeld op te nemen.</value></data>
+  <data name="TodoVisitFuelStation" xml:space="preserve"><value>Tank je auto vol bij een tankstation.</value></data>
   <data name="TodoTaxiJobs" xml:space="preserve"><value>Voltooi {0} taxiritten. (nu {1})</value></data>
   <data name="TodoEarnCr" xml:space="preserve"><value>Verdien in totaal {0} CR. (nu {1})</value></data>
   <data name="TodoEarnXp" xml:space="preserve"><value>Verdien in totaal {0} XP. (nu {1:0.00})</value></data>

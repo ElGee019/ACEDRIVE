@@ -25,4 +25,5 @@ public sealed record TodoFacts(
     bool CarDealerEntered,
     bool InsuranceBrokerEntered,
     bool BankEntered,
+    bool FuelStationVisited,
     bool DeliveryCareerOpened);
