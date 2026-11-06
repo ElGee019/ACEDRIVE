@@ -14,6 +14,10 @@ namespace AceDrive.Core;
 /// now takes the gross return (<see cref="ReceivedForGoods"/> +
 /// <see cref="DistanceCharge"/>) and <see cref="TotalEarned"/> is the run's
 /// net profit, which the lifetime reading banks and the page shows as TOTAL.
+/// The starter tail is Unity's business starter bonus priced on that same
+/// net profit (never on the wholesale-inflated gross) and folded into
+/// <see cref="TotalEarned"/>; a rate of 0 — a fully decayed zone — hides
+/// the row.
 /// </summary>
 public sealed record DeliveryReceipt(
     double DistanceKm,
@@ -32,10 +36,15 @@ public sealed record DeliveryReceipt(
     int CredPEarned,
     double TotalCredP,
     bool ProfitBoostApplied = false,
-    double ProfitBoostRate = 0.0)
+    double ProfitBoostRate = 0.0,
+    double StarterBonusRate = 0.0,
+    double StarterBonus = 0.0)
 {
     /// <summary>False when the run rested on no owned hub.</summary>
     public bool HasFriendship => HubOwnerName.Length > 0;
+
+    /// <summary>False when the zone/car decay left no starter bonus.</summary>
+    public bool HasStarterBonus => StarterBonus > 0.0;
 
     /// <summary>False when the stores rested on no owned hub.</summary>
     public bool HasCredP => CredPEarned > 0;

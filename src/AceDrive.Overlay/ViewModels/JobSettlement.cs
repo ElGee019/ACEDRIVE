@@ -307,7 +307,11 @@ public sealed class JobSettlement
             _deliveryFares, deliveryClass, deliveryRarity,
             PlaceholderStreetKnowledgePct, _wallet.Xp,
             friendship, credPEarned, _career.CredP, awardsXp: earnsProgress,
-            profitBoostMultiplier: profitBoostCarried ? profitCard!.Amount : 1.0);
+            profitBoostMultiplier: profitBoostCarried ? profitCard!.Amount : 1.0,
+            // The starter bonus decays with the operating zone and the car
+            // count (PORTPLAN 47, Unity ProvincialStarterBonus), on the run's
+            // profit base like Unity's delivery path.
+            zoneKm: _zone.Km, ownedCars: _garage.Cars.Count);
         if (receipt.HasProfitBoost)
         {
             if (_glovebox.TryConsume(RewardCardEffect.DeliveryProfitBoost, _trunk))

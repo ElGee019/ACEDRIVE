@@ -114,6 +114,31 @@ public sealed class DeliveryReceiptScreenTests
     }
 
     [Fact]
+    public void StarterBonus_ShowsTheDecayedRowBetweenFareAndTotal()
+    {
+        // PORTPLAN 47: the same row the taxi receipt prints, priced on this
+        // run's profit (143.40 x 99%).
+        var receipt = DeliveryReceiptBuilder.Build(
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
+            zoneKm: 1.929, ownedCars: 1);
+        var (vm, _, _) = Create(receipt: receipt);
+
+        Assert.True(vm.HasStarterBonus);
+        Assert.Equal(
+            new ReceiptLine("Business Starter Bonus 99.0%", "€141.97"),
+            vm.StarterBonusLine);
+        Assert.Equal(new ReceiptLine("Total earned", "€285.37"), vm.TotalLine);
+    }
+
+    [Fact]
+    public void WithoutZone_HidesTheStarterRow()
+    {
+        var (vm, _, _) = Create();
+
+        Assert.False(vm.HasStarterBonus);
+    }
+
+    [Fact]
     public void Standings_PlaceholderThenLiveOnTheBoardEvent()
     {
         var rivals = new FakeRivals();

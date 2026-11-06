@@ -12,8 +12,10 @@ namespace AceDrive.Overlay.ViewModels;
 /// in), the tiered distance fare, the totals, the Credibility Points the
 /// ramp earned, the XP award with its calculation line, and the XP world
 /// standings pair. Skipped until their systems land (Unity hides them too
-/// or the port defers them): fines, auto fuel, starter bonus. The Delivery
-/// Profit Boost card prints its teal applied row under the goods payout.
+/// or the port defers them): fines, auto fuel. The business starter bonus
+/// (PORTPLAN 47) prints its decayed row between the fare and the total. The
+/// Delivery Profit Boost card prints its teal applied row under the goods
+/// payout.
 /// Money lines are computed once and never change; the standings
 /// block follows the backend's live updates. CONTINUE hands the main page
 /// back, so a voice tap flashes teal first and waits out the shared beat.
@@ -66,6 +68,15 @@ public sealed class DeliveryReceiptScreenViewModel : ViewModelBase, IVoiceScreen
 
     public ReceiptLine FareLine => new(
         Strings.Get("DelReceiptFare"), ReceiptText.Amount(_receipt.DistanceCharge));
+
+    /// <summary>False once the zone/car decay has left no starter bonus.</summary>
+    public bool HasStarterBonus => _receipt.HasStarterBonus;
+
+    /// <summary>Unity's starter row: the decayed percentage + the amount it
+    /// added to this run's profit.</summary>
+    public ReceiptLine StarterBonusLine => new(
+        Strings.Format("ReceiptStarterBonus", _receipt.StarterBonusRate),
+        ReceiptText.Amount(_receipt.StarterBonus));
 
     public ReceiptLine TotalLine => new(
         Strings.Get("ReceiptTotal"), ReceiptText.Amount(_receipt.TotalEarned));
