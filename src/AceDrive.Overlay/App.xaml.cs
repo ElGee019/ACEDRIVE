@@ -528,6 +528,14 @@ public partial class App : Application, IDisposable
             zone, game, poiGenerator, poiDirectory, residents, garage, cars,
             willyRules, willyLedger, friendships, trunk, driver, hud, saver,
             rivals, beat, () => dayCycle.DisplayWeek, new Random(taxiSeed + 9), _log);
+        // Friday's pancake visit (PORTPLAN 52): the calendar row's briefing, the
+        // drive to grandma's house and the meal that packs the stack the
+        // appetite's one-shot event needs. Its door is the profile's own home
+        // address, resolved like the intro leg's, so the weekly visit never sits
+        // on a street the save no longer names.
+        var pancakesFlow = new PancakeFlow(
+            game, () => AddressBook.Home(addressMap, profileStore.Load()),
+            trunk, hunger, storeCatalog, hud, saver, rivals, weeklyEvents, beat, _log);
         // The road test (PORTPLAN 49): its own flow owns the drive to La Strada,
         // the 0-60 leg, the photo mission and the receipt page, so the
         // coordinator only forwards the calendar tap, the poll and the
@@ -586,7 +594,8 @@ public partial class App : Application, IDisposable
         // rules so the poll only asks whether the town moved; the introduction
         // gate arrives as the coordinator's live value.
         var world = new WorldTicks(
-            game, city, hunger, fleet, deliveryBoard, deliveryCareer, saver, rivals, _log);
+            game, city, hunger, trunk, fleet, deliveryBoard, deliveryCareer,
+            saver, rivals, _log);
         // The POI world and its arrival router: the store handler rides in from
         // here, the business interiors are appended by the world. The world
         // attaches to the coordinator as its host inside the VM's constructor;
@@ -719,7 +728,7 @@ public partial class App : Application, IDisposable
             employeeRides, employeeDeliveries, employeeDeliveryPayout,
             taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
-            valuationFlow, willyFlow, careFlow, roadTestFlow, touristen,
+            valuationFlow, willyFlow, pancakesFlow, careFlow, roadTestFlow, touristen,
             weeklyEvents, calendarGate,
             // The Cento Miglia registration draw: a page-local number, seeded
             // off the same launch seed the other draws use. The menu's call
@@ -747,7 +756,7 @@ public partial class App : Application, IDisposable
         var story = new OnboardingFlow(
             onboardingStore, content, profileStore, playerNames, addressMap, playerName,
             poiGenerator, poiDirectory, poiStore, residents, poiArrivals, trunk,
-            deliveryCareer, deliveryBoard.Catalog.StartCredP,
+            storeCatalog, deliveryCareer, deliveryBoard.Catalog.StartCredP,
             preferencesStore, preferences, culture, beat, hud, garage,
             () => dayCycle.DisplayWeek, saver.SaveGarage, () => carBrands.Brand,
             _log, new StoryHost(panel, navigation, saver, rivals, todoBoard),
@@ -782,7 +791,8 @@ public partial class App : Application, IDisposable
             rivals,
             garage,
             catchUp, zoneGrowth, saver, fleet, fuel, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
+            taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow,
+            willyFlow, pancakesFlow,
             careFlow, roadTestFlow, touristen,
             navigation, readouts, dayCycle,
             todoBoard,

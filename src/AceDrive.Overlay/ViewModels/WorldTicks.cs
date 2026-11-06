@@ -24,6 +24,10 @@ public sealed class WorldTicks
     private readonly GameClock _game;
     private readonly CityEconomy _city;
     private readonly Hunger _hunger;
+    // The carried stacks the appetite's one-shot event asks about: the pancakes
+    // only fire the event while the trunk holds them, so the fact is read live
+    // off the trunk (an in-memory scan, no I/O on the poll).
+    private readonly Trunk _trunk;
     private readonly FleetService _fleet;
     private readonly DeliveryBoard _board;
     private readonly DeliveryCareer _career;
@@ -38,13 +42,14 @@ public sealed class WorldTicks
     private bool _hungerBlocked;
 
     public WorldTicks(
-        GameClock game, CityEconomy city, Hunger hunger, FleetService fleet,
-        DeliveryBoard board, DeliveryCareer career, GameStateSaver saver,
-        IRivalsService rivals, ILog log)
+        GameClock game, CityEconomy city, Hunger hunger, Trunk trunk,
+        FleetService fleet, DeliveryBoard board, DeliveryCareer career,
+        GameStateSaver saver, IRivalsService rivals, ILog log)
     {
         _game = game;
         _city = city;
         _hunger = hunger;
+        _trunk = trunk;
         _fleet = fleet;
         _board = board;
         _career = career;
@@ -55,18 +60,18 @@ public sealed class WorldTicks
 
     /// <summary>
     /// Advances every game-clock world rule to the moment the shared clock
-    /// reads. Returns whether the town's cells moved: that is the transition
-    /// that makes the cached delivery board stale, and most calls answer false
-    /// (half citizens only bank, so the page is not rebuilt every minute).
-    /// <paramref name="onboardingDone"/> is the live introduction gate: the
-    /// appetite stays frozen until it closes (Unity's firstSceneComplete).
+    /// reads. Returns what moved: the town's cells (the transition that makes
+    /// the cached delivery board stale, most calls answer false, since half
+    /// citizens only bank) and whether the appetite's one-shot pancake event
+    /// fired. <paramref name="onboardingDone"/> is the live introduction gate:
+    /// the appetite stays frozen until it closes (Unity's firstSceneComplete).
     /// </summary>
-    public bool Tick(bool onboardingDone)
+    public WorldTickReport Tick(bool onboardingDone)
     {
         bool cityMoved = TickCity();
-        TickHunger(onboardingDone);
+        bool pancakeThreshold = TickHunger(onboardingDone);
         TickInsurance();
-        return cityMoved;
+        return new WorldTickReport(cityMoved, pancakeThreshold);
     }
 
     // The town ticks on game minutes, whether or not a page is open: all work
@@ -90,13 +95,16 @@ public sealed class WorldTicks
     // Hunger meter (PORTPLAN 26, Unity GameClockManager.UpdateHunger): +1 once
     // per crossed game hour and only past onboarding, capped at the rules' max,
     // work only on a whole-hour boundary. Unity blocks the job centre at
-    // maxHunger - 1 (HungerBlockPopup); the block is disabled for now — no
-    // trunk or grocery store exists yet (items 51 / 26 map POI), so the gate
-    // would be a one-way valve. hasPancakes stays false until a trunk lands;
-    // the one-shot event then fires exactly the way Unity fires it.
-    private void TickHunger(bool onboardingDone)
+    // maxHunger - 1 (HungerBlockPopup) and the jobs page refuses on the same
+    // rule, so the latch below is the player-facing warning that the block just
+    // started. The one-shot pancake event fires the hour the reading lands on
+    // the threshold with grandma's pancakes still in the trunk, exactly the way
+    // Unity fires it; the coordinator turns that return value into the
+    // companion's nudge.
+    private bool TickHunger(bool onboardingDone)
     {
-        HungerReport report = _hunger.AdvanceTo(_game.GameNow, onboardingDone, hasPancakes: false);
+        HungerReport report = _hunger.AdvanceTo(
+            _game.GameNow, onboardingDone, PancakeVisit.IsCarried(_trunk));
         if (report.Changed)
         {
             _log.LogInfo($"[Hunger] {_hunger.Value}/{_hunger.Max}");
@@ -108,17 +116,24 @@ public sealed class WorldTicks
             _saver.SaveHunger();
         }
 
-        if (_hunger.Blocks == _hungerBlocked)
+        if (report.ThresholdFired)
         {
-            return;
+            _log.LogInfo(
+                $"[Hunger] pancake event fired at {_hunger.Value}/{_hunger.Max}: " +
+                "the trunk carries grandma's pancakes");
         }
 
-        _hungerBlocked = _hunger.Blocks;
-        if (_hungerBlocked)
+        if (_hunger.Blocks != _hungerBlocked)
         {
-            _log.LogWarning("[Hunger] job gate reached (" +
-                $"{_hunger.Value}/{_hunger.Max}) — the TOO HUNGRY block is disabled until a food source lands");
+            _hungerBlocked = _hunger.Blocks;
+            if (_hungerBlocked)
+            {
+                _log.LogWarning("[Hunger] job gate reached (" +
+                    $"{_hunger.Value}/{_hunger.Max}) — the job entries refuse until the player eats");
+            }
         }
+
+        return report.ThresholdFired;
     }
 
     // Nightly insurance charge (PORTPLAN 34, Unity GameClockManager.

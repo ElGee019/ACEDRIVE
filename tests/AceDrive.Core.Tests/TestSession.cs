@@ -234,8 +234,8 @@ internal static class TestSession
         // The game-clock world: the same instances the saver and the fleet
         // hold, so an insurance charge lands in the driver file the tests read.
         var world = new WorldTicks(
-            game, cityInstance, hungerInstance, fleet, deliveryBoard, deliveryCareer,
-            saver, rivalsInstance, logger);
+            game, cityInstance, hungerInstance, trunkInstance, fleet, deliveryBoard,
+            deliveryCareer, saver, rivalsInstance, logger);
         var poiWorld = new PoiWorld(
             spawnerInstance, directory, directoryStore, map, deliveryBoard, deliveryCareer,
             cityInstance, storeCatalogInstance, zoneInstance, jobsInstance,
@@ -298,6 +298,13 @@ internal static class TestSession
             zoneInstance, game, clock, valuationInstance, valuationBoard, garageInstance, pool,
             walletInstance, profiles, options.Hud, saver, rivalsInstance, beat,
             options.ValuationRng ?? new Random(3), logger, options.IgnoreEventGates);
+        // Friday's pancake visit (PORTPLAN 52): the same trunk, appetite and
+        // weekly ledger the assertions read, with grandma's door resolved from
+        // the saved profile exactly like the introduction's pancake leg does.
+        var pancakesFlow = new PancakeFlow(
+            game, () => AddressBook.Home(map, profiles.Load()), trunkInstance,
+            hungerInstance, storeCatalogInstance, options.Hud, saver, rivalsInstance,
+            weeklyEventsInstance, beat, logger, options.IgnoreEventGates);
         // The road test (PORTPLAN 49): its own board, hold stream and flow, on
         // the same onboarding store the La Strada door is banked in, with the
         // audience read from the city and friendship stores the receipts use.
@@ -379,7 +386,7 @@ internal static class TestSession
             taxi, delivery, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
-            willyFlow, careFlow, roadTestFlow, touristenFlow,
+            willyFlow, pancakesFlow, careFlow, roadTestFlow, touristenFlow,
             weeklyEventsInstance, calendarGate,
             () => brands.Brand,
             () => options.CallInput?.Label ?? CallBinding.Default.Label,
@@ -395,7 +402,7 @@ internal static class TestSession
             options.PlayerNames ?? new OfflinePlayerNameRegistry(), map,
             options.DetectedName, options.Pois ?? new PoiGenerator(map, PoiCatalog.Default, seed: 0),
             directory, directoryStore, residentsInstance, poiArrivals, trunkInstance,
-            deliveryCareer, board.StartCredP,
+            storeCatalogInstance, deliveryCareer, board.StartCredP,
             options.PreferencesStore ?? new FakePreferencesStore(),
             options.Preferences ?? PlayerPreferences.Default,
             options.Culture ?? new FakeCultureService(), beat, options.Hud, garageInstance,
@@ -415,7 +422,8 @@ internal static class TestSession
             rivalsInstance, garageInstance,
             catchUp, zoneGrowth,
             saver, fleet, fuel, settlement, shell, panel, story, voiceRouter,
-            taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow, willyFlow,
+            taxi, delivery, haul, poiWorld, cento, centoSettlement, valuationFlow,
+            willyFlow, pancakesFlow,
             careFlow, roadTestFlow, touristenFlow,
             navigation, readouts, dayCycle,
             todoBoard,

@@ -29,7 +29,8 @@ public sealed class NavigationTests
         Garage Garage, FakeGarageStore GarageStore, TestLog Log,
         RoadTestFlow RoadTest) Create(
         int startWeek = 1, IReadOnlyList<CarSpec>? cars = null, Garage? garage = null,
-        IZoneStandings? zoneStandings = null, bool ignoreEventGates = false)
+        IZoneStandings? zoneStandings = null, bool ignoreEventGates = false,
+        Hunger? hunger = null)
     {
         // Deterministic locale: resources resolve to en, numbers format with '.'.
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
@@ -44,7 +45,9 @@ public sealed class NavigationTests
         var garageStore = new FakeGarageStore();
         var trunk = new Trunk();
         var glovebox = new Glovebox(RewardTable.Default, wallet);
-        var hunger = new Hunger(HungerRules.Default);
+        // The appetite the saver, the navigator and Friday's visit all share:
+        // a case can hand in a reading already in the block band.
+        Hunger appetite = hunger ?? new Hunger(HungerRules.Default);
         var city = new CityEconomy([], CityRules.Default);
         var roads = new RoadTestLedger(pool, seed: 0);
         var roadTests = new FakeRoadTestStore();
@@ -86,7 +89,7 @@ public sealed class NavigationTests
             clock, game, new FakeGameClockStore(), new FakeDriverStore(), garageStore,
             new FakeCityStore(), new FakeHungerStore(), roadTests, shiftStore,
             wallet, new DailyStreak(clock, null), zoneInstance,
-            trunk, garageInstance, city, hunger, roads, shift, new ShiftRecord(null),
+            trunk, garageInstance, city, appetite, roads, shift, new ShiftRecord(null),
             new JobLedger(), new VisitLedger(),
             valuationLedger, willyLedger, career, weeklyEvents, carePackages);
         var board = new DeliveryBoard(DeliveryCatalog.Default);
@@ -176,6 +179,18 @@ public sealed class NavigationTests
             garageInstance, poolCars, WhereIsWillyRules.Default, willyLedger, friends,
             trunk, wallet, null, saver, rivals, beat, () => day.DisplayWeek,
             new Random(0), log);
+        // Friday's pancake visit: its door is the profile's own home address, the
+        // same street the introduction's pancake leg pins.
+        var pancakes = new PancakeFlow(
+            game,
+            () => AddressBook.Home(
+                AddressMap.Default,
+                new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1)),
+            trunk, appetite, StoreCatalog.Default, null, saver, rivals, weeklyEvents,
+            beat, log, ignoreEventGates);
+        // Friday's visit reports its pages through a host: the test routes them
+        // into the shell the assertions read, like the coordinator does.
+        pancakes.Attach(new FakePancakeHost(page => shell.ShowScreen(page)));
         // The road test: its flow owns the drive to La Strada and the 0-60 leg,
         // so the Tuesday tap goes through it (the board stays offline). The
         // audience and the settlement read the same city, wallet and friends
@@ -230,13 +245,13 @@ public sealed class NavigationTests
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
-            trunk, glovebox, hunger, StoreCatalog.Default,
+            trunk, glovebox, appetite, StoreCatalog.Default,
             directory, null, board, career, city, employeeRoster, employeeJobs,
             employeeAssignments, carShareJobs, carShareRequests,
             employeeRides, employeeDeliveries, employeeDeliveryPayout,
             taxi, delivery, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
-            valuation, willy, care, roadTest, touristen, weeklyEvents, gate,
+            valuation, willy, pancakes, care, roadTest, touristen, weeklyEvents, gate,
             () => "mazda", () => CallBinding.Default.Label, new Random(0), log, ignoreEventGates);
         var host = new FakeNavigationHost();
         nav.Attach(host);
@@ -763,6 +778,64 @@ public sealed class NavigationTests
 
         Assert.IsType<MainControlScreenViewModel>(shell.CurrentScreen);
     }
+
+    [Fact]
+    public void PancakeDay_OpensTheBriefingInsteadOfThePlaceholder()
+    {
+        // The Friday row used to be a page-less placeholder: the tap only logged
+        // "no page behind this event yet". It now opens the visit's briefing,
+        // whose START pins grandma's house (the flow tests own the drive).
+        var (nav, shell, _, _, _, _, _, _, _, _, log, _) = Create(ignoreEventGates: true);
+        nav.ShowMenuPage();
+        Assert.IsType<MenuScreenViewModel>(shell.CurrentScreen).CalendarCommand.Execute(null);
+        var calendar = Assert.IsType<CalendarScreenViewModel>(shell.CurrentScreen);
+        int pancakeDay = ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.Pancakes).DayOfWeek;
+
+        calendar.DayCommand.Execute(pancakeDay);
+
+        var briefing = Assert.IsType<PancakeBriefingScreenViewModel>(shell.CurrentScreen);
+        Assert.NotEmpty(briefing.VenueLine);
+        Assert.Contains(
+            log.Infos, line => line.StartsWith("pancake friday opened:", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            log.Infos, line => line.Contains("no page behind this event yet", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void TooHungry_RefusesTheTaxiTapAndOpensTheTrunkInOneTap()
+    {
+        // Unity's HungerBlockPopup: in the block band the job entries refuse, and
+        // the tap still answers instead of reading as a broken button. The page
+        // hands the player straight to the trunk, where the carried food is.
+        var (nav, shell, _, _, shift, shiftStore, _, _, _, _, log, _) = Create(
+            hunger: new Hunger(HungerRules.Default, new HungerState(35, false)));
+
+        nav.TaxiShiftCommand.Execute(null);
+
+        var page = Assert.IsType<TooHungryScreenViewModel>(shell.CurrentScreen);
+        Assert.False(shift.IsStarted);
+        Assert.Empty(shiftStore.Saved);
+        Assert.Contains(log.Infos, line => line.StartsWith("taxi shift refused: TOO HUNGRY", StringComparison.Ordinal));
+
+        page.ToTrunkCommand.Execute(null);
+
+        Assert.IsType<TrunkScreenViewModel>(shell.CurrentScreen);
+    }
+
+    [Fact]
+    public void HungerBelowTheBlockBand_StillOpensTheJob()
+    {
+        // maxHunger - 1 is the edge: one point below it the shift starts as
+        // usual, so the gate never refuses a job the rules still allow.
+        var (nav, _, _, _, shift, _, _, _, _, _, _, _) = Create(
+            hunger: new Hunger(HungerRules.Default, new HungerState(34, false)));
+
+        nav.TaxiShiftCommand.Execute(null);
+
+        Assert.True(shift.IsStarted);
+    }
+
     private static string RoadTestButton(CalendarScreenViewModel calendar) =>
         Assert.Single(calendar.Days, day => day.DayOfWeek == 3).EventLabel;
 }

@@ -107,6 +107,12 @@ public sealed class Navigation
     // centre.
     private readonly WhereIsWillyFlow _willy;
 
+    // Friday's pancake visit (PORTPLAN 52): the row opens its briefing, START
+    // pins grandma's house and the ENTER at her door serves the plate that keeps
+    // the appetite's one-shot event alive. The flow owns the leg and its pages,
+    // so the row is one call beside the other events.
+    private readonly PancakeFlow _pancakes;
+
     // The care-package run (PORTPLAN 21): the jobs page's DELIVER CARE PACKAGES
     // starts it, and while it owns the companion the other job entries refuse,
     // exactly like the missing-person run.
@@ -171,6 +177,10 @@ public sealed class Navigation
     // the same way: the strip owns which weekday hosts the event.
     private readonly int _willyDay = WillyDayOfWeek();
 
+    // Weekday number of Friday's pancake visit, read off the same calendar data
+    // so the strip keeps owning which weekday hosts the event.
+    private readonly int _pancakeDay = PancakeDayOfWeek();
+
     // Weekday number of the Saturday Touristenfahrten run, read off the same
     // calendar data so the strip keeps owning which weekday hosts the event.
     private readonly int _touristenDay = TouristenDayOfWeek();
@@ -202,7 +212,7 @@ public sealed class Navigation
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
-        ValuationFlow valuation, WhereIsWillyFlow willy,
+        ValuationFlow valuation, WhereIsWillyFlow willy, PancakeFlow pancakes,
         CarePackageFlow care, RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         WeeklyEventLedger weeklyEvents, CalendarGate gate,
         Func<string> carBrand, Func<string> callLabel,
@@ -249,6 +259,7 @@ public sealed class Navigation
         _cento = cento;
         _valuation = valuation;
         _willy = willy;
+        _pancakes = pancakes;
         _care = care;
         _weeklyEvents = weeklyEvents;
         _gate = gate;
@@ -328,12 +339,38 @@ public sealed class Navigation
     // run. A refused start leaves the block and its button exactly as they were.
     private void DeliverCarePackages()
     {
+        if (RefuseWhenTooHungry("care packages"))
+        {
+            return;
+        }
+
         if (!_care.Begin())
         {
             return;
         }
 
         _todos.AcknowledgeCommand.Execute(null);
+    }
+
+    // Unity's blocked job centre (PORTPLAN item 26, MapScreen's HungerBlockPopup):
+    // at hunger >= maxHunger - 1 every job entry refuses, and the tap still
+    // answers — the popup says why, names the two ways to eat and jumps to the
+    // trunk in one tap. WHY only the job entries and not the whole calendar:
+    // stores stay reachable, and so does Friday's pancake visit, so a broke
+    // driver with an empty trunk is never locked out of the one free meal the
+    // game hands over. A silent refusal would read as a broken button.
+    private bool RefuseWhenTooHungry(string entry)
+    {
+        if (!_hunger.Blocks)
+        {
+            return false;
+        }
+
+        _log.LogInfo(
+            $"{entry} refused: TOO HUNGRY at {_hunger.Value}/{_hunger.Max}");
+        ShowScreen(new TooHungryScreenViewModel(
+            _hunger, new RelayCommand(OpenTrunk), new RelayCommand(ShowControl), _beat));
+        return true;
     }
 
     /// <summary>Re-reads the cached control page (the taxi flow's tick does).</summary>
@@ -353,6 +390,11 @@ public sealed class Navigation
     // shift record and its summary page).
     private void OpenTaxiShift()
     {
+        if (RefuseWhenTooHungry("taxi shift"))
+        {
+            return;
+        }
+
         // Unity's blocked job centre (ToWhereIsWilly.md §2.1): a missing-person
         // run in flight starts no second job, so the shift button is refused
         // until the receipt or a give-up clears it.
@@ -403,6 +445,11 @@ public sealed class Navigation
     // OPEN NEW CAREER page (item 18).
     private void ShowDelivery()
     {
+        if (RefuseWhenTooHungry("delivery career"))
+        {
+            return;
+        }
+
         // The same lock the shift reads: the delivery career is the other job a
         // missing-person run may not start beside (Unity's blocked job centre).
         if (_willy.InFlight)
@@ -428,6 +475,11 @@ public sealed class Navigation
     // leg and the receipt.
     private void OpenHaul()
     {
+        if (RefuseWhenTooHungry("car hauling"))
+        {
+            return;
+        }
+
         if (_care.InFlight)
         {
             _log.LogInfo("haul refused: the care-package run is in flight");
@@ -593,6 +645,16 @@ public sealed class Navigation
             return;
         }
 
+        // Friday's pancake visit owns the companion while its door is pinned:
+        // the leg is one pinned house and its ENTER completes it, so a second
+        // event must not repin the HUD underneath it. The row itself stays open
+        // — that is how a stalled briefing is reopened.
+        if (_pancakes.InFlight && day != _pancakeDay)
+        {
+            _log.LogInfo($"calendar day {day} refused: the pancake visit is in flight");
+            return;
+        }
+
         if (day == _roadTestDay)
         {
             // The road test is a drive now (PORTPLAN 49): the row sends the
@@ -658,8 +720,18 @@ public sealed class Navigation
             return;
         }
 
+        // Friday's pancake visit (PORTPLAN 52): the row opens the briefing, and
+        // its START pins grandma's house. The flow re-checks the weekday, the
+        // 8am-8pm window and the week's stamp, so a cached page or a voice tap
+        // cannot jump them; the meal's own stamp is written when it is served.
+        if (day == _pancakeDay)
+        {
+            _pancakes.Begin();
+            return;
+        }
+
         // Only placeholder rows reach this: an event whose page or leg has not
-        // landed yet (Grandma's pancakes).
+        // landed yet.
         _log.LogInfo($"calendar day {day} tapped: no page behind this event yet");
     }
 
@@ -1105,6 +1177,21 @@ public sealed class Navigation
         foreach (CalendarDay day in ControlCalendar.Week)
         {
             if (day.EventId == ControlCalendar.Touristenfahrten)
+            {
+                return day.DayOfWeek;
+            }
+        }
+
+        return -1;
+    }
+
+    // Pancake-visit weekday number, read off the same calendar data: the strip
+    // owns which weekday hosts Friday's visit, the flow never assumes Friday.
+    private static int PancakeDayOfWeek()
+    {
+        foreach (CalendarDay day in ControlCalendar.Week)
+        {
+            if (day.EventId == ControlCalendar.Pancakes)
             {
                 return day.DayOfWeek;
             }

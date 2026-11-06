@@ -20,7 +20,7 @@ public sealed class MainViewModel
     : ViewModelBase, IJobSettlementHost, ITaxiJobHost, IDeliveryHost,
       ICarHaulHost,
       ICentoRaceHost, IPoiWorldHost, INavigationHost, IDayCycleHost,
-      IValuationHost, IWhereIsWillyHost, ICarePackageHost, IRoadTestHost,
+      IValuationHost, IWhereIsWillyHost, IPancakeHost, ICarePackageHost, IRoadTestHost,
       ITouristenfahrtenHost, IFuelHost, IDisposable
 {
     private readonly ITelemetrySource _telemetry;
@@ -67,6 +67,10 @@ public sealed class MainViewModel
     // drive home and the receipt. It owns its session state and reaches back
     // only through IWhereIsWillyHost for the panel and the page.
     private readonly WhereIsWillyFlow _willy;
+    // Friday's pancake visit (PORTPLAN 52): the briefing, the drive to grandma's
+    // house and the meal that keeps the appetite's one-shot event alive. It owns
+    // its session state and reaches back only through IPancakeHost.
+    private readonly PancakeFlow _pancakes;
     // The care-package run (PORTPLAN 21): the jobs page's DELIVER CARE PACKAGES,
     // the store pickup legs and the community-centre drop-off. It owns its
     // session route and reaches back only through ICarePackageHost.
@@ -185,6 +189,10 @@ public sealed class MainViewModel
     // taxi refusals use, long enough to read one sentence.
     private const double HaulNoticeSec = 4.0;
 
+    // The one-shot pancake event's nudge: it has to survive a glance away from
+    // the companion while driving, so it rides slightly longer than a refusal.
+    private const double PancakeNoticeSec = 8.0;
+
     private bool _resizing;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
@@ -238,8 +246,8 @@ public sealed class MainViewModel
         VoiceRouter voiceRouter,
         TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld poiWorld,
         CentoRaceFlow cento, CentoRaceSettlement centoSettlement,
-        ValuationFlow valuation, WhereIsWillyFlow willy, CarePackageFlow care,
-        RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
+        ValuationFlow valuation, WhereIsWillyFlow willy, PancakeFlow pancakes,
+        CarePackageFlow care, RoadTestFlow roadTest, TouristenfahrtenFlow touristen,
         Navigation navigation, TelemetryReadouts readouts, DayCycle day,
         TodoBoard todos,
         ITelemetryHud? hud = null,
@@ -296,6 +304,7 @@ public sealed class MainViewModel
         _centoSettlement = centoSettlement;
         _valuation = valuation;
         _willy = willy;
+        _pancakes = pancakes;
         _care = care;
         if (_hud is not null)
         {
@@ -337,6 +346,7 @@ public sealed class MainViewModel
         _cento.Attach(this);
         _valuation.Attach(this);
         _willy.Attach(this);
+        _pancakes.Attach(this);
         _care.Attach(this);
         _roadTest.Attach(this);
         _touristen.Attach(this);
@@ -602,6 +612,15 @@ public sealed class MainViewModel
     void IWhereIsWillyHost.ShowMenu() => _nav.ShowMenuPage();
     void IWhereIsWillyHost.ShowCalendar() => _nav.ShowCalendarPage();
 
+    // The host slice Friday's pancake visit sees: the flow owns the briefing, the
+    // pinned door and the meal; the shell owns the panel, the receipt page and
+    // the two pages the visit hands back to (the calendar behind BACK, the menu
+    // behind CONTINUE).
+    void IPancakeHost.Present(object page) => _panel.PresentJob(page);
+    void IPancakeHost.HidePanel() => _panel.Hide();
+    void IPancakeHost.ShowCalendar() => _nav.ShowCalendarPage();
+    void IPancakeHost.ShowMenu() => _nav.ShowMenuPage();
+
     // The host slice the care-package run sees: the flow owns the route, the
     // pickups and the drop-off; the shell owns the panel, the delivered page a
     // finished run opens (receipt with its reward cards) and the return to the
@@ -815,11 +834,20 @@ public sealed class MainViewModel
 
         // The town, the appetite and the nightly premium advance on the game
         // clock, whether or not a page is open and whether or not EVO is
-        // attached. The tick reports the town's movement: only the cached
-        // board page holds cells, so that is the one repaint it owes.
-        if (_world.Tick(_story.Done))
+        // attached. The tick reports the town's movement (only the cached
+        // board page holds cells, so that is the one repaint it owes) and the
+        // appetite's one-shot pancake event, which the companion announces —
+        // the meter is the only place hunger is visible while driving.
+        WorldTickReport world = _world.Tick(_story.Done);
+        if (world.CityMoved)
         {
             _delivery.RefreshBoard();
+        }
+
+        if (world.PancakeThreshold)
+        {
+            _hud?.ShowNotice(
+                Strings.Get("HudPancakeThreshold"), TimeSpan.FromSeconds(PancakeNoticeSec));
         }
 
         // Wall-clock bank: runs before the telemetry read so it also holds
@@ -1304,6 +1332,14 @@ public sealed class MainViewModel
         if (_care.InFlight)
         {
             _care.ConfirmStop();
+            return;
+        }
+
+        // Friday's pancake visit owns grandma's door while its leg is live: the
+        // flow checks that the pinned house is the one the car is parked at, so
+        // an ENTER anywhere else still falls through to the story/job split.
+        if (_pancakes.TryEnter())
+        {
             return;
         }
 

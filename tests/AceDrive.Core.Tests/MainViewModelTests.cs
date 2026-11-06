@@ -2307,6 +2307,91 @@ public sealed class MainViewModelTests
         return Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
     }
 
+    [Fact]
+    public void PancakeThreshold_CarryingGrandmasStack_NotifiesTheCompanion()
+    {
+        // PORTPLAN 26's one-shot: the hour the reading lands on the threshold
+        // with the stack in the car, the appetite reports the event and the poll
+        // turns it into the companion's nudge. Without the trunk fact this hour
+        // stayed silent, which is what made the event look unported.
+        var trunk = new Trunk(
+            [new TrunkItem(PancakeVisit.ItemName, 0.5) { Quantity = 1 }]);
+        var hunger = new Hunger(
+            HungerRules.Default, new HungerState(13, ThresholdTriggered: false));
+        var hud = new FakeTelemetryHud();
+        var (vm, clock, _, _) = Create(
+            speedKmh: 0f, progress: FinishedTour(), hunger: hunger, trunk: trunk, hud: hud);
+        vm.Poll(); // anchors the appetite to the first game moment
+
+        // 61 game minutes in real seconds: the crossing pays, one minute keeps
+        // the assertion off the clock's floating-point edge.
+        clock.Advance(TimeSpan.FromSeconds(GameClock.RealSecondsPerGameMinute * 61));
+        vm.Poll();
+
+        Assert.Equal(14, hunger.Value);
+        Assert.True(hunger.ThresholdAlarmed);
+        Assert.Equal(Strings.Get("HudPancakeThreshold"), hud.Notice);
+    }
+
+    [Fact]
+    public void PancakeFriday_OpensTheBriefingAndTheDoorServesThePlate()
+    {
+        // PORTPLAN 52: the Friday row has a page and a leg now. The whole chain
+        // runs here on the coordinator's own wiring — calendar tap, briefing,
+        // pinned house, ENTER, receipt — so the flow cannot pass while the app
+        // still answers the row with the placeholder log. Friday noon is the
+        // first Friday the seeded Saturday career can reach.
+        var trunk = new Trunk();
+        var hunger = new Hunger(
+            HungerRules.Default, new HungerState(20, ThresholdTriggered: false));
+        var hud = new FakeTelemetryHud();
+        var profile = new PlayerProfile("Ace", "Germany", "Brands", "street-1", 1);
+        var session = Create(
+            // The introduction's tour is fully banked, so nothing else pins the
+            // companion: the Friday leg must be the only destination on the HUD.
+            progress: FinishedTour() with
+            {
+                MaxErrandDone = true,
+                JustinPickedUp = true,
+                AnnabellaPickedUp = true,
+                PancakesDone = true,
+            },
+            gameStart: new DateTime(2026, 10, 16, 12, 0, 0, DateTimeKind.Utc),
+            hud: hud, hunger: hunger, trunk: trunk, profile: profile);
+        var (vm, _, _, _) = session;
+        var calendar = ShowCalendar(vm);
+        int pancakeDay = ControlCalendar.Week
+            .Single(day => day.EventId == ControlCalendar.Pancakes).DayOfWeek;
+
+        calendar.DayCommand.Execute(pancakeDay);
+
+        var briefing = Assert.IsType<PancakeBriefingScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
+        Assert.Null(hud.Destination); // nothing is pinned before START
+
+        briefing.StartCommand.Execute(null);
+
+        // START pins grandma's house and hides the panel for the drive.
+        Assert.False(vm.IsShown);
+        PointOfInterest home = Assert.IsType<PointOfInterest>(hud.Destination);
+        Assert.Equal(PoiTypes.Home, home.Type);
+        Assert.Equal(
+            AddressBook.Home(AddressMap.Default, profile)!.Value.HouseNumber,
+            home.Address.HouseNumber);
+        Assert.Equal("HudPancakeDrive", hud.HintKey);
+
+        hud.AtDestination = true;
+        hud.RaiseEnter();
+
+        // The plate, the road stack and the week's stamp land on the ENTER, and
+        // the receipt prints them.
+        Assert.Equal(6, hunger.Value);
+        Assert.True(PancakeVisit.IsCarried(trunk));
+        Assert.IsType<PancakeReceiptScreenViewModel>(vm.CurrentScreen);
+        Assert.True(vm.IsShown);
+        Assert.Null(hud.Destination);
+    }
+
     // A call resumes the page it left; only a menu under it needs the tile.
     private static CalendarScreenViewModel ShowCalendar(MainViewModel vm)
     {
@@ -3276,6 +3361,9 @@ public sealed class MainViewModelTests
         dialogue.ContinueCommand.Execute(null);
 
         Assert.True(onboarding.State.PancakesDone);
+        // "Take these, love, pancakes for the road": the gift is real trunk
+        // state, which is the only thing the appetite's one-shot event asks for.
+        Assert.True(PancakeVisit.IsCarried(trunk));
         Assert.False(vm.IsShown);
         Assert.IsType<MainControlScreenViewModel>(vm.CurrentScreen);
         PointOfInterest centre = Assert.IsType<PointOfInterest>(hud.Destination);

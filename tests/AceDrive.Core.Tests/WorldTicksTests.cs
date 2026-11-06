@@ -32,14 +32,15 @@ public sealed class WorldTicksTests
 
     private sealed record Fixture(
         WorldTicks World, FakeClock Clock, CityEconomy City, Hunger Hunger,
-        Garage Garage, DriverWallet Wallet, FakeDriverStore Drivers,
+        Garage Garage, DriverWallet Wallet, Trunk Trunk, FakeDriverStore Drivers,
         FakeHungerStore HungerStore, TestLog Log);
 
     public WorldTicksTests() =>
         CultureInfo.CurrentCulture = CultureInfo.CurrentUICulture = new CultureInfo("en-US");
 
     private static Fixture Build(
-        DateTime gameStart, Hunger? hunger = null, CarSpec? car = null, bool insured = true)
+        DateTime gameStart, Hunger? hunger = null, CarSpec? car = null, bool insured = true,
+        Trunk? trunk = null)
     {
         var clock = new FakeClock { Now = gameStart };
         var game = new GameClock(clock, gameStart);
@@ -49,6 +50,7 @@ public sealed class WorldTicksTests
         var catalog = new DeliveryCatalog([FullMarket], 0.7, 100);
         var city = new CityEconomy(catalog.Stores, CityRules.Default);
         var appetite = hunger ?? new Hunger(HungerRules.Default);
+        var carried = trunk ?? new Trunk();
         var wallet = new DriverWallet();
         IReadOnlyList<CarSpec> pool = car is null ? [] : [car];
         var garage = new Garage(pool);
@@ -70,14 +72,15 @@ public sealed class WorldTicksTests
             clock, game, new FakeGameClockStore(), driverStore, new FakeGarageStore(),
             new FakeCityStore(), hungerStore, new FakeRoadTestStore(),
             new FakeShiftStore(), wallet, new DailyStreak(clock, null),
-            new OperatingZone(null, seed: 0, AddressMap.Default), new Trunk(), garage, city, appetite,
+            new OperatingZone(null, seed: 0, AddressMap.Default), carried, garage, city, appetite,
             new RoadTestLedger(pool, seed: 0), new TaxiShift(), new ShiftRecord(null),
             new JobLedger(), new VisitLedger(),
             new ValuationLedger(), new WhereIsWillyLedger(), career,
             new WeeklyEventLedger(), new CarePackageLedger());
         var world = new WorldTicks(
-            game, city, appetite, fleet, board, career, saver, rivals, log);
-        return new Fixture(world, clock, city, appetite, garage, wallet, driverStore, hungerStore, log);
+            game, city, appetite, carried, fleet, board, career, saver, rivals, log);
+        return new Fixture(
+            world, clock, city, appetite, garage, wallet, carried, driverStore, hungerStore, log);
     }
 
     [Fact]
@@ -88,7 +91,7 @@ public sealed class WorldTicksTests
         var fixture = Build(MondayNoon);
         fixture.Clock.Advance(TimeSpan.FromDays(7));
 
-        Assert.False(fixture.World.Tick(onboardingDone: true));
+        Assert.False(fixture.World.Tick(onboardingDone: true).CityMoved);
         Assert.Equal(100, fixture.City.TotalCitizens([FullMarket]));
     }
 
@@ -99,11 +102,11 @@ public sealed class WorldTicksTests
         _ = fixture.World.Tick(onboardingDone: true); // primes the town
 
         fixture.Clock.Advance(TimeSpan.FromSeconds(60)); // 27 game minutes: too early
-        Assert.False(fixture.World.Tick(true));
+        Assert.False(fixture.World.Tick(true).CityMoved);
         Assert.Equal(100, fixture.City.TotalCitizens([FullMarket]));
 
         fixture.Clock.Advance(OneGameMinute * 4); // 31 game minutes: one tick
-        Assert.True(fixture.World.Tick(true));
+        Assert.True(fixture.World.Tick(true).CityMoved);
         Assert.Equal(101, fixture.City.TotalCitizens([FullMarket]));
         Assert.Contains(
             fixture.Log.Infos,
@@ -171,6 +174,54 @@ public sealed class WorldTicksTests
         Assert.True(fixture.Hunger.Blocks);
         Assert.Single(fixture.Log.Warnings, line =>
             line.StartsWith("[Hunger] job gate reached", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Tick_PancakeOneShot_FiresTheHourTheTrunkCarriesTheStack()
+    {
+        // The threshold event is Unity's: it fires the one hour the reading
+        // lands exactly on the threshold while grandma's pancakes are carried.
+        var carrying = new Trunk(
+            [new TrunkItem(PancakeVisit.ItemName, 0.5) { Quantity = 1 }]);
+        var withStack = Build(
+            MondayNoon,
+            hunger: new Hunger(HungerRules.Default, new HungerState(13, false)),
+            trunk: carrying);
+        _ = withStack.World.Tick(onboardingDone: true); // anchors at 13
+
+        // One game hour plus a minute: the crossing is the pay, and the extra
+        // minute keeps the assertion off the clock's floating-point edge.
+        withStack.Clock.Advance(OneGameHour + OneGameMinute);
+        WorldTickReport report = withStack.World.Tick(true);
+
+        Assert.True(report.PancakeThreshold);
+        Assert.Equal(14, withStack.Hunger.Value);
+        Assert.True(withStack.Hunger.ThresholdAlarmed);
+        Assert.Contains(
+            withStack.Log.Infos,
+            line => line.StartsWith("[Hunger] pancake event fired", StringComparison.Ordinal));
+
+        // One-shot: a later hour gains the reading but never refires.
+        withStack.Clock.Advance(OneGameHour + OneGameMinute);
+        Assert.False(withStack.World.Tick(true).PancakeThreshold);
+    }
+
+    [Fact]
+    public void Tick_PancakeOneShot_NeedsTheStackInTheTrunk()
+    {
+        // Without the stack the hour lands on the threshold and nothing fires:
+        // the stack is what the event asks the trunk for.
+        var empty = Build(
+            MondayNoon,
+            hunger: new Hunger(HungerRules.Default, new HungerState(13, false)));
+        _ = empty.World.Tick(onboardingDone: true); // anchors at 13
+
+        empty.Clock.Advance(OneGameHour + OneGameMinute);
+        WorldTickReport report = empty.World.Tick(true);
+
+        Assert.False(report.PancakeThreshold);
+        Assert.Equal(14, empty.Hunger.Value);
+        Assert.False(empty.Hunger.ThresholdAlarmed);
     }
 
     [Fact]

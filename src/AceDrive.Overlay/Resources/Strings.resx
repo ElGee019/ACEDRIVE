@@ -43,6 +43,14 @@
   <data name="HudEnter" xml:space="preserve"><value>ENTER</value></data>
   <data name="HudPickUp" xml:space="preserve"><value>PICK UP</value></data>
   <data name="HudPancakes" xml:space="preserve"><value>PANCAKES!</value></data>
+  <!-- Pancake Friday (PORTPLAN 52): the weekly drive to grandma's house. The
+       drive line keeps the shared {0} name / {1} street / {2} number / {3} city
+       placeholders, so a translation may reorder them; the arrival line has
+       none. The threshold note is the one-shot appetite event's nudge on the
+       companion, shown while driving, so it names where the food already is. -->
+  <data name="HudPancakeDrive" xml:space="preserve"><value>Drive to {0}, {1} No. {2} in {3}. It's Pancake Friday — grandma has a fresh stack waiting.</value></data>
+  <data name="HudPancakeArrived" xml:space="preserve"><value>You have arrived at grandma's house. Park up and go in for pancakes.</value></data>
+  <data name="HudPancakeThreshold" xml:space="preserve"><value>Hungry? Grandma's pancakes are in the trunk — open TRUNK and eat one.</value></data>
   <data name="HudTrack" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="HudNoTrack" xml:space="preserve"><value>no track</value></data>
   <data name="HudNoPosition" xml:space="preserve"><value>no track position</value></data>
@@ -158,6 +166,18 @@
   <data name="GrandmaCarInstruction" xml:space="preserve"><value>To be able to play ACEDRIVE change into the 1971 Datsun 240Z.</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>HAPPY BIRTHDAY!</value></data>
   <data name="PancakeTitle" xml:space="preserve"><value>PANCAKES</value></data>
+  <!-- Pancake Friday (PORTPLAN 52): the Friday row's briefing page and the
+       receipt the visit leaves. The briefing says what the drive earns and
+       reuses the trunk page's HUNGER reading; the receipt prints the plate, the
+       stack packed for the road and where it is kept. The venue line's single
+       placeholder is the formatted home address, and the meal line's three are
+       the hunger the plate took, the reading after it and the rules' cap. -->
+  <data name="PancakeBriefingBody" xml:space="preserve"><value>Pancake Friday at grandma's. She has a fresh stack on the table and one to take with you.&#10;&#10;Drive over and park at her door — she is waiting.</value></data>
+  <data name="PancakeBriefingVenue" xml:space="preserve"><value>Grandma's house: {0}</value></data>
+  <data name="PancakeStartDrive" xml:space="preserve"><value>START DRIVE</value></data>
+  <data name="PancakeReceiptTitle" xml:space="preserve"><value>PANCAKES!</value></data>
+  <data name="PancakeReceiptMeal" xml:space="preserve"><value>Straight off the griddle: hunger -{0} ({1}/{2})</value></data>
+  <data name="PancakeReceiptPacked" xml:space="preserve"><value>For the road: Grandma's pancakes — eat them from the TRUNK when hunger strikes.</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>COMMUNITY CENTRE</value></data>
   <!-- The post-intro community centre interior (PORTPLAN 54, Unity
        CommunityCentre's hire mode): one greeting, the HIRE AN EMPLOYEE reveal,
@@ -618,6 +638,14 @@ Accept this job?</value></data>
   <data name="HungerIntroBody" xml:space="preserve"><value>As time progresses you will get hungry.&#10;You can buy food by driving to any Pizzeria, Grocery Store or Coffee Shop.&#10;&#10;The items you bought will be added to your trunk.&#10;You can access food by going to the Main Menu and selecting TRUNK.</value></data>
   <data name="HungerIntroContinue" xml:space="preserve"><value>CONTINUE</value></data>
   <data name="HungerIntroToTrunk" xml:space="preserve"><value>TO TRUNK</value></data>
+  <!-- Unity's HungerBlockPopup (PORTPLAN items 26/52): the page a refused job
+       tap lands on once the appetite reaches the block band. It says why the
+       job board shut and names both ways to eat (the trunk's carried food, or a
+       shop), then jumps to the trunk page in one tap. No placeholders: the
+       reading is a separate resx line (TrunkHunger), so translators keep the
+       body short and rewordable. -->
+  <data name="TooHungryTitle" xml:space="preserve"><value>TOO HUNGRY</value></data>
+  <data name="TooHungryBody" xml:space="preserve"><value>The job board stays shut while you are this hungry.&#10;Eat something from your trunk, or buy food at any grocery store, pizzeria or coffee shop.</value></data>
   <!-- Longest-operating-zone world standings (PORTPLAN 58, Unity
        ZoneStandingsService + ZoneExpansionScreen): the section label, the rank
        line ({0} = ordinal rank, {1} = competitors) and the —/— placeholder

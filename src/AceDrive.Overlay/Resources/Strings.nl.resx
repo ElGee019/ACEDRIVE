@@ -34,6 +34,9 @@
   <data name="HudEnter" xml:space="preserve"><value>BINNENGAAN</value></data>
   <data name="HudPickUp" xml:space="preserve"><value>OPHALEN</value></data>
   <data name="HudPancakes" xml:space="preserve"><value>PANNEKOEKEN!</value></data>
+  <data name="HudPancakeDrive" xml:space="preserve"><value>Rijd naar {0}, {1} nr. {2} in {3}. Het is pannenkoekenvrijdag — oma heeft een verse stapel klaarstaan.</value></data>
+  <data name="HudPancakeArrived" xml:space="preserve"><value>Je bent bij oma's huis. Parkeer en ga naar binnen voor pannenkoeken.</value></data>
+  <data name="HudPancakeThreshold" xml:space="preserve"><value>Honger? Oma's pannenkoeken liggen in je kofferbak — open KOFFERBAK en eet er een.</value></data>
   <data name="HudTrack" xml:space="preserve"><value>{0} · {1}</value></data>
   <data name="HudNoTrack" xml:space="preserve"><value>geen baan</value></data>
   <data name="HudNoPosition" xml:space="preserve"><value>geen positie op de baan</value></data>
@@ -120,6 +123,12 @@
   <data name="GrandmaCarInstruction" xml:space="preserve"><value>Om ACEDRIVE te kunnen spelen, stap over naar de 1971 Datsun 240Z.</value></data>
   <data name="BirthdayTitle" xml:space="preserve"><value>GEFELICITEERD!</value></data>
   <data name="PancakeTitle" xml:space="preserve"><value>PANNEKOEKEN</value></data>
+  <data name="PancakeBriefingBody" xml:space="preserve"><value>Pannenkoekenvrijdag bij oma. Er staat een verse stapel op tafel en je krijgt er een mee voor onderweg.&#10;&#10;Rijd ernaartoe en parkeer bij haar deur — ze wacht op je.</value></data>
+  <data name="PancakeBriefingVenue" xml:space="preserve"><value>Oma's huis: {0}</value></data>
+  <data name="PancakeStartDrive" xml:space="preserve"><value>START RIT</value></data>
+  <data name="PancakeReceiptTitle" xml:space="preserve"><value>PANNEKOEKEN!</value></data>
+  <data name="PancakeReceiptMeal" xml:space="preserve"><value>Zo van de plaat: honger -{0} ({1}/{2})</value></data>
+  <data name="PancakeReceiptPacked" xml:space="preserve"><value>Voor onderweg: oma's pannenkoeken — eet ze uit de KOFFERBAK als de honger toeslaat.</value></data>
   <data name="CommunityCentreTitle" xml:space="preserve"><value>BUURTHUIS</value></data>
   <!-- Het buurthuis na de introductie (PORTPLAN 54): begroeting, de knop om
        werknemers te zoeken, de vijf kandidaten van deze week en de bevestiging
@@ -459,6 +468,8 @@ Deze klus aannemen?</value></data>
   <data name="HungerIntroBody" xml:space="preserve"><value>Naarmate de tijd verstrijkt, krijg je honger.&#10;Je kunt eten kopen door naar een Pizzeria, Supermarkt of Koffiebar te rijden.&#10;&#10;De gekochte producten worden in je kofferbak gelegd.&#10;Je kunt bij eten komen via het Hoofdmenu en dan KOFFERBAK te kiezen.</value></data>
   <data name="HungerIntroContinue" xml:space="preserve"><value>VERDER</value></data>
   <data name="HungerIntroToTrunk" xml:space="preserve"><value>NAAR KOFFERBAK</value></data>
+  <data name="TooHungryTitle" xml:space="preserve"><value>TE HONGERIG</value></data>
+  <data name="TooHungryBody" xml:space="preserve"><value>Het klussenbord blijft dicht zolang je zo'n honger hebt.&#10;Eet iets uit je kofferbak, of koop eten bij een supermarkt, pizzeria of koffiebar.</value></data>
   <data name="ZoneStandingsLabel" xml:space="preserve"><value>Wereldranglijst langste werkgebied</value></data>
   <data name="ZoneStandingsRank" xml:space="preserve"><value>{0} van {1}.</value></data>
   <data name="ZoneStandingsUnknown" xml:space="preserve"><value>—/—</value></data>

@@ -92,6 +92,15 @@
         <DataTemplate DataType="{x:Type vm:HungerIntroScreenViewModel}">
             <views:HungerIntroScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:TooHungryScreenViewModel}">
+            <views:TooHungryScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:PancakeBriefingScreenViewModel}">
+            <views:PancakeBriefingScreenView/>
+        </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:PancakeReceiptScreenViewModel}">
+            <views:PancakeReceiptScreenView/>
+        </DataTemplate>
         <DataTemplate DataType="{x:Type vm:ShiftEndedScreenViewModel}">
             <views:ShiftEndedScreenView/>
         </DataTemplate>

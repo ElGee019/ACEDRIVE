@@ -16,13 +16,19 @@ public sealed record StoreCatalog(
 {
     /// <summary>
     /// Small fallback used when Data/store_items.json is missing or invalid.
-    /// Maple Syrup stays in the table because the birthday errand needs it.
+    /// Maple Syrup stays in the table because the birthday errand needs it; the
+    /// pancake row stays because the weekly visit hands it over (and the
+    /// appetite's one-shot event asks the trunk for it), so a build without the
+    /// data file still plays the survival loop.
     /// </summary>
     public static readonly StoreCatalog Default = new(
         [
             new StoreItem("MAPLE SYRUP", 45.99, 0.4, 3, "groceries"),
             new StoreItem("BANANA", 2.0, 0.3, 4, "groceries"),
             new StoreItem("GLAZED DONUT", 4.0, 0.36, 6, "groceries"),
+            // A gift, never a shelf row: no store layout draws the "pancakes"
+            // source category, so only grandma hands it over.
+            new StoreItem(PancakeVisit.ItemName, 0.0, 0.5, 14, "pancakes"),
         ],
         DefaultStock: 20,
         Layouts: new Dictionary<string, IReadOnlyDictionary<string, int>>(

@@ -27,6 +27,9 @@ public sealed class OnboardingFlow : IScreenController
     private readonly ResidentBook _residents;
     private readonly PoiArrivalRouter? _poiArrivals;
     private readonly Trunk _trunk;
+    // The item table the pancake gift's volume and hunger come from, so the
+    // trunk row the intro packs is exactly the row the weekly visit repacks.
+    private readonly StoreCatalog _stores;
     private readonly DeliveryCareer _career;
     // The first-store CredP gift (Data/delivery_catalog.json StartCredP).
     private readonly int _introCredP;
@@ -119,7 +122,7 @@ public sealed class OnboardingFlow : IScreenController
         AddressMap addressMap, string? detectedPlayerName,
         PoiGenerator pois, PoiDirectory poiDirectory, IPoiDirectoryStore poiStore,
         ResidentBook residents, PoiArrivalRouter? poiArrivals, Trunk trunk,
-        DeliveryCareer career, int introCredP,
+        StoreCatalog stores, DeliveryCareer career, int introCredP,
         IPreferencesStore preferencesStore, PlayerPreferences preferences,
         ICultureService culture, VoiceBeat beat, ITelemetryHud? hud,
         Garage garage, Func<int> displayWeek, Action saveGarage,
@@ -139,6 +142,7 @@ public sealed class OnboardingFlow : IScreenController
         _residents = residents;
         _poiArrivals = poiArrivals;
         _trunk = trunk;
+        _stores = stores;
         _career = career;
         _introCredP = introCredP;
         _preferencesStore = preferencesStore;
@@ -524,6 +528,16 @@ public sealed class OnboardingFlow : IScreenController
 
     private void FinishPancakes()
     {
+        // "Before you go, take these, love, pancakes for the road": the first
+        // food the career carries. The appetite's one-shot event only fires
+        // while the trunk holds this stack (PORTPLAN 26), so the gift is real
+        // trunk state and banks with the dialogue's completion.
+        if (!PancakeVisit.Pack(_trunk, _stores))
+        {
+            _log.LogWarning("pancake gift skipped: the item catalogue lost the row");
+        }
+
+        _host.SaveDriver();
         _progress = _progress with { PancakesDone = true };
         _onboarding.Save(_progress);
         _log.LogInfo("pancake dialogue done: heading to the community centre");
