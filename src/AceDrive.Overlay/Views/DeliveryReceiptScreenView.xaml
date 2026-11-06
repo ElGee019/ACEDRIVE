@@ -52,6 +52,12 @@
             <ContentPresenter Content="{Binding FareLine}"
                               ContentTemplate="{StaticResource ReceiptLineTemplate}"
                               TextElement.Foreground="#FFF" TextElement.FontSize="16"/>
+            <!-- Business starter bonus (PORTPLAN 47, Unity starterBonusText):
+                 one row with the decayed percentage and the CR it paid. -->
+            <ContentPresenter Content="{Binding StarterBonusLine}"
+                              ContentTemplate="{StaticResource ReceiptLineTemplate}"
+                              TextElement.Foreground="#FFF" TextElement.FontSize="16"
+                              Visibility="{Binding HasStarterBonus, Converter={StaticResource BoolToVis}}"/>
             <ContentPresenter Content="{Binding TotalLine}"
                               ContentTemplate="{StaticResource ReceiptLineTemplate}"
                               TextElement.Foreground="#FF97EAD2" TextElement.FontSize="20"

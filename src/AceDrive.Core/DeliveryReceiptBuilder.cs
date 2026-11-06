@@ -9,11 +9,14 @@ namespace AceDrive.Core;
 /// distance charge, the goods money (wholesale out, retail payout in) and
 /// the delivery XP (the taxi formula at <see cref="XpEarning.DeliveryShare"/>:
 /// distance × class × rarity / 100 × street knowledge, then diminishing).
-/// Skips what has no system here yet (starter bonus, free-tank-refill cards,
-/// auto fuel): those arrive as new receipt fields with their own systems,
-/// never as branches in this method. <paramref name="profitBoostMultiplier"/>
+/// Skips what has no system here yet (free-tank-refill cards, auto fuel):
+/// those arrive as new receipt fields with their own systems, never as
+/// branches in this method. <paramref name="profitBoostMultiplier"/>
 /// is the Delivery Profit Boost card's scale on the goods payout; the charge is
-/// never boosted (Unity boosts the goods earnings only).
+/// never boosted (Unity boosts the goods earnings only). The starter bonus
+/// (PORTPLAN 47) is priced on the run's own profit, `max(0, gross − wholesale)`
+/// — Unity keys it to what the ride actually made, so the wholesale CR the
+/// goods cost can never inflate it; a null <paramref name="zoneKm"/> pays none.
 /// </summary>
 public static class DeliveryReceiptBuilder
 {
@@ -30,7 +33,9 @@ public static class DeliveryReceiptBuilder
         int credPEarned = 0,
         double totalCredP = 0.0,
         bool awardsXp = true,
-        double profitBoostMultiplier = 1.0)
+        double profitBoostMultiplier = 1.0,
+        double? zoneKm = null,
+        int ownedCars = 0)
     {
         distanceKm = Math.Max(0.0, distanceKm);
         List<ReceiptTier> lines = FareTierLines.Of(distanceKm, table.Tiers);
@@ -47,6 +52,19 @@ public static class DeliveryReceiptBuilder
         bool boosted = boost > 1.0;
         goods = Cents(goods * boost);
         double totalEarned = Cents(goods - Math.Max(0.0, paidForGoods) + charge);
+        // Unity's delivery starter bonus: the taxi's rate function on this
+        // run's profit base, added on top and banked with the total. Null
+        // means no zone yet, which pays nothing (Unity's 0 km zone would
+        // read 100%; a receipt before onboarding has no business to support).
+        double starterRate = 0.0;
+        double starterBonus = 0.0;
+        if (zoneKm is { } operatingZoneKm)
+        {
+            starterRate = StarterBonus.Percentage(operatingZoneKm, ownedCars);
+            starterBonus = Cents(
+                StarterBonus.Amount(Math.Max(0.0, totalEarned), operatingZoneKm, ownedCars));
+            totalEarned = Cents(totalEarned + starterBonus);
+        }
         // An unowned car pays the run but earns no player XP: the caller owns
         // the ownership rule, this builder only knows whether to award.
         double xp = awardsXp
@@ -70,7 +88,9 @@ public static class DeliveryReceiptBuilder
             Math.Max(0, credPEarned),
             Math.Max(0.0, totalCredP),
             boosted,
-            boosted ? boost - 1.0 : 0.0);
+            boosted ? boost - 1.0 : 0.0,
+            starterRate,
+            starterBonus);
     }
 
     private static double Cents(double value) =>

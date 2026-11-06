@@ -12,7 +12,10 @@ namespace AceDrive.Core;
 /// the run rested on no owned hub, so the receipt hides the block. The
 /// wallet delta is <see cref="TotalEarned"/> itself: the wholesale cost
 /// left with the run and the retail payout plus the fare came back, a
-/// positive earned is the run's profit added to the cash.
+/// positive earned is the run's profit added to the cash. The starter tail
+/// is Unity's business starter bonus priced on that same profit base (never
+/// on the wholesale-inflated gross); a rate of 0 — a fully decayed zone —
+/// hides the row.
 /// </summary>
 public sealed record DeliveryReceipt(
     double DistanceKm,
@@ -31,10 +34,15 @@ public sealed record DeliveryReceipt(
     int CredPEarned,
     double TotalCredP,
     bool ProfitBoostApplied = false,
-    double ProfitBoostRate = 0.0)
+    double ProfitBoostRate = 0.0,
+    double StarterBonusRate = 0.0,
+    double StarterBonus = 0.0)
 {
     /// <summary>False when the run rested on no owned hub.</summary>
     public bool HasFriendship => HubOwnerName.Length > 0;
+
+    /// <summary>False when the zone/car decay left no starter bonus.</summary>
+    public bool HasStarterBonus => StarterBonus > 0.0;
 
     /// <summary>False when the stores rested on no owned hub.</summary>
     public bool HasCredP => CredPEarned > 0;

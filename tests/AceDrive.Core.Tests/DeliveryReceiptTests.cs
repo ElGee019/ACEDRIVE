@@ -126,4 +126,58 @@ public sealed class DeliveryReceiptTests
         Assert.Equal(129.40, boosted.DistanceCharge);
         Assert.Equal(156.00, boosted.TotalEarned);
     }
+
+    [Fact]
+    public void StarterBonus_PaysTheZoneRateOnTheRunsProfit()
+    {
+        // Unity's delivery starter bonus (PORTPLAN 47): the taxi rate on the
+        // profit base (141.40 above) rather than the wholesale gross. A 1.929 km
+        // zone pays 99%, so the run totals 143.40 + 141.97.
+        DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
+            zoneKm: 1.929, ownedCars: 1);
+
+        Assert.True(receipt.HasStarterBonus);
+        Assert.Equal(99.0, receipt.StarterBonusRate, precision: 9);
+        Assert.Equal(141.97, receipt.StarterBonus);
+        Assert.Equal(285.37, receipt.TotalEarned);
+    }
+
+    [Fact]
+    public void StarterBonus_SplitsByOwnedCars()
+    {
+        // The same run in a two-car garage: 99% / 2 = 49.5% of 143.40.
+        DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
+            8.2, 49.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
+            zoneKm: 1.929, ownedCars: 2);
+
+        Assert.Equal(49.5, receipt.StarterBonusRate, precision: 9);
+        Assert.Equal(70.98, receipt.StarterBonus);
+        Assert.Equal(214.38, receipt.TotalEarned);
+    }
+
+    [Fact]
+    public void StarterBonus_NeverPaysOnAWholesaleLoss()
+    {
+        // Received 63, paid 100, no fare: the profit base clamps at 0, so a
+        // losing run earns no boost and the loss stays a loss.
+        DeliveryReceipt receipt = DeliveryReceiptBuilder.Build(
+            0.0, 100.00, 63.00, DeliveryFareTable.Default, 10, 1, 100, 0.0,
+            zoneKm: 1.929, ownedCars: 1);
+
+        Assert.False(receipt.HasStarterBonus);
+        Assert.Equal(0.0, receipt.StarterBonus);
+        Assert.Equal(-37.00, receipt.TotalEarned);
+    }
+
+    [Fact]
+    public void WithoutZone_NoStarterBonus()
+    {
+        // No zone yet (null): the row stays off and the total is the plain
+        // profit, exactly like the taxi receipt's without-zone case.
+        Assert.False(Base.HasStarterBonus);
+        Assert.Equal(0.0, Base.StarterBonusRate);
+        Assert.Equal(0.0, Base.StarterBonus);
+        Assert.Equal(143.40, Base.TotalEarned);
+    }
 }

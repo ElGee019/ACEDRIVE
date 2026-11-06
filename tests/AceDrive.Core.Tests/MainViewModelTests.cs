@@ -4088,8 +4088,11 @@ public sealed class MainViewModelTests
         hud.RaiseJobEnter();
 
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
-        // 63.00 payout + 129.40 fare - 49.00 wholesale = the profit delta.
-        Assert.Equal(143.40, wallet.Cash);
+        // 63.00 payout + 129.40 fare - 49.00 wholesale = 143.40 profit, plus
+        // the 99% starter bonus on that profit (141.97, PORTPLAN 47).
+        Assert.Equal(285.37, wallet.Cash);
+        Assert.True(receipt.HasStarterBonus);
+        Assert.Equal("Business Starter Bonus 99.0%", receipt.StarterBonusLine.Explanation);
         // Delivery XP is the taxi rate at a fifth: (8.2 × class 1 × rarity 1)
         // / 100 × 0.2 = 0.0164.
         Assert.Equal(0.0164, wallet.Xp, precision: 9);
@@ -4152,7 +4155,9 @@ public sealed class MainViewModelTests
         hud.RaiseJobEnter(); // deliver the store
 
         var receipt = Assert.IsType<DeliveryReceiptScreenViewModel>(vm.CurrentScreen);
-        Assert.Equal(143.40, wallet.Cash);
+        // The money still settles (profit + the 99% starter bonus), only the
+        // career progress is withheld.
+        Assert.Equal(285.37, wallet.Cash);
         Assert.Equal(0.0, wallet.Xp);
         Assert.Contains("0.00", receipt.XpLine, StringComparison.Ordinal);
         Assert.Empty(rarity.Recorded);
@@ -4160,7 +4165,7 @@ public sealed class MainViewModelTests
         Assert.Empty(rivals.RefreshedAt);
         Assert.Empty(rivals.Pushed);
         DriverState saved = drivers.Saved[^1];
-        Assert.Equal(143.40, saved.Cash);
+        Assert.Equal(285.37, saved.Cash);
         Assert.Equal(0, saved.ExpansionJobs);
     }
 
