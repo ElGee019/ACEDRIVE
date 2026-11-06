@@ -58,6 +58,13 @@ public sealed class FuelReceiptScreenViewModel : ViewModelBase, IVoiceScreen, IK
     /// <summary>Why the bill is zero.</summary>
     public string FreeLine { get; } = Strings.Get("FuelReceiptFree");
 
+    /// <summary>True when a roadside repair had already paid for part/all of
+    /// this fill (PORTPLAN 38).</summary>
+    public bool HasPrepaid => _receipt.HasPrepaid;
+
+    /// <summary>"Roadside refuel prepaid: 42.0 L".</summary>
+    public string PrepaidLine => Strings.Format("FuelOutPrepaid", _receipt.PrepaidLitres);
+
     /// <summary>Unity familiarity sentence (attendant bands).</summary>
     public bool HasFriendship => _receipt.HasFriendship;
 

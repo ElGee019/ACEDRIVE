@@ -67,6 +67,7 @@ public sealed class Navigation
     // haul receipt is the haul's.
     private readonly TaxiJobFlow _taxi;
     private readonly DeliveryFlow _delivery;
+    private readonly FuelFlow _fuel;
     private readonly CarHaulFlow _haul;
     private readonly PoiWorld _world;
 
@@ -161,6 +162,14 @@ public sealed class Navigation
     private ParameterizedCommand<int>? _openDay;
     private readonly ICommand _deliverCarePackagesCommand;
 
+    // The control page's stranded band (PORTPLAN 38): one cached offer, rebuilt
+    // only when the dry/prepaid state or the wallet's ability to pay flips, so
+    // the 10 Hz Refresh never formats the label on a parked car.
+    private readonly ICommand _roadServiceCommand;
+    private RoadServiceOffer _roadOffer = RoadServiceOffer.Hidden;
+    private bool _lastRoadVisible;
+    private bool _lastRoadCanPay;
+
     // Weekday number of the road-test event (Unity: Tuesday), read off the
     // calendar data by RoadTestDayOfWeek, never hardcoded here.
     private readonly int _roadTestDay = RoadTestDayOfWeek();
@@ -209,7 +218,8 @@ public sealed class Navigation
         CarShareRequestPlanner carShareRequests,
         EmployeeRides employeeRides, EmployeeDeliveries employeeDeliveries,
         EmployeeDeliveryPayout employeeDeliveryPayout,
-        TaxiJobFlow taxi, DeliveryFlow delivery, CarHaulFlow haul, PoiWorld world,
+        TaxiJobFlow taxi, DeliveryFlow delivery, FuelFlow fuel, CarHaulFlow haul,
+        PoiWorld world,
         DayCycle day, OperatingZone zone, IReadOnlyList<CentoTier> centoTiers,
         AddressMap addressMap, Func<string?> playerStreetId, CentoRaceFlow cento,
         ValuationFlow valuation, WhereIsWillyFlow willy, PancakeFlow pancakes,
@@ -249,6 +259,7 @@ public sealed class Navigation
         _employeeDeliveryPayout = employeeDeliveryPayout;
         _taxi = taxi;
         _delivery = delivery;
+        _fuel = fuel;
         _haul = haul;
         _world = world;
         _day = day;
@@ -270,6 +281,8 @@ public sealed class Navigation
         _rng = rng;
         _log = log;
         _deliverCarePackagesCommand = new RelayCommand(DeliverCarePackages);
+        _roadServiceCommand = new RelayCommand(
+            CallRoadService, () => _fuel.IsStranded && _fuel.CanAffordRoadService);
         _ignoreEventGates = ignoreEventGates;
 
         ControlCommand = new RelayCommand(ShowControl);
@@ -322,7 +335,7 @@ public sealed class Navigation
             new ControlActions(
                 TaxiShiftCommand, new RelayCommand(ShowDelivery),
                 new RelayCommand(OpenHaul), _deliverCarePackagesCommand,
-                CareDeliveryAvailable),
+                CareDeliveryAvailable, _roadServiceCommand, CurrentRoadService),
             MenuCommand, _day.DisplayWeek);
         return _control;
     }
@@ -332,6 +345,50 @@ public sealed class Navigation
     // is offered — a leftover kit from an earlier run cannot raise the button on
     // its own. A previous session's kits already in the car still offer the run.
     private bool CareDeliveryAvailable() => _care.CanOffer;
+
+    // The control page's stranded band (PORTPLAN 38, Unity MapScreen's road
+    // service button): a parked dry tank has no run-dry edge to open the repair
+    // page, so the page offers the flat charge instead. One cached offer,
+    // rebuilt only when the dry state or the wallet's ability to pay flips.
+    private RoadServiceOffer CurrentRoadService()
+    {
+        bool visible = _fuel.IsStranded;
+        bool canPay = visible && _fuel.CanAffordRoadService;
+        if (visible != _lastRoadVisible || canPay != _lastRoadCanPay)
+        {
+            _lastRoadVisible = visible;
+            _lastRoadCanPay = canPay;
+            _roadOffer = visible
+                ? new RoadServiceOffer(
+                    true,
+                    Strings.Format(
+                        canPay ? "ControlRoadService" : "ControlRoadServiceNoCash",
+                        _fuel.RoadServiceFee),
+                    canPay)
+                : RoadServiceOffer.Hidden;
+        }
+        return _roadOffer;
+    }
+
+    // Unity's CallRoadService: the flat charge, then the taxi job (the only job
+    // a stranded map can carry) is failed. The tank is prepaid by the flow, so
+    // the next pump visit only bills the litres beyond it.
+    private void CallRoadService()
+    {
+        if (!_fuel.CallRoadService())
+        {
+            return;
+        }
+
+        // A delivery run is not failed here: Unity's road-service button only
+        // ever answered a parked car, where no run is live.
+        if (_taxi.FailForRoadService() is { } customer)
+        {
+            _log.LogWarning($"[RoadService] taxi ride cut: {customer} friendship -1");
+        }
+        _saver.SaveDriver(_rivals.LastResult);
+        RefreshControl();
+    }
 
     // DELIVER CARE PACKAGES: the flow starts the run (or resumes the drop-off)
     // and hides the panel; the tips the run just carried are acknowledged like

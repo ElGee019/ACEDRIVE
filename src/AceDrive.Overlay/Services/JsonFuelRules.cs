@@ -35,7 +35,8 @@ public sealed class JsonFuelRules
 
         _log.LogInfo($"fuel rules loaded: CR {rules.StartPricePerLitre:0.00}/L start, " +
             $"band {rules.MinPricePerLitre:0.00}..{rules.MaxPricePerLitre:0.00}, " +
-            $"drift {rules.DailyChangeMin:+0.00;-0.00}..{rules.DailyChangeMax:+0.00;-0.00}");
+            $"drift {rules.DailyChangeMin:+0.00;-0.00}..{rules.DailyChangeMax:+0.00;-0.00}, " +
+            $"roadside CR {rules.OutOfFuelServiceFee:0.00}/CR {rules.RoadServiceFee:0.00}");
         return rules;
     }
 
@@ -58,5 +59,9 @@ public sealed class JsonFuelRules
         && rules.SettleSeconds > 0.0
         && double.IsFinite(rules.MinDriveBeforeFillMetres)
         && rules.MinDriveBeforeFillMetres >= 0.0
+        && double.IsFinite(rules.OutOfFuelServiceFee)
+        && rules.OutOfFuelServiceFee >= 0.0
+        && double.IsFinite(rules.RoadServiceFee)
+        && rules.RoadServiceFee >= 0.0
         && rules.OwnerName is not null;
 }

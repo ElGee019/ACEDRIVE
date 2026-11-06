@@ -19,7 +19,9 @@ public sealed class JsonFuelRulesTests
           "MinFillLitres": 1.0,
           "SettleSeconds": 2.0,
           "MinDriveBeforeFillMetres": 150.0,
-          "OwnerName": "Anke Vogt"
+          "OwnerName": "Anke Vogt",
+          "OutOfFuelServiceFee": 120.0,
+          "RoadServiceFee": 350.0
         }
         """;
 
@@ -38,6 +40,8 @@ public sealed class JsonFuelRulesTests
         Assert.Equal(2.0, rules.SettleSeconds);
         Assert.Equal(150.0, rules.MinDriveBeforeFillMetres);
         Assert.Equal("Anke Vogt", rules.OwnerName);
+        Assert.Equal(120.0, rules.OutOfFuelServiceFee);
+        Assert.Equal(350.0, rules.RoadServiceFee);
         Assert.Empty(log.Warnings);
     }
 
@@ -69,6 +73,8 @@ public sealed class JsonFuelRulesTests
     [InlineData("min-fill-zero")]
     [InlineData("settle-zero")]
     [InlineData("drive-gate-negative")]
+    [InlineData("service-fee-negative")]
+    [InlineData("road-service-negative")]
     [InlineData("owner-missing")]
     public void InvalidRules_FallBackToUnityDefaults(string which)
     {
@@ -85,6 +91,8 @@ public sealed class JsonFuelRulesTests
             "min-fill-zero" => FuelRules.Default with { MinFillLitres = 0.0 },
             "settle-zero" => FuelRules.Default with { SettleSeconds = 0.0 },
             "drive-gate-negative" => FuelRules.Default with { MinDriveBeforeFillMetres = -1.0 },
+            "service-fee-negative" => FuelRules.Default with { OutOfFuelServiceFee = -1.0 },
+            "road-service-negative" => FuelRules.Default with { RoadServiceFee = -1.0 },
             "owner-missing" => FuelRules.Default with { OwnerName = null! },
             _ => throw new ArgumentOutOfRangeException(nameof(which)),
         };
@@ -111,6 +119,8 @@ public sealed class JsonFuelRulesTests
         Assert.Equal(1.40, rules.MinPricePerLitre);
         Assert.Equal(2.20, rules.MaxPricePerLitre);
         Assert.Equal(100.0, rules.MinDriveBeforeFillMetres);
+        Assert.Equal(100.0, rules.OutOfFuelServiceFee);
+        Assert.Equal(300.0, rules.RoadServiceFee);
     }
 
     private static FuelRules Load(string json, TestLog log)

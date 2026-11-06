@@ -242,6 +242,13 @@ public sealed class NavigationTests
                 new FakeResidentStore(),
                 new ProceduralNameGenerator(NamePoolTable.Default, seed: 0), log),
             friends.GetLevel);
+        // The control page's stranded band reads the fuel flow; this suite never
+        // drives it, so the market is seeded and the fleet is the one above.
+        var fuel = new FuelFlow(
+            new FuelMarket(FuelRules.Default, null, game.GameDay, seed: 0),
+            new FuelFillTracker(FuelRules.Default), FuelRules.Default, game,
+            garageInstance, new FakeOnboardingStore(), friends, wallet, glovebox, trunk,
+            new VisitLedger(), saver, rivals, new FakeFuelPriceStore(), beat, log);
         var nav = new Navigation(
             shell, beat, game, clock, shift, todoBoard, roads, saver,
             wallet, garageInstance, rivals, zoneStandings ?? new FakeZoneStandings(),
@@ -249,7 +256,7 @@ public sealed class NavigationTests
             directory, null, board, career, city, employeeRoster, employeeJobs,
             employeeAssignments, carShareJobs, carShareRequests,
             employeeRides, employeeDeliveries, employeeDeliveryPayout,
-            taxi, delivery, haul, world, day,
+            taxi, delivery, fuel, haul, world, day,
             zoneInstance, CentoTiers, AddressMap.Default, () => (string?)null, cento,
             valuation, willy, pancakes, care, roadTest, touristen, weeklyEvents, gate,
             () => "mazda", () => CallBinding.Default.Label, new Random(0), log, ignoreEventGates);

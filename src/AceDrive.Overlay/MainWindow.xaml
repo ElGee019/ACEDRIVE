@@ -179,6 +179,9 @@
         <DataTemplate DataType="{x:Type vm:FuelReceiptScreenViewModel}">
             <views:FuelReceiptScreenView/>
         </DataTemplate>
+        <DataTemplate DataType="{x:Type vm:FuelOutScreenViewModel}">
+            <views:FuelOutScreenView/>
+        </DataTemplate>
     </Window.Resources>
     <!-- Two rings: the outer Border paints the background, its Padding pushes
          the edge line 10 px inward so the dark fill frames it. The window is

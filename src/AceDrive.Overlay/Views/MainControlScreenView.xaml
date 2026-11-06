@@ -56,6 +56,24 @@
                      filth readings live on the menu's battery tiles (PORTPLAN items
                      26/33), so the job entries lead here. -->
                 <StackPanel>
+                    <!-- Stranded band (PORTPLAN 38, Unity MapScreen's road
+                         service button): only a parked dry tank has no run-dry
+                         edge to open the repair page, so it can call the flat
+                         service instead; the label carries the refusal while
+                         the wallet is short. -->
+                    <Button Content="{Binding RoadServiceLabel}"
+                            Command="{Binding RoadServiceCommand}" Margin="0,0,0,6"
+                            Visibility="{Binding ShowRoadService, Converter={StaticResource BoolToVis}}">
+                        <Button.Style>
+                            <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding RoadServiceFlash}" Value="True">
+                                        <Setter Property="Foreground" Value="#FF97EAD2"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                     <Button Content="{Binding TaxiLabel}" Margin="0,0,0,6"
                             Command="{Binding TaxiCommand}">
                         <Button.Style>

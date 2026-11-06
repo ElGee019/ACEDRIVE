@@ -92,7 +92,7 @@ Rules: changing Town resets Street+Housenumber; changing Street resets Housenumb
 
 ## 5. Fuel / Breakdown / Police
 - [x] 37 Fuel prices + refuel receipt — CONFIRMED (the burn stays Kunos' — item 38 below; the overlay reads EVO's own fuel level from the documented graphics field (<c>fuel_liter_current_quantity</c>; the AC1 physics slot is a deprecated mirror) and prices the fill it detects: litres × the market's CR/L, charged in full so a short wallet goes into debt like Unity's <c>cash -= cost</c> (the fuel is already in the tank), a Free Tank Refill card makes it free, and the receipt prints the litres, the pump price, the paid amount and the station attendant's familiarity +1. The price is Unity's: 1.65 start, one uniform ±0.15 drift per game day at the midnight roll, clamped to 1.40–2.20, persisted in <c>fuel.json</c> so a restart continues the curve. The fill detector settles a run of rising samples after 1.5 s of stillness and re-primes on a reload/new track/car change. The top-ups EVO makes on load, restart and at the pit box are never billed: the graphics pit-box/pit-lane flags re-prime the detector, and a fill only counts after the car has driven <c>MinDriveBeforeFillMetres</c> away from the spawn (the temporary freeroam map can spawn a fresh tank). The introduction drives stay free. Data: <c>Data/fuel_rules.json</c>)
-- [ ] 38 Fuel-out stranding + roadside refuel — PENDING/CONDITIONAL (implement depending on Kunos)
+- [x] 38 Fuel-out stranding + roadside refuel — CONFIRMED (landed: a live run-dry edge opens Unity's RepairScreen with the exact <c>Your car ran out of fuel.</c> line, the car, <c>Repair cost: CR…</c>, <c>Cash before: … | Cash after: …</c> and REPAIR; the bill is the full tank at today's market price plus the mechanic's CR100 service fee (Unity multiplied by the most expensive station's <c>priceMultiplier</c>; this port has one market price for every forecourt, so that factor is 1), charged in full so a short wallet goes into debt, and a Free Car Repair card covers it. REPAIR fails the interrupted ride or delivery with Unity's consequences — customer/hub owner −1, freight lost, Delivery Insurance Shield refunded — and shows the exact <c>Your Delivery Insurance Shield refunded the invested CR.</c> note. The live page only fires on a reading that falls from above zero, never on an app reload or a stop at the pump; the introduction drives stay free. EVO's tank is read-only, so the repair prepays the next fill for that car instead of writing the level: the paid litres ride <c>fuel.json</c>, the next station fill bills only the litres beyond them and prints the prepaid row, and a load/restart/pit top-up realises (clears) the credit rather than paying for a second tank. A parked dry tank at session start gets Unity's map fallback instead: <c>CALL ROAD SERVICE (300 CR)</c> / <c>NEED 300 CR FOR ROAD SERVICE</c> on the jobs page, which charges the flat fee, prepays a full tank, fails a live taxi ride and disappears once paid. Data: <c>Data/fuel_rules.json</c> (service fees))
 - [x] 39 Mechanical breakdown session — CONFIRMED
 - [-] 40 Accidents (damage roll / payout cut) — DECLINED as a random roll (ACE owns collisions); the ACE collision damage itself now prices a body repair: a hit banks a twentieth of impact speed ÷ car top speed × car value (a top-speed impact costs 5% of the car, twenty unrepaired ones total it), banked per car and covered 90% by insurance. A crash during a taxi ride or a delivery run ends that job on the spot (no fare, no receipt) and costs the customer one friendship; the companion then offers REPAIR THE CAR, which takes the bill, banks the insured share for the broker and returns the main page
 - [x] 41 Police patrols + fines — CONFIRMED
@@ -159,6 +159,7 @@ Confirmed list will grow below as you approve.
 - 33 Dirt/filth + car wash
 - 34 Insurance + broker + cargo cover
 - 35 Brand systems
+- 38 Fuel-out stranding + roadside refuel
 - 39 Mechanical breakdown session
 - 41 Police patrols + fines
 - 42 Protective consumables
@@ -178,7 +179,6 @@ Confirmed list will grow below as you approve.
 - 61 Reward catalog + glovebox cards + name pools
 
 ## CONDITIONAL / TBD (depends on Kunos free-roam)
-- 38 Fuel-out stranding + roadside refuel
 - 51 Persistent save + migration + glovebox/trunk
 
 ## DECLINED (use ACEVO/Kunos native)

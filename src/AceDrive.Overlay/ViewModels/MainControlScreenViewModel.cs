@@ -93,6 +93,10 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     private readonly ICommand _backCommand;
     private readonly ICommand _deliverCarePackages;
     private readonly Func<bool> _canDeliverCarePackages;
+    // The stranded band (PORTPLAN 38): the command and the cached visible/
+    // label/affordable reading the fuel flow publishes.
+    private readonly ICommand _roadServiceCommand;
+    private readonly Func<RoadServiceOffer> _roadServiceOffer;
 
     // The police button's own name, whatever the toast currently prints: the
     // voice entry keys off this and the hold restores it, so the swap never
@@ -112,6 +116,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     private bool? _deliveryOffered;
     private bool? _shiftOffered;
     private bool? _careDeliveryOffered;
+    private bool _roadServiceOffered;
+    private string _roadServiceLabel = string.Empty;
     private int _todoVersion = -1;
     private int _carePackageCount = -1;
     // The clock header's own guards, so a new game minute never re-formats the
@@ -133,9 +139,12 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         _backCommand = back;
         _deliverCarePackages = actions.DeliverCarePackages;
         _canDeliverCarePackages = actions.CanDeliverCarePackages;
+        _roadServiceCommand = actions.RoadService;
+        _roadServiceOffer = actions.RoadServiceOffer;
         TaxiCommand = actions.Taxi;
         DeliveryCommand = actions.Delivery;
         HaulCommand = actions.Haul;
+        RoadServiceCommand = actions.RoadService;
         PoliceCommand = new RelayCommand(ShowComingSoon);
         BackCommand = new RelayCommand(Back);
         DeliveryLabel = Strings.Get("ControlDelivery");
@@ -211,6 +220,16 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     public string PoliceLabel { get => _policeLabel; private set => SetField(ref _policeLabel, value); }
     private string _policeLabel = "";
 
+    /// <summary>The stranded band's text: Unity's CALL ROAD SERVICE (300 CR),
+    /// or the NEED 300 CR refusal when the wallet is short.</summary>
+    public string RoadServiceLabel { get => _roadServiceLabel; private set => SetField(ref _roadServiceLabel, value); }
+
+    /// <summary>True while the car sits dry with no prepaid fill.</summary>
+    public bool ShowRoadService { get => _showRoadService; private set => SetField(ref _showRoadService, value); }
+    private bool _showRoadService;
+
+    public ICommand RoadServiceCommand { get; }
+
     public ICommand TaxiCommand { get; }
     public ICommand DeliveryCommand { get; }
     public ICommand HaulCommand { get; }
@@ -238,6 +257,10 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
     /// <summary>Teal-glow acknowledgment for a spoken police tap.</summary>
     public bool PoliceFlash { get => _policeFlash; private set => SetField(ref _policeFlash, value); }
     private bool _policeFlash;
+
+    /// <summary>Teal-glow acknowledgment for a spoken road-service tap.</summary>
+    public bool RoadServiceFlash { get => _roadServiceFlash; private set => SetField(ref _roadServiceFlash, value); }
+    private bool _roadServiceFlash;
 
     /// <summary>Teal-glow acknowledgment for the navigating BACK tap.</summary>
     public bool BackFlash { get => _backFlash; private set => SetField(ref _backFlash, value); }
@@ -272,10 +295,13 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         bool shiftStarted = _shift.IsStarted;
         int careCount = _todos.CarePackageCount;
         bool careOffered = _canDeliverCarePackages();
+        RoadServiceOffer road = _roadServiceOffer();
         if (deliveryOpen == _deliveryOffered
             && shiftStarted == _shiftOffered
             && careCount == _carePackageCount
             && careOffered == _careDeliveryOffered
+            && road.Visible == _roadServiceOffered
+            && road.Label == _roadServiceLabel
             && _todos.Version == _todoVersion)
         {
             return;
@@ -284,6 +310,8 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         _shiftOffered = shiftStarted;
         _carePackageCount = careCount;
         _careDeliveryOffered = careOffered;
+        _roadServiceOffered = road.Visible;
+        _roadServiceLabel = road.Label;
         _todoVersion = _todos.Version;
 
         TodoLines = BuildLines(_todos.Slots, numbered: false);
@@ -293,6 +321,11 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         CarePackageCountLine = careOffered
             ? Strings.Format("TodoCarePackageCount", careCount)
             : string.Empty;
+        ShowRoadService = road.Visible;
+        RoadServiceLabel = road.Label;
+        // The command's own CanExecute reads the live fuel state; WPF only
+        // re-queries on this event, so the short-wallet milestone must raise it.
+        (_roadServiceCommand as RelayCommand)?.RaiseCanExecuteChanged();
         SyncTaxiLabel();
         RebuildVoice();
     }
@@ -359,6 +392,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         Action taxi = () => FireVoice("taxi", TaxiCommand);
         Action haul = () => FireVoice("haul", HaulCommand);
         Action police = () => FireVoice("police", PoliceCommand);
+        Action roadService = () => FireVoice("roadservice", _roadServiceCommand);
         var actions = new Dictionary<string, Action>
         {
             [ShiftLabel(started: false)] = taxi,
@@ -382,6 +416,12 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
             // DELIVER CARE PACKAGES is a utility tap, not a navigation: it acts
             // at once like a click.
             actions[Strings.Get("TodoDeliver")] = () => _deliverCarePackages.Execute(null);
+        }
+        if (ShowRoadService && _roadServiceCommand.CanExecute(null))
+        {
+            // The stranded band's one action; the label is the visible text, so
+            // the mic answers the same words the player reads.
+            actions[RoadServiceLabel] = roadService;
         }
         foreach (string keyword in TaxiKeywords)
         {
@@ -449,6 +489,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         DeliveryFlash = target == "delivery";
         HaulFlash = target == "haul";
         PoliceFlash = target == "police";
+        RoadServiceFlash = target == "roadservice";
         _flashTarget = target;
         _flashUntil = _beat.Deadline();
     }
@@ -517,6 +558,7 @@ public sealed class MainControlScreenViewModel : ViewModelBase, IVoiceScreen
         DeliveryFlash = false;
         HaulFlash = false;
         PoliceFlash = false;
+        RoadServiceFlash = false;
         BackFlash = false;
     }
 }

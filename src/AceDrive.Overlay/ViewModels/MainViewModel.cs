@@ -193,6 +193,10 @@ public sealed class MainViewModel
     // the companion while driving, so it rides slightly longer than a refusal.
     private const double PancakeNoticeSec = 8.0;
 
+    // A roadside repair's reward-card refund is a second sentence after the
+    // page closes, so it gets the same long read as the pancake nudge.
+    private const double FuelNoticeSec = 8.0;
+
     private bool _resizing;
     private readonly DispatcherTimer _timer;
     private DateTime _lastTick;
@@ -577,6 +581,38 @@ public sealed class MainViewModel
         _todos.Sync();
     }
     void IFuelHost.ResumeAfterFuelReceipt() => _panel.ResumeInterrupted();
+    // The host slice the dry tank sees (PORTPLAN 38): the repair page is the
+    // same kind of event as a fill (the player did not ask for it), so it
+    // interrupts the page that was up and REPAIR hands it back. What the dry
+    // tank interrupted — a ride or a delivery — is failed here, because the
+    // two flows and the card that refunds the cargo live on the coordinator.
+    void IFuelHost.ShowFuelOut(object page) =>
+        _panel.PresentInterruption(page, "fuel out");
+    void IFuelHost.FailJobForFuelOut()
+    {
+        if (_taxi.FailForRoadService() is { } customer)
+        {
+            _log.LogWarning($"[FuelOut] taxi ride cut: {customer} friendship -1");
+            return;
+        }
+
+        if (_delivery.FailForRoadService() is { } invested)
+        {
+            // Delivery Insurance Shield: one glovebox card refunds the CR
+            // invested in the lost cargo (Unity's FailJobOnFuelOut branch).
+            if (invested > 0.0
+                && _glovebox.TryConsume(RewardCardEffect.DeliveryInsurance, _trunk))
+            {
+                _wallet.AddSale(invested);
+                _hud?.ShowNotice(
+                    Strings.Get("FuelOutInsuranceRefund"),
+                    TimeSpan.FromSeconds(FuelNoticeSec));
+            }
+            _log.LogWarning(
+                $"[FuelOut] delivery cut: CR {invested:0.00} cargo lost");
+        }
+    }
+    void IFuelHost.ResumeAfterFuelOut() => _panel.ResumeInterrupted();
     // The host slice the Cento Miglia entry sees: the flow owns the phases, the
     // registration check and the reputation ticker; the shell owns the panel,
     // the companion's line and the settle that prices the receipt.

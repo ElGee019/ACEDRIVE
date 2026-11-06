@@ -248,7 +248,16 @@ public sealed class DeliveryFlow
     /// without a receipt. Returns the CR invested in the goods (null when no
     /// run was live) so the caller can price the insurance refund.
     /// </summary>
-    public double? FailForAccident(bool shielded = false)
+    public double? FailForAccident(bool shielded = false) => Fail("accident", shielded);
+
+    /// <summary>
+    /// The dry tank that ends a run (Unity's FailJobOnFuelOut delivery branch):
+    /// the cargo is lost and every producing hub's owner loses one familiarity.
+    /// Returns the CR invested in the goods, or null when no run was live.
+    /// </summary>
+    public double? FailForRoadService() => Fail("road service", shielded: false);
+
+    private double? Fail(string reason, bool shielded)
     {
         if (_job is not { IsComplete: false } run)
         {
@@ -264,7 +273,7 @@ public sealed class DeliveryFlow
         }
 
         double invested = run.Run.PaidForGoods;
-        _log.LogWarning($"delivery run ended by accident: {run.Run.Orders.Count} stores lost, " +
+        _log.LogWarning($"delivery run ended by {reason}: {run.Run.Orders.Count} stores lost, " +
             $"€{invested:0.00} cargo, " +
             $"friendship {(shielded ? "kept (shield)" : "-1 per hub owner")}");
         // Stop drops the run and the companion's leg; the shells' saves follow

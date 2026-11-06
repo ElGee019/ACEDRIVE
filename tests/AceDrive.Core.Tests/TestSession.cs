@@ -383,7 +383,7 @@ internal static class TestSession
             deliveryCareer, cityInstance, employeeRoster, employeeJobs,
             employeeAssignments, carShareJobs, carShareRequests,
             employeeRides, employeeDeliveries, employeeDeliveryPayout,
-            taxi, delivery, haul, poiWorld, dayCycle,
+            taxi, delivery, fuel, haul, poiWorld, dayCycle,
             zoneInstance, options.CentoTiers ?? [],
             map, () => profiles.Load()?.StreetId, cento, valuationFlow,
             willyFlow, pancakesFlow, careFlow, roadTestFlow, touristenFlow,

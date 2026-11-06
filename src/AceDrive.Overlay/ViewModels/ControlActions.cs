@@ -12,4 +12,6 @@ public sealed record ControlActions(
     ICommand Delivery,
     ICommand Haul,
     ICommand DeliverCarePackages,
-    Func<bool> CanDeliverCarePackages);
+    Func<bool> CanDeliverCarePackages,
+    ICommand RoadService,
+    Func<RoadServiceOffer> RoadServiceOffer);

@@ -207,6 +207,11 @@ Bijvoorbeeld "{0}".</value></data>
        terug. -->
   <data name="ControlPolice" xml:space="preserve"><value>POLITIE</value></data>
   <data name="ControlPoliceSoon" xml:space="preserve"><value>BINNENKORT</value></data>
+  <!-- Pechdienst (PORTPLAN 38, Unity MapScreen): een vast bedrag dat een volle
+       tank vooruitbetaalt wanneer de auto bij de start van een sessie leegstaat.
+       Het label wisselt naar de weigering als het geld niet volstaat. -->
+  <data name="ControlRoadService" xml:space="preserve"><value>PECHDIENST BELLEN ({0:0} CR)</value></data>
+  <data name="ControlRoadServiceNoCash" xml:space="preserve"><value>NOG {0:0} CR NODIG VOOR PECHDIENST</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>KLUSSEN</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TAKENLIJST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
@@ -425,6 +430,19 @@ Deze klus aannemen?</value></data>
   <data name="FuelReceiptPrice" xml:space="preserve"><value>Brandstofprijs: €{0:0.00}/L</value></data>
   <data name="FuelReceiptPaid" xml:space="preserve"><value>Betaald: €{0:0.00}</value></data>
   <data name="FuelReceiptFree" xml:space="preserve"><value>Gratis Tankbeurt-kaart gebruikt — deze keer niets betaald.</value></data>
+  <!-- Reparatiescherm na een lege tank (PORTPLAN 38, Unity RepairScreen via
+       MapScreen.OnFuelOutDetected): de droge-tankzin, de rekening van de
+       monteur (volle tank aan de pompprijs plus CR100), contant voor/na en de
+       REPAREREN-knop. De vooruitbetaalde regel legt uit waarom een later
+       pompbezoek gratis is. -->
+  <data name="FuelOutTitle" xml:space="preserve"><value>REPAREREN</value></data>
+  <data name="FuelOutMessage" xml:space="preserve"><value>Je auto heeft geen brandstof meer.</value></data>
+  <data name="FuelOutRepairCost" xml:space="preserve"><value>Reparatiekosten: CR{0:0.00}</value></data>
+  <data name="FuelOutFreeRepair" xml:space="preserve"><value>Dankzij je beloning is deze reparatie gratis.</value></data>
+  <data name="FuelOutCash" xml:space="preserve"><value>Contant voor: CR{0:0.00} | Contant na: CR{1:0.00}</value></data>
+  <data name="FuelOutRepair" xml:space="preserve"><value>REPAREREN</value></data>
+  <data name="FuelOutPrepaid" xml:space="preserve"><value>Tankbeurt vooruitbetaald: {0:0.0} L</value></data>
+  <data name="FuelOutInsuranceRefund" xml:space="preserve"><value>Je Delivery Insurance Shield heeft de geïnvesteerde CR terugbetaald.</value></data>
   <data name="ShiftEndedTitle" xml:space="preserve"><value>DIENST VOORBIJ</value></data>
   <data name="ShiftEndedJobs" xml:space="preserve"><value>Afgeronde ritten: {0}</value></data>
   <data name="ShiftEndedEarnings" xml:space="preserve"><value>Totaal verdiend: €{0:0.00}</value></data>

@@ -267,6 +267,11 @@ For instance "{0}".</value></data>
        SOON line and restores it three seconds later. -->
   <data name="ControlPolice" xml:space="preserve"><value>POLICE</value></data>
   <data name="ControlPoliceSoon" xml:space="preserve"><value>COMING SOON</value></data>
+  <!-- Road service (PORTPLAN 38, Unity MapScreen's stranded button): a flat
+       charge that prepays a full tank when the car sits dry at the start of a
+       session. The label swaps to the refusal when the wallet is short. -->
+  <data name="ControlRoadService" xml:space="preserve"><value>CALL ROAD SERVICE ({0:0} CR)</value></data>
+  <data name="ControlRoadServiceNoCash" xml:space="preserve"><value>NEED {0:0} CR FOR ROAD SERVICE</value></data>
   <data name="ControlJobs" xml:space="preserve"><value>JOBS</value></data>
   <data name="ControlTodo" xml:space="preserve"><value>SONJA'S TODO LIST</value></data>
   <data name="ClockDate" xml:space="preserve"><value>{0} / WEEK {1}</value></data>
@@ -565,6 +570,20 @@ Accept this job?</value></data>
   <data name="FuelReceiptPrice" xml:space="preserve"><value>Fuel price: €{0:0.00}/L</value></data>
   <data name="FuelReceiptPaid" xml:space="preserve"><value>Paid: €{0:0.00}</value></data>
   <data name="FuelReceiptFree" xml:space="preserve"><value>Free Tank Refill card used — no charge this visit.</value></data>
+  <!-- Fuel-out repair page (PORTPLAN 38, Unity RepairScreen fed by
+       MapScreen.OnFuelOutDetected): the exact dry-tank sentence, the mechanic's
+       bill (a full tank at the pump price plus CR100), the cash before/after
+       line and the REPAIR button. The prepaid line explains why a later pump
+       visit is free. Placeholders survive translation; translators may reorder,
+       never remove. -->
+  <data name="FuelOutTitle" xml:space="preserve"><value>REPAIR</value></data>
+  <data name="FuelOutMessage" xml:space="preserve"><value>Your car ran out of fuel.</value></data>
+  <data name="FuelOutRepairCost" xml:space="preserve"><value>Repair cost: CR{0:0.00}</value></data>
+  <data name="FuelOutFreeRepair" xml:space="preserve"><value>Thanks to your reward, repair is free this time.</value></data>
+  <data name="FuelOutCash" xml:space="preserve"><value>Cash before: CR{0:0.00} | Cash after: CR{1:0.00}</value></data>
+  <data name="FuelOutRepair" xml:space="preserve"><value>REPAIR</value></data>
+  <data name="FuelOutPrepaid" xml:space="preserve"><value>Roadside refuel prepaid: {0:0.0} L</value></data>
+  <data name="FuelOutInsuranceRefund" xml:space="preserve"><value>Your Delivery Insurance Shield refunded the invested CR.</value></data>
   <!-- Shift-ended page (PORTPLAN 12, Unity ShiftEndedScreen): the shift that
        just timed out, its lifetime records and the best-single-shift world
        standings. {0} is the jobs / amount / minutes / ordinal, {1} the board

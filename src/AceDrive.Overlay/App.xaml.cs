@@ -726,7 +726,7 @@ public partial class App : Application, IDisposable
             employeeRoster, employeeJobs, employeeAssignments,
             carShareJobs, carShareRequests,
             employeeRides, employeeDeliveries, employeeDeliveryPayout,
-            taxi, delivery, haul, poiWorld, dayCycle, zone, centoTiers,
+            taxi, delivery, fuel, haul, poiWorld, dayCycle, zone, centoTiers,
             addressMap, () => profileStore.Load()?.StreetId, cento,
             valuationFlow, willyFlow, pancakesFlow, careFlow, roadTestFlow, touristen,
             weeklyEvents, calendarGate,

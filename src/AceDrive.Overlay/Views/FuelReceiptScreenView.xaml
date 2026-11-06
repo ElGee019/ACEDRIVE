@@ -25,6 +25,11 @@
             <TextBlock Text="{Binding FreeLine}" Foreground="#FF97EAD2" FontSize="14"
                        TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"
                        Visibility="{Binding HasFree, Converter={StaticResource BoolToVis}}"/>
+            <!-- The roadside repair already paid for these litres (PORTPLAN
+                 38): the pump bill is only the remainder. -->
+            <TextBlock Text="{Binding PrepaidLine}" Foreground="#FF97EAD2" FontSize="14"
+                       TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"
+                       Visibility="{Binding HasPrepaid, Converter={StaticResource BoolToVis}}"/>
             <TextBlock Text="{Binding FriendshipLine}" FontSize="14"
                        TextAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,8"
                        Visibility="{Binding HasFriendship, Converter={StaticResource BoolToVis}}">

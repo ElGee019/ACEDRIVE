@@ -38,7 +38,9 @@ public sealed class MainControlScreenTests
                 new RelayCommand(() => { }, () => deliveryOpen),
                 new RelayCommand(() => { }),
                 deliverCarePackages ?? new RelayCommand(() => { }),
-                () => canDeliverCarePackages),
+                () => canDeliverCarePackages,
+                new RelayCommand(() => { }),
+                () => RoadServiceOffer.Hidden),
             backCommand ?? new RelayCommand(() => { }),
             week);
     }
@@ -265,7 +267,9 @@ public sealed class MainControlScreenTests
                 new RelayCommand(() => fired = true),
                 new RelayCommand(() => { }),
                 new RelayCommand(() => { }),
-                () => false),
+                () => false,
+                new RelayCommand(() => { }),
+                () => RoadServiceOffer.Hidden),
             new RelayCommand(() => { }),
             1);
 

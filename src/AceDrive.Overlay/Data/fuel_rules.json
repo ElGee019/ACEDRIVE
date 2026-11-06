@@ -7,5 +7,7 @@
   "MinFillLitres": 0.5,
   "SettleSeconds": 1.5,
   "MinDriveBeforeFillMetres": 100.0,
-  "OwnerName": "Rolf Brenner"
+  "OwnerName": "Rolf Brenner",
+  "OutOfFuelServiceFee": 100.0,
+  "RoadServiceFee": 300.0
 }

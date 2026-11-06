@@ -5,10 +5,12 @@
 namespace AceDrive.Core;
 
 /// <summary>
-/// The pump's balance table (PORTPLAN item 37): the starting CR/L, the daily
-/// drift window, the clamp band, the owner a fill makes friends with, and the
-/// two readings that tell a fill apart from a torn frame. Unity's shipped
-/// numbers (PlayerDefaults.fuelPrice 1.65, GameTimeConfigSO −0.15..+0.15 and
+/// The pump's balance table (PORTPLAN items 37/38): the starting CR/L, the
+/// daily drift window, the clamp band, the owner a fill makes friends with,
+/// the two readings that tell a fill apart from a torn frame, and the two
+/// roadside charges Unity hardcodes (the mechanic's CR100 service fee on a
+/// dry tank and the CR300 road service). Unity's shipped numbers
+/// (PlayerDefaults.fuelPrice 1.65, GameTimeConfigSO −0.15..+0.15 and
 /// 1.40..2.20) are the defaults; Data/fuel_rules.json overrides them.
 /// </summary>
 public sealed record FuelRules(
@@ -20,7 +22,9 @@ public sealed record FuelRules(
     double MinFillLitres,
     double SettleSeconds,
     double MinDriveBeforeFillMetres,
-    string OwnerName)
+    string OwnerName,
+    double OutOfFuelServiceFee = 100.0,
+    double RoadServiceFee = 300.0)
 {
     /// <summary>The test-shell fallback: Unity's shipped numbers and one
     /// station attendant who can still be named on a receipt.</summary>
@@ -37,7 +41,9 @@ public sealed record FuelRules(
         // must never be priced. A fill only counts after the player has driven
         // at least this far from the spawn/session baseline.
         MinDriveBeforeFillMetres: 100.0,
-        OwnerName: "Rolf Brenner");
+        OwnerName: "Rolf Brenner",
+        OutOfFuelServiceFee: 100.0,
+        RoadServiceFee: 300.0);
 
     /// <summary>The same clamp Unity's UpdateFuelPrice applies after every
     /// daily change, rounded to the CR cent the rest of the ledger uses.</summary>

@@ -341,7 +341,17 @@ public sealed class TaxiJobFlow
     /// <paramref name="shielded"/> is the Accident Loyalty Shield: the card was
     /// consumed by the caller, so the familiarity is left untouched.
     /// </summary>
-    public string? FailForAccident(bool shielded = false)
+    public string? FailForAccident(bool shielded = false) => Fail("accident", shielded);
+
+    /// <summary>
+    /// The dry tank that ends a ride (Unity's FailJobOnRoadService): the
+    /// customer loses one familiarity and the job is abandoned with no fare,
+    /// no tip and no receipt. Returns the customer's name, or null when no job
+    /// was live.
+    /// </summary>
+    public string? FailForRoadService() => Fail("road service", shielded: false);
+
+    private string? Fail(string reason, bool shielded)
     {
         if (!InProgress)
         {
@@ -353,7 +363,7 @@ public sealed class TaxiJobFlow
         {
             _friends.AddFamiliarity(customer, -1);
         }
-        _log.LogWarning($"taxi job ended by accident: {_job.Customer.Full} " +
+        _log.LogWarning($"taxi job ended by {reason}: {_job.Customer.Full} " +
             $"{_job.PickupName} -> {_job.DropoffName}, " +
             $"friendship {(shielded ? "kept (shield)" : "-1")}");
         // AbandonJob clears the request, the challenge and the companion line;
